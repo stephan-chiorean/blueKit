@@ -1,19 +1,9 @@
 import {
-  DrawerRoot,
-  DrawerBackdrop,
-  DrawerPositioner,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerCloseTrigger,
+  Box,
+  Heading,
   TreeView,
   createTreeCollection,
 } from '@chakra-ui/react';
-
-interface NavigationDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 interface TreeNode {
   id: string;
@@ -79,30 +69,31 @@ const TreeNode = (props: { node: TreeNode; indexPath: number[] }) => {
   );
 };
 
-export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerProps) {
+export default function NavigationSidebar() {
   // Create collection with root node - TreeView requires it
   const collection = createTreeCollection({
     rootNode: { id: 'root', name: 'root', children: treeData },
   });
 
   return (
-    <DrawerRoot open={isOpen} onOpenChange={(e) => !e.open && onClose()} placement="start">
-      <DrawerBackdrop />
-      <DrawerPositioner>
-        <DrawerContent>
-          <DrawerHeader>Navigation</DrawerHeader>
-          <DrawerCloseTrigger />
-          <DrawerBody>
-            <TreeView.Root collection={collection} defaultExpandedValue={[]}>
-              <TreeView.Tree>
-                {treeData.map((node, index) => (
-                  <TreeNode key={node.id} node={node} indexPath={[index]} />
-                ))}
-              </TreeView.Tree>
-            </TreeView.Root>
-          </DrawerBody>
-        </DrawerContent>
-      </DrawerPositioner>
-    </DrawerRoot>
+    <Box
+      width="250px"
+      minH="100vh"
+      bg="header.bg"
+      borderRightWidth="1px"
+      borderColor="border.subtle"
+      p={4}
+    >
+      <Heading size="sm" mb={4} color="fg.muted" fontWeight="medium">
+        Navigation
+      </Heading>
+      <TreeView.Root collection={collection} defaultExpandedValue={[]}>
+        <TreeView.Tree>
+          {treeData.map((node, index) => (
+            <TreeNode key={node.id} node={node} indexPath={[index]} />
+          ))}
+        </TreeView.Tree>
+      </TreeView.Root>
+    </Box>
   );
 }
