@@ -38,6 +38,7 @@ async fn main() {
             commands::ping,              // Simple ping/pong test command
             commands::get_app_info,      // Returns app metadata
             commands::example_error,      // Demonstrates error handling
+            commands::get_project_kits,  // Get kits from .bluekit directory
         ])
         // `.run()` actually starts the Tauri application
         // This is an async function, so we use `.await` to wait for it

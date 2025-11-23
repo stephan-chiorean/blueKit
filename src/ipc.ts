@@ -36,6 +36,18 @@ export interface AppInfo {
 }
 
 /**
+ * Type definition for a kit file returned by `get_project_kits`.
+ * 
+ * This interface must match the `KitFile` struct in `src-tauri/src/commands.rs`.
+ */
+export interface KitFile {
+  /** Name of the kit file (without .md extension) */
+  name: string;
+  /** Full path to the kit file */
+  path: string;
+}
+
+/**
  * Simple ping command to test IPC communication.
  * 
  * This is the simplest IPC command - it takes no parameters and returns a string.
@@ -102,6 +114,28 @@ export async function invokeExampleError(shouldFail: boolean): Promise<string> {
   // Commands can accept parameters by passing an object as the second argument
   // The keys must match the parameter names in the Rust function
   return await invoke<string>('example_error', { shouldFail });
+}
+
+/**
+ * Gets the list of kit files (.md files) from a project's .bluekit directory.
+ * 
+ * This command reads the .bluekit directory in the specified project path
+ * and returns a list of all .md files found there. Each .md file represents a kit.
+ * 
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to an array of KitFile objects
+ * 
+ * @example
+ * ```typescript
+ * const kits = await invokeGetProjectKits('/path/to/project');
+ * kits.forEach(kit => {
+ *   console.log(kit.name); // "my-kit" (without .md extension)
+ *   console.log(kit.path); // "/path/to/project/.bluekit/my-kit.md"
+ * });
+ * ```
+ */
+export async function invokeGetProjectKits(projectPath: string): Promise<KitFile[]> {
+  return await invoke<KitFile[]>('get_project_kits', { projectPath });
 }
 
 /**

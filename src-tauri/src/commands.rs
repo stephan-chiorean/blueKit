@@ -11,6 +11,7 @@
 /// 5. Can return data back to the frontend
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Response structure for the `get_app_info` command.
 /// 
@@ -131,6 +132,78 @@ pub async fn example_error(should_fail: bool) -> Result<String, String> {
         // Return success
         Ok("Success!".to_string())
     }
+}
+
+/// Kit file information structure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KitFile {
+    /// Name of the kit file (without .md extension)
+    pub name: String,
+    /// Full path to the kit file
+    pub path: String,
+}
+
+/// Reads the .bluekit directory and returns a list of .md files (kits).
+/// 
+/// # Arguments
+/// 
+/// * `project_path` - The path to the project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<Vec<KitFile>, String>` containing either:
+/// - `Ok(Vec<KitFile>)` - Success case with list of kit files
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, String> {
+    use std::fs;
+    
+    // Construct the path to .bluekit directory
+    let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
+    
+    // Check if .bluekit directory exists
+    if !bluekit_path.exists() {
+        return Ok(Vec::new()); // Return empty vector if directory doesn't exist
+    }
+    
+    // Read the directory
+    let entries = fs::read_dir(&bluekit_path)
+        .map_err(|e| format!("Failed to read .bluekit directory: {}", e))?;
+    
+    let mut kits = Vec::new();
+    
+    // Iterate through directory entries
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+        
+        // Check if it's a file and has .md extension
+        if path.is_file() {
+            if let Some(extension) = path.extension() {
+                if extension == "md" {
+                    // Get the file name without extension
+                    let name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    
+                    // Get the full path as a string
+                    let path_str = path
+                        .to_str()
+                        .ok_or_else(|| "Invalid path encoding".to_string())?
+                        .to_string();
+                    
+                    kits.push(KitFile {
+                        name,
+                        path: path_str,
+                    });
+                }
+            }
+        }
+    }
+    
+    Ok(kits)
 }
 
 // How to add a new command:

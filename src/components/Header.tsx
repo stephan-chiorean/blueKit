@@ -28,6 +28,8 @@ export default function Header() {
             <Input
               placeholder="Search..."
               variant="subtle"
+              borderWidth="1px"
+              borderColor="primary.300"
             />
           </InputGroup>
         </Box>
