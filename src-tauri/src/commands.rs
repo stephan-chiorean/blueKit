@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::env;
+use tauri::AppHandle;
 
 /// Response structure for the `get_app_info` command.
 /// 
@@ -268,6 +269,60 @@ pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
     
     eprintln!("Successfully parsed {} projects from registry", projects.len());
     Ok(projects)
+}
+
+/// Starts watching a project's .bluekit directory for kit file changes.
+/// 
+/// This command sets up a file watcher that monitors the .bluekit directory
+/// in the specified project path. When any .md file is added, modified, or
+/// removed, it emits a Tauri event that the frontend can listen to.
+/// 
+/// # Arguments
+/// 
+/// * `app_handle` - Tauri application handle (automatically provided)
+/// * `project_path` - The path to the project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// await invoke('watch_project_kits', { projectPath: '/path/to/project' });
+/// ```
+#[tauri::command]
+pub async fn watch_project_kits(
+    app_handle: AppHandle,
+    project_path: String,
+) -> Result<(), String> {
+    use crate::watcher;
+    
+    // Construct the path to .bluekit directory
+    let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
+    
+    // Generate a unique event name based on the project path
+    // Sanitize the path to create a valid event name
+    // Replace path separators and special characters with underscores
+    let sanitized_path: String = project_path
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '.' | ' ' => '_',
+            _ => c,
+        })
+        .collect();
+    let event_name = format!("project-kits-changed-{}", sanitized_path);
+    
+    // Start watching the directory
+    watcher::watch_directory(
+        app_handle,
+        bluekit_path,
+        event_name,
+    )?;
+    
+    Ok(())
 }
 
 // How to add a new command:

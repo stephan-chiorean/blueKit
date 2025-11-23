@@ -41,6 +41,7 @@ async fn main() {
             commands::example_error,      // Demonstrates error handling
             commands::get_project_kits,  // Get kits from .bluekit directory
             commands::get_project_registry, // Get projects from registry
+            commands::watch_project_kits, // Watch project .bluekit directory for changes
         ])
         .setup(|app| {
             // Set up file watcher for project registry

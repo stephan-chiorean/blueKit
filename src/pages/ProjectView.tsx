@@ -14,9 +14,10 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
+import { listen } from '@tauri-apps/api/event';
 import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import { invokeGetProjectKits, KitFile } from '../ipc';
+import { invokeGetProjectKits, invokeWatchProjectKits, KitFile } from '../ipc';
 
 interface ProjectData {
   id: string;
@@ -50,7 +51,45 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
       }
     };
 
+    // Load initial kits
     loadKits();
+
+    // Set up file watcher for this project
+    let unlistenFn: (() => void) | null = null;
+
+    const setupFileWatcher = async () => {
+      try {
+        // Start watching the project's .bluekit directory
+        await invokeWatchProjectKits(project.path);
+
+        // Generate the event name (must match the Rust code)
+        const sanitizedPath = project.path
+          .replace(/\//g, '_')
+          .replace(/\\/g, '_')
+          .replace(/:/g, '_')
+          .replace(/\./g, '_')
+          .replace(/ /g, '_');
+        const eventName = `project-kits-changed-${sanitizedPath}`;
+
+        // Listen for file change events
+        const unlisten = await listen(eventName, () => {
+          console.log('Kits directory changed, reloading...');
+          loadKits();
+        });
+        unlistenFn = unlisten;
+      } catch (error) {
+        console.error('Failed to set up file watcher:', error);
+      }
+    };
+
+    setupFileWatcher();
+
+    // Cleanup: unlisten when component unmounts
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
   }, [project.path]);
 
   return (

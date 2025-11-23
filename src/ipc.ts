@@ -176,6 +176,26 @@ export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
 }
 
 /**
+ * Starts watching a project's .bluekit directory for kit file changes.
+ * 
+ * This command sets up a file watcher that monitors the .bluekit directory
+ * in the specified project path. When any .md file is added, modified, or
+ * removed, it emits a Tauri event that the frontend can listen to.
+ * 
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves when the watcher is set up
+ * 
+ * @example
+ * ```typescript
+ * await invokeWatchProjectKits('/path/to/project');
+ * // Then listen for 'project-kits-changed' events
+ * ```
+ */
+export async function invokeWatchProjectKits(projectPath: string): Promise<void> {
+  return await invoke<void>('watch_project_kits', { projectPath });
+}
+
+/**
  * How to add a new IPC command:
  * 
  * 1. Add the command handler in `src-tauri/src/commands.rs`:

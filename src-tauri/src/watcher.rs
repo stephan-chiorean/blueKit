@@ -116,6 +116,82 @@ pub fn watch_file(
     Ok(())
 }
 
+/// Starts watching a directory for .md file changes and emits Tauri events.
+/// 
+/// This function watches a directory (typically a .bluekit directory) and emits
+/// events when any .md file is created, modified, or removed.
+/// 
+/// # Arguments
+/// 
+/// * `app_handle` - Tauri application handle for emitting events
+/// * `directory_path` - Path to the directory to watch
+/// * `event_name` - Name of the Tauri event to emit when files change
+/// 
+/// # Returns
+/// 
+/// A `Result<(), String>` indicating success or failure
+pub fn watch_directory(
+    app_handle: AppHandle,
+    directory_path: PathBuf,
+    event_name: String,
+) -> Result<(), String> {
+    // Create a channel for file system events
+    let (tx, rx) = mpsc::channel();
+    
+    // Create the directory if it doesn't exist (resilient to missing directories)
+    if !directory_path.exists() {
+        fs::create_dir_all(&directory_path)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+    
+    // Create the watcher
+    let mut watcher: RecommendedWatcher = Watcher::new(
+        tx,
+        notify::Config::default()
+    ).map_err(|e| format!("Failed to create file watcher: {}", e))?;
+    
+    // Start watching the directory (non-recursive)
+    watcher.watch(&directory_path, RecursiveMode::NonRecursive)
+        .map_err(|e| format!("Failed to start watching directory: {}", e))?;
+    
+    // Spawn a task to handle file system events
+    let app_handle_clone = app_handle.clone();
+    
+    tauri::async_runtime::spawn(async move {
+        // Keep watcher alive by moving it into the task
+        let _watcher = watcher;
+        
+        while let Ok(event) = rx.recv() {
+            match event {
+                Ok(Event { kind: EventKind::Modify(_), paths, .. }) |
+                Ok(Event { kind: EventKind::Create(_), paths, .. }) |
+                Ok(Event { kind: EventKind::Remove(_), paths, .. }) => {
+                    // Check if any of the changed files are .md files
+                    let has_md_file = paths.iter().any(|p| {
+                        p.extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| ext == "md")
+                            .unwrap_or(false)
+                    });
+                    
+                    if has_md_file {
+                        // Emit Tauri event to frontend
+                        app_handle_clone.emit_all(&event_name, ()).unwrap_or_else(|e| {
+                            eprintln!("Failed to emit directory change event: {}", e);
+                        });
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Directory watcher error: {}", e);
+                }
+                _ => {}
+            }
+        }
+    });
+    
+    Ok(())
+}
+
 /// Gets the path to the project registry file.
 pub fn get_registry_path() -> Result<PathBuf, String> {
     let home_dir = env::var("HOME")
