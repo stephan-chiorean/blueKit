@@ -12,9 +12,11 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { open } from '@tauri-apps/api/dialog';
+import { LuFolderOpen, LuPackage, LuFileText, LuBookOpen, LuLayers } from 'react-icons/lu';
 import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import ProjectDetailsModal from '../components/ProjectDetailsModal';
+import ConditionalTabContent from '../components/BaseTabContent';
 
 export interface ProjectData {
   id: string;
@@ -94,18 +96,17 @@ export default function HomePage({ onViewProject }: HomePageProps) {
             </Flex>
 
             <Tabs.Content value="projects">
-              <Flex justify="flex-end" mb={4}>
-                <Button onClick={handleLinkProject}>Link Project</Button>
-              </Flex>
-              {projects.length === 0 ? (
-                <Box
-                  textAlign="center"
-                  py={12}
-                  color="gray.500"
-                >
-                  No projects linked yet. Click "Link Project" to get started.
-                </Box>
-              ) : (
+              <ConditionalTabContent
+                hasDependency={projects.length > 0}
+                onSatisfyDependency={handleLinkProject}
+                emptyStateTitle="No projects linked yet"
+                emptyStateDescription="Link a project to get started and manage your blueKit projects."
+                emptyStateIcon={<LuFolderOpen />}
+                actionButtonText="Link Project"
+              >
+                <Flex justify="flex-end" mb={4}>
+                  <Button onClick={handleLinkProject}>Link Project</Button>
+                </Flex>
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
                   {projects.map((project) => (
                     <Card.Root key={project.id} variant="subtle">
@@ -137,19 +138,55 @@ export default function HomePage({ onViewProject }: HomePageProps) {
                     </Card.Root>
                   ))}
                 </SimpleGrid>
-              )}
+              </ConditionalTabContent>
             </Tabs.Content>
             <Tabs.Content value="kits">
-              <Box>Kits Content</Box>
+              <ConditionalTabContent
+                hasDependency={projects.length > 0}
+                onSatisfyDependency={handleLinkProject}
+                emptyStateTitle="No kits available"
+                emptyStateDescription="Link a project to discover and use kits from your .bluekit directory."
+                emptyStateIcon={<LuPackage />}
+                actionButtonText="Link Project"
+              >
+                <Box>Kits Content</Box>
+              </ConditionalTabContent>
             </Tabs.Content>
             <Tabs.Content value="blueprints">
-              <Box>Blueprints Content</Box>
+              <ConditionalTabContent
+                hasDependency={projects.length > 0}
+                onSatisfyDependency={handleLinkProject}
+                emptyStateTitle="No blueprints available"
+                emptyStateDescription="Link a project to access and manage blueprints."
+                emptyStateIcon={<LuFileText />}
+                actionButtonText="Link Project"
+              >
+                <Box>Blueprints Content</Box>
+              </ConditionalTabContent>
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
-              <Box>Walkthroughs Content</Box>
+              <ConditionalTabContent
+                hasDependency={projects.length > 0}
+                onSatisfyDependency={handleLinkProject}
+                emptyStateTitle="No walkthroughs available"
+                emptyStateDescription="Link a project to access walkthroughs and guides."
+                emptyStateIcon={<LuBookOpen />}
+                actionButtonText="Link Project"
+              >
+                <Box>Walkthroughs Content</Box>
+              </ConditionalTabContent>
             </Tabs.Content>
             <Tabs.Content value="collections">
-              <Box>Collections Content</Box>
+              <ConditionalTabContent
+                hasDependency={projects.length > 0}
+                onSatisfyDependency={handleLinkProject}
+                emptyStateTitle="No collections available"
+                emptyStateDescription="Link a project to browse and organize collections."
+                emptyStateIcon={<LuLayers />}
+                actionButtonText="Link Project"
+              >
+                <Box>Collections Content</Box>
+              </ConditionalTabContent>
             </Tabs.Content>
           </Tabs.Root>
         </Box>
