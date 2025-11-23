@@ -154,7 +154,7 @@ export default function HomePage({ onViewProject }: HomePageProps) {
                 </ConditionalTabContent>
               ) : (
                 <>
-                  <Flex justify="flex-end" mb={4}>
+                  <Flex justify="flex-start" mb={4}>
                     <Button onClick={handleLinkProject}>Link Project</Button>
                   </Flex>
                   <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
@@ -170,7 +170,7 @@ export default function HomePage({ onViewProject }: HomePageProps) {
                           <Box mb={4} fontSize="sm" color="gray.500">
                             {project.path}
                           </Box>
-                          <Flex gap={2}>
+                          <Flex gap={2} justify="flex-end">
                             <Button
                               size="sm"
                               variant="subtle"

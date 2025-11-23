@@ -12,12 +12,17 @@ import {
   VStack,
   Text,
   HStack,
+  Breadcrumb,
+  HoverCard,
+  Tag,
+  Stack,
+  Portal,
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
 import { listen } from '@tauri-apps/api/event';
 import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
-import Header from '../components/Header';
 import { invokeGetProjectKits, invokeWatchProjectKits, KitFile } from '../ipc';
+import { useSelection } from '../contexts/SelectionContext';
 
 interface ProjectData {
   id: string;
@@ -35,6 +40,12 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
   const [kits, setKits] = useState<KitFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { selectedItems, toggleItem, isSelected, hasSelection } = useSelection();
+
+  // Debug: Log when selectedItems changes
+  useEffect(() => {
+    console.log('[ProjectView] selectedItems changed:', selectedItems);
+  }, [selectedItems]);
 
   useEffect(() => {
     const loadKits = async () => {
@@ -92,36 +103,98 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
     };
   }, [project.path]);
 
+  const handleKitToggle = (kit: KitFile) => {
+    console.log('[ProjectView] handleKitToggle called for kit:', kit);
+    console.log('[ProjectView] Current selectedItems:', selectedItems);
+    const itemToToggle = {
+      id: kit.path,
+      name: kit.name,
+      type: 'Kit' as const,
+      path: kit.path,
+    };
+    console.log('[ProjectView] Toggling item:', itemToToggle);
+    toggleItem(itemToToggle);
+  };
+
+  const selectedCount = selectedItems.length;
+  console.log('[ProjectView] Render - selectedCount:', selectedCount, 'selectedItems:', selectedItems);
+
   return (
     <Box position="relative" minH="100vh" bg="main.bg">
       <VStack align="stretch" gap={0}>
-        <Header />
-        
         <Box flex="1" p={6} position="relative">
           <NavigationMenu>
             {({ onOpen }) => <MenuButton onClick={onOpen} />}
           </NavigationMenu>
-          <Flex align="center" gap={4} mb={6}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-            >
-              <HStack gap={2}>
-                <LuArrowLeft />
-                <Text>Back</Text>
-              </HStack>
-            </Button>
-            <Heading size="lg">{project.title}</Heading>
-          </Flex>
+          <Breadcrumb.Root mb={6}>
+            <Breadcrumb.List>
+              <Breadcrumb.Item>
+                <Breadcrumb.Link as="button" onClick={onBack}>
+                  Projects
+                </Breadcrumb.Link>
+              </Breadcrumb.Item>
+              <Breadcrumb.Separator />
+              <Breadcrumb.Item>
+                <Breadcrumb.CurrentLink>{project.title}</Breadcrumb.CurrentLink>
+              </Breadcrumb.Item>
+            </Breadcrumb.List>
+          </Breadcrumb.Root>
 
           <Tabs.Root defaultValue="kits" variant="enclosed">
-            <Flex justify="center" mb={6}>
-              <Tabs.List>
-                <Tabs.Trigger value="kits">Kits</Tabs.Trigger>
-                <Tabs.Trigger value="blueprints">Blueprints</Tabs.Trigger>
-                <Tabs.Trigger value="configuration">Configuration</Tabs.Trigger>
-              </Tabs.List>
+            <Flex align="center" gap={4} mb={6} position="relative" w="100%">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+              >
+                <HStack gap={2}>
+                  <LuArrowLeft />
+                  <Text>Back</Text>
+                </HStack>
+              </Button>
+              <Box 
+                position="absolute" 
+                left="50%" 
+                style={{ transform: 'translateX(-50%)' }}
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value="kits">Kits</Tabs.Trigger>
+                  <Tabs.Trigger value="blueprints">Blueprints</Tabs.Trigger>
+                  <Tabs.Trigger value="configuration">Configuration</Tabs.Trigger>
+                </Tabs.List>
+              </Box>
+              {hasSelection && (
+                <Box position="absolute" right={0}>
+                  <HoverCard.Root size="sm">
+                    <HoverCard.Trigger asChild>
+                      <Button variant="subtle" size="sm">
+                        Show Selected ({selectedCount})
+                      </Button>
+                    </HoverCard.Trigger>
+                    <Portal>
+                      <HoverCard.Positioner>
+                        <HoverCard.Content maxW="300px">
+                          <Stack gap={3}>
+                            <Text fontWeight="semibold" fontSize="sm">
+                              Selected Items
+                            </Text>
+                            <Stack gap={2}>
+                              {selectedItems.map((item) => (
+                                <Flex key={item.id} align="center" justify="space-between" gap={2}>
+                                  <Text fontSize="sm">{item.name}</Text>
+                                  <Tag.Root size="sm" variant="subtle">
+                                    <Tag.Label>{item.type}</Tag.Label>
+                                  </Tag.Root>
+                                </Flex>
+                              ))}
+                            </Stack>
+                          </Stack>
+                        </HoverCard.Content>
+                      </HoverCard.Positioner>
+                    </Portal>
+                  </HoverCard.Root>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="kits">
@@ -138,28 +211,45 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
                   No kits found in .bluekit directory.
                 </Box>
               ) : (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                  {kits.map((kit) => (
-                    <Card.Root key={kit.path} variant="subtle">
-                      <CardHeader>
-                        <Heading size="md">{kit.name}</Heading>
-                      </CardHeader>
-                      <CardBody>
-                        <Text fontSize="sm" color="gray.500" mb={4}>
-                          {kit.path}
-                        </Text>
-                        <Flex gap={2}>
-                          <Button size="sm" variant="subtle">
-                            View
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            Use
-                          </Button>
-                        </Flex>
-                      </CardBody>
-                    </Card.Root>
-                  ))}
-                </SimpleGrid>
+                <>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+                    {kits.map((kit) => {
+                      const kitSelected = isSelected(kit.path);
+                      console.log('[ProjectView] Kit:', kit.name, 'path:', kit.path, 'isSelected:', kitSelected);
+                      return (
+                        <Card.Root 
+                          key={kit.path} 
+                          variant="subtle"
+                          borderWidth={kitSelected ? "2px" : "1px"}
+                          borderColor={kitSelected ? "primary.500" : "border.subtle"}
+                          bg={kitSelected ? "blue.50" : undefined}
+                        >
+                          <CardHeader>
+                            <Heading size="md">{kit.name}</Heading>
+                          </CardHeader>
+                          <CardBody>
+                            <Text fontSize="sm" color="gray.500" mb={4}>
+                              {kit.path}
+                            </Text>
+                            <Flex gap={2} justify="flex-end">
+                              <Button size="sm" variant="subtle">
+                                View
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant={kitSelected ? "solid" : "outline"}
+                                colorPalette={kitSelected ? "primary" : undefined}
+                                onClick={() => handleKitToggle(kit)}
+                              >
+                                {kitSelected ? "Selected" : "Select"}
+                              </Button>
+                            </Flex>
+                          </CardBody>
+                        </Card.Root>
+                      );
+                    })}
+                  </SimpleGrid>
+                </>
               )}
             </Tabs.Content>
             <Tabs.Content value="blueprints">

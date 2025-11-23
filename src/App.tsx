@@ -2,6 +2,8 @@ import { useState } from 'react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectView from './pages/ProjectView';
+import { SelectionProvider } from './contexts/SelectionContext';
+import GlobalActionBar from './components/GlobalActionBar';
 
 interface ProjectData {
   id: string;
@@ -30,15 +32,18 @@ function App() {
     setSelectedProject(null);
   };
 
-  if (currentView === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleGetStarted} />;
-  }
-
-  if (currentView === 'project' && selectedProject) {
-    return <ProjectView project={selectedProject} onBack={handleBackToHome} />;
-  }
-
-  return <HomePage onViewProject={handleViewProject} />;
+  return (
+    <SelectionProvider>
+      {currentView === 'welcome' ? (
+        <WelcomeScreen onGetStarted={handleGetStarted} />
+      ) : currentView === 'project' && selectedProject ? (
+        <ProjectView project={selectedProject} onBack={handleBackToHome} />
+      ) : (
+        <HomePage onViewProject={handleViewProject} />
+      )}
+      <GlobalActionBar />
+    </SelectionProvider>
+  );
 }
 
 export default App;

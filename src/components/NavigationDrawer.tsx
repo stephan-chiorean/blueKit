@@ -23,7 +23,7 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
       {children?.({ isOpen, onOpen: () => setIsOpen(true) })}
 
       {/* Drawer with navigation menu */}
-      <Drawer.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} placement="start">
+      <Drawer.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} placement="end">
         <Portal>
           <Drawer.Backdrop />
           <Drawer.Positioner>
@@ -69,7 +69,7 @@ export function MenuButton({ onClick }: { onClick: () => void }) {
       _hover={{ bg: 'transparent', opacity: 0.7 }}
       position="absolute"
       top={4}
-      left={4}
+      right={4}
       zIndex={10}
     >
       <LuMenu />
