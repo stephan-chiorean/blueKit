@@ -12,6 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::env;
 
 /// Response structure for the `get_app_info` command.
 /// 
@@ -204,6 +205,69 @@ pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, Stri
     }
     
     Ok(kits)
+}
+
+/// Project registry entry structure.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProjectEntry {
+    /// Unique identifier for the project
+    pub id: String,
+    /// Project title/name
+    pub title: String,
+    /// Project description
+    pub description: String,
+    /// Absolute path to the project directory
+    pub path: String,
+}
+
+/// Reads the project registry from ~/.bluekit/projectRegistry.json.
+/// 
+/// # Returns
+/// 
+/// A `Result<Vec<ProjectEntry>, String>` containing either:
+/// - `Ok(Vec<ProjectEntry>)` - Success case with list of projects
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
+    use std::fs;
+    
+    // Get home directory
+    let home_dir = env::var("HOME")
+        .or_else(|_| env::var("USERPROFILE")) // Windows fallback
+        .map_err(|_| "Could not determine home directory".to_string())?;
+    
+    // Construct path to project registry
+    let registry_path = PathBuf::from(&home_dir)
+        .join(".bluekit")
+        .join("projectRegistry.json");
+    
+    // Check if registry file exists
+    if !registry_path.exists() {
+        eprintln!("Project registry file does not exist: {:?}", registry_path);
+        return Ok(Vec::new()); // Return empty vector if file doesn't exist
+    }
+    
+    // Read the file
+    let contents = fs::read_to_string(&registry_path)
+        .map_err(|e| format!("Failed to read project registry: {}", e))?;
+    
+    // Handle empty file
+    if contents.trim().is_empty() {
+        eprintln!("Project registry file is empty");
+        return Ok(Vec::new());
+    }
+    
+    eprintln!("Read project registry file, contents length: {}", contents.len());
+    
+    // Parse JSON
+    let projects: Vec<ProjectEntry> = serde_json::from_str(&contents)
+        .map_err(|e| {
+            eprintln!("Failed to parse project registry JSON. Content: {}", contents);
+            format!("Failed to parse project registry JSON: {}", e)
+        })?;
+    
+    eprintln!("Successfully parsed {} projects from registry", projects.len());
+    Ok(projects)
 }
 
 // How to add a new command:

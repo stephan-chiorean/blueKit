@@ -7,6 +7,7 @@
 mod commands; // IPC command handlers
 mod state;    // Application state management
 mod utils;    // Utility functions
+mod watcher;  // File watching functionality
 
 // Import statements: bring items from other modules into scope
 // `use` statements allow us to reference items without their full path
@@ -39,7 +40,22 @@ async fn main() {
             commands::get_app_info,      // Returns app metadata
             commands::example_error,      // Demonstrates error handling
             commands::get_project_kits,  // Get kits from .bluekit directory
+            commands::get_project_registry, // Get projects from registry
         ])
+        .setup(|app| {
+            // Set up file watcher for project registry
+            let app_handle = app.handle();
+            if let Ok(registry_path) = watcher::get_registry_path() {
+                if let Err(e) = watcher::watch_file(
+                    app_handle.clone(),
+                    registry_path,
+                    "project-registry-changed".to_string(),
+                ) {
+                    eprintln!("Failed to start file watcher: {}", e);
+                }
+            }
+            Ok(())
+        })
         // `.run()` actually starts the Tauri application
         // This is an async function, so we use `.await` to wait for it
         // If there's an error, `expect()` will panic with the provided message

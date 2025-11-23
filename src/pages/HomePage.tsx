@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -12,18 +12,15 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { open } from '@tauri-apps/api/dialog';
+import { listen } from '@tauri-apps/api/event';
 import { LuFolderOpen, LuPackage, LuFileText, LuBookOpen, LuLayers } from 'react-icons/lu';
 import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import ProjectDetailsModal from '../components/ProjectDetailsModal';
 import ConditionalTabContent from '../components/BaseTabContent';
+import { invokeGetProjectRegistry, ProjectEntry } from '../ipc';
 
-export interface ProjectData {
-  id: string;
-  title: string;
-  description: string;
-  path: string;
-}
+export type ProjectData = ProjectEntry;
 
 interface HomePageProps {
   onViewProject: (project: ProjectData) => void;
@@ -31,8 +28,48 @@ interface HomePageProps {
 
 export default function HomePage({ onViewProject }: HomePageProps) {
   const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      console.log('Loading projects from registry...');
+      const registryProjects = await invokeGetProjectRegistry();
+      console.log('Loaded projects:', registryProjects);
+      setProjects(registryProjects);
+    } catch (error) {
+      console.error('Error loading project registry:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Load projects on mount
+    loadProjects();
+
+    // Set up file watcher event listener
+    let unlistenFn: (() => void) | null = null;
+
+    const setupFileWatcher = async () => {
+      const unlisten = await listen('project-registry-changed', () => {
+        // Reload projects when registry file changes
+        loadProjects();
+      });
+      unlistenFn = unlisten;
+    };
+
+    setupFileWatcher();
+
+    // Cleanup: unlisten when component unmounts
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, []);
 
   const handleLinkProject = async () => {
     try {
@@ -51,17 +88,21 @@ export default function HomePage({ onViewProject }: HomePageProps) {
     }
   };
 
-  const handleSaveProject = (name: string, description: string) => {
+  const handleSaveProject = async (_name: string, _description: string) => {
     if (selectedPath) {
-      const newProject: ProjectData = {
-        id: Date.now().toString(),
-        title: name,
-        description: description || 'No description provided',
-        path: selectedPath,
-      };
-      setProjects([...projects, newProject]);
+      // TODO: Write to projectRegistry.json file using name and description
+      // For now, just reload from registry
+      // In the future, we'll need a write command to update the registry
+      // Reload projects from registry after adding
+      try {
+        const registryProjects = await invokeGetProjectRegistry();
+        setProjects(registryProjects);
+      } catch (error) {
+        console.error('Error reloading project registry:', error);
+      }
       setSelectedPath(null);
     }
+    // Note: name and description parameters will be used when implementing registry write
   };
 
   const handleView = (projectId: string) => {
@@ -96,49 +137,61 @@ export default function HomePage({ onViewProject }: HomePageProps) {
             </Flex>
 
             <Tabs.Content value="projects">
-              <ConditionalTabContent
-                hasDependency={projects.length > 0}
-                onSatisfyDependency={handleLinkProject}
-                emptyStateTitle="No projects linked yet"
-                emptyStateDescription="Link a project to get started and manage your blueKit projects."
-                emptyStateIcon={<LuFolderOpen />}
-                actionButtonText="Link Project"
-              >
-                <Flex justify="flex-end" mb={4}>
-                  <Button onClick={handleLinkProject}>Link Project</Button>
-                </Flex>
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                  {projects.map((project) => (
-                    <Card.Root key={project.id} variant="subtle">
-                      <CardHeader>
-                        <Heading size="md">{project.title}</Heading>
-                      </CardHeader>
-                      <CardBody>
-                        <Box mb={4}>{project.description}</Box>
-                        <Box mb={4} fontSize="sm" color="gray.500">
-                          {project.path}
-                        </Box>
-                        <Flex gap={2}>
-                          <Button
-                            size="sm"
-                            variant="subtle"
-                            onClick={() => handleView(project.id)}
-                          >
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSelect(project.id)}
-                          >
-                            Select
-                          </Button>
-                        </Flex>
-                      </CardBody>
-                    </Card.Root>
-                  ))}
-                </SimpleGrid>
-              </ConditionalTabContent>
+              {loading ? (
+                <Box textAlign="center" py={12} color="gray.500">
+                  Loading projects...
+                </Box>
+              ) : projects.length === 0 ? (
+                <ConditionalTabContent
+                  hasDependency={false}
+                  onSatisfyDependency={handleLinkProject}
+                  emptyStateTitle="No projects linked yet"
+                  emptyStateDescription="Link a project to get started and manage your blueKit projects."
+                  emptyStateIcon={<LuFolderOpen />}
+                  actionButtonText="Link Project"
+                >
+                  <Box />
+                </ConditionalTabContent>
+              ) : (
+                <>
+                  <Flex justify="flex-end" mb={4}>
+                    <Button onClick={handleLinkProject}>Link Project</Button>
+                  </Flex>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+                    {projects.map((project) => (
+                      <Card.Root key={project.id} variant="subtle">
+                        <CardHeader>
+                          <Heading size="md">{project.title}</Heading>
+                        </CardHeader>
+                        <CardBody>
+                          {project.description && (
+                            <Box mb={4}>{project.description}</Box>
+                          )}
+                          <Box mb={4} fontSize="sm" color="gray.500">
+                            {project.path}
+                          </Box>
+                          <Flex gap={2}>
+                            <Button
+                              size="sm"
+                              variant="subtle"
+                              onClick={() => handleView(project.id)}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSelect(project.id)}
+                            >
+                              Select
+                            </Button>
+                          </Flex>
+                        </CardBody>
+                      </Card.Root>
+                    ))}
+                  </SimpleGrid>
+                </>
+              )}
             </Tabs.Content>
             <Tabs.Content value="kits">
               <ConditionalTabContent

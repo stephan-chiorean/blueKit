@@ -48,6 +48,22 @@ export interface KitFile {
 }
 
 /**
+ * Type definition for a project entry in the project registry.
+ * 
+ * This interface must match the `ProjectEntry` struct in `src-tauri/src/commands.rs`.
+ */
+export interface ProjectEntry {
+  /** Unique identifier for the project */
+  id: string;
+  /** Project title/name */
+  title: string;
+  /** Project description */
+  description: string;
+  /** Absolute path to the project directory */
+  path: string;
+}
+
+/**
  * Simple ping command to test IPC communication.
  * 
  * This is the simplest IPC command - it takes no parameters and returns a string.
@@ -136,6 +152,27 @@ export async function invokeExampleError(shouldFail: boolean): Promise<string> {
  */
 export async function invokeGetProjectKits(projectPath: string): Promise<KitFile[]> {
   return await invoke<KitFile[]>('get_project_kits', { projectPath });
+}
+
+/**
+ * Gets the project registry from ~/.bluekit/projectRegistry.json.
+ * 
+ * This command reads the project registry file from the user's home directory
+ * and returns a list of all registered projects.
+ * 
+ * @returns A promise that resolves to an array of ProjectEntry objects
+ * 
+ * @example
+ * ```typescript
+ * const projects = await invokeGetProjectRegistry();
+ * projects.forEach(project => {
+ *   console.log(project.title); // "project-name"
+ *   console.log(project.path); // "/absolute/path/to/project"
+ * });
+ * ```
+ */
+export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
+  return await invoke<ProjectEntry[]>('get_project_registry');
 }
 
 /**
