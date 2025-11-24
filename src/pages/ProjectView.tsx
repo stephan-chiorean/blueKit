@@ -23,6 +23,7 @@ import { listen } from '@tauri-apps/api/event';
 import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
 import { invokeGetProjectKits, invokeWatchProjectKits, KitFile } from '../ipc';
 import { useSelection } from '../contexts/SelectionContext';
+import CreateBlueprintModal from '../components/CreateBlueprintModal';
 
 interface ProjectData {
   id: string;
@@ -34,13 +35,28 @@ interface ProjectData {
 interface ProjectViewProps {
   project: ProjectData;
   onBack: () => void;
+  onCreateBlueprint: (name: string, description: string) => void;
 }
 
-export default function ProjectView({ project, onBack }: ProjectViewProps) {
+interface Blueprint {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export default function ProjectView({ project, onBack, onCreateBlueprint }: ProjectViewProps) {
   const [kits, setKits] = useState<KitFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selectedItems, toggleItem, isSelected, hasSelection } = useSelection();
+  
+  // Fake blueprint data for now
+  const [blueprints] = useState<Blueprint[]>([
+    { id: '1', name: 'Authentication Flow', description: 'Complete user authentication setup' },
+    { id: '2', name: 'Dashboard Layout', description: 'Main dashboard with navigation' },
+    { id: '3', name: 'API Integration', description: 'REST API integration patterns' },
+  ]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Debug: Log when selectedItems changes
   useEffect(() => {
@@ -140,7 +156,15 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
             </Breadcrumb.List>
           </Breadcrumb.Root>
 
-          <Tabs.Root defaultValue="kits" variant="enclosed">
+          <Tabs.Root 
+            defaultValue="kits" 
+            variant="enclosed"
+            css={{
+              '& [data-selected]': {
+                borderColor: 'colors.primary.300',
+              },
+            }}
+          >
             <Flex align="center" gap={4} mb={6} position="relative" w="100%">
               <Button
                 variant="ghost"
@@ -222,7 +246,7 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
                           variant="subtle"
                           borderWidth={kitSelected ? "2px" : "1px"}
                           borderColor={kitSelected ? "primary.500" : "border.subtle"}
-                          bg={kitSelected ? "blue.50" : undefined}
+                          bg={kitSelected ? "primary.50" : undefined}
                         >
                           <CardHeader>
                             <Heading size="md">{kit.name}</Heading>
@@ -253,9 +277,46 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
               )}
             </Tabs.Content>
             <Tabs.Content value="blueprints">
-              <Box textAlign="center" py={12} color="gray.500">
-                Blueprints content coming soon...
-              </Box>
+              {blueprints.length === 0 ? (
+                <Box textAlign="center" py={12} color="gray.500">
+                  <Flex direction="column" align="center" gap={4}>
+                    <Text>No blueprints yet.</Text>
+                    <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
+                      Create Blueprint
+                    </Button>
+                  </Flex>
+                </Box>
+              ) : (
+                <>
+                  <Flex justify="flex-start" mb={4}>
+                    <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
+                      Create Blueprint
+                    </Button>
+                  </Flex>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+                    {blueprints.map((blueprint) => (
+                      <Card.Root key={blueprint.id} variant="subtle">
+                        <CardHeader>
+                          <Heading size="md">{blueprint.name}</Heading>
+                        </CardHeader>
+                        <CardBody>
+                          <Text fontSize="sm" color="gray.500" mb={4}>
+                            {blueprint.description}
+                          </Text>
+                          <Flex gap={2} justify="flex-end">
+                            <Button size="sm" variant="subtle">
+                              View
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              Select
+                            </Button>
+                          </Flex>
+                        </CardBody>
+                      </Card.Root>
+                    ))}
+                  </SimpleGrid>
+                </>
+              )}
             </Tabs.Content>
             <Tabs.Content value="configuration">
               <Box textAlign="center" py={12} color="gray.500">
@@ -265,6 +326,11 @@ export default function ProjectView({ project, onBack }: ProjectViewProps) {
           </Tabs.Root>
         </Box>
       </VStack>
+      <CreateBlueprintModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={onCreateBlueprint}
+      />
     </Box>
   );
 }

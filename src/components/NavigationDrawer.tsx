@@ -31,7 +31,7 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
               <Drawer.Header>
                 <VStack align="flex-start" gap={2} mb={4}>
                   <Heading size="2xl">
-                    <Text as="span" color="blue.500">
+                    <Text as="span" color="primary.500">
                       blue
                     </Text>
                     <Text as="span">Kit</Text>
@@ -65,8 +65,8 @@ export function MenuButton({ onClick }: { onClick: () => void }) {
       size="lg"
       aria-label="Open menu"
       onClick={onClick}
-      color="black"
-      _hover={{ bg: 'transparent', opacity: 0.7 }}
+      color="primary.500"
+      _hover={{ bg: 'primary.50', opacity: 0.8 }}
       position="absolute"
       top={4}
       right={4}

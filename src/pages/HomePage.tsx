@@ -10,39 +10,88 @@ import {
   Tabs,
   Flex,
   VStack,
+  Text,
+  IconButton,
 } from '@chakra-ui/react';
-import { open } from '@tauri-apps/api/dialog';
 import { listen } from '@tauri-apps/api/event';
-import { LuFolderOpen, LuPackage, LuFileText, LuBookOpen, LuLayers } from 'react-icons/lu';
-import NavigationMenu, { MenuButton } from '../components/NavigationDrawer';
+import { LuMenu } from 'react-icons/lu';
+import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import ProjectDetailsModal from '../components/ProjectDetailsModal';
-import ConditionalTabContent from '../components/BaseTabContent';
-import { invokeGetProjectRegistry, ProjectEntry } from '../ipc';
+import CreateBlueprintModal from '../components/CreateBlueprintModal';
+import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, KitFile, ProjectEntry } from '../ipc';
+import { useSelection } from '../contexts/SelectionContext';
 
-export type ProjectData = ProjectEntry;
-
-interface HomePageProps {
-  onViewProject: (project: ProjectData) => void;
+interface Blueprint {
+  id: string;
+  name: string;
+  description: string;
 }
 
-export default function HomePage({ onViewProject }: HomePageProps) {
-  const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+interface HomePageProps {
+  onCreateBlueprint: (name: string, description: string) => void;
+}
 
+export default function HomePage({ onCreateBlueprint }: HomePageProps) {
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [kits, setKits] = useState<KitFile[]>([]);
+  const [kitsLoading, setKitsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { selectedItems, toggleItem, isSelected } = useSelection();
+  
+  // Fake blueprint data for now
+  const [blueprints] = useState<Blueprint[]>([
+    { id: '1', name: 'Authentication Flow', description: 'Complete user authentication setup' },
+    { id: '2', name: 'Dashboard Layout', description: 'Main dashboard with navigation' },
+    { id: '3', name: 'API Integration', description: 'REST API integration patterns' },
+  ]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Load projects from registry
   const loadProjects = async () => {
     try {
-      setLoading(true);
       console.log('Loading projects from registry...');
       const registryProjects = await invokeGetProjectRegistry();
       console.log('Loaded projects:', registryProjects);
       setProjects(registryProjects);
     } catch (error) {
       console.error('Error loading project registry:', error);
+    }
+  };
+
+  // Load kits from all projects
+  const loadAllKits = async () => {
+    try {
+      setKitsLoading(true);
+      setError(null);
+      
+      if (projects.length === 0) {
+        setKits([]);
+        setKitsLoading(false);
+        return;
+      }
+
+      // Load kits from all projects in parallel
+      const kitPromises = projects.map(project => 
+        invokeGetProjectKits(project.path).catch(err => {
+          console.error(`Error loading kits from ${project.path}:`, err);
+          return [] as KitFile[];
+        })
+      );
+
+      const allKitsArrays = await Promise.all(kitPromises);
+      
+      // Flatten and deduplicate kits by path
+      const kitsMap = new Map<string, KitFile>();
+      allKitsArrays.flat().forEach(kit => {
+        kitsMap.set(kit.path, kit);
+      });
+      
+      setKits(Array.from(kitsMap.values()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load kits');
+      console.error('Error loading kits:', err);
     } finally {
-      setLoading(false);
+      setKitsLoading(false);
     }
   };
 
@@ -50,7 +99,7 @@ export default function HomePage({ onViewProject }: HomePageProps) {
     // Load projects on mount
     loadProjects();
 
-    // Set up file watcher event listener
+    // Set up file watcher event listener for registry changes
     let unlistenFn: (() => void) | null = null;
 
     const setupFileWatcher = async () => {
@@ -71,50 +120,70 @@ export default function HomePage({ onViewProject }: HomePageProps) {
     };
   }, []);
 
-  const handleLinkProject = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: 'Select Project Directory',
-      });
+  // Reload kits when projects change
+  useEffect(() => {
+    loadAllKits();
+  }, [projects]);
 
-      if (selected && typeof selected === 'string') {
-        setSelectedPath(selected);
-        setIsModalOpen(true);
+  // Set up file watchers for all projects
+  useEffect(() => {
+    if (projects.length === 0) return;
+
+    const setupWatchers = async () => {
+      const unlistenFunctions: (() => void)[] = [];
+
+      for (const project of projects) {
+        try {
+          await invokeWatchProjectKits(project.path);
+
+          // Generate the event name (must match the Rust code)
+          const sanitizedPath = project.path
+            .replace(/\//g, '_')
+            .replace(/\\/g, '_')
+            .replace(/:/g, '_')
+            .replace(/\./g, '_')
+            .replace(/ /g, '_');
+          const eventName = `project-kits-changed-${sanitizedPath}`;
+
+          // Listen for file change events
+          const unlisten = await listen(eventName, () => {
+            console.log(`Kits directory changed for ${project.path}, reloading...`);
+            loadAllKits();
+          });
+          unlistenFunctions.push(unlisten);
+        } catch (error) {
+          console.error(`Failed to set up file watcher for ${project.path}:`, error);
+        }
       }
-    } catch (error) {
-      console.error('Error selecting directory:', error);
-    }
+
+      // Cleanup: unlisten all watchers when component unmounts or projects change
+      return () => {
+        unlistenFunctions.forEach(unlisten => unlisten());
+      };
+    };
+
+    const cleanup = setupWatchers();
+    
+    return () => {
+      cleanup.then(cleanupFn => cleanupFn?.());
+    };
+  }, [projects]);
+
+  const handleKitToggle = (kit: KitFile) => {
+    console.log('[HomePage] handleKitToggle called for kit:', kit);
+    console.log('[HomePage] Current selectedItems:', selectedItems);
+    const itemToToggle = {
+      id: kit.path,
+      name: kit.name,
+      type: 'Kit' as const,
+      path: kit.path,
+    };
+    console.log('[HomePage] Toggling item:', itemToToggle);
+    toggleItem(itemToToggle);
   };
 
-  const handleSaveProject = async (_name: string, _description: string) => {
-    if (selectedPath) {
-      // TODO: Write to projectRegistry.json file using name and description
-      // For now, just reload from registry
-      // In the future, we'll need a write command to update the registry
-      // Reload projects from registry after adding
-      try {
-        const registryProjects = await invokeGetProjectRegistry();
-        setProjects(registryProjects);
-      } catch (error) {
-        console.error('Error reloading project registry:', error);
-      }
-      setSelectedPath(null);
-    }
-    // Note: name and description parameters will be used when implementing registry write
-  };
-
-  const handleView = (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    if (project) {
-      onViewProject(project);
-    }
-  };
-
-  const handleSelect = (projectId: string) => {
-    console.log('Select project:', projectId);
-  };
+  const selectedCount = selectedItems.length;
+  console.log('[HomePage] Render - selectedCount:', selectedCount, 'selectedItems:', selectedItems);
 
   return (
     <Box position="relative" minH="100vh" bg="main.bg">
@@ -122,136 +191,161 @@ export default function HomePage({ onViewProject }: HomePageProps) {
         <Header />
         
         <Box flex="1" p={6} position="relative">
-          <NavigationMenu>
-            {({ onOpen }) => <MenuButton onClick={onOpen} />}
-          </NavigationMenu>
-          <Tabs.Root defaultValue="projects" variant="enclosed">
-            <Flex justify="center" mb={6}>
-              <Tabs.List>
-                <Tabs.Trigger value="projects">Projects</Tabs.Trigger>
-                <Tabs.Trigger value="kits">Kits</Tabs.Trigger>
-                <Tabs.Trigger value="blueprints">Blueprints</Tabs.Trigger>
-                <Tabs.Trigger value="walkthroughs">Walkthroughs</Tabs.Trigger>
-                <Tabs.Trigger value="collections">Collections</Tabs.Trigger>
-              </Tabs.List>
+          <Tabs.Root 
+            defaultValue="kits" 
+            variant="enclosed"
+            css={{
+              '& [data-selected]': {
+                borderColor: 'colors.primary.300',
+              },
+            }}
+          >
+            <Flex align="center" gap={4} mb={6} mt={6} position="relative" w="100%">
+              <NavigationMenu>
+                {({ onOpen }) => (
+                  <IconButton
+                    variant="ghost"
+                    size="lg"
+                    aria-label="Open menu"
+                    onClick={onOpen}
+                    color="gray.600"
+                    _hover={{ bg: 'gray.100', opacity: 0.8 }}
+                  >
+                    <LuMenu />
+                  </IconButton>
+                )}
+              </NavigationMenu>
+              <Box 
+                position="absolute" 
+                left="50%" 
+                style={{ transform: 'translateX(-50%)' }}
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value="kits">Kits</Tabs.Trigger>
+                  <Tabs.Trigger value="blueprints">Blueprints</Tabs.Trigger>
+                  <Tabs.Trigger value="walkthroughs">Walkthroughs</Tabs.Trigger>
+                  <Tabs.Trigger value="collections">Collections</Tabs.Trigger>
+                  <Tabs.Trigger value="configuration">Configuration</Tabs.Trigger>
+                </Tabs.List>
+              </Box>
             </Flex>
 
-            <Tabs.Content value="projects">
-              {loading ? (
+            <Tabs.Content value="kits">
+              {kitsLoading ? (
                 <Box textAlign="center" py={12} color="gray.500">
-                  Loading projects...
+                  Loading kits...
+                </Box>
+              ) : error ? (
+                <Box textAlign="center" py={12} color="red.500">
+                  Error: {error}
                 </Box>
               ) : projects.length === 0 ? (
-                <ConditionalTabContent
-                  hasDependency={false}
-                  onSatisfyDependency={handleLinkProject}
-                  emptyStateTitle="No projects linked yet"
-                  emptyStateDescription="Link a project to get started and manage your blueKit projects."
-                  emptyStateIcon={<LuFolderOpen />}
-                  actionButtonText="Link Project"
-                >
-                  <Box />
-                </ConditionalTabContent>
+                <Box textAlign="center" py={12} color="gray.500">
+                  No projects linked. Projects are managed via CLI and will appear here automatically.
+                </Box>
+              ) : kits.length === 0 ? (
+                <Box textAlign="center" py={12} color="gray.500">
+                  No kits found in any linked project's .bluekit directory.
+                </Box>
               ) : (
                 <>
-                  <Flex justify="flex-start" mb={4}>
-                    <Button onClick={handleLinkProject}>Link Project</Button>
-                  </Flex>
                   <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                    {projects.map((project) => (
-                      <Card.Root key={project.id} variant="subtle">
-                        <CardHeader>
-                          <Heading size="md">{project.title}</Heading>
-                        </CardHeader>
-                        <CardBody>
-                          {project.description && (
-                            <Box mb={4}>{project.description}</Box>
-                          )}
-                          <Box mb={4} fontSize="sm" color="gray.500">
-                            {project.path}
-                          </Box>
-                          <Flex gap={2} justify="flex-end">
-                            <Button
-                              size="sm"
-                              variant="subtle"
-                              onClick={() => handleView(project.id)}
-                            >
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSelect(project.id)}
-                            >
-                              Select
-                            </Button>
-                          </Flex>
-                        </CardBody>
-                      </Card.Root>
-                    ))}
+                    {kits.map((kit) => {
+                      const kitSelected = isSelected(kit.path);
+                      console.log('[HomePage] Kit:', kit.name, 'path:', kit.path, 'isSelected:', kitSelected);
+                      return (
+                        <Card.Root 
+                          key={kit.path} 
+                          variant="subtle"
+                          borderWidth={kitSelected ? "2px" : "1px"}
+                          borderColor={kitSelected ? "primary.500" : "border.subtle"}
+                          bg={kitSelected ? "primary.50" : undefined}
+                        >
+                          <CardHeader>
+                            <Heading size="md">{kit.name}</Heading>
+                          </CardHeader>
+                          <CardBody>
+                            <Text fontSize="sm" color="gray.500" mb={4}>
+                              {kit.path}
+                            </Text>
+                            <Flex gap={2} justify="flex-end">
+                              <Button size="sm" variant="subtle">
+                                View
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant={kitSelected ? "solid" : "outline"}
+                                colorPalette={kitSelected ? "primary" : undefined}
+                                onClick={() => handleKitToggle(kit)}
+                              >
+                                {kitSelected ? "Selected" : "Select"}
+                              </Button>
+                            </Flex>
+                          </CardBody>
+                        </Card.Root>
+                      );
+                    })}
                   </SimpleGrid>
                 </>
               )}
             </Tabs.Content>
-            <Tabs.Content value="kits">
-              <ConditionalTabContent
-                hasDependency={projects.length > 0}
-                onSatisfyDependency={handleLinkProject}
-                emptyStateTitle="No kits available"
-                emptyStateDescription="Link a project to discover and use kits from your .bluekit directory."
-                emptyStateIcon={<LuPackage />}
-                actionButtonText="Link Project"
-              >
-                <Box>Kits Content</Box>
-              </ConditionalTabContent>
-            </Tabs.Content>
             <Tabs.Content value="blueprints">
-              <ConditionalTabContent
-                hasDependency={projects.length > 0}
-                onSatisfyDependency={handleLinkProject}
-                emptyStateTitle="No blueprints available"
-                emptyStateDescription="Link a project to access and manage blueprints."
-                emptyStateIcon={<LuFileText />}
-                actionButtonText="Link Project"
-              >
-                <Box>Blueprints Content</Box>
-              </ConditionalTabContent>
+              <Flex justify="flex-end" mb={4}>
+                <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
+                  Create Blueprint
+                </Button>
+              </Flex>
+              {blueprints.length === 0 ? (
+                <Box textAlign="center" py={12} color="gray.500">
+                  <Text>No blueprints yet.</Text>
+                </Box>
+              ) : (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+                  {blueprints.map((blueprint) => (
+                    <Card.Root key={blueprint.id} variant="subtle">
+                      <CardHeader>
+                        <Heading size="md">{blueprint.name}</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <Text fontSize="sm" color="gray.500" mb={4}>
+                          {blueprint.description}
+                        </Text>
+                        <Flex gap={2} justify="flex-end">
+                          <Button size="sm" variant="subtle">
+                            View
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            Select
+                          </Button>
+                        </Flex>
+                      </CardBody>
+                    </Card.Root>
+                  ))}
+                </SimpleGrid>
+              )}
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
-              <ConditionalTabContent
-                hasDependency={projects.length > 0}
-                onSatisfyDependency={handleLinkProject}
-                emptyStateTitle="No walkthroughs available"
-                emptyStateDescription="Link a project to access walkthroughs and guides."
-                emptyStateIcon={<LuBookOpen />}
-                actionButtonText="Link Project"
-              >
-                <Box>Walkthroughs Content</Box>
-              </ConditionalTabContent>
+              <Box textAlign="center" py={12} color="gray.500">
+                Walkthroughs content coming soon...
+              </Box>
             </Tabs.Content>
             <Tabs.Content value="collections">
-              <ConditionalTabContent
-                hasDependency={projects.length > 0}
-                onSatisfyDependency={handleLinkProject}
-                emptyStateTitle="No collections available"
-                emptyStateDescription="Link a project to browse and organize collections."
-                emptyStateIcon={<LuLayers />}
-                actionButtonText="Link Project"
-              >
-                <Box>Collections Content</Box>
-              </ConditionalTabContent>
+              <Box textAlign="center" py={12} color="gray.500">
+                Collections content coming soon...
+              </Box>
+            </Tabs.Content>
+            <Tabs.Content value="configuration">
+              <Box textAlign="center" py={12} color="gray.500">
+                Configuration content coming soon...
+              </Box>
             </Tabs.Content>
           </Tabs.Root>
         </Box>
       </VStack>
-      <ProjectDetailsModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedPath(null);
-        }}
-        onSave={handleSaveProject}
-        defaultName={selectedPath ? selectedPath.split(/[/\\]/).pop() || '' : ''}
+      <CreateBlueprintModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={onCreateBlueprint}
       />
     </Box>
   );

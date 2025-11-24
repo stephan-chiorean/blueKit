@@ -1,45 +1,47 @@
 import { useState } from 'react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
-import ProjectView from './pages/ProjectView';
+import CreateBlueprintPage from './pages/CreateBlueprintPage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import GlobalActionBar from './components/GlobalActionBar';
 
-interface ProjectData {
-  id: string;
-  title: string;
+interface BlueprintData {
+  name: string;
   description: string;
-  path: string;
 }
 
-type View = 'welcome' | 'home' | 'project';
+type View = 'welcome' | 'home' | 'create-blueprint';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('welcome');
-  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
+  const [blueprintData, setBlueprintData] = useState<BlueprintData | null>(null);
 
   const handleGetStarted = () => {
     setCurrentView('home');
   };
 
-  const handleViewProject = (project: ProjectData) => {
-    setSelectedProject(project);
-    setCurrentView('project');
+  const handleCreateBlueprint = (name: string, description: string) => {
+    setBlueprintData({ name, description });
+    setCurrentView('create-blueprint');
   };
 
-  const handleBackToHome = () => {
+  const handleBackFromBlueprint = () => {
     setCurrentView('home');
-    setSelectedProject(null);
+    setBlueprintData(null);
   };
 
   return (
     <SelectionProvider>
       {currentView === 'welcome' ? (
         <WelcomeScreen onGetStarted={handleGetStarted} />
-      ) : currentView === 'project' && selectedProject ? (
-        <ProjectView project={selectedProject} onBack={handleBackToHome} />
+      ) : currentView === 'create-blueprint' && blueprintData ? (
+        <CreateBlueprintPage
+          blueprintName={blueprintData.name}
+          blueprintDescription={blueprintData.description}
+          onBack={handleBackFromBlueprint}
+        />
       ) : (
-        <HomePage onViewProject={handleViewProject} />
+        <HomePage onCreateBlueprint={handleCreateBlueprint} />
       )}
       <GlobalActionBar />
     </SelectionProvider>

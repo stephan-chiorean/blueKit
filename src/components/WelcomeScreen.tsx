@@ -15,13 +15,13 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
     >
       <VStack spacing={6}>
         <Heading size="2xl">
-          <Text as="span" color="blue.500">
+          <Text as="span" color="primary.500">
             blue
           </Text>
           <Text as="span">Kit</Text>
         </Heading>
         <Button
-          colorScheme="blue"
+          colorPalette="primary"
           size="lg"
           onClick={onGetStarted}
         >

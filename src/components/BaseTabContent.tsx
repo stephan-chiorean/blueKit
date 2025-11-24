@@ -50,7 +50,7 @@ export default function ConditionalTabContent({
               </EmptyState.Description>
             )}
           </VStack>
-          <Button onClick={onSatisfyDependency} mt={4}>
+          <Button onClick={onSatisfyDependency} mt={4} colorPalette="primary">
             {actionButtonText}
           </Button>
         </EmptyState.Content>
