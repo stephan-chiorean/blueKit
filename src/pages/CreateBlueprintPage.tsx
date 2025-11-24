@@ -13,12 +13,12 @@ import {
   EmptyState,
   Icon,
 } from '@chakra-ui/react';
-import { LuPlus, LuArrowLeft, LuPackage } from 'react-icons/lu';
+import { LuPlus, LuArrowLeft, LuPackage, LuArrowRight, LuPuzzle } from 'react-icons/lu';
 import AddComponentModal from '../components/AddComponentModal';
 
 interface CreateBlueprintPageProps {
   blueprintName: string;
-  blueprintDescription: string;
+  blueprintDescription?: string;
   onBack: () => void;
 }
 
@@ -30,11 +30,10 @@ interface TimelineNode {
 
 export default function CreateBlueprintPage({
   blueprintName,
-  blueprintDescription,
   onBack,
 }: CreateBlueprintPageProps) {
-  // Start with one "add-component" entry
-  const [nodes, setNodes] = useState<TimelineNode[]>([{ id: '1', type: 'add-component' }]);
+  // Start with empty nodes array
+  const [nodes, setNodes] = useState<TimelineNode[]>([]);
   const [isAddComponentModalOpen, setIsAddComponentModalOpen] = useState(false);
 
   const handleAddComponent = () => {
@@ -43,45 +42,20 @@ export default function CreateBlueprintPage({
 
   const handleSelectCategory = (category: 'Kits' | 'Collections' | 'Walkthroughs' | 'Custom') => {
     if (category === 'Custom') {
-      // Convert first add-component node to custom-input, then add new add-component node
-      const updatedNodes = [...nodes];
-      const firstAddComponentIndex = updatedNodes.findIndex((n) => n.type === 'add-component');
-      
-      if (firstAddComponentIndex !== -1) {
-        // Convert this add-component to custom-input
-        updatedNodes[firstAddComponentIndex] = {
-          id: updatedNodes[firstAddComponentIndex].id,
-          type: 'custom-input',
-          value: '',
-        };
-        // Add new add-component node after it
-        updatedNodes.splice(firstAddComponentIndex + 1, 0, {
-          id: `${Date.now()}`,
-          type: 'add-component',
-        });
-      } else {
-        // No add-component found, just add a new one
-        updatedNodes.push({ id: `${Date.now()}`, type: 'add-component' });
-      }
-      setNodes(updatedNodes);
+      // Add a new custom-input node
+      setNodes([...nodes, { id: `${Date.now()}`, type: 'custom-input', value: '' }]);
     }
+    setIsAddComponentModalOpen(false);
+  };
+
+  const handleAddStep = () => {
+    setIsAddComponentModalOpen(true);
   };
 
   const handleInputChange = (nodeId: string, value: string) => {
     setNodes((prev) =>
       prev.map((node) => (node.id === nodeId ? { ...node, value } : node))
     );
-  };
-
-  const handleAddNewComponent = (nodeId: string) => {
-    // Add new add-component node after the current one
-    const currentIndex = nodes.findIndex((n) => n.id === nodeId);
-    const newNodes = [...nodes];
-    newNodes.splice(currentIndex + 1, 0, {
-      id: `${Date.now()}`,
-      type: 'add-component',
-    });
-    setNodes(newNodes);
   };
 
   const hasNodes = nodes.length > 0;
@@ -97,27 +71,35 @@ export default function CreateBlueprintPage({
                 <Text>Back</Text>
               </HStack>
             </Button>
-            <Heading size="lg">{blueprintName}</Heading>
           </Flex>
 
-          {blueprintDescription && (
-            <Text color="gray.500" mb={6}>
-              {blueprintDescription}
-            </Text>
-          )}
+          <Heading size="lg" mb={6}>
+            {blueprintName}
+          </Heading>
 
           {!hasNodes ? (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
-                  <Icon size="xl">
-                    <LuPlus />
-                  </Icon>
+                  <HStack gap={4} align="center">
+                    <Icon size="xl" color="primary.500">
+                      <LuPuzzle />
+                    </Icon>
+                    <Icon size="xl" color="primary.500">
+                      <LuPuzzle />
+                    </Icon>
+                    <Icon size="xl" color="primary.500">
+                      <LuPuzzle />
+                    </Icon>
+                    <Icon size="xl" color="primary.500">
+                      <LuArrowRight />
+                    </Icon>
+                    <Icon size="xl" color="primary.500">
+                      <LuPackage />
+                    </Icon>
+                  </HStack>
                 </EmptyState.Indicator>
-                <EmptyState.Title>No components yet</EmptyState.Title>
-                <EmptyState.Description>
-                  Get started by adding your first component to this blueprint.
-                </EmptyState.Description>
+                <EmptyState.Title>Arrange kits and context together to create recipes for your agent</EmptyState.Title>
                 <Button onClick={handleAddComponent} mt={4}>
                   <HStack gap={2}>
                     <LuPlus />
@@ -127,28 +109,19 @@ export default function CreateBlueprintPage({
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
-            <Timeline.Root maxW="800px">
-              {nodes.map((node, index) => (
-                <Timeline.Item key={node.id}>
-                  <Timeline.Connector>
-                    <Timeline.Separator />
-                    <Timeline.Indicator>
-                      <Icon color="primary.500">
-                        <LuPackage />
-                      </Icon>
-                    </Timeline.Indicator>
-                  </Timeline.Connector>
-                  <Timeline.Content>
-                    {node.type === 'add-component' ? (
-                      <Box>
-                        <Button variant="outline" onClick={() => handleAddComponent()}>
-                          <HStack gap={2}>
-                            <LuPlus />
-                            <Text>Add Component</Text>
-                          </HStack>
-                        </Button>
-                      </Box>
-                    ) : (
+            <Box>
+              <Timeline.Root maxW="800px">
+                {nodes.filter((node) => node.type === 'custom-input').map((node) => (
+                  <Timeline.Item key={node.id}>
+                    <Timeline.Connector>
+                      <Timeline.Separator />
+                      <Timeline.Indicator>
+                        <Icon color="primary.500">
+                          <LuPackage />
+                        </Icon>
+                      </Timeline.Indicator>
+                    </Timeline.Connector>
+                    <Timeline.Content>
                       <Box>
                         <Field.Root>
                           <Field.Label>Input Context</Field.Label>
@@ -160,11 +133,17 @@ export default function CreateBlueprintPage({
                           />
                         </Field.Root>
                       </Box>
-                    )}
-                  </Timeline.Content>
-                </Timeline.Item>
-              ))}
-            </Timeline.Root>
+                    </Timeline.Content>
+                  </Timeline.Item>
+                ))}
+              </Timeline.Root>
+              <Button colorPalette="primary" onClick={handleAddStep} mt={6}>
+                <HStack gap={2}>
+                  <LuPlus />
+                  <Text>Add Step</Text>
+                </HStack>
+              </Button>
+            </Box>
           )}
 
           <AddComponentModal

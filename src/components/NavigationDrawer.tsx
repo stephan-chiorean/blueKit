@@ -1,6 +1,5 @@
 import { useState, ReactNode } from 'react';
 import {
-  Heading,
   IconButton,
   Drawer,
   Portal,
@@ -14,6 +13,8 @@ import {
   Box,
   Icon,
   Flex,
+  NativeSelect,
+  Switch,
 } from '@chakra-ui/react';
 import { 
   LuMenu, 
@@ -80,6 +81,7 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const { colorMode, toggleColorMode } = useColorMode();
+  const [selectedWorkspace, setSelectedWorkspace] = useState('workspace-1');
 
   const handleMenuItemClick = (item: MenuItem) => {
     if (item.children) {
@@ -105,12 +107,9 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
             <Drawer.Content>
               <Drawer.Header>
                 <Flex align="center" justify="space-between" w="100%">
-                  <Heading size="2xl">
-                    <Text as="span" color="primary.500">
-                      blue
-                    </Text>
-                    <Text as="span">Kit</Text>
-                  </Heading>
+                  <Text fontWeight="semibold" fontSize="md">
+                    Navigation
+                  </Text>
                   <Drawer.CloseTrigger asChild>
                     <CloseButton size="sm" />
                   </Drawer.CloseTrigger>
@@ -118,22 +117,50 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
               </Drawer.Header>
               <Drawer.Body>
                 <VStack align="stretch" gap={1}>
+                  {/* Workspace Selector */}
+                  <Box mb={2}>
+                    <NativeSelect.Root size="sm">
+                      <NativeSelect.Field
+                        value={selectedWorkspace}
+                        onChange={(e) => setSelectedWorkspace(e.currentTarget.value)}
+                      >
+                        <option value="workspace-1">Workspace 1</option>
+                        <option value="workspace-2">Workspace 2</option>
+                        <option value="workspace-3">Workspace 3</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Box>
+
+                  <Separator mb={2} />
+
                   {/* Color Mode Toggle */}
                   <Box mb={2}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      w="100%"
-                      justifyContent="flex-start"
-                      onClick={toggleColorMode}
-                    >
+                    <HStack justify="space-between" w="100%">
                       <HStack gap={2}>
                         <Icon>
                           {colorMode === 'light' ? <LuMoon /> : <LuSun />}
                         </Icon>
-                        <Text>{colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}</Text>
+                        <Text fontSize="sm">
+                          {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
+                        </Text>
                       </HStack>
-                    </Button>
+                      <Switch.Root
+                        checked={colorMode === 'dark'}
+                        onCheckedChange={(e) => {
+                          if (e.checked && colorMode === 'light') {
+                            toggleColorMode();
+                          } else if (!e.checked && colorMode === 'dark') {
+                            toggleColorMode();
+                          }
+                        }}
+                      >
+                        <Switch.HiddenInput />
+                        <Switch.Control>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                      </Switch.Root>
+                    </HStack>
                   </Box>
 
                   <Separator mb={2} />

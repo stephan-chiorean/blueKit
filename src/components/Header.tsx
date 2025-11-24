@@ -12,14 +12,13 @@ import {
   Text,
   Tag,
   Portal,
+  Heading,
 } from '@chakra-ui/react';
 import { LuSearch, LuBell, LuUser, LuBriefcase } from 'react-icons/lu';
 import { useSelection } from '../contexts/SelectionContext';
-import { useColorMode } from '../contexts/ColorModeContext';
 
 export default function Header() {
   const { selectedItems } = useSelection();
-  const { colorMode } = useColorMode();
   const selectedCount = selectedItems.length;
 
   return (
@@ -33,8 +32,15 @@ export default function Header() {
       boxShadow="sm"
     >
       <Flex align="center" justify="space-between" gap={4}>
-        {/* Left spacer to balance the layout */}
-        <Box flex="1" />
+        {/* blueKit branding on the left */}
+        <Box flex="1">
+          <Heading size="lg">
+            <Text as="span" color="primary.500">
+              blue
+            </Text>
+            <Text as="span">Kit</Text>
+          </Heading>
+        </Box>
 
         {/* Center search bar */}
         <Box flex="2" maxW="600px">
@@ -43,7 +49,7 @@ export default function Header() {
               placeholder="Search..."
               variant="subtle"
               borderWidth="1px"
-              borderColor={colorMode === 'dark' ? 'gray.700' : 'primary.300'}
+              borderColor="primary.300"
             />
           </InputGroup>
         </Box>
