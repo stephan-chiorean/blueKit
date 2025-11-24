@@ -3,6 +3,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import CreateBlueprintPage from './pages/CreateBlueprintPage';
 import { SelectionProvider } from './contexts/SelectionContext';
+import { ColorModeProvider } from './contexts/ColorModeContext';
 import GlobalActionBar from './components/GlobalActionBar';
 
 interface BlueprintData {
@@ -31,20 +32,22 @@ function App() {
   };
 
   return (
-    <SelectionProvider>
-      {currentView === 'welcome' ? (
-        <WelcomeScreen onGetStarted={handleGetStarted} />
-      ) : currentView === 'create-blueprint' && blueprintData ? (
-        <CreateBlueprintPage
-          blueprintName={blueprintData.name}
-          blueprintDescription={blueprintData.description}
-          onBack={handleBackFromBlueprint}
-        />
-      ) : (
-        <HomePage onCreateBlueprint={handleCreateBlueprint} />
-      )}
-      <GlobalActionBar />
-    </SelectionProvider>
+    <ColorModeProvider>
+      <SelectionProvider>
+        {currentView === 'welcome' ? (
+          <WelcomeScreen onGetStarted={handleGetStarted} />
+        ) : currentView === 'create-blueprint' && blueprintData ? (
+          <CreateBlueprintPage
+            blueprintName={blueprintData.name}
+            blueprintDescription={blueprintData.description}
+            onBack={handleBackFromBlueprint}
+          />
+        ) : (
+          <HomePage onCreateBlueprint={handleCreateBlueprint} />
+        )}
+        <GlobalActionBar />
+      </SelectionProvider>
+    </ColorModeProvider>
   );
 }
 

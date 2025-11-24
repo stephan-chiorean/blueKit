@@ -30,17 +30,26 @@ export const system = createSystem(defaultConfig, {
         primary: {
           solid: { value: '{colors.primary.600}' },
           contrast: { value: '{colors.primary.50}' },
-          fg: { value: { _light: '{colors.primary.700}', _dark: '{colors.primary.300}' } },
+          fg: { value: { _light: '{colors.primary.700}', _dark: '{colors.primary.200}' } },
           muted: { value: '{colors.primary.100}' },
           subtle: { value: '{colors.primary.200}' },
           emphasized: { value: '{colors.primary.300}' },
           focusRing: { value: '{colors.primary.500}' },
           border: { value: '{colors.primary.200}' },
         },
-        // Header background - subtle gray (keeping it subtle)
-        'header.bg': { value: { _light: '#f9fafb', _dark: '{colors.primary.800}' } },
-        // Main content background - lighter than header
-        'main.bg': { value: { _light: '{colors.white}', _dark: '{colors.primary.900}' } },
+        // Subtle background for cards, tabs, header - consistent across the app
+        // Using Chakra UI's default subtle background (gray.100 in light, gray.800 in dark)
+        'bg.subtle': { value: { _light: '{colors.gray.100}', _dark: '{colors.gray.950}' } },
+        // Header background - same as subtle background (cards/tabs)
+        'header.bg': { value: { _light: '{colors.gray.100}', _dark: '{colors.gray.950}' } },
+        // Main content background - darker than header/tabs/cards in dark mode (neutral dark gray/black)
+        'main.bg': { value: { _light: '{colors.white}', _dark: '{colors.gray.950}' } },
+        // Text color - uses blue in dark mode
+        'text.primary': { value: { _light: '{colors.gray.900}', _dark: '{colors.primary.200}' } },
+        'text.secondary': { value: { _light: '{colors.gray.600}', _dark: '{colors.primary.400}' } },
+        // Default foreground color - uses blue in dark mode
+        fg: { value: { _light: '{colors.gray.900}', _dark: '{colors.primary.200}' } },
+        'fg.muted': { value: { _light: '{colors.gray.600}', _dark: '{colors.primary.400}' } },
       },
     },
   },

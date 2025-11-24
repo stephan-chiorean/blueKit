@@ -15,14 +15,16 @@ import {
 } from '@chakra-ui/react';
 import { LuSearch, LuBell, LuUser, LuBriefcase } from 'react-icons/lu';
 import { useSelection } from '../contexts/SelectionContext';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 export default function Header() {
   const { selectedItems } = useSelection();
+  const { colorMode } = useColorMode();
   const selectedCount = selectedItems.length;
 
   return (
     <Box
-      bg="#e5e7eb"
+      bg="bg.subtle"
       px={6}
       py={2}
       position="sticky"
@@ -41,20 +43,20 @@ export default function Header() {
               placeholder="Search..."
               variant="subtle"
               borderWidth="1px"
-              borderColor="primary.300"
+              borderColor={colorMode === 'dark' ? 'gray.700' : 'primary.300'}
             />
           </InputGroup>
         </Box>
 
         {/* Right side icons */}
         <HStack gap={2} flex="1" justify="flex-end">
-          {selectedCount > 0 && (
-            <Popover.Root>
-              <Popover.Trigger asChild>
-                <Box position="relative" cursor="pointer">
-                  <IconButton variant="ghost" size="sm" aria-label="Workstation">
-                    <LuBriefcase />
-                  </IconButton>
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <Box position="relative" cursor="pointer">
+                <IconButton variant="ghost" size="sm" aria-label="Workstation">
+                  <LuBriefcase />
+                </IconButton>
+                {selectedCount > 0 && (
                   <Badge
                     position="absolute"
                     top="-1"
@@ -72,17 +74,19 @@ export default function Header() {
                   >
                     {selectedCount}
                   </Badge>
-                </Box>
-              </Popover.Trigger>
-              <Portal>
-                <Popover.Positioner>
-                  <Popover.Content maxW="300px">
-                    <Popover.Header>
-                      <Text fontWeight="semibold" fontSize="sm">
-                        Selected Items
-                      </Text>
-                    </Popover.Header>
-                    <Popover.Body>
+                )}
+              </Box>
+            </Popover.Trigger>
+            <Portal>
+              <Popover.Positioner>
+                <Popover.Content maxW="300px">
+                  <Popover.Header>
+                    <Text fontWeight="semibold" fontSize="sm">
+                      Selected Items
+                    </Text>
+                  </Popover.Header>
+                  <Popover.Body>
+                    {selectedItems.length > 0 ? (
                       <Stack gap={2}>
                         {selectedItems.map((item) => (
                           <Flex key={item.id} align="center" justify="space-between" gap={2}>
@@ -93,12 +97,16 @@ export default function Header() {
                           </Flex>
                         ))}
                       </Stack>
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Positioner>
-              </Portal>
-            </Popover.Root>
-          )}
+                    ) : (
+                      <Text fontSize="sm" color="fg.muted">
+                        No items selected
+                      </Text>
+                    )}
+                  </Popover.Body>
+                </Popover.Content>
+              </Popover.Positioner>
+            </Portal>
+          </Popover.Root>
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />
           </IconButton>

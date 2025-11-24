@@ -12,9 +12,11 @@ import {
   VStack,
   Text,
   IconButton,
+  Icon,
+  HStack,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu } from 'react-icons/lu';
+import { LuMenu, LuPackage, LuLayers, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import CreateBlueprintModal from '../components/CreateBlueprintModal';
@@ -45,6 +47,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
     { id: '3', name: 'API Integration', description: 'REST API integration patterns' },
   ]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('kits');
 
   // Load projects from registry
   const loadProjects = async () => {
@@ -194,6 +197,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
           <Tabs.Root 
             defaultValue="kits" 
             variant="enclosed"
+            onValueChange={(details) => setActiveTab(details.value)}
             css={{
               '& [data-selected]': {
                 borderColor: 'colors.primary.300',
@@ -221,18 +225,52 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 style={{ transform: 'translateX(-50%)' }}
               >
                 <Tabs.List>
-                  <Tabs.Trigger value="kits">Kits</Tabs.Trigger>
-                  <Tabs.Trigger value="blueprints">Blueprints</Tabs.Trigger>
-                  <Tabs.Trigger value="walkthroughs">Walkthroughs</Tabs.Trigger>
-                  <Tabs.Trigger value="collections">Collections</Tabs.Trigger>
-                  <Tabs.Trigger value="configuration">Configuration</Tabs.Trigger>
+                  <Tabs.Trigger value="kits">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPackage />
+                      </Icon>
+                      <Text>Kits</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="blueprints">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuLayers />
+                      </Icon>
+                      <Text>Blueprints</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="walkthroughs">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBookOpen />
+                      </Icon>
+                      <Text>Walkthroughs</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="collections">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuFolderOpen />
+                      </Icon>
+                      <Text>Collections</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
+              {activeTab === 'blueprints' && (
+                <Box position="absolute" right={0}>
+                  <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
+                    Create Blueprint
+                  </Button>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="kits">
               {kitsLoading ? (
-                <Box textAlign="center" py={12} color="gray.500">
+                <Box textAlign="center" py={12} color="text.secondary">
                   Loading kits...
                 </Box>
               ) : error ? (
@@ -240,11 +278,11 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                   Error: {error}
                 </Box>
               ) : projects.length === 0 ? (
-                <Box textAlign="center" py={12} color="gray.500">
+                <Box textAlign="center" py={12} color="text.secondary">
                   No projects linked. Projects are managed via CLI and will appear here automatically.
                 </Box>
               ) : kits.length === 0 ? (
-                <Box textAlign="center" py={12} color="gray.500">
+                <Box textAlign="center" py={12} color="text.secondary">
                   No kits found in any linked project's .bluekit directory.
                 </Box>
               ) : (
@@ -265,7 +303,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                             <Heading size="md">{kit.name}</Heading>
                           </CardHeader>
                           <CardBody>
-                            <Text fontSize="sm" color="gray.500" mb={4}>
+                            <Text fontSize="sm" color="text.secondary" mb={4}>
                               {kit.path}
                             </Text>
                             <Flex gap={2} justify="flex-end">
@@ -290,13 +328,8 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
               )}
             </Tabs.Content>
             <Tabs.Content value="blueprints">
-              <Flex justify="flex-end" mb={4}>
-                <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
-                  Create Blueprint
-                </Button>
-              </Flex>
               {blueprints.length === 0 ? (
-                <Box textAlign="center" py={12} color="gray.500">
+                <Box textAlign="center" py={12} color="text.secondary">
                   <Text>No blueprints yet.</Text>
                 </Box>
               ) : (
@@ -307,7 +340,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                         <Heading size="md">{blueprint.name}</Heading>
                       </CardHeader>
                       <CardBody>
-                        <Text fontSize="sm" color="gray.500" mb={4}>
+                        <Text fontSize="sm" color="text.secondary" mb={4}>
                           {blueprint.description}
                         </Text>
                         <Flex gap={2} justify="flex-end">
@@ -325,18 +358,13 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
               )}
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
-              <Box textAlign="center" py={12} color="gray.500">
+              <Box textAlign="center" py={12} color="text.secondary">
                 Walkthroughs content coming soon...
               </Box>
             </Tabs.Content>
             <Tabs.Content value="collections">
-              <Box textAlign="center" py={12} color="gray.500">
+              <Box textAlign="center" py={12} color="text.secondary">
                 Collections content coming soon...
-              </Box>
-            </Tabs.Content>
-            <Tabs.Content value="configuration">
-              <Box textAlign="center" py={12} color="gray.500">
-                Configuration content coming soon...
               </Box>
             </Tabs.Content>
           </Tabs.Root>
