@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Button,
   Card,
@@ -23,7 +23,6 @@ import {
 import { LuFolderOpen, LuPlus } from 'react-icons/lu';
 import { Collection } from './CreateCollectionModal';
 import CollectionItemsSelector from './CollectionItemsSelector';
-import EditCollectionModal from './EditCollectionModal';
 import { KitFile } from '../../ipc';
 
 interface CollectionsTabContentProps {
@@ -48,7 +47,6 @@ export default function CollectionsTabContent({
   const [collectionDescription, setCollectionDescription] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const handleToggleItem = (itemId: string) => {
     setSelectedItemIds((prev) => {
@@ -78,6 +76,7 @@ export default function CollectionsTabContent({
     setCollectionName('');
     setCollectionDescription('');
     setSelectedItemIds(new Set());
+    setEditingCollection(null);
   };
 
   const handleCreate = () => {
@@ -92,9 +91,39 @@ export default function CollectionsTabContent({
     }
   };
 
+  const handleSave = () => {
+    if (collectionName.trim() && editingCollection) {
+      const updatedCollection: Collection = {
+        ...editingCollection,
+        name: collectionName.trim(),
+        description: collectionDescription.trim() || undefined,
+      };
+      onUpdateCollection(updatedCollection, Array.from(selectedItemIds));
+      handleCancel();
+    }
+  };
+
+  // Update form fields when editing collection changes
+  useEffect(() => {
+    if (editingCollection && viewMode === 'edit') {
+      setCollectionName(editingCollection.name);
+      setCollectionDescription(editingCollection.description || '');
+      const fullCollection = collections.find(c => c.id === editingCollection.id);
+      const itemIds = (fullCollection as any)?.selectedItemIds || [];
+      setSelectedItemIds(new Set(itemIds));
+    }
+  }, [editingCollection, viewMode, collections]);
+
   const handleViewCollection = (collection: Collection) => {
     setEditingCollection(collection);
-    setIsEditModalOpen(true);
+    setCollectionName(collection.name);
+    setCollectionDescription(collection.description || '');
+    // Get selected item IDs from the collection if available
+    // We need to find the collection in the collections array to get its selectedItemIds
+    const fullCollection = collections.find(c => c.id === collection.id);
+    const itemIds = (fullCollection as any)?.selectedItemIds || [];
+    setSelectedItemIds(new Set(itemIds));
+    setViewMode('edit');
   };
 
   if (viewMode === 'create') {
@@ -147,124 +176,135 @@ export default function CollectionsTabContent({
       </VStack>
     );
   }
+
+  if (viewMode === 'edit' && editingCollection) {
+    return (
+      <VStack align="stretch" gap={6}>
+        <Box>
+          <Field.Root mb={4}>
+            <Field.Label>Collection Name</Field.Label>
+            <Input
+              value={collectionName}
+              onChange={(e) => setCollectionName(e.target.value)}
+              placeholder="Enter collection name"
+              autoFocus
+            />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Description</Field.Label>
+            <Textarea
+              value={collectionDescription}
+              onChange={(e) => setCollectionDescription(e.target.value)}
+              placeholder="Enter collection description (optional)"
+              rows={3}
+            />
+          </Field.Root>
+        </Box>
+
+        <Separator />
+
+        <CollectionItemsSelector
+          kits={kits}
+          kitsLoading={kitsLoading}
+          selectedItemIds={selectedItemIds}
+          onToggleItem={handleToggleItem}
+          isSelected={isSelected}
+          mode="edit"
+        />
+
+        <Flex justify="flex-end" gap={2}>
+          <Button variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!collectionName.trim()}
+            colorPalette="primary"
+          >
+            Save Collection
+          </Button>
+        </Flex>
+      </VStack>
+    );
+  }
   if (collections.length === 0) {
     return (
-      <>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Icon size="xl" color="primary.500">
-                <LuFolderOpen />
-              </Icon>
-            </EmptyState.Indicator>
-            <EmptyState.Title>
-              <Highlight
-                query={['kits', 'blueprints', 'resources']}
-                styles={{
-                  px: '1',
-                  py: '0.5',
-                  bg: 'primary.100',
-                  color: 'primary.700',
-                  borderRadius: 'sm',
-                }}
-              >
-                Save and organize your kits, blueprints, and resources into collections
-              </Highlight>
-            </EmptyState.Title>
-            <Button
-              colorPalette="primary"
-              onClick={handleStartCreate}
-              mt={4}
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size="xl" color="primary.500">
+              <LuFolderOpen />
+            </Icon>
+          </EmptyState.Indicator>
+          <EmptyState.Title>
+            <Highlight
+              query={['kits', 'blueprints', 'resources']}
+              styles={{
+                px: '1',
+                py: '0.5',
+                bg: 'primary.100',
+                color: 'primary.700',
+                borderRadius: 'sm',
+              }}
             >
-              <HStack gap={2}>
-                <LuPlus />
-                <Text>Add Collection</Text>
-              </HStack>
-            </Button>
-          </EmptyState.Content>
-        </EmptyState.Root>
-        {isEditModalOpen && editingCollection && (
-          <EditCollectionModal
-            isOpen={isEditModalOpen}
-            onClose={() => {
-              setIsEditModalOpen(false);
-              setEditingCollection(null);
-            }}
-            onSave={(collection, selectedItemIds) => {
-              onUpdateCollection(collection, selectedItemIds);
-              setIsEditModalOpen(false);
-              setEditingCollection(null);
-            }}
-            collection={editingCollection}
-            selectedItemIds={editingCollection.selectedItemIds || []}
-            kits={kits}
-            kitsLoading={kitsLoading}
-          />
-        )}
-      </>
+              Save and organize your kits, blueprints, and resources into collections
+            </Highlight>
+          </EmptyState.Title>
+          <Button
+            colorPalette="primary"
+            onClick={handleStartCreate}
+            mt={4}
+          >
+            <HStack gap={2}>
+              <LuPlus />
+              <Text>Add Collection</Text>
+            </HStack>
+          </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
 
   return (
-    <>
-      <Box>
-        <Flex mb={4}>
-          <Tag.Root
-            cursor="pointer"
-            colorPalette="primary"
-            variant="subtle"
-            onClick={handleStartCreate}
-            _hover={{ bg: 'primary.100' }}
-          >
-            <Tag.Label>Add Collection</Tag.Label>
-          </Tag.Root>
-        </Flex>
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-          {collections.map((collection) => (
-            <Card.Root key={collection.id} variant="subtle">
-              <CardHeader>
-                <Heading size="md">{collection.name}</Heading>
-              </CardHeader>
-              <CardBody>
-                <Text fontSize="sm" color="text.secondary" mb={4}>
-                  Collection
-                </Text>
-                <Flex gap={2} justify="flex-end">
-                  <Button 
-                    size="sm" 
-                    variant="subtle"
-                    onClick={() => handleViewCollection(collection)}
-                  >
-                    View
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    Select
-                  </Button>
-                </Flex>
-              </CardBody>
-            </Card.Root>
-          ))}
-        </SimpleGrid>
-      </Box>
-      {isEditModalOpen && editingCollection && (
-        <EditCollectionModal
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setEditingCollection(null);
-          }}
-          onSave={(collection, selectedItemIds) => {
-            onUpdateCollection(collection, selectedItemIds);
-            setIsEditModalOpen(false);
-            setEditingCollection(null);
-          }}
-          collection={editingCollection}
-          selectedItemIds={(editingCollection as any).selectedItemIds || []}
-          kits={kits}
-          kitsLoading={kitsLoading}
-        />
-      )}
-    </>
+    <Box>
+      <Flex mb={4}>
+        <Tag.Root
+          cursor="pointer"
+          colorPalette="primary"
+          variant="subtle"
+          onClick={handleStartCreate}
+          _hover={{ bg: 'primary.100' }}
+        >
+          <Tag.Label>Add Collection</Tag.Label>
+        </Tag.Root>
+      </Flex>
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+        {collections.map((collection) => (
+          <Card.Root key={collection.id} variant="subtle">
+            <CardHeader>
+              <Heading size="md">{collection.name}</Heading>
+            </CardHeader>
+            <CardBody>
+              <Text fontSize="sm" color="text.secondary" mb={4}>
+                Collection
+              </Text>
+              <Flex gap={2} justify="flex-end">
+                <Button 
+                  size="sm" 
+                  variant="subtle"
+                  onClick={() => handleViewCollection(collection)}
+                >
+                  View
+                </Button>
+                <Button size="sm" variant="outline">
+                  Select
+                </Button>
+              </Flex>
+            </CardBody>
+          </Card.Root>
+        ))}
+      </SimpleGrid>
+    </Box>
   );
 }
 
