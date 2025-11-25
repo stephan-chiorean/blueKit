@@ -3,6 +3,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
+import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import GlobalActionBar from './components/GlobalActionBar';
 
 type View = 'welcome' | 'home';
@@ -21,14 +22,16 @@ function App() {
 
   return (
     <ColorModeProvider>
-      <SelectionProvider>
-        {currentView === 'welcome' ? (
-          <WelcomeScreen onGetStarted={handleGetStarted} />
-        ) : (
-          <HomePage onCreateBlueprint={handleCreateBlueprint} />
-        )}
-        <GlobalActionBar />
-      </SelectionProvider>
+      <FeatureFlagsProvider>
+        <SelectionProvider>
+          {currentView === 'welcome' ? (
+            <WelcomeScreen onGetStarted={handleGetStarted} />
+          ) : (
+            <HomePage onCreateBlueprint={handleCreateBlueprint} />
+          )}
+          <GlobalActionBar />
+        </SelectionProvider>
+      </FeatureFlagsProvider>
     </ColorModeProvider>
   );
 }
