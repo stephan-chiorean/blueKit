@@ -13,6 +13,8 @@ import {
 import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
+import { useWorkstation } from '../../contexts/WorkstationContext';
+import { invokeReadFile } from '../../ipc';
 
 interface KitsTabContentProps {
   kits: KitFile[];
@@ -28,6 +30,7 @@ export default function KitsTabContent({
   projectsCount,
 }: KitsTabContentProps) {
   const { toggleItem, isSelected } = useSelection();
+  const { setSelectedKit } = useWorkstation();
 
   const handleKitToggle = (kit: KitFile) => {
     const itemToToggle = {
@@ -37,6 +40,15 @@ export default function KitsTabContent({
       path: kit.path,
     };
     toggleItem(itemToToggle);
+  };
+
+  const handleViewKit = async (kit: KitFile) => {
+    try {
+      const content = await invokeReadFile(kit.path);
+      setSelectedKit(kit, content);
+    } catch (error) {
+      console.error('Failed to load kit content:', error);
+    }
   };
 
   if (kitsLoading) {
@@ -105,7 +117,11 @@ export default function KitsTabContent({
                 {description}
               </Text>
               <Flex gap={2} justify="flex-end" mt="auto">
-                <Button size="sm" variant="subtle">
+                <Button 
+                  size="sm" 
+                  variant="subtle"
+                  onClick={() => handleViewKit(kit)}
+                >
                   View
                 </Button>
                 <Button 

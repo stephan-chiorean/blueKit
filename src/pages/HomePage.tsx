@@ -15,7 +15,7 @@ import { LuMenu, LuPackage, LuLayers, LuBookOpen, LuFolderOpen } from 'react-ico
 import { BiMinusFront } from 'react-icons/bi';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import Workstation from '../components/Workstation';
+import Workstation from '../components/workstation/Workstation';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import BasesTabContent from '../components/bases/BasesTabContent';
 import KitsTabContent from '../components/kits/KitsTabContent';
