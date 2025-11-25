@@ -1,34 +1,22 @@
 import { useState } from 'react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
-import CreateBlueprintPage from './pages/CreateBlueprintPage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import GlobalActionBar from './components/GlobalActionBar';
 
-interface BlueprintData {
-  name: string;
-  description: string;
-}
-
-type View = 'welcome' | 'home' | 'create-blueprint';
+type View = 'welcome' | 'home';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('welcome');
-  const [blueprintData, setBlueprintData] = useState<BlueprintData | null>(null);
 
   const handleGetStarted = () => {
     setCurrentView('home');
   };
 
   const handleCreateBlueprint = (name: string, description: string) => {
-    setBlueprintData({ name, description });
-    setCurrentView('create-blueprint');
-  };
-
-  const handleBackFromBlueprint = () => {
-    setCurrentView('home');
-    setBlueprintData(null);
+    // Blueprint creation is now handled inline in HomePage
+    console.log('Blueprint created:', name, description);
   };
 
   return (
@@ -36,12 +24,6 @@ function App() {
       <SelectionProvider>
         {currentView === 'welcome' ? (
           <WelcomeScreen onGetStarted={handleGetStarted} />
-        ) : currentView === 'create-blueprint' && blueprintData ? (
-          <CreateBlueprintPage
-            blueprintName={blueprintData.name}
-            blueprintDescription={blueprintData.description}
-            onBack={handleBackFromBlueprint}
-          />
         ) : (
           <HomePage onCreateBlueprint={handleCreateBlueprint} />
         )}

@@ -1,3 +1,12 @@
+---
+id: button-component
+alias: Button Component
+is_base: false
+version: 1
+tags: [ui, component, button]
+description: "Reusable button component pattern for consistent, accessible buttons"
+---
+
 # Reusable Button Component Pattern
 
 ## Overview

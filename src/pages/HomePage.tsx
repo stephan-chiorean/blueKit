@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Heading,
-  SimpleGrid,
   Tabs,
   Flex,
   VStack,
@@ -14,28 +8,21 @@ import {
   IconButton,
   Icon,
   HStack,
-  Separator,
-  EmptyState,
-  Highlight,
-  Group,
-  Dialog,
-  Field,
-  Input,
-  Portal,
-  CloseButton,
-  Tag,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuPackage, LuLayers, LuBookOpen, LuFolderOpen, LuArrowRight, LuArrowLeft, LuPlus } from 'react-icons/lu';
+import { LuMenu, LuPackage, LuLayers, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
 import { BiMinusFront } from 'react-icons/bi';
-import { ImTree } from 'react-icons/im';
-import { PiTreeStructure } from 'react-icons/pi';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import CreateBlueprintModal from '../components/CreateBlueprintModal';
-import FeaturedBasesModal from '../components/FeaturedBasesModal';
+import BasesTabContent from '../components/bases/BasesTabContent';
+import KitsTabContent from '../components/kits/KitsTabContent';
+import BlueprintsTabContentWrapper from '../components/blueprints/BlueprintsTabContentWrapper';
+import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
+import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, KitFile, ProjectEntry } from '../ipc';
 import { useSelection } from '../contexts/SelectionContext';
+import { Branch } from '../components/bases/AddBranchDialog';
+import { Collection } from '../components/collections/CreateCollectionModal';
 
 interface Blueprint {
   id: string;
@@ -52,7 +39,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
   const [kits, setKits] = useState<KitFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { selectedItems, toggleItem, isSelected } = useSelection();
+  const { selectedItems } = useSelection();
   
   // Fake blueprint data for now
   const [blueprints] = useState<Blueprint[]>([
@@ -60,22 +47,30 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
     { id: '2', name: 'Dashboard Layout', description: 'Main dashboard with navigation' },
     { id: '3', name: 'API Integration', description: 'REST API integration patterns' },
   ]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('kits');
-  const [isFeaturedBasesModalOpen, setIsFeaturedBasesModalOpen] = useState(false);
+  const [isCreateBlueprintMode, setIsCreateBlueprintMode] = useState(false);
   const [selectedBase, setSelectedBase] = useState<string | null>(null);
   
   // Branches state - each branch has a name and an array of blueprint IDs
-  interface Branch {
-    id: string;
-    name: string;
-    blueprints: string[];
-  }
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [isAddBranchDialogOpen, setIsAddBranchDialogOpen] = useState(false);
-  const [isSelectBlueprintModalOpen, setIsSelectBlueprintModalOpen] = useState(false);
-  const [selectedBranchForBlueprint, setSelectedBranchForBlueprint] = useState<string | null>(null);
-  const [newBranchName, setNewBranchName] = useState('');
+  const [isFeaturedBasesModalOpen, setIsFeaturedBasesModalOpen] = useState(false);
+  
+  // Collections state - store selectedItemIds with each collection
+  interface CollectionWithItems extends Collection {
+    selectedItemIds: string[];
+  }
+  const [collections, setCollections] = useState<CollectionWithItems[]>([]);
+
+  const handleCollectionCreated = (collection: Collection, selectedItemIds: string[]) => {
+    setCollections([...collections, { ...collection, selectedItemIds }]);
+  };
+
+  const handleCollectionUpdated = (collection: Collection, selectedItemIds: string[]) => {
+    setCollections(collections.map(c => 
+      c.id === collection.id 
+        ? { ...collection, selectedItemIds }
+        : c
+    ));
+  };
 
   // Featured bases data - these are foundational templates for spinning up new apps
   const featuredBases = [
@@ -208,19 +203,6 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
     };
   }, [projects]);
 
-  const handleKitToggle = (kit: KitFile) => {
-    console.log('[HomePage] handleKitToggle called for kit:', kit);
-    console.log('[HomePage] Current selectedItems:', selectedItems);
-    const itemToToggle = {
-      id: kit.path,
-      name: kit.name,
-      type: 'Kit' as const,
-      path: kit.path,
-    };
-    console.log('[HomePage] Toggling item:', itemToToggle);
-    toggleItem(itemToToggle);
-  };
-
   const selectedCount = selectedItems.length;
   console.log('[HomePage] Render - selectedCount:', selectedCount, 'selectedItems:', selectedItems);
 
@@ -233,14 +215,13 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
           <Tabs.Root 
             defaultValue="kits" 
             variant="enclosed"
-            onValueChange={(details) => setActiveTab(details.value)}
             css={{
               '& [data-selected]': {
                 borderColor: 'colors.primary.300',
               },
             }}
           >
-            <Flex align="center" gap={4} mb={6} mt={6} position="relative" w="100%">
+            <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
               <NavigationMenu>
                 {({ onOpen }) => (
                   <IconButton
@@ -303,477 +284,68 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                   </Tabs.Trigger>
                 </Tabs.List>
               </Box>
-              {activeTab === 'blueprints' && (
-                <Box position="absolute" right={0}>
-                  <Button onClick={() => setIsCreateModalOpen(true)} colorPalette="primary">
-                    Create Blueprint
-                  </Button>
-                </Box>
-              )}
             </Flex>
 
             <Tabs.Content value="bases">
-              {selectedBase ? (
-                // Base detail view
-                <VStack align="stretch" gap={4}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedBase(null);
-                      setBranches([]);
-                    }}
-                    alignSelf="flex-start"
-                  >
-                    <HStack gap={2}>
-                      <LuArrowLeft />
-                      <Text>Back</Text>
-                    </HStack>
-                  </Button>
-                  
-                  {/* Base Name */}
-                  <Heading size="lg">
-                    {featuredBases.find(b => b.id === selectedBase)?.name || 'Base'}
-                  </Heading>
-
-                  {branches.length === 0 ? (
-                    // Empty state when no branches
-                    <EmptyState.Root>
-                      <EmptyState.Content>
-                        <EmptyState.Indicator>
-                          <Icon size="xl" color="primary.500">
-                            <ImTree />
-                          </Icon>
-                        </EmptyState.Indicator>
-                        <EmptyState.Title>
-                          <Highlight
-                            query="Branches"
-                            styles={{
-                              px: '1',
-                              py: '0.5',
-                              bg: 'primary.100',
-                              color: 'primary.700',
-                              borderRadius: 'sm',
-                            }}
-                          >
-                            Add Blueprints in separately reusable Branches for your base
-                          </Highlight>
-                        </EmptyState.Title>
-                        <EmptyState.Description>
-                          Branches are separately reusable components for your base
-                        </EmptyState.Description>
-                        <Button
-                          colorPalette="primary"
-                          onClick={() => setIsAddBranchDialogOpen(true)}
-                          mt={4}
-                        >
-                          <HStack gap={2}>
-                            <ImTree />
-                            <Text>Add Branch</Text>
-                          </HStack>
-                        </Button>
-                      </EmptyState.Content>
-                    </EmptyState.Root>
-                  ) : (
-                    // Branches view
-                    <VStack align="stretch" gap={6}>
-                      {branches.map((branch) => (
-                        <Box key={branch.id}>
-                          <Flex align="center" justify="space-between" mb={3}>
-                            <HStack gap={2}>
-                              <Icon color="primary.500">
-                                <PiTreeStructure />
-                              </Icon>
-                              <Heading size="md">
-                                {branch.name}
-                              </Heading>
-                            </HStack>
-                            <Tag.Root
-                              cursor="pointer"
-                              colorPalette="primary"
-                              variant="subtle"
-                              onClick={() => {
-                                // Handle "Add to Project" click
-                                console.log('Add branch to project:', branch.id);
-                              }}
-                              _hover={{ bg: 'primary.100' }}
-                            >
-                              <Tag.Label>Add to Project</Tag.Label>
-                            </Tag.Root>
-                          </Flex>
-                          <Group>
-                            {branch.blueprints.map((blueprintId) => (
-                              <Card.Root
-                                key={blueprintId}
-                                variant="subtle"
-                                minW="200px"
-                              >
-                                <CardBody>
-                                  <Text fontSize="sm">
-                                    {blueprints.find(b => b.id === blueprintId)?.name || 'Blueprint'}
-                                  </Text>
-                                </CardBody>
-                              </Card.Root>
-                            ))}
-                            <Card.Root
-                              borderWidth="1px"
-                              borderColor="primary.600"
-                              bg="primary.100"
-                              cursor="pointer"
-                              _hover={{ bg: 'primary.200' }}
-                              transition="all 0.2s"
-                              minW="200px"
-                              onClick={() => {
-                                setSelectedBranchForBlueprint(branch.id);
-                                setIsSelectBlueprintModalOpen(true);
-                              }}
-                            >
-                              <CardBody>
-                                <HStack gap={2} justify="center">
-                                  <Icon color="primary.700">
-                                    <LuPlus />
-                                  </Icon>
-                                  <Text color="primary.700" fontSize="sm" fontWeight="medium">
-                                    Add Blueprint
-                                  </Text>
-                                </HStack>
-                              </CardBody>
-                            </Card.Root>
-                          </Group>
-                        </Box>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsAddBranchDialogOpen(true)}
-                        alignSelf="flex-start"
-                      >
-                        <HStack gap={2}>
-                          <ImTree />
-                          <Text>Add Branch</Text>
-                        </HStack>
-                      </Button>
-                    </VStack>
-                  )}
-                </VStack>
-              ) : (
-                <VStack align="stretch" gap={6}>
-                  {/* Featured Bases Section */}
-                  <Box>
-                    <Heading size="md" mb={4}>
-                      Featured Bases
-                    </Heading>
-                    <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={4} mb={4}>
-                      {featuredBases.map((base) => (
-                        <Card.Root
-                          key={base.id}
-                          variant="subtle"
-                          cursor="pointer"
-                          _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
-                          transition="all 0.2s"
-                          onClick={() => {
-                            setSelectedBase(base.id);
-                            setBranches([]);
-                          }}
-                        >
-                          <CardHeader>
-                            <Heading size="sm">{base.name}</Heading>
-                          </CardHeader>
-                          <CardBody>
-                            <Text fontSize="sm" color="text.secondary">
-                              {base.description}
-                            </Text>
-                          </CardBody>
-                        </Card.Root>
-                      ))}
-                    </SimpleGrid>
-                    <Flex justify="flex-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsFeaturedBasesModalOpen(true)}
-                      >
-                        <HStack gap={2}>
-                          <Text>See More</Text>
-                          <LuArrowRight />
-                        </HStack>
-                      </Button>
-                    </Flex>
-                  </Box>
-
-                  <Separator />
-
-                  {/* Personal Templates Empty State */}
-                  <EmptyState.Root>
-                    <EmptyState.Content>
-                      <EmptyState.Title>
-                        <Highlight
-                          query="Bases"
-                          styles={{
-                            px: '1',
-                            py: '0.5',
-                            bg: 'primary.100',
-                            color: 'primary.700',
-                            borderRadius: 'sm',
-                          }}
-                        >
-                          Assign Kits as Bases to view here
-                        </Highlight>
-                      </EmptyState.Title>
-                      <EmptyState.Description>
-                        Bases are foundational templates that are specifically meant to spin up entirely new apps
-                      </EmptyState.Description>
-                    </EmptyState.Content>
-                  </EmptyState.Root>
-                </VStack>
-              )}
+              <BasesTabContent
+                selectedBase={selectedBase}
+                onSelectBase={(baseId) => {
+                  setSelectedBase(baseId);
+                  setBranches([]);
+                }}
+                onDeselectBase={() => {
+                  setSelectedBase(null);
+                  setBranches([]);
+                }}
+                featuredBases={featuredBases}
+                branches={branches}
+                onAddBranch={(branch) => setBranches([...branches, branch])}
+                onSelectBlueprint={(branchId, blueprintId) => {
+                  setBranches(branches.map(branch =>
+                    branch.id === branchId
+                      ? { ...branch, blueprints: [...branch.blueprints, blueprintId] }
+                      : branch
+                  ));
+                }}
+                blueprints={blueprints}
+                isFeaturedBasesModalOpen={isFeaturedBasesModalOpen}
+                onOpenFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(true)}
+                onCloseFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(false)}
+              />
             </Tabs.Content>
             <Tabs.Content value="kits">
-              {kitsLoading ? (
-                <Box textAlign="center" py={12} color="text.secondary">
-                  Loading kits...
-                </Box>
-              ) : error ? (
-                <Box textAlign="center" py={12} color="red.500">
-                  Error: {error}
-                </Box>
-              ) : projects.length === 0 ? (
-                <Box textAlign="center" py={12} color="text.secondary">
-                  No projects linked. Projects are managed via CLI and will appear here automatically.
-                </Box>
-              ) : kits.length === 0 ? (
-                <Box textAlign="center" py={12} color="text.secondary">
-                  No kits found in any linked project's .bluekit directory.
-                </Box>
-              ) : (
-                <>
-                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                    {kits.map((kit) => {
-                      const kitSelected = isSelected(kit.path);
-                      console.log('[HomePage] Kit:', kit.name, 'path:', kit.path, 'isSelected:', kitSelected);
-                      return (
-                        <Card.Root 
-                          key={kit.path} 
-                          variant="subtle"
-                          borderWidth={kitSelected ? "2px" : "1px"}
-                          borderColor={kitSelected ? "primary.500" : "border.subtle"}
-                          bg={kitSelected ? "primary.50" : undefined}
-                        >
-                          <CardHeader>
-                            <Heading size="md">{kit.name}</Heading>
-                          </CardHeader>
-                          <CardBody>
-                            <Text fontSize="sm" color="text.secondary" mb={4}>
-                              {kit.path}
-                            </Text>
-                            <Flex gap={2} justify="flex-end">
-                              <Button size="sm" variant="subtle">
-                                View
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant={kitSelected ? "solid" : "outline"}
-                                colorPalette={kitSelected ? "primary" : undefined}
-                                onClick={() => handleKitToggle(kit)}
-                              >
-                                {kitSelected ? "Selected" : "Select"}
-                              </Button>
-                            </Flex>
-                          </CardBody>
-                        </Card.Root>
-                      );
-                    })}
-                  </SimpleGrid>
-                </>
-              )}
+              <KitsTabContent
+                kits={kits}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={projects.length}
+              />
             </Tabs.Content>
             <Tabs.Content value="blueprints">
-              {blueprints.length === 0 ? (
-                <Box textAlign="center" py={12} color="text.secondary">
-                  <Text>No blueprints yet.</Text>
-                </Box>
-              ) : (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                  {blueprints.map((blueprint) => (
-                    <Card.Root key={blueprint.id} variant="subtle">
-                      <CardHeader>
-                        <Heading size="md">{blueprint.name}</Heading>
-                      </CardHeader>
-                      <CardBody>
-                        <Text fontSize="sm" color="text.secondary" mb={4}>
-                          {blueprint.description}
-                        </Text>
-                        <Flex gap={2} justify="flex-end">
-                          <Button size="sm" variant="subtle">
-                            View
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            Select
-                          </Button>
-                        </Flex>
-                      </CardBody>
-                    </Card.Root>
-                  ))}
-                </SimpleGrid>
-              )}
+              <BlueprintsTabContentWrapper
+                blueprints={blueprints}
+                onCreateBlueprint={onCreateBlueprint}
+                isCreateMode={isCreateBlueprintMode}
+                onSetCreateMode={setIsCreateBlueprintMode}
+                kits={kits}
+                kitsLoading={kitsLoading}
+              />
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
-              <Box textAlign="center" py={12} color="text.secondary">
-                Walkthroughs content coming soon...
-              </Box>
+              <WalkthroughsTabContent />
             </Tabs.Content>
             <Tabs.Content value="collections">
-              <Box textAlign="center" py={12} color="text.secondary">
-                Collections content coming soon...
-              </Box>
+              <CollectionsTabContent
+                collections={collections}
+                onAddCollection={handleCollectionCreated}
+                onUpdateCollection={handleCollectionUpdated}
+                kits={kits}
+                kitsLoading={kitsLoading}
+              />
             </Tabs.Content>
           </Tabs.Root>
         </Box>
       </VStack>
-      <CreateBlueprintModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreate={onCreateBlueprint}
-      />
-      <FeaturedBasesModal
-        isOpen={isFeaturedBasesModalOpen}
-        onClose={() => setIsFeaturedBasesModalOpen(false)}
-      />
-      
-      {/* Add Branch Dialog */}
-      <Dialog.Root open={isAddBranchDialogOpen} onOpenChange={(e) => {
-        if (!e.open) {
-          setIsAddBranchDialogOpen(false);
-          setNewBranchName('');
-        }
-      }}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content>
-              <Dialog.Header>
-                <Dialog.Title>Add Branch</Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Field.Root>
-                  <Field.Label>Branch Name</Field.Label>
-                  <Input
-                    value={newBranchName}
-                    onChange={(e) => setNewBranchName(e.target.value)}
-                    placeholder="Enter branch name"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newBranchName.trim()) {
-                        const newBranch: Branch = {
-                          id: `branch-${Date.now()}`,
-                          name: newBranchName.trim(),
-                          blueprints: [],
-                        };
-                        setBranches([...branches, newBranch]);
-                        setNewBranchName('');
-                        setIsAddBranchDialogOpen(false);
-                      }
-                    }}
-                  />
-                </Field.Root>
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Dialog.ActionTrigger asChild>
-                  <Button variant="outline">Cancel</Button>
-                </Dialog.ActionTrigger>
-                <Button
-                  onClick={() => {
-                    if (newBranchName.trim()) {
-                      const newBranch: Branch = {
-                        id: `branch-${Date.now()}`,
-                        name: newBranchName.trim(),
-                        blueprints: [],
-                      };
-                      setBranches([...branches, newBranch]);
-                      setNewBranchName('');
-                      setIsAddBranchDialogOpen(false);
-                    }
-                  }}
-                  disabled={!newBranchName.trim()}
-                  colorPalette="primary"
-                >
-                  Add
-                </Button>
-              </Dialog.Footer>
-              <Dialog.CloseTrigger asChild>
-                <CloseButton size="sm" />
-              </Dialog.CloseTrigger>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-
-      {/* Select Blueprint Modal */}
-      <Dialog.Root open={isSelectBlueprintModalOpen} onOpenChange={(e) => {
-        if (!e.open) {
-          setIsSelectBlueprintModalOpen(false);
-          setSelectedBranchForBlueprint(null);
-        }
-      }}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content maxW="600px">
-              <Dialog.Header>
-                <Dialog.Title>Select Blueprint</Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <VStack align="stretch" gap={2}>
-                  {blueprints.length === 0 ? (
-                    <Text color="text.secondary" textAlign="center" py={4}>
-                      No blueprints available
-                    </Text>
-                  ) : (
-                    blueprints.map((blueprint) => (
-                      <Card.Root
-                        key={blueprint.id}
-                        variant="subtle"
-                        cursor="pointer"
-                        _hover={{ bg: 'primary.50', borderColor: 'primary.300' }}
-                        borderWidth="1px"
-                        borderColor="border.subtle"
-                        onClick={() => {
-                          if (selectedBranchForBlueprint) {
-                            setBranches(branches.map(branch =>
-                              branch.id === selectedBranchForBlueprint
-                                ? { ...branch, blueprints: [...branch.blueprints, blueprint.id] }
-                                : branch
-                            ));
-                            setIsSelectBlueprintModalOpen(false);
-                            setSelectedBranchForBlueprint(null);
-                          }
-                        }}
-                      >
-                        <CardBody>
-                          <Heading size="sm" mb={1}>{blueprint.name}</Heading>
-                          {blueprint.description && (
-                            <Text fontSize="sm" color="text.secondary">
-                              {blueprint.description}
-                            </Text>
-                          )}
-                        </CardBody>
-                      </Card.Root>
-                    ))
-                  )}
-                </VStack>
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Dialog.ActionTrigger asChild>
-                  <Button variant="outline">Cancel</Button>
-                </Dialog.ActionTrigger>
-              </Dialog.Footer>
-              <Dialog.CloseTrigger asChild>
-                <CloseButton size="sm" />
-              </Dialog.CloseTrigger>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
     </Box>
   );
 }

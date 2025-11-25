@@ -1,3 +1,12 @@
+---
+id: form-validation
+alias: Form Validation
+is_base: false
+version: 1
+tags: [form, validation, ui]
+description: "Reusable pattern for implementing client-side form validation"
+---
+
 # Form Validation Pattern
 
 ## Overview

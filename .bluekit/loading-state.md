@@ -1,3 +1,12 @@
+---
+id: loading-state
+alias: Loading State
+is_base: false
+version: 1
+tags: [ui, pattern, loading]
+description: "Reusable pattern for displaying loading states throughout an application"
+---
+
 # Loading State Pattern
 
 ## Overview
