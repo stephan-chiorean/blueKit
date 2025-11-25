@@ -19,7 +19,8 @@ import KitsTabContent from '../components/kits/KitsTabContent';
 import BlueprintsTabContentWrapper from '../components/blueprints/BlueprintsTabContentWrapper';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
-import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, KitFile, ProjectEntry } from '../ipc';
+import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
+import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
 import { Branch } from '../components/bases/AddBranchDialog';
 import { Collection } from '../components/collections/CreateCollectionModal';
@@ -120,7 +121,24 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
         kitsMap.set(kit.path, kit);
       });
       
-      setKits(Array.from(kitsMap.values()));
+      // Read file contents and parse front matter for each kit
+      const kitsWithFrontMatter = await Promise.all(
+        Array.from(kitsMap.values()).map(async (kit) => {
+          try {
+            const content = await invokeReadFile(kit.path);
+            const frontMatter = parseFrontMatter(content);
+            return {
+              ...kit,
+              frontMatter,
+            };
+          } catch (err) {
+            console.error(`Error reading kit file ${kit.path}:`, err);
+            return kit; // Return kit without front matter if read fails
+          }
+        })
+      );
+      
+      setKits(kitsWithFrontMatter);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load kits');
       console.error('Error loading kits:', err);

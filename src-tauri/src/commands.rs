@@ -325,6 +325,41 @@ pub async fn watch_project_kits(
     Ok(())
 }
 
+/// Reads the contents of a file.
+/// 
+/// # Arguments
+/// 
+/// * `file_path` - The absolute path to the file to read
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with file contents
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// const contents = await invoke<string>('read_file', { filePath: '/path/to/file.md' });
+/// ```
+#[tauri::command]
+pub async fn read_file(file_path: String) -> Result<String, String> {
+    use std::fs;
+    
+    let path = PathBuf::from(&file_path);
+    
+    // Check if file exists
+    if !path.exists() {
+        return Err(format!("File does not exist: {}", file_path));
+    }
+    
+    // Read the file
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
+    
+    Ok(contents)
+}
+
 // How to add a new command:
 // 
 // 1. Create a new async function in this file

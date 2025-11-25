@@ -45,6 +45,26 @@ export interface KitFile {
   name: string;
   /** Full path to the kit file */
   path: string;
+  /** Parsed YAML front matter */
+  frontMatter?: KitFrontMatter;
+}
+
+/**
+ * YAML front matter structure for kit files.
+ */
+export interface KitFrontMatter {
+  /** Unique identifier for the kit */
+  id?: string;
+  /** Display alias/name for the kit */
+  alias?: string;
+  /** Whether this is a base kit */
+  is_base?: boolean;
+  /** Version number */
+  version?: number;
+  /** Tags array */
+  tags?: string[];
+  /** Description of the kit */
+  description?: string;
 }
 
 /**
@@ -193,6 +213,22 @@ export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
  */
 export async function invokeWatchProjectKits(projectPath: string): Promise<void> {
   return await invoke<void>('watch_project_kits', { projectPath });
+}
+
+/**
+ * Reads the contents of a file.
+ * 
+ * @param filePath - The absolute path to the file to read
+ * @returns A promise that resolves to the file contents as a string
+ * 
+ * @example
+ * ```typescript
+ * const contents = await invokeReadFile('/path/to/file.md');
+ * console.log(contents); // File contents as string
+ * ```
+ */
+export async function invokeReadFile(filePath: string): Promise<string> {
+  return await invoke<string>('read_file', { filePath });
 }
 
 /**

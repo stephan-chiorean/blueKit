@@ -8,7 +8,9 @@ import {
   SimpleGrid,
   Flex,
   Text,
+  Icon,
 } from '@chakra-ui/react';
+import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 
@@ -73,6 +75,9 @@ export default function KitsTabContent({
     <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
       {kits.map((kit) => {
         const kitSelected = isSelected(kit.path);
+        const displayName = kit.frontMatter?.alias || kit.name;
+        const description = kit.frontMatter?.description || kit.path;
+        const isBase = kit.frontMatter?.is_base === true;
         return (
           <Card.Root 
             key={kit.path} 
@@ -80,15 +85,26 @@ export default function KitsTabContent({
             borderWidth={kitSelected ? "2px" : "1px"}
             borderColor={kitSelected ? "primary.500" : "border.subtle"}
             bg={kitSelected ? "primary.50" : undefined}
+            position="relative"
           >
             <CardHeader>
-              <Heading size="md">{kit.name}</Heading>
+              <Flex align="center" justify="space-between" gap={4}>
+                <Heading size="md">{displayName}</Heading>
+                {isBase && (
+                  <Icon
+                    as={ImTree}
+                    boxSize={5}
+                    color="primary.500"
+                    flexShrink={0}
+                  />
+                )}
+              </Flex>
             </CardHeader>
-            <CardBody>
-              <Text fontSize="sm" color="text.secondary" mb={4}>
-                {kit.path}
+            <CardBody display="flex" flexDirection="column" flex="1">
+              <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                {description}
               </Text>
-              <Flex gap={2} justify="flex-end">
+              <Flex gap={2} justify="flex-end" mt="auto">
                 <Button size="sm" variant="subtle">
                   View
                 </Button>

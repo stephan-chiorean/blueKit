@@ -1,7 +1,7 @@
 ---
 id: tauri-file-watching
 alias: Tauri File Watching
-is_base: false
+is_base: true
 version: 1
 tags: [tauri, file-system, events]
 description: "Pattern for watching files in a Tauri application and updating the frontend"
