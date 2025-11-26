@@ -370,7 +370,12 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
               />
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
-              <WalkthroughsTabContent />
+              <WalkthroughsTabContent
+                kits={kits}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={projects.length}
+              />
             </Tabs.Content>
             <Tabs.Content value="collections">
               <CollectionsTabContent
@@ -515,7 +520,12 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 />
               </Tabs.Content>
               <Tabs.Content value="walkthroughs">
-                <WalkthroughsTabContent />
+                <WalkthroughsTabContent
+                  kits={kits}
+                  kitsLoading={kitsLoading}
+                  error={error}
+                  projectsCount={projects.length}
+                />
               </Tabs.Content>
               <Tabs.Content value="collections">
                 <CollectionsTabContent
