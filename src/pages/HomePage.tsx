@@ -241,22 +241,14 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
           <Splitter.Root
             defaultSize={[50, 50]}
             panels={[
-              { id: 'workstation', minSize: 20, collapsible: true, collapsedSize: 5 },
               { id: 'content', minSize: 30 },
+              { id: 'workstation', minSize: 20, collapsible: true, collapsedSize: 5 },
             ]}
             h="100%"
             orientation="horizontal"
           >
-            {/* Workstation Panel */}
-            <Splitter.Panel id="workstation">
-              <Workstation />
-            </Splitter.Panel>
-
-            {/* Resize Trigger */}
-            <Splitter.ResizeTrigger id="workstation:content" />
-
-        {/* Main Content Area */}
-        <Splitter.Panel id="content">
+            {/* Main Content Area */}
+            <Splitter.Panel id="content">
           <Box h="100%" p={6} position="relative" overflow="auto">
             <Tabs.Root 
               defaultValue="kits" 
@@ -389,8 +381,16 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 kitsLoading={kitsLoading}
               />
             </Tabs.Content>
-          </Tabs.Root>
-        </Box>
+            </Tabs.Root>
+          </Box>
+            </Splitter.Panel>
+
+            {/* Resize Trigger */}
+            <Splitter.ResizeTrigger id="content:workstation" />
+
+            {/* Workstation Panel */}
+            <Splitter.Panel id="workstation">
+              <Workstation />
             </Splitter.Panel>
           </Splitter.Root>
         ) : (
