@@ -26,7 +26,7 @@ import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
-import { Collection } from '../components/collections/CreateCollectionModal';
+import { Collection } from '../components/collections/AddCollectionDialog';
 import { Branch } from '../components/templates/AddBranchDialog';
 
 interface HomePageProps {

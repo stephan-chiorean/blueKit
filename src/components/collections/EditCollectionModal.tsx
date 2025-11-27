@@ -10,9 +10,8 @@ import {
   Separator,
   VStack,
   Box,
-  Flex,
 } from '@chakra-ui/react';
-import { Collection } from './CreateCollectionModal';
+import { Collection } from './AddCollectionDialog';
 import CollectionItemsSelector from './CollectionItemsSelector';
 import { KitFile } from '../../ipc';
 

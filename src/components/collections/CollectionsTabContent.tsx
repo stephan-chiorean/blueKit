@@ -21,7 +21,7 @@ import {
   Tag,
 } from '@chakra-ui/react';
 import { LuFolderOpen, LuPlus } from 'react-icons/lu';
-import { Collection } from './CreateCollectionModal';
+import { Collection } from './AddCollectionDialog';
 import CollectionItemsSelector from './CollectionItemsSelector';
 import { KitFile } from '../../ipc';
 

@@ -58,7 +58,7 @@ export default function CollectionItemsSelector({
         <Heading size="sm" mb={4}>
           {mode === 'edit' ? 'Edit Items' : 'Add Items'}
         </Heading>
-        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+        <HStack gap={4} flexWrap="wrap">
           {categories.map((category) => {
             const selectedCount = getSelectedCount(category.type);
             return (
@@ -72,6 +72,8 @@ export default function CollectionItemsSelector({
                   bg: 'primary.50',
                 }}
                 onClick={() => setSelectedCategory(category.name as Category)}
+                flex="1"
+                minW="150px"
               >
                 <CardHeader>
                   <HStack gap={3}>
@@ -89,7 +91,7 @@ export default function CollectionItemsSelector({
               </Card.Root>
             );
           })}
-        </SimpleGrid>
+        </HStack>
       </Box>
     );
   }

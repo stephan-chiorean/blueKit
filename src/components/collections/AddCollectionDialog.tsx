@@ -11,6 +11,7 @@ import {
 export interface Collection {
   id: string;
   name: string;
+  description?: string;
 }
 
 interface AddCollectionDialogProps {
