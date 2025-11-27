@@ -17,14 +17,20 @@ import {
   Group,
   Icon,
   Tag,
+  Carousel,
+  Image,
+  IconButton,
 } from '@chakra-ui/react';
-import { LuArrowLeft, LuArrowRight, LuPlus } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight, LuPlus, LuChevronLeft, LuChevronRight } from 'react-icons/lu';
 import { ImTree } from 'react-icons/im';
 import { PiTreeStructure } from 'react-icons/pi';
 import { Branch } from './AddBranchDialog';
 import FeaturedTemplatesModal from './FeaturedTemplatesModal';
 import AddBranchDialog from './AddBranchDialog';
 import SelectTemplateModal from './SelectTemplateModal';
+import featuredPic1 from '../../assets/featured-pic-1.png';
+import featuredPic2 from '../../assets/featured-pic-2.avif';
+import featuredPic3 from '../../assets/featured-pic-3.png';
 
 interface Template {
   id: string;
@@ -226,6 +232,14 @@ export default function TemplatesTabContent({
     );
   }
 
+  // Featured template images - using 3 unique images + 1 duplicate to make 4 total
+  const featuredImages = [
+    featuredPic1,
+    featuredPic2,
+    featuredPic3,
+    featuredPic1, // Duplicate first image
+  ];
+
   return (
     <>
       <VStack align="stretch" gap={6}>
@@ -233,27 +247,67 @@ export default function TemplatesTabContent({
           <Heading size="md" mb={4}>
             Featured Templates
           </Heading>
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={4} mb={4}>
-            {featuredTemplates.map((template) => (
-              <Card.Root
-                key={template.id}
-                variant="subtle"
-                cursor="pointer"
-                _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
-                transition="all 0.2s"
-                onClick={() => onSelectTemplate(template.id)}
-              >
-                <CardHeader>
-                  <Heading size="sm">{template.name}</Heading>
-                </CardHeader>
-                <CardBody>
-                  <Text fontSize="sm" color="text.secondary">
-                    {template.description}
-                  </Text>
-                </CardBody>
-              </Card.Root>
-            ))}
-          </SimpleGrid>
+          <Carousel.Root slideCount={featuredImages.length} mb={4} gap={4}>
+            <Carousel.Control justifyContent="center" gap={4} width="full">
+              <Carousel.PrevTrigger asChild>
+                <IconButton size="sm" variant="ghost" aria-label="Previous">
+                  <LuChevronLeft />
+                </IconButton>
+              </Carousel.PrevTrigger>
+
+              <Carousel.ItemGroup width="full">
+                {featuredImages.map((imageSrc, index) => (
+                  <Carousel.Item key={index} index={index}>
+                    <Box
+                      position="relative"
+                      w="100%"
+                      h="300px"
+                      borderRadius="lg"
+                      overflow="hidden"
+                      cursor="pointer"
+                      _hover={{ transform: 'scale(1.02)', transition: 'transform 0.2s' }}
+                      onClick={() => {
+                        // Map image index to template index (cycling through templates)
+                        const templateIndex = index % featuredTemplates.length;
+                        onSelectTemplate(featuredTemplates[templateIndex].id);
+                      }}
+                    >
+                      <Image
+                        src={imageSrc}
+                        alt={`Featured template ${index + 1}`}
+                        w="100%"
+                        h="100%"
+                        fit="cover"
+                      />
+                      <Box
+                        position="absolute"
+                        bottom={0}
+                        left={0}
+                        right={0}
+                        bg="linear-gradient(to top, rgba(0,0,0,0.7), transparent)"
+                        p={4}
+                      >
+                        <Heading size="sm" color="white">
+                          {featuredTemplates[index % featuredTemplates.length]?.name}
+                        </Heading>
+                        <Text fontSize="sm" color="white" mt={1}>
+                          {featuredTemplates[index % featuredTemplates.length]?.description}
+                        </Text>
+                      </Box>
+                    </Box>
+                  </Carousel.Item>
+                ))}
+              </Carousel.ItemGroup>
+
+              <Carousel.NextTrigger asChild>
+                <IconButton size="sm" variant="ghost" aria-label="Next">
+                  <LuChevronRight />
+                </IconButton>
+              </Carousel.NextTrigger>
+            </Carousel.Control>
+
+            <Carousel.Indicators />
+          </Carousel.Root>
           <Flex justify="flex-end">
             <Button
               variant="outline"
