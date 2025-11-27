@@ -10,7 +10,7 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
+import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen, LuBot } from 'react-icons/lu';
 import { BiMinusFront } from 'react-icons/bi';
 import { BsStack } from 'react-icons/bs';
 import NavigationMenu from '../components/NavigationDrawer';
@@ -20,6 +20,7 @@ import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
+import AgentsTabContent from '../components/agents/AgentsTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
@@ -313,6 +314,14 @@ export default function HomePage({}: HomePageProps) {
                       <Text>Kits</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="agents">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBot />
+                      </Icon>
+                      <Text>Agents</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                   <Tabs.Trigger value="blueprints">
                     <HStack gap={2}>
                       <Icon>
@@ -376,6 +385,9 @@ export default function HomePage({}: HomePageProps) {
                 projectsCount={projects.length}
                 onViewKit={handleViewKit}
               />
+            </Tabs.Content>
+            <Tabs.Content value="agents">
+              <AgentsTabContent />
             </Tabs.Content>
             <Tabs.Content value="blueprints">
               <BlueprintsTabContent
