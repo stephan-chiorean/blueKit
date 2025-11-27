@@ -23,6 +23,7 @@ import {
   SegmentGroup,
 } from '@chakra-ui/react';
 import { LuArrowLeft, LuArrowRight, LuPlus, LuChevronLeft, LuChevronRight, LuStar, LuUser } from 'react-icons/lu';
+import { BiMinusFront } from 'react-icons/bi';
 import { ImTree } from 'react-icons/im';
 import { PiTreeStructure } from 'react-icons/pi';
 import { Branch } from './AddBranchDialog';
@@ -356,6 +357,11 @@ export default function TemplatesTabContent({
         ) : (
           <EmptyState.Root>
             <EmptyState.Content>
+              <EmptyState.Indicator>
+                <Icon size="xl" color="primary.500">
+                  <BiMinusFront />
+                </Icon>
+              </EmptyState.Indicator>
               <EmptyState.Title>
                 <Highlight
                   query="Templates"
