@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -11,8 +12,17 @@ import {
   HStack,
   Checkbox,
   Tag,
+  IconButton,
+  Button,
+  Table,
+  VStack,
+  Input,
+  InputGroup,
+  Field,
+  Separator,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
+import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 
@@ -24,6 +34,8 @@ interface WalkthroughsTabContentProps {
   onViewKit: (kit: KitFile) => void;
 }
 
+type ViewMode = 'card' | 'table';
+
 export default function WalkthroughsTabContent({
   kits,
   kitsLoading,
@@ -32,6 +44,54 @@ export default function WalkthroughsTabContent({
   onViewKit,
 }: WalkthroughsTabContentProps) {
   const { toggleItem, isSelected } = useSelection();
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [nameFilter, setNameFilter] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Filter kits to only show those with type: walkthrough in front matter
+  const walkthroughs = useMemo(() => 
+    kits.filter(kit => kit.frontMatter?.type === 'walkthrough'),
+    [kits]
+  );
+
+  // Get all unique tags from walkthroughs
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    walkthroughs.forEach(walkthrough => {
+      walkthrough.frontMatter?.tags?.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [walkthroughs]);
+
+  // Filter walkthroughs based on name and selected tags
+  const filteredWalkthroughs = useMemo(() => {
+    return walkthroughs.filter(walkthrough => {
+      const displayName = walkthrough.frontMatter?.alias || walkthrough.name;
+      const matchesName = !nameFilter || 
+        displayName.toLowerCase().includes(nameFilter.toLowerCase()) ||
+        walkthrough.name.toLowerCase().includes(nameFilter.toLowerCase());
+      
+      const matchesTags = selectedTags.length === 0 || 
+        selectedTags.some(selectedTag =>
+          walkthrough.frontMatter?.tags?.some(tag => 
+            tag.toLowerCase() === selectedTag.toLowerCase()
+          )
+        );
+      
+      return matchesName && matchesTags;
+    });
+  }, [walkthroughs, nameFilter, selectedTags]);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  };
 
   const handleWalkthroughToggle = (walkthrough: KitFile) => {
     const itemToToggle = {
@@ -71,9 +131,6 @@ export default function WalkthroughsTabContent({
     );
   }
 
-  // Filter kits to only show those with type: walkthrough in front matter
-  const walkthroughs = kits.filter(kit => kit.frontMatter?.type === 'walkthrough');
-
   if (walkthroughs.length === 0) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
@@ -82,9 +139,9 @@ export default function WalkthroughsTabContent({
     );
   }
 
-  return (
+  const renderCardView = () => (
     <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-      {walkthroughs.map((walkthrough) => {
+      {filteredWalkthroughs.map((walkthrough) => {
         const walkthroughSelected = isSelected(walkthrough.path);
         const displayName = walkthrough.frontMatter?.alias || walkthrough.name;
         const description = walkthrough.frontMatter?.description || walkthrough.path;
@@ -150,6 +207,245 @@ export default function WalkthroughsTabContent({
         );
       })}
     </SimpleGrid>
+  );
+
+  const renderTableView = () => (
+    <Table.Root size="sm" variant="outline">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader w="6">
+            <Checkbox.Root
+              size="sm"
+              checked={filteredWalkthroughs.length > 0 && filteredWalkthroughs.every(walkthrough => isSelected(walkthrough.path))}
+              onCheckedChange={(changes) => {
+                filteredWalkthroughs.forEach(walkthrough => {
+                  if (changes.checked && !isSelected(walkthrough.path)) {
+                    handleWalkthroughToggle(walkthrough);
+                  } else if (!changes.checked && isSelected(walkthrough.path)) {
+                    handleWalkthroughToggle(walkthrough);
+                  }
+                });
+              }}
+            >
+              <Checkbox.HiddenInput />
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+            </Checkbox.Root>
+          </Table.ColumnHeader>
+          <Table.ColumnHeader>Name</Table.ColumnHeader>
+          <Table.ColumnHeader>Description</Table.ColumnHeader>
+          <Table.ColumnHeader>Tags</Table.ColumnHeader>
+          <Table.ColumnHeader>Base</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {filteredWalkthroughs.map((walkthrough) => {
+          const walkthroughSelected = isSelected(walkthrough.path);
+          const displayName = walkthrough.frontMatter?.alias || walkthrough.name;
+          const description = walkthrough.frontMatter?.description || walkthrough.path;
+          const isBase = walkthrough.frontMatter?.is_base === true;
+          return (
+            <Table.Row
+              key={walkthrough.path}
+              cursor="pointer"
+              onClick={() => handleViewWalkthrough(walkthrough)}
+              _hover={{ bg: "bg.subtle" }}
+              data-selected={walkthroughSelected ? "" : undefined}
+            >
+              <Table.Cell>
+                <Checkbox.Root
+                  size="sm"
+                  checked={walkthroughSelected}
+                  onCheckedChange={() => {
+                    handleWalkthroughToggle(walkthrough);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox.Root>
+              </Table.Cell>
+              <Table.Cell>
+                <HStack gap={2}>
+                  <Text fontWeight="medium">{displayName}</Text>
+                  {isBase && (
+                    <Icon
+                      as={ImTree}
+                      boxSize={4}
+                      color="primary.500"
+                    />
+                  )}
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>
+                <Text fontSize="sm" color="text.secondary" noOfLines={1}>
+                  {description}
+                </Text>
+              </Table.Cell>
+              <Table.Cell>
+                {walkthrough.frontMatter?.tags && walkthrough.frontMatter.tags.length > 0 ? (
+                  <HStack gap={1} flexWrap="wrap">
+                    {walkthrough.frontMatter.tags.map((tag) => (
+                      <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                        <Tag.Label>{tag}</Tag.Label>
+                      </Tag.Root>
+                    ))}
+                  </HStack>
+                ) : (
+                  <Text fontSize="sm" color="text.tertiary">—</Text>
+                )}
+              </Table.Cell>
+              <Table.Cell>
+                {isBase ? (
+                  <Tag.Root size="sm" variant="solid" colorPalette="primary">
+                    <Tag.Label>Base</Tag.Label>
+                  </Tag.Root>
+                ) : (
+                  <Text fontSize="sm" color="text.tertiary">—</Text>
+                )}
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
+      </Table.Body>
+    </Table.Root>
+  );
+
+  return (
+    <Box position="relative">
+      {/* Main Content */}
+      <VStack align="stretch" gap={4}>
+        <Flex justify="space-between" align="center">
+          {/* Filter Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            leftIcon={<LuFilter />}
+          >
+            Filter
+          </Button>
+
+          {/* View Mode Switcher */}
+          <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
+            <Button
+              onClick={() => setViewMode('card')}
+              variant="ghost"
+              borderRadius={0}
+              borderRightWidth="1px"
+              borderRightColor="border.subtle"
+              bg={viewMode === 'card' ? 'white' : 'transparent'}
+              color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
+              _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuLayoutGrid />
+                </Icon>
+                <Text>Cards</Text>
+              </HStack>
+            </Button>
+            <Button
+              onClick={() => setViewMode('table')}
+              variant="ghost"
+              borderRadius={0}
+              bg={viewMode === 'table' ? 'white' : 'transparent'}
+              color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
+              _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuTable />
+                </Icon>
+                <Text>Table</Text>
+              </HStack>
+            </Button>
+          </HStack>
+        </Flex>
+
+        {/* Filter Overlay */}
+        {isFilterOpen && (
+          <Box
+            position="absolute"
+            top="50px"
+            left={0}
+            zIndex={10}
+            w="300px"
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="md"
+            p={4}
+            bg="white"
+            boxShadow="lg"
+          >
+            <VStack align="stretch" gap={4}>
+              <Field.Root>
+                <Field.Label>Name</Field.Label>
+                <InputGroup
+                  endElement={nameFilter ? (
+                    <IconButton
+                      size="xs"
+                      variant="ghost"
+                      aria-label="Clear name filter"
+                      onClick={() => setNameFilter('')}
+                    >
+                      <Icon>
+                        <LuX />
+                      </Icon>
+                    </IconButton>
+                  ) : undefined}
+                >
+                  <Input
+                    placeholder="Filter by name..."
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                  />
+                </InputGroup>
+              </Field.Root>
+
+              {allTags.length > 0 && (
+                <Field.Root>
+                  <Field.Label>Tags</Field.Label>
+                  <HStack gap={1} flexWrap="wrap" mt={2}>
+                    {allTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <Tag.Root
+                          key={tag}
+                          size="sm"
+                          variant={isSelected ? 'solid' : 'subtle'}
+                          colorPalette={isSelected ? 'primary' : undefined}
+                          cursor="pointer"
+                          onClick={() => toggleTag(tag)}
+                          opacity={isSelected ? 1 : 0.6}
+                          _hover={{ opacity: 1 }}
+                        >
+                          <Tag.Label>{tag}</Tag.Label>
+                        </Tag.Root>
+                      );
+                    })}
+                  </HStack>
+                </Field.Root>
+              )}
+            </VStack>
+          </Box>
+        )}
+
+        {/* Content */}
+        {filteredWalkthroughs.length === 0 ? (
+          <Box textAlign="center" py={12} color="text.secondary">
+            No walkthroughs match the current filters.
+          </Box>
+        ) : (
+          viewMode === 'card' ? renderCardView() : renderTableView()
+        )}
+      </VStack>
+    </Box>
   );
 }
 
