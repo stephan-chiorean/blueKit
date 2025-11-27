@@ -10,6 +10,7 @@ import {
   Icon,
   HStack,
   Checkbox,
+  Tag,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
@@ -132,6 +133,15 @@ export default function KitsTabContent({
               <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
                 {description}
               </Text>
+              {kit.frontMatter?.tags && kit.frontMatter.tags.length > 0 && (
+                <HStack gap={2} flexWrap="wrap" mt="auto">
+                  {kit.frontMatter.tags.map((tag) => (
+                    <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                      <Tag.Label>{tag}</Tag.Label>
+                    </Tag.Root>
+                  ))}
+                </HStack>
+              )}
             </CardBody>
           </Card.Root>
         );

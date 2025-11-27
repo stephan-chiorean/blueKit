@@ -276,11 +276,15 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   size="xs"
                   variant="ghost"
                   onClick={saveNotes}
-                  isLoading={isSaving}
+                  loading={isSaving}
                   loadingText="Saving..."
-                  leftIcon={<Icon><LuSave /></Icon>}
                 >
-                  Save
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuSave />
+                    </Icon>
+                    <Text>Save</Text>
+                  </HStack>
                 </Button>
               </Flex>
               <Box position="relative">

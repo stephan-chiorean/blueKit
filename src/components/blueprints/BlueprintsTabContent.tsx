@@ -108,26 +108,16 @@ interface BlueprintsTabContentProps {
 }
 
 export default function BlueprintsTabContent({
-  kits,
+  kits: _kits,
   kitsLoading,
   error,
   projectsCount,
-  onViewKit,
+  onViewKit: _onViewKit,
 }: BlueprintsTabContentProps) {
-  const { toggleItem, isSelected } = useSelection();
+  const { isSelected } = useSelection();
   const [expandedBlueprints, setExpandedBlueprints] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<BlueprintTask | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-
-  const handleBlueprintToggle = (blueprintId: string) => {
-    const itemToToggle = {
-      id: blueprintId,
-      name: blueprintId,
-      type: 'Blueprint' as const,
-      path: blueprintId,
-    };
-    toggleItem(itemToToggle);
-  };
 
   const toggleBlueprintExpansion = (blueprintId: string) => {
     setExpandedBlueprints((prev) => {
@@ -205,13 +195,17 @@ export default function BlueprintsTabContent({
         <Button
           variant="outline"
           size="sm"
-          leftIcon={<LuPlus />}
           onClick={() => {
             // TODO: Open create blueprint modal
             console.log('Create blueprint');
           }}
         >
-          Add Blueprint
+          <HStack gap={2}>
+            <Icon>
+              <LuPlus />
+            </Icon>
+            <Text>Add Blueprint</Text>
+          </HStack>
         </Button>
       </Flex>
       <SimpleGrid columns={{ base: 1, md: 1, lg: 1 }} gap={4}>

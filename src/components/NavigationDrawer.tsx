@@ -30,6 +30,7 @@ import {
   LuSettings,
   LuMoon,
   LuSun,
+  LuArchive,
 } from 'react-icons/lu';
 import {FaBucket} from "react-icons/fa6";
 import { FaMoon, FaSun } from "react-icons/fa";
@@ -74,6 +75,11 @@ const menuItems: MenuItem[] = [
     children: [
       { id: 'settings', label: 'Settings', icon: LuSettings },
     ],
+  },
+  {
+    id: 'archive',
+    label: 'Archive',
+    icon: LuArchive,
   },
 ];
 

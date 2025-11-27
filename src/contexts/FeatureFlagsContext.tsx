@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface FeatureFlags {
-  workstation: boolean;
+  // Add new feature flags here as needed
+  // Example: newFeature: boolean;
 }
 
 interface FeatureFlagsContextType {
@@ -22,9 +23,7 @@ export function FeatureFlagsProvider({
   initialFlags = {} 
 }: FeatureFlagsProviderProps) {
   // Default feature flags - set to true to enable features
-  // To enable workstation: <FeatureFlagsProvider initialFlags={{ workstation: true }}>
   const defaultFlags: FeatureFlags = {
-    workstation: true, // Set to true to enable workstation panel
     ...initialFlags,
   };
 
