@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -9,176 +7,138 @@ import {
   SimpleGrid,
   Flex,
   Text,
-  VStack,
-  Textarea,
-  Field,
-  Input,
-  Separator,
-  Tag,
+  Icon,
+  HStack,
+  Checkbox,
 } from '@chakra-ui/react';
-import CollectionItemsSelector from '../collections/CollectionItemsSelector';
+import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
-
-interface Blueprint {
-  id: string;
-  name: string;
-  description: string;
-}
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface BlueprintsTabContentProps {
-  blueprints: Blueprint[];
-  onCreateBlueprint: (name: string, description: string) => void;
-  initialCreateMode?: boolean;
-  onCancelCreate?: () => void;
   kits: KitFile[];
   kitsLoading: boolean;
+  error: string | null;
+  projectsCount: number;
+  onViewKit: (kit: KitFile) => void;
 }
 
 export default function BlueprintsTabContent({
-  blueprints,
-  onCreateBlueprint,
-  initialCreateMode = false,
-  onCancelCreate,
   kits,
   kitsLoading,
+  error,
+  projectsCount,
+  onViewKit,
 }: BlueprintsTabContentProps) {
-  const [viewMode, setViewMode] = useState<'list' | 'create'>(initialCreateMode ? 'create' : 'list');
-  const [blueprintName, setBlueprintName] = useState('');
-  const [blueprintDescription, setBlueprintDescription] = useState('');
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const { toggleItem, isSelected } = useSelection();
 
-  useEffect(() => {
-    if (initialCreateMode && viewMode === 'list') {
-      setViewMode('create');
-    }
-  }, [initialCreateMode]);
-
-  const handleToggleItem = (itemId: string) => {
-    setSelectedItemIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
+  const handleBlueprintToggle = (blueprint: KitFile) => {
+    const itemToToggle = {
+      id: blueprint.path,
+      name: blueprint.name,
+      type: 'Kit' as const,
+      path: blueprint.path,
+    };
+    toggleItem(itemToToggle);
   };
 
-  const isSelected = (itemId: string) => {
-    return selectedItemIds.has(itemId);
+  const handleViewBlueprint = (blueprint: KitFile) => {
+    onViewKit(blueprint);
   };
 
-  const handleCancel = () => {
-    setViewMode('list');
-    setBlueprintName('');
-    setBlueprintDescription('');
-    setSelectedItemIds(new Set());
-    onCancelCreate?.();
-  };
-
-  const handleCreate = () => {
-    if (blueprintName.trim()) {
-      onCreateBlueprint(blueprintName.trim(), blueprintDescription.trim());
-      handleCancel();
-    }
-  };
-
-  if (viewMode === 'create') {
+  if (kitsLoading) {
     return (
-      <VStack align="stretch" gap={6}>
-        <Box>
-          <Field.Root mb={4}>
-            <Field.Label>Blueprint Name</Field.Label>
-            <Input
-              value={blueprintName}
-              onChange={(e) => setBlueprintName(e.target.value)}
-              placeholder="Enter blueprint name"
-              autoFocus
-            />
-          </Field.Root>
-          <Field.Root>
-            <Field.Label>Description</Field.Label>
-            <Textarea
-              value={blueprintDescription}
-              onChange={(e) => setBlueprintDescription(e.target.value)}
-              placeholder="Enter blueprint description (optional)"
-              rows={3}
-            />
-          </Field.Root>
-        </Box>
-
-        <Separator />
-
-        <CollectionItemsSelector
-          kits={kits}
-          kitsLoading={kitsLoading}
-          selectedItemIds={selectedItemIds}
-          onToggleItem={handleToggleItem}
-          isSelected={isSelected}
-          mode="add"
-        />
-
-        <Flex justify="flex-end" gap={2}>
-          <Button variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreate}
-            disabled={!blueprintName.trim()}
-            colorPalette="primary"
-          >
-            Create Blueprint
-          </Button>
-        </Flex>
-      </VStack>
+      <Box textAlign="center" py={12} color="text.secondary">
+        Loading blueprints...
+      </Box>
     );
   }
+
+  if (error) {
+    return (
+      <Box textAlign="center" py={12} color="red.500">
+        Error: {error}
+      </Box>
+    );
+  }
+
+  if (projectsCount === 0) {
+    return (
+      <Box textAlign="center" py={12} color="text.secondary">
+        No projects linked. Projects are managed via CLI and will appear here automatically.
+      </Box>
+    );
+  }
+
+  // Filter kits to only show those with type: blueprint in front matter
+  const blueprints = kits.filter(kit => kit.frontMatter?.type === 'blueprint');
 
   if (blueprints.length === 0) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
-        <Text>No blueprints yet.</Text>
+        No blueprints found in any linked project's .bluekit directory.
       </Box>
     );
   }
 
   return (
-    <Box>
-      <Flex mb={4}>
-        <Tag.Root
-          cursor="pointer"
-          colorPalette="primary"
-          variant="subtle"
-          onClick={() => setViewMode('create')}
-          _hover={{ bg: 'primary.100' }}
-        >
-          <Tag.Label>Add Blueprint</Tag.Label>
-        </Tag.Root>
-      </Flex>
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-        {blueprints.map((blueprint) => (
-          <Card.Root key={blueprint.id} variant="subtle">
+    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+      {blueprints.map((blueprint) => {
+        const blueprintSelected = isSelected(blueprint.path);
+        const displayName = blueprint.frontMatter?.alias || blueprint.name;
+        const description = blueprint.frontMatter?.description || blueprint.path;
+        const isBase = blueprint.frontMatter?.is_base === true;
+        return (
+          <Card.Root 
+            key={blueprint.path} 
+            variant="subtle"
+            borderWidth={blueprintSelected ? "2px" : "1px"}
+            borderColor={blueprintSelected ? "primary.500" : "border.subtle"}
+            bg={blueprintSelected ? "primary.50" : undefined}
+            position="relative"
+            cursor="pointer"
+            onClick={() => handleViewBlueprint(blueprint)}
+            _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+          >
             <CardHeader>
-              <Heading size="md">{blueprint.name}</Heading>
-            </CardHeader>
-            <CardBody>
-              <Text fontSize="sm" color="text.secondary" mb={4}>
-                {blueprint.description}
-              </Text>
-              <Flex gap={2} justify="flex-end">
-                <Button size="sm" variant="subtle">
-                  View
-                </Button>
-                <Button size="sm" variant="outline">
-                  Select
-                </Button>
+              <Flex align="center" justify="space-between" gap={4}>
+                <HStack gap={2} align="center">
+                  <Heading size="md">{displayName}</Heading>
+                  {isBase && (
+                    <Icon
+                      as={ImTree}
+                      boxSize={5}
+                      color="primary.500"
+                      flexShrink={0}
+                    />
+                  )}
+                </HStack>
+                <Checkbox.Root
+                  checked={blueprintSelected}
+                  colorPalette="blue"
+                  onCheckedChange={() => {
+                    handleBlueprintToggle(blueprint);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  cursor="pointer"
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox.Root>
               </Flex>
+            </CardHeader>
+            <CardBody display="flex" flexDirection="column" flex="1">
+              <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                {description}
+              </Text>
             </CardBody>
           </Card.Root>
-        ))}
-      </SimpleGrid>
-    </Box>
+        );
+      })}
+    </SimpleGrid>
   );
 }
-

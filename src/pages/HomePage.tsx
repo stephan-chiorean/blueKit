@@ -12,12 +12,14 @@ import {
 import { listen } from '@tauri-apps/api/event';
 import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
 import { BiMinusFront } from 'react-icons/bi';
+import { BsStack } from 'react-icons/bs';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import TemplatesTabContent from '../components/templates/TemplatesTabContent';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
+import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
 import KitViewPage from './KitViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
@@ -298,6 +300,14 @@ export default function HomePage({}: HomePageProps) {
                       <Text>Kits</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="blueprints">
+                    <HStack gap={2}>
+                      <Icon>
+                        <BsStack />
+                      </Icon>
+                      <Text>Blueprints</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                   <Tabs.Trigger value="walkthroughs">
                     <HStack gap={2}>
                       <Icon>
@@ -347,6 +357,15 @@ export default function HomePage({}: HomePageProps) {
             </Tabs.Content>
             <Tabs.Content value="kits">
               <KitsTabContent
+                kits={kits}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={projects.length}
+                onViewKit={handleViewKit}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="blueprints">
+              <BlueprintsTabContent
                 kits={kits}
                 kitsLoading={kitsLoading}
                 error={error}
