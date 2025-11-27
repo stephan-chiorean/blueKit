@@ -32,6 +32,7 @@ import {
   LuSun,
 } from 'react-icons/lu';
 import {FaBucket} from "react-icons/fa6";
+import { FaMoon, FaSun } from "react-icons/fa";
 import { useColorMode } from '../contexts/ColorModeContext';
 
 interface NavigationMenuProps {
@@ -136,15 +137,12 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
                   {/* Color Mode Toggle */}
                   <Box mb={2}>
                     <HStack justify="space-between" w="100%">
-                      <HStack gap={2}>
-                        <Icon>
-                          {colorMode === 'light' ? <LuMoon /> : <LuSun />}
-                        </Icon>
-                        <Text fontSize="sm">
-                          {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
-                        </Text>
-                      </HStack>
+                      <Text fontSize="sm">
+                        {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
+                      </Text>
                       <Switch.Root
+                        colorPalette="blue"
+                        size="lg"
                         checked={colorMode === 'dark'}
                         onCheckedChange={(e) => {
                           if (e.checked && colorMode === 'light') {
@@ -157,6 +155,9 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
                         <Switch.HiddenInput />
                         <Switch.Control>
                           <Switch.Thumb />
+                          <Switch.Indicator fallback={<Icon as={FaSun} color="yellow.400" />}>
+                            <Icon as={FaMoon} color="gray.400" />
+                          </Switch.Indicator>
                         </Switch.Control>
                       </Switch.Root>
                     </HStack>

@@ -10,13 +10,13 @@ import Workstation from '../components/workstation/Workstation';
 import { useWorkstation } from '../contexts/WorkstationContext';
 import { KitFile } from '../ipc';
 
-interface KitViewPageProps {
+interface WalkthroughViewPageProps {
   kit: KitFile;
   kitContent: string;
   onBack: () => void;
 }
 
-export default function KitViewPage({ kit, kitContent, onBack }: KitViewPageProps) {
+export default function WalkthroughViewPage({ kit, kitContent, onBack }: WalkthroughViewPageProps) {
   const { setSelectedKit, clearSelectedKit } = useWorkstation();
 
   // Set the selected kit when component mounts

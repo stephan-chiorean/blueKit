@@ -21,6 +21,7 @@ import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabCo
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
 import KitViewPage from './KitViewPage';
+import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
@@ -233,15 +234,27 @@ export default function HomePage({}: HomePageProps) {
     setKitViewContent(null);
   };
 
-  // If viewing a kit, show the kit view page
+  // If viewing a kit or walkthrough, show the appropriate view page
   if (viewingKit && kitViewContent) {
-    return (
-      <KitViewPage 
-        kit={viewingKit} 
-        kitContent={kitViewContent}
-        onBack={handleBackFromKitView}
-      />
-    );
+    const isWalkthrough = viewingKit.frontMatter?.type === 'walkthrough';
+    
+    if (isWalkthrough) {
+      return (
+        <WalkthroughViewPage 
+          kit={viewingKit} 
+          kitContent={kitViewContent}
+          onBack={handleBackFromKitView}
+        />
+      );
+    } else {
+      return (
+        <KitViewPage 
+          kit={viewingKit} 
+          kitContent={kitViewContent}
+          onBack={handleBackFromKitView}
+        />
+      );
+    }
   }
 
   return (
