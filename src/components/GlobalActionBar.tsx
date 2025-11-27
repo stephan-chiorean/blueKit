@@ -59,7 +59,7 @@ export default function GlobalActionBar() {
               <Button variant="outline" size="sm">
                 <HStack gap={2}>
                   <LuFileText />
-                  <Text>Add to Blueprint</Text>
+                  <Text>Add to Template</Text>
                 </HStack>
               </Button>
               <Button variant="outline" size="sm">

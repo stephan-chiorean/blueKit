@@ -1,0 +1,33 @@
+# BlueKit Cursor Rules
+
+## Product Context
+
+When working on BlueKit features, components, or documentation, reference `product.md` for:
+- Understanding the product vision and goals
+- Core concepts (Kits, Walkthroughs, Blueprints, Bases, Collections)
+- Use cases and workflows
+- Architecture and design principles
+- Feature requirements and user needs
+
+The product.md file contains the complete product overview and should be consulted when:
+- Adding new features
+- Making architectural decisions
+- Writing documentation
+- Understanding user workflows
+- Planning new capabilities
+
+## Project Structure
+
+- Kits are stored in `.bluekit/` directories within projects
+- Project registry is managed at `~/.bluekit/projectRegistry.json`
+- Frontend: React + TypeScript + Chakra UI in `src/`
+- Backend: Rust + Tauri in `src-tauri/`
+- IPC communication: Type-safe wrappers in `src/ipc.ts`
+
+## Key Principles
+
+1. **File-Based**: Kits live in `.bluekit` directories, versioned with code
+2. **Type-Safe**: Full TypeScript and Rust type safety throughout
+3. **Real-Time**: Event-driven updates for immediate feedback
+4. **Non-Intrusive**: No database, just markdown files
+

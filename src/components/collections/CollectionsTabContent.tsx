@@ -238,7 +238,7 @@ export default function CollectionsTabContent({
           </EmptyState.Indicator>
           <EmptyState.Title>
             <Highlight
-              query={['kits', 'blueprints', 'resources']}
+              query={['kits', 'templates', 'resources']}
               styles={{
                 px: '1',
                 py: '0.5',
@@ -247,7 +247,7 @@ export default function CollectionsTabContent({
                 borderRadius: 'sm',
               }}
             >
-              Save and organize your kits, blueprints, and resources into collections
+              Save and organize your kits, templates, and resources into collections
             </Highlight>
           </EmptyState.Title>
           <Button

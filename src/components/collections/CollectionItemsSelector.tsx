@@ -17,7 +17,7 @@ import {
 import { LuPackage, LuLayers, LuBookOpen } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
 
-type Category = 'Kits' | 'Blueprints' | 'Walkthroughs' | null;
+type Category = 'Kits' | 'Templates' | 'Walkthroughs' | null;
 
 interface CollectionItemsSelectorProps {
   kits: KitFile[];
@@ -40,12 +40,12 @@ export default function CollectionItemsSelector({
 
   const categories = [
     { name: 'Kits', icon: LuPackage, type: 'Kit' as const },
-    { name: 'Blueprints', icon: LuLayers, type: 'Blueprint' as const },
+    { name: 'Templates', icon: LuLayers, type: 'Template' as const },
     { name: 'Walkthroughs', icon: LuBookOpen, type: 'Collection' as const },
   ] as const;
 
   // Count selected items by category type
-  const getSelectedCount = (type: 'Kit' | 'Blueprint' | 'Collection') => {
+  const getSelectedCount = (type: 'Kit' | 'Template' | 'Collection') => {
     if (type === 'Kit') {
       return kits.filter(kit => selectedItemIds.has(kit.path)).length;
     }

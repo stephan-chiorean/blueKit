@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -9,18 +8,19 @@ import {
   Flex,
   Text,
   Icon,
+  HStack,
+  Checkbox,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
-import { useWorkstation } from '../../contexts/WorkstationContext';
-import { invokeReadFile } from '../../ipc';
 
 interface WalkthroughsTabContentProps {
   kits: KitFile[];
   kitsLoading: boolean;
   error: string | null;
   projectsCount: number;
+  onViewKit: (kit: KitFile) => void;
 }
 
 export default function WalkthroughsTabContent({
@@ -28,9 +28,9 @@ export default function WalkthroughsTabContent({
   kitsLoading,
   error,
   projectsCount,
+  onViewKit,
 }: WalkthroughsTabContentProps) {
   const { toggleItem, isSelected } = useSelection();
-  const { setSelectedKit } = useWorkstation();
 
   const handleWalkthroughToggle = (walkthrough: KitFile) => {
     const itemToToggle = {
@@ -42,13 +42,8 @@ export default function WalkthroughsTabContent({
     toggleItem(itemToToggle);
   };
 
-  const handleViewWalkthrough = async (walkthrough: KitFile) => {
-    try {
-      const content = await invokeReadFile(walkthrough.path);
-      setSelectedKit(walkthrough, content);
-    } catch (error) {
-      console.error('Failed to load walkthrough content:', error);
-    }
+  const handleViewWalkthrough = (walkthrough: KitFile) => {
+    onViewKit(walkthrough);
   };
 
   if (kitsLoading) {
@@ -101,41 +96,45 @@ export default function WalkthroughsTabContent({
             borderColor={walkthroughSelected ? "primary.500" : "border.subtle"}
             bg={walkthroughSelected ? "primary.50" : undefined}
             position="relative"
+            cursor="pointer"
+            onClick={() => handleViewWalkthrough(walkthrough)}
+            _hover={{ borderColor: "primary.400", bg: "primary.50" }}
           >
             <CardHeader>
               <Flex align="center" justify="space-between" gap={4}>
-                <Heading size="md">{displayName}</Heading>
-                {isBase && (
-                  <Icon
-                    as={ImTree}
-                    boxSize={5}
-                    color="primary.500"
-                    flexShrink={0}
-                  />
-                )}
+                <HStack gap={2} align="center">
+                  <Heading size="md">{displayName}</Heading>
+                  {isBase && (
+                    <Icon
+                      as={ImTree}
+                      boxSize={5}
+                      color="primary.500"
+                      flexShrink={0}
+                    />
+                  )}
+                </HStack>
+                <Checkbox.Root
+                  checked={walkthroughSelected}
+                  colorPalette="blue"
+                  onCheckedChange={() => {
+                    handleWalkthroughToggle(walkthrough);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  cursor="pointer"
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox.Root>
               </Flex>
             </CardHeader>
             <CardBody display="flex" flexDirection="column" flex="1">
               <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
                 {description}
               </Text>
-              <Flex gap={2} justify="flex-end" mt="auto">
-                <Button 
-                  size="sm" 
-                  variant="subtle"
-                  onClick={() => handleViewWalkthrough(walkthrough)}
-                >
-                  View
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={walkthroughSelected ? "solid" : "outline"}
-                  colorPalette={walkthroughSelected ? "primary" : undefined}
-                  onClick={() => handleWalkthroughToggle(walkthrough)}
-                >
-                  {walkthroughSelected ? "Selected" : "Select"}
-                </Button>
-              </Flex>
             </CardBody>
           </Card.Root>
         );

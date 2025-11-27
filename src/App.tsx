@@ -16,11 +16,6 @@ function App() {
     setCurrentView('home');
   };
 
-  const handleCreateBlueprint = (name: string, description: string) => {
-    // Blueprint creation is now handled inline in HomePage
-    console.log('Blueprint created:', name, description);
-  };
-
   return (
     <ColorModeProvider>
       <FeatureFlagsProvider>
@@ -29,7 +24,7 @@ function App() {
             {currentView === 'welcome' ? (
               <WelcomeScreen onGetStarted={handleGetStarted} />
             ) : (
-              <HomePage onCreateBlueprint={handleCreateBlueprint} />
+              <HomePage />
             )}
             <GlobalActionBar />
           </SelectionProvider>

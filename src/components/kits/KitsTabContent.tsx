@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -9,18 +8,19 @@ import {
   Flex,
   Text,
   Icon,
+  HStack,
+  Checkbox,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
-import { useWorkstation } from '../../contexts/WorkstationContext';
-import { invokeReadFile } from '../../ipc';
 
 interface KitsTabContentProps {
   kits: KitFile[];
   kitsLoading: boolean;
   error: string | null;
   projectsCount: number;
+  onViewKit: (kit: KitFile) => void;
 }
 
 export default function KitsTabContent({
@@ -28,9 +28,9 @@ export default function KitsTabContent({
   kitsLoading,
   error,
   projectsCount,
+  onViewKit,
 }: KitsTabContentProps) {
   const { toggleItem, isSelected } = useSelection();
-  const { setSelectedKit } = useWorkstation();
 
   const handleKitToggle = (kit: KitFile) => {
     const itemToToggle = {
@@ -42,13 +42,8 @@ export default function KitsTabContent({
     toggleItem(itemToToggle);
   };
 
-  const handleViewKit = async (kit: KitFile) => {
-    try {
-      const content = await invokeReadFile(kit.path);
-      setSelectedKit(kit, content);
-    } catch (error) {
-      console.error('Failed to load kit content:', error);
-    }
+  const handleViewKit = (kit: KitFile) => {
+    onViewKit(kit);
   };
 
   if (kitsLoading) {
@@ -98,41 +93,45 @@ export default function KitsTabContent({
             borderColor={kitSelected ? "primary.500" : "border.subtle"}
             bg={kitSelected ? "primary.50" : undefined}
             position="relative"
+            cursor="pointer"
+            onClick={() => handleViewKit(kit)}
+            _hover={{ borderColor: "primary.400", bg: "primary.50" }}
           >
             <CardHeader>
               <Flex align="center" justify="space-between" gap={4}>
-                <Heading size="md">{displayName}</Heading>
-                {isBase && (
-                  <Icon
-                    as={ImTree}
-                    boxSize={5}
-                    color="primary.500"
-                    flexShrink={0}
-                  />
-                )}
+                <HStack gap={2} align="center">
+                  <Heading size="md">{displayName}</Heading>
+                  {isBase && (
+                    <Icon
+                      as={ImTree}
+                      boxSize={5}
+                      color="primary.500"
+                      flexShrink={0}
+                    />
+                  )}
+                </HStack>
+                <Checkbox.Root
+                  checked={kitSelected}
+                  colorPalette="blue"
+                  onCheckedChange={() => {
+                    handleKitToggle(kit);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  cursor="pointer"
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox.Root>
               </Flex>
             </CardHeader>
             <CardBody display="flex" flexDirection="column" flex="1">
               <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
                 {description}
               </Text>
-              <Flex gap={2} justify="flex-end" mt="auto">
-                <Button 
-                  size="sm" 
-                  variant="subtle"
-                  onClick={() => handleViewKit(kit)}
-                >
-                  View
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={kitSelected ? "solid" : "outline"}
-                  colorPalette={kitSelected ? "primary" : undefined}
-                  onClick={() => handleKitToggle(kit)}
-                >
-                  {kitSelected ? "Selected" : "Select"}
-                </Button>
-              </Flex>
             </CardBody>
           </Card.Root>
         );

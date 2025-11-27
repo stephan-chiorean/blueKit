@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type SelectionType = 'Kit' | 'Blueprint' | 'Collection' | 'Project';
+export type SelectionType = 'Kit' | 'Template' | 'Collection' | 'Project';
 
 export interface SelectedItem {
   id: string;

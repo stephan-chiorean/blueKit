@@ -53,7 +53,6 @@ const menuItems: MenuItem[] = [
     icon: LuUsers,
     children: [
       { id: 'projects', label: 'Projects', icon: LuFolderOpen },
-      { id: 'blueprints', label: 'Blueprints', icon: LuFileText },
       { id: 'walkthroughs', label: 'Walkthroughs', icon: LuBookOpen },
     ],
   },

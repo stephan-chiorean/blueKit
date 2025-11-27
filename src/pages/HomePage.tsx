@@ -8,61 +8,48 @@ import {
   IconButton,
   Icon,
   HStack,
-  Splitter,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuPackage, LuLayers, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
+import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen } from 'react-icons/lu';
 import { BiMinusFront } from 'react-icons/bi';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import Workstation from '../components/workstation/Workstation';
-import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import BasesTabContent from '../components/bases/BasesTabContent';
+import TemplatesTabContent from '../components/templates/TemplatesTabContent';
 import KitsTabContent from '../components/kits/KitsTabContent';
-import BlueprintsTabContentWrapper from '../components/blueprints/BlueprintsTabContentWrapper';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
+import KitViewPage from './KitViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
-import { Branch } from '../components/bases/AddBranchDialog';
 import { Collection } from '../components/collections/CreateCollectionModal';
-
-interface Blueprint {
-  id: string;
-  name: string;
-  description: string;
-}
+import { Branch } from '../components/templates/AddBranchDialog';
 
 interface HomePageProps {
-  onCreateBlueprint: (name: string, description: string) => void;
 }
 
-export default function HomePage({ onCreateBlueprint }: HomePageProps) {
+export default function HomePage({}: HomePageProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [kits, setKits] = useState<KitFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selectedItems } = useSelection();
   
-  // Fake blueprint data for now
-  const [blueprints] = useState<Blueprint[]>([
-    { id: '1', name: 'Authentication Flow', description: 'Complete user authentication setup' },
-    { id: '2', name: 'Dashboard Layout', description: 'Main dashboard with navigation' },
-    { id: '3', name: 'API Integration', description: 'REST API integration patterns' },
-  ]);
-  const [isCreateBlueprintMode, setIsCreateBlueprintMode] = useState(false);
-  const [selectedBase, setSelectedBase] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [isFeaturedTemplatesModalOpen, setIsFeaturedTemplatesModalOpen] = useState(false);
   
-  // Branches state - each branch has a name and an array of blueprint IDs
+  // Branches state - each branch has a name and an array of template IDs
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [isFeaturedBasesModalOpen, setIsFeaturedBasesModalOpen] = useState(false);
   
   // Collections state - store selectedItemIds with each collection
   interface CollectionWithItems extends Collection {
     selectedItemIds: string[];
   }
   const [collections, setCollections] = useState<CollectionWithItems[]>([]);
+
+  // Kit view state - for viewing a kit/walkthrough in split view
+  const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
+  const [kitViewContent, setKitViewContent] = useState<string | null>(null);
 
   const handleCollectionCreated = (collection: Collection, selectedItemIds: string[]) => {
     setCollections([...collections, { ...collection, selectedItemIds }]);
@@ -76,8 +63,8 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
     ));
   };
 
-  // Featured bases data - these are foundational templates for spinning up new apps
-  const featuredBases = [
+  // Featured templates data - these are foundational templates for spinning up new apps
+  const featuredTemplates = [
     { id: '1', name: 'React + TypeScript', description: 'Modern React app with TypeScript' },
     { id: '2', name: 'Next.js Starter', description: 'Full-stack Next.js application' },
     { id: '3', name: 'Vite + React', description: 'Fast Vite-based React setup' },
@@ -225,8 +212,35 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
   }, [projects]);
 
   const selectedCount = selectedItems.length;
-  const { flags } = useFeatureFlags();
   console.log('[HomePage] Render - selectedCount:', selectedCount, 'selectedItems:', selectedItems);
+
+  // Handler to navigate to kit view
+  const handleViewKit = async (kit: KitFile) => {
+    try {
+      const content = await invokeReadFile(kit.path);
+      setViewingKit(kit);
+      setKitViewContent(content);
+    } catch (error) {
+      console.error('Failed to load kit content:', error);
+    }
+  };
+
+  // Handler to go back from kit view
+  const handleBackFromKitView = () => {
+    setViewingKit(null);
+    setKitViewContent(null);
+  };
+
+  // If viewing a kit, show the kit view page
+  if (viewingKit && kitViewContent) {
+    return (
+      <KitViewPage 
+        kit={viewingKit} 
+        kitContent={kitViewContent}
+        onBack={handleBackFromKitView}
+      />
+    );
+  }
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
@@ -235,120 +249,100 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
         <Header />
       </Box>
       
-      {/* Splitter layout below header */}
+      {/* Full screen content area - no workstation until kit is selected */}
       <Box flex="1" minH={0} overflow="hidden">
-        {flags.workstation ? (
-          <Splitter.Root
-            defaultSize={[50, 50]}
-            panels={[
-              { id: 'content', minSize: 30 },
-              { id: 'workstation', minSize: 20, collapsible: true, collapsedSize: 5 },
-            ]}
-            h="100%"
-            orientation="horizontal"
+        <Box h="100%" p={6} position="relative" overflow="auto">
+          <Tabs.Root 
+            defaultValue="kits" 
+            variant="enclosed"
+            css={{
+              '& [data-selected]': {
+                borderColor: 'colors.primary.300',
+              },
+            }}
           >
-            {/* Main Content Area */}
-            <Splitter.Panel id="content">
-          <Box h="100%" p={6} position="relative" overflow="auto">
-            <Tabs.Root 
-              defaultValue="kits" 
-              variant="enclosed"
-              css={{
-                '& [data-selected]': {
-                  borderColor: 'colors.primary.300',
-                },
-              }}
-            >
-              <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
-                <NavigationMenu>
-                  {({ onOpen }) => (
-                    <IconButton
-                      variant="ghost"
-                      size="lg"
-                      aria-label="Open menu"
-                      onClick={onOpen}
-                      color="gray.600"
-                      _hover={{ bg: 'gray.100', opacity: 0.8 }}
-                    >
-                      <LuMenu />
-                    </IconButton>
-                  )}
-                </NavigationMenu>
-                <Box 
-                  position="absolute" 
-                  left="50%" 
-                  style={{ transform: 'translateX(-50%)' }}
-                >
-                  <Tabs.List>
-                    <Tabs.Trigger value="bases">
-                      <HStack gap={2}>
-                        <Icon>
-                          <BiMinusFront />
-                        </Icon>
-                        <Text>Bases</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="kits">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuPackage />
-                        </Icon>
-                        <Text>Kits</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="blueprints">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuLayers />
-                        </Icon>
-                        <Text>Blueprints</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="walkthroughs">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuBookOpen />
-                        </Icon>
-                        <Text>Walkthroughs</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="collections">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuFolderOpen />
-                        </Icon>
-                        <Text>Collections</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  </Tabs.List>
-                </Box>
-              </Flex>
+            <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
+              <NavigationMenu>
+                {({ onOpen }) => (
+                  <IconButton
+                    variant="ghost"
+                    size="lg"
+                    aria-label="Open menu"
+                    onClick={onOpen}
+                    color="gray.600"
+                    _hover={{ bg: 'gray.100', opacity: 0.8 }}
+                  >
+                    <LuMenu />
+                  </IconButton>
+                )}
+              </NavigationMenu>
+              <Box 
+                position="absolute" 
+                left="50%" 
+                style={{ transform: 'translateX(-50%)' }}
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value="templates">
+                    <HStack gap={2}>
+                      <Icon>
+                        <BiMinusFront />
+                      </Icon>
+                      <Text>Templates</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="kits">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPackage />
+                      </Icon>
+                      <Text>Kits</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="walkthroughs">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBookOpen />
+                      </Icon>
+                      <Text>Walkthroughs</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="collections">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuFolderOpen />
+                      </Icon>
+                      <Text>Collections</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                </Tabs.List>
+              </Box>
+            </Flex>
 
-            <Tabs.Content value="bases">
-              <BasesTabContent
-                selectedBase={selectedBase}
-                onSelectBase={(baseId) => {
-                  setSelectedBase(baseId);
+            <Tabs.Content value="templates">
+              <TemplatesTabContent
+                selectedTemplate={selectedTemplate}
+                onSelectTemplate={(templateId) => {
+                  setSelectedTemplate(templateId);
                   setBranches([]);
                 }}
-                onDeselectBase={() => {
-                  setSelectedBase(null);
+                onDeselectTemplate={() => {
+                  setSelectedTemplate(null);
                   setBranches([]);
                 }}
-                featuredBases={featuredBases}
+                featuredTemplates={featuredTemplates}
                 branches={branches}
                 onAddBranch={(branch) => setBranches([...branches, branch])}
-                onSelectBlueprint={(branchId, blueprintId) => {
+                onSelectTemplateForBranch={(branchId, templateId) => {
                   setBranches(branches.map(branch =>
                     branch.id === branchId
-                      ? { ...branch, blueprints: [...branch.blueprints, blueprintId] }
+                      ? { ...branch, templates: [...branch.templates, templateId] }
                       : branch
                   ));
                 }}
-                blueprints={blueprints}
-                isFeaturedBasesModalOpen={isFeaturedBasesModalOpen}
-                onOpenFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(true)}
-                onCloseFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(false)}
+                availableTemplates={featuredTemplates}
+                isFeaturedTemplatesModalOpen={isFeaturedTemplatesModalOpen}
+                onOpenFeaturedTemplatesModal={() => setIsFeaturedTemplatesModalOpen(true)}
+                onCloseFeaturedTemplatesModal={() => setIsFeaturedTemplatesModalOpen(false)}
               />
             </Tabs.Content>
             <Tabs.Content value="kits">
@@ -357,16 +351,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 kitsLoading={kitsLoading}
                 error={error}
                 projectsCount={projects.length}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="blueprints">
-              <BlueprintsTabContentWrapper
-                blueprints={blueprints}
-                onCreateBlueprint={onCreateBlueprint}
-                isCreateMode={isCreateBlueprintMode}
-                onSetCreateMode={setIsCreateBlueprintMode}
-                kits={kits}
-                kitsLoading={kitsLoading}
+                onViewKit={handleViewKit}
               />
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">
@@ -375,6 +360,7 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 kitsLoading={kitsLoading}
                 error={error}
                 projectsCount={projects.length}
+                onViewKit={handleViewKit}
               />
             </Tabs.Content>
             <Tabs.Content value="collections">
@@ -386,159 +372,8 @@ export default function HomePage({ onCreateBlueprint }: HomePageProps) {
                 kitsLoading={kitsLoading}
               />
             </Tabs.Content>
-            </Tabs.Root>
-          </Box>
-            </Splitter.Panel>
-
-            {/* Resize Trigger */}
-            <Splitter.ResizeTrigger id="content:workstation" />
-
-            {/* Workstation Panel */}
-            <Splitter.Panel id="workstation">
-              <Workstation />
-            </Splitter.Panel>
-          </Splitter.Root>
-        ) : (
-          <Box h="100%" p={6} position="relative" overflow="auto">
-            <Tabs.Root 
-              defaultValue="kits" 
-              variant="enclosed"
-              css={{
-                '& [data-selected]': {
-                  borderColor: 'colors.primary.300',
-                },
-              }}
-            >
-              <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
-                <NavigationMenu>
-                  {({ onOpen }) => (
-                    <IconButton
-                      variant="ghost"
-                      size="lg"
-                      aria-label="Open menu"
-                      onClick={onOpen}
-                      color="gray.600"
-                      _hover={{ bg: 'gray.100', opacity: 0.8 }}
-                    >
-                      <LuMenu />
-                    </IconButton>
-                  )}
-                </NavigationMenu>
-                <Box 
-                  position="absolute" 
-                  left="50%" 
-                  style={{ transform: 'translateX(-50%)' }}
-                >
-                  <Tabs.List>
-                    <Tabs.Trigger value="bases">
-                      <HStack gap={2}>
-                        <Icon>
-                          <BiMinusFront />
-                        </Icon>
-                        <Text>Bases</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="kits">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuPackage />
-                        </Icon>
-                        <Text>Kits</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="blueprints">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuLayers />
-                        </Icon>
-                        <Text>Blueprints</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="walkthroughs">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuBookOpen />
-                        </Icon>
-                        <Text>Walkthroughs</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="collections">
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuFolderOpen />
-                        </Icon>
-                        <Text>Collections</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  </Tabs.List>
-                </Box>
-              </Flex>
-
-              <Tabs.Content value="bases">
-                <BasesTabContent
-                  selectedBase={selectedBase}
-                  onSelectBase={(baseId) => {
-                    setSelectedBase(baseId);
-                    setBranches([]);
-                  }}
-                  onDeselectBase={() => {
-                    setSelectedBase(null);
-                    setBranches([]);
-                  }}
-                  featuredBases={featuredBases}
-                  branches={branches}
-                  onAddBranch={(branch) => setBranches([...branches, branch])}
-                  onSelectBlueprint={(branchId, blueprintId) => {
-                    setBranches(branches.map(branch =>
-                      branch.id === branchId
-                        ? { ...branch, blueprints: [...branch.blueprints, blueprintId] }
-                        : branch
-                    ));
-                  }}
-                  blueprints={blueprints}
-                  isFeaturedBasesModalOpen={isFeaturedBasesModalOpen}
-                  onOpenFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(true)}
-                  onCloseFeaturedBasesModal={() => setIsFeaturedBasesModalOpen(false)}
-                />
-              </Tabs.Content>
-              <Tabs.Content value="kits">
-                <KitsTabContent
-                  kits={kits}
-                  kitsLoading={kitsLoading}
-                  error={error}
-                  projectsCount={projects.length}
-                />
-              </Tabs.Content>
-              <Tabs.Content value="blueprints">
-                <BlueprintsTabContentWrapper
-                  blueprints={blueprints}
-                  onCreateBlueprint={onCreateBlueprint}
-                  isCreateMode={isCreateBlueprintMode}
-                  onSetCreateMode={setIsCreateBlueprintMode}
-                  kits={kits}
-                  kitsLoading={kitsLoading}
-                />
-              </Tabs.Content>
-              <Tabs.Content value="walkthroughs">
-                <WalkthroughsTabContent
-                  kits={kits}
-                  kitsLoading={kitsLoading}
-                  error={error}
-                  projectsCount={projects.length}
-                />
-              </Tabs.Content>
-              <Tabs.Content value="collections">
-                <CollectionsTabContent
-                  collections={collections}
-                  onAddCollection={handleCollectionCreated}
-                  onUpdateCollection={handleCollectionUpdated}
-                  kits={kits}
-                  kitsLoading={kitsLoading}
-                />
-              </Tabs.Content>
-            </Tabs.Root>
-          </Box>
-        )}
+          </Tabs.Root>
+        </Box>
       </Box>
     </VStack>
   );

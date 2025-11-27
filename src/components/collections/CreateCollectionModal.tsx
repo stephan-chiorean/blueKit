@@ -37,7 +37,7 @@ interface CreateCollectionModalProps {
   kitsLoading: boolean;
 }
 
-type Category = 'Kits' | 'Blueprints' | 'Walkthroughs' | null;
+type Category = 'Kits' | 'Templates' | 'Walkthroughs' | null;
 
 export default function CreateCollectionModal({
   isOpen,
@@ -53,12 +53,12 @@ export default function CreateCollectionModal({
 
   const categories = [
     { name: 'Kits', icon: LuPackage, type: 'Kit' as const },
-    { name: 'Blueprints', icon: LuLayers, type: 'Blueprint' as const },
+    { name: 'Templates', icon: LuLayers, type: 'Template' as const },
     { name: 'Walkthroughs', icon: LuBookOpen, type: 'Collection' as const }, // Using Collection as placeholder for now
   ] as const;
 
   // Count selected items by category type
-  const getSelectedCount = (type: 'Kit' | 'Blueprint' | 'Collection') => {
+  const getSelectedCount = (type: 'Kit' | 'Template' | 'Collection') => {
     // For now, only Kits are implemented, so count kits
     if (type === 'Kit') {
       return kits.filter(kit => selectedItemIds.has(kit.path)).length;

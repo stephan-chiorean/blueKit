@@ -65,6 +65,8 @@ export interface KitFrontMatter {
   tags?: string[];
   /** Description of the kit */
   description?: string;
+  /** Type of the kit (e.g., 'walkthrough') */
+  type?: string;
 }
 
 /**
