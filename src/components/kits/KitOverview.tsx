@@ -1,14 +1,18 @@
+import { useEffect, useState } from 'react';
 import {
   Box,
   Card,
   CardBody,
   Text,
   VStack,
-  IconButton,
+  Button,
   Flex,
+  Status,
+  HStack,
+  Icon,
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
-import { KitFile } from '../../ipc';
+import { KitFile, invokeGetProjectRegistry } from '../../ipc';
 
 interface KitOverviewProps {
   kit: KitFile;
@@ -18,6 +22,24 @@ interface KitOverviewProps {
 export default function KitOverview({ kit, onBack }: KitOverviewProps) {
   // Extract project path from kit path
   const projectPath = kit.path.split('/.bluekit/')[0] || kit.path;
+  const [isLinked, setIsLinked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkProjectStatus = async () => {
+      try {
+        const projects = await invokeGetProjectRegistry();
+        const isProjectLinked = projects.some(
+          (project) => project.path === projectPath
+        );
+        setIsLinked(isProjectLinked);
+      } catch (error) {
+        console.error('Failed to check project status:', error);
+        setIsLinked(false);
+      }
+    };
+
+    checkProjectStatus();
+  }, [projectPath]);
 
   return (
     <Box h="100%" overflow="auto" bg="bg.subtle">
@@ -33,16 +55,33 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
             {/* Back Button */}
             {onBack && (
               <Flex>
-                <IconButton
+                <Button
                   variant="ghost"
                   size="sm"
-                  aria-label="Back"
                   onClick={onBack}
                 >
-                  <LuArrowLeft />
-                </IconButton>
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuArrowLeft />
+                    </Icon>
+                    <Text>Back</Text>
+                  </HStack>
+                </Button>
               </Flex>
             )}
+            
+            {/* Project Status */}
+            <Box>
+              <Text fontSize="sm" fontWeight="semibold" mb={2} color="text.secondary">
+                Project Status
+              </Text>
+              <Status.Root
+                colorPalette={isLinked === true ? 'green' : isLinked === false ? 'red' : 'gray'}
+              >
+                <Status.Indicator />
+                {isLinked === true ? 'Linked' : isLinked === false ? 'Disconnected' : 'Checking...'}
+              </Status.Root>
+            </Box>
             
             {/* File Information */}
             <Box>
