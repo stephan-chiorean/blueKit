@@ -1,7 +1,7 @@
 ---
 id: tauri-file-watching
 alias: Product
-is_base: true
+is_base: false
 type: walkthrough
 version: 1
 tags: [tauri, file-system, events]

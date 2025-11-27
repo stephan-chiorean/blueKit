@@ -2,7 +2,7 @@
 id: rust-backend-walkthrough
 alias: Rust Backend Walkthrough
 type: walkthrough
-is_base: true
+is_base: false
 version: 1
 tags: [rust, tauri, backend, ipc, file-watching]
 description: "Comprehensive walkthrough explaining the Rust backend architecture, IPC commands, file watching system, and state management in this Tauri application"

@@ -2,7 +2,7 @@
 id: ipc-walkthrough
 alias: IPC Communication Walkthrough
 type: walkthrough
-is_base: true
+is_base: false
 version: 1
 tags: [ipc, tauri, typescript, rust, communication, frontend, backend]
 description: "Comprehensive walkthrough explaining how Inter-Process Communication (IPC) works in this Tauri application, covering the frontend TypeScript layer, Rust backend handlers, type safety, error handling, and how to add new commands"
