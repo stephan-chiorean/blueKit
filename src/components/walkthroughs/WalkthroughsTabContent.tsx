@@ -19,7 +19,6 @@ import {
   Input,
   InputGroup,
   Field,
-  Separator,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
@@ -283,7 +282,7 @@ export default function WalkthroughsTabContent({
                 </HStack>
               </Table.Cell>
               <Table.Cell>
-                <Text fontSize="sm" color="text.secondary" noOfLines={1}>
+                <Text fontSize="sm" color="text.secondary" lineClamp={1}>
                   {description}
                 </Text>
               </Table.Cell>
@@ -326,9 +325,13 @@ export default function WalkthroughsTabContent({
             variant="ghost"
             size="sm"
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            leftIcon={<LuFilter />}
           >
-            Filter
+            <HStack gap={2}>
+              <Icon>
+                <LuFilter />
+              </Icon>
+              <Text>Filter</Text>
+            </HStack>
           </Button>
 
           {/* View Mode Switcher */}

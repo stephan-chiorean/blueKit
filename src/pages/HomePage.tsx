@@ -387,7 +387,13 @@ export default function HomePage({}: HomePageProps) {
               />
             </Tabs.Content>
             <Tabs.Content value="agents">
-              <AgentsTabContent />
+              <AgentsTabContent
+                kits={kits}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={projects.length}
+                onViewKit={handleViewKit}
+              />
             </Tabs.Content>
             <Tabs.Content value="blueprints">
               <BlueprintsTabContent

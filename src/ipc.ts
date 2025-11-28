@@ -65,8 +65,12 @@ export interface KitFrontMatter {
   tags?: string[];
   /** Description of the kit */
   description?: string;
-  /** Type of the kit (e.g., 'walkthrough') */
+  /** Type of the kit (e.g., 'walkthrough', 'agent') */
   type?: string;
+  /** Capabilities array (used for agents) */
+  capabilities?: string[];
+  /** Execution notes (used for agents) */
+  executionNotes?: string;
 }
 
 /**

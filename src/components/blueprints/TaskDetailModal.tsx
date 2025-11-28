@@ -160,7 +160,7 @@ export default function TaskDetailModal({
                   >
                     <CardBody>
                       <VStack gap={3} align="center" py={4}>
-                        <Icon size="3xl" color="primary.500">
+                        <Icon size="2xl" color="primary.500">
                           <LuBot />
                         </Icon>
                         <Heading size="sm" textAlign="center">
@@ -250,7 +250,7 @@ export default function TaskDetailModal({
                   >
                     <CardBody>
                       <VStack gap={3} align="center" py={4}>
-                        <Icon size="3xl" color="primary.500">
+                        <Icon size="2xl" color="primary.500">
                           <LuPlus />
                         </Icon>
                         <Text color="primary.500" fontWeight="medium" textAlign="center">
@@ -265,7 +265,7 @@ export default function TaskDetailModal({
                 <Card.Root variant="subtle" borderWidth="1px" h="100%">
                   <CardBody>
                     <VStack gap={3} align="center" py={4}>
-                      <Icon size="3xl" color="primary.500">
+                      <Icon size="2xl" color="primary.500">
                         <LuPackage />
                       </Icon>
                       <Heading size="sm" textAlign="center">
