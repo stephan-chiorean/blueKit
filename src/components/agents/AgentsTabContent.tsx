@@ -87,12 +87,14 @@ export default function AgentsTabContent({
         <Button
           variant="outline"
           size="sm"
-          leftIcon={<LuPlus />}
           onClick={() => {
             // TODO: Open create agent modal
             console.log('Create agent');
           }}
         >
+          <Icon>
+            <LuPlus />
+          </Icon>
           Add Agent
         </Button>
       </Flex>
