@@ -10,27 +10,24 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen, LuBot, LuFolder } from 'react-icons/lu';
+import { LuMenu, LuFolderOpen, LuBot, LuFolder } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import ProjectsTabContent from '../components/projects/ProjectsTabContent';
-import KitsTabContent from '../components/kits/KitsTabContent';
-import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
 import AgentsTabContent from '../components/agents/AgentsTabContent';
-import KitViewPage from './KitViewPage';
-import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
 import { Collection } from '../components/collections/AddCollectionDialog';
 
 interface HomePageProps {
+  onProjectSelect: (project: ProjectEntry) => void;
 }
 
-export default function HomePage({}: HomePageProps) {
+export default function HomePage({ onProjectSelect }: HomePageProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -44,10 +41,6 @@ export default function HomePage({}: HomePageProps) {
     selectedItemIds: string[];
   }
   const [collections, setCollections] = useState<CollectionWithItems[]>([]);
-
-  // Kit view state - for viewing a kit/walkthrough in split view
-  const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
-  const [kitViewContent, setKitViewContent] = useState<string | null>(null);
 
   const handleCollectionCreated = (collection: Collection, selectedItemIds: string[]) => {
     setCollections([...collections, { ...collection, selectedItemIds }]);
@@ -209,45 +202,12 @@ export default function HomePage({}: HomePageProps) {
   const selectedCount = selectedItems.length;
   console.log('[HomePage] Render - selectedCount:', selectedCount, 'selectedItems:', selectedItems);
 
-  // Handler to navigate to kit view
+  // Handler to navigate to kit view (for Agents/Blueprints/Collections tabs)
   const handleViewKit = async (kit: KitFile) => {
-    try {
-      const content = await invokeReadFile(kit.path);
-      setViewingKit(kit);
-      setKitViewContent(content);
-    } catch (error) {
-      console.error('Failed to load kit content:', error);
-    }
+    // This will be handled by the individual tab components
+    // For now, we'll just log it
+    console.log('View kit:', kit);
   };
-
-  // Handler to go back from kit view
-  const handleBackFromKitView = () => {
-    setViewingKit(null);
-    setKitViewContent(null);
-  };
-
-  // If viewing a kit or walkthrough, show the appropriate view page
-  if (viewingKit && kitViewContent) {
-    const isWalkthrough = viewingKit.frontMatter?.type === 'walkthrough';
-    
-    if (isWalkthrough) {
-      return (
-        <WalkthroughViewPage 
-          kit={viewingKit} 
-          kitContent={kitViewContent}
-          onBack={handleBackFromKitView}
-        />
-      );
-    } else {
-      return (
-        <KitViewPage 
-          kit={viewingKit} 
-          kitContent={kitViewContent}
-          onBack={handleBackFromKitView}
-        />
-      );
-    }
-  }
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
@@ -260,7 +220,7 @@ export default function HomePage({}: HomePageProps) {
       <Box flex="1" minH={0} overflow="hidden">
         <Box h="100%" p={6} position="relative" overflow="auto">
           <Tabs.Root 
-            defaultValue="kits" 
+            defaultValue="projects" 
             variant="enclosed"
             css={{
               '& [data-selected]': {
@@ -297,14 +257,6 @@ export default function HomePage({}: HomePageProps) {
                       <Text>Projects</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="kits">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPackage />
-                      </Icon>
-                      <Text>Kits</Text>
-                    </HStack>
-                  </Tabs.Trigger>
                   <Tabs.Trigger value="agents">
                     <HStack gap={2}>
                       <Icon>
@@ -319,14 +271,6 @@ export default function HomePage({}: HomePageProps) {
                         <BsStack />
                       </Icon>
                       <Text>Blueprints</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="walkthroughs">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuBookOpen />
-                      </Icon>
-                      <Text>Walkthroughs</Text>
                     </HStack>
                   </Tabs.Trigger>
                   <Tabs.Trigger value="collections">
@@ -346,15 +290,7 @@ export default function HomePage({}: HomePageProps) {
                 projects={projects}
                 projectsLoading={projectsLoading}
                 error={projectsError}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="kits">
-              <KitsTabContent
-                kits={kits}
-                kitsLoading={kitsLoading}
-                error={error}
-                projectsCount={projects.length}
-                onViewKit={handleViewKit}
+                onProjectSelect={onProjectSelect}
               />
             </Tabs.Content>
             <Tabs.Content value="agents">
@@ -368,15 +304,6 @@ export default function HomePage({}: HomePageProps) {
             </Tabs.Content>
             <Tabs.Content value="blueprints">
               <BlueprintsTabContent
-                kits={kits}
-                kitsLoading={kitsLoading}
-                error={error}
-                projectsCount={projects.length}
-                onViewKit={handleViewKit}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="walkthroughs">
-              <WalkthroughsTabContent
                 kits={kits}
                 kitsLoading={kitsLoading}
                 error={error}

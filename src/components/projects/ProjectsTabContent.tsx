@@ -18,12 +18,14 @@ interface ProjectsTabContentProps {
   projects: ProjectEntry[];
   projectsLoading: boolean;
   error: string | null;
+  onProjectSelect: (project: ProjectEntry) => void;
 }
 
 export default function ProjectsTabContent({
   projects,
   projectsLoading,
   error,
+  onProjectSelect,
 }: ProjectsTabContentProps) {
   if (projectsLoading) {
     return (
@@ -73,6 +75,7 @@ export default function ProjectsTabContent({
             cursor="pointer"
             _hover={{ borderColor: "primary.400", bg: "primary.50" }}
             transition="all 0.2s"
+            onClick={() => onProjectSelect(project)}
           >
             <CardHeader>
               <VStack align="start" gap={2}>
