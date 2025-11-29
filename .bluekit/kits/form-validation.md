@@ -1,6 +1,7 @@
 ---
 id: form-validation
 alias: Form Validation
+type: kit
 is_base: false
 version: 1
 tags: [form, validation, ui]

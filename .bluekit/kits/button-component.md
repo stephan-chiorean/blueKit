@@ -1,6 +1,7 @@
 ---
 id: button-component
 alias: Button Component
+type: kit
 is_base: false
 version: 1
 tags: [ui, component, button]

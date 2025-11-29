@@ -1,6 +1,7 @@
 ---
 id: feature-flags
 alias: Feature Flags
+type: kit
 is_base: false
 version: 1
 tags: [frontend, feature-flags, context, react]

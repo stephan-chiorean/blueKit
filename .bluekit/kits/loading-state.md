@@ -1,6 +1,7 @@
 ---
 id: loading-state
 alias: Loading State
+type: kit
 is_base: false
 version: 1
 tags: [ui, pattern, loading]

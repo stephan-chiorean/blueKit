@@ -1,6 +1,7 @@
 ---
 id: base-tab-content
 alias: Base Tab Content
+type: kit
 is_base: false
 version: 1
 tags: [ui, tab, pattern]

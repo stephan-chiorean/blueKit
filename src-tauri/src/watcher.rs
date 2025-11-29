@@ -150,8 +150,8 @@ pub fn watch_directory(
         notify::Config::default()
     ).map_err(|e| format!("Failed to create file watcher: {}", e))?;
     
-    // Start watching the directory (non-recursive)
-    watcher.watch(&directory_path, RecursiveMode::NonRecursive)
+    // Start watching the directory (recursive to watch subdirectories)
+    watcher.watch(&directory_path, RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to start watching directory: {}", e))?;
     
     // Spawn a task to handle file system events
