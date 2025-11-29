@@ -20,7 +20,7 @@ import {
   Separator,
   Tag,
 } from '@chakra-ui/react';
-import { LuFolderOpen, LuPlus } from 'react-icons/lu';
+import { LuLibrary, LuPlus } from 'react-icons/lu';
 import { Collection } from './AddCollectionDialog';
 import CollectionItemsSelector from './CollectionItemsSelector';
 import { KitFile } from '../../ipc';
@@ -233,7 +233,7 @@ export default function CollectionsTabContent({
         <EmptyState.Content>
           <EmptyState.Indicator>
             <Icon size="xl" color="primary.500">
-              <LuFolderOpen />
+              <LuLibrary />
             </Icon>
           </EmptyState.Indicator>
           <EmptyState.Title>

@@ -5,19 +5,19 @@ import {
   Flex,
   VStack,
   Text,
-  IconButton,
   Icon,
   HStack,
   Heading,
   Button,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
+import AgentsTabContent from '../components/agents/AgentsTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
@@ -126,6 +126,10 @@ export default function ProjectDetailPage({ project, onBack }: ProjectDetailPage
 
   const blueprints = useMemo(() => {
     return kits.filter(kit => kit.frontMatter?.type === 'blueprint');
+  }, [kits]);
+
+  const agents = useMemo(() => {
+    return kits.filter(kit => kit.frontMatter?.type === 'agent');
   }, [kits]);
 
   // Handler to navigate to kit view
@@ -242,6 +246,14 @@ export default function ProjectDetailPage({ project, onBack }: ProjectDetailPage
                       <Text>Walkthroughs</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="agents">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBot />
+                      </Icon>
+                      <Text>Agents</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -267,6 +279,15 @@ export default function ProjectDetailPage({ project, onBack }: ProjectDetailPage
             <Tabs.Content value="walkthroughs">
               <WalkthroughsTabContent
                 kits={walkthroughs}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={1}
+                onViewKit={handleViewKit}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="agents">
+              <AgentsTabContent
+                kits={agents}
                 kitsLoading={kitsLoading}
                 error={error}
                 projectsCount={1}
