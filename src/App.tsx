@@ -6,7 +6,6 @@ import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WorkstationProvider } from './contexts/WorkstationContext';
-import GlobalActionBar from './components/GlobalActionBar';
 import { ProjectEntry } from './ipc';
 
 type View = 'welcome' | 'home' | 'project-detail';
@@ -41,7 +40,6 @@ function App() {
             ) : (
               <HomePage onProjectSelect={handleProjectSelect} />
             )}
-            <GlobalActionBar />
           </SelectionProvider>
         </WorkstationProvider>
       </FeatureFlagsProvider>

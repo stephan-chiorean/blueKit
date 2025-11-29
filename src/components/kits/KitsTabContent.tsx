@@ -24,6 +24,7 @@ import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
+import KitsActionBar from './KitsActionBar';
 
 interface KitsTabContentProps {
   kits: KitFile[];
@@ -311,6 +312,7 @@ export default function KitsTabContent({
 
   return (
     <Box position="relative">
+      <KitsActionBar />
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">

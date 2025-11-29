@@ -43,6 +43,7 @@ async fn main() {
             commands::get_project_registry, // Get projects from registry
             commands::watch_project_kits, // Watch project .bluekit directory for changes
             commands::read_file,        // Read file contents
+            commands::copy_kit_to_project, // Copy kit file to project
         ])
         .setup(|app| {
             // Set up file watcher for project registry

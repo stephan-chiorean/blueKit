@@ -238,6 +238,35 @@ export async function invokeReadFile(filePath: string): Promise<string> {
 }
 
 /**
+ * Copies a kit file to a project's .bluekit directory.
+ * 
+ * This command reads the source kit file and writes it to the target project's
+ * .bluekit/kits directory. It creates the directory structure if it doesn't exist.
+ * 
+ * @param sourceFilePath - The absolute path to the source kit file
+ * @param targetProjectPath - The absolute path to the target project root directory
+ * @returns A promise that resolves to the path of the copied file
+ * 
+ * @example
+ * ```typescript
+ * const result = await invokeCopyKitToProject(
+ *   '/path/to/source/kit.md',
+ *   '/path/to/target/project'
+ * );
+ * console.log(result); // "/path/to/target/project/.bluekit/kits/kit.md"
+ * ```
+ */
+export async function invokeCopyKitToProject(
+  sourceFilePath: string,
+  targetProjectPath: string,
+): Promise<string> {
+  return await invoke<string>('copy_kit_to_project', {
+    sourceFilePath,
+    targetProjectPath,
+  });
+}
+
+/**
  * How to add a new IPC command:
  * 
  * 1. Add the command handler in `src-tauri/src/commands.rs`:

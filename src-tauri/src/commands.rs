@@ -379,6 +379,83 @@ pub async fn read_file(file_path: String) -> Result<String, String> {
     Ok(contents)
 }
 
+/// Copies a kit file to a project's .bluekit directory.
+/// 
+/// This command reads the source kit file and writes it to the target project's
+/// .bluekit/kits directory. It creates the directory structure if it doesn't exist.
+/// 
+/// # Arguments
+/// 
+/// * `source_file_path` - The absolute path to the source kit file
+/// * `target_project_path` - The absolute path to the target project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with the path to the copied file
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// const result = await invoke<string>('copy_kit_to_project', {
+///   sourceFilePath: '/path/to/source/kit.md',
+///   targetProjectPath: '/path/to/target/project'
+/// });
+/// ```
+#[tauri::command]
+pub async fn copy_kit_to_project(
+    source_file_path: String,
+    target_project_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let source_path = PathBuf::from(&source_file_path);
+    let target_project = PathBuf::from(&target_project_path);
+    
+    // Check if source file exists
+    if !source_path.exists() {
+        return Err(format!("Source file does not exist: {}", source_file_path));
+    }
+    
+    // Check if target project directory exists
+    if !target_project.exists() {
+        return Err(format!("Target project directory does not exist: {}", target_project_path));
+    }
+    
+    // Get the source file name
+    let file_name = source_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid source file name".to_string())?
+        .to_string();
+    
+    // Construct target path: target_project/.bluekit/kits/filename
+    let bluekit_dir = target_project.join(".bluekit");
+    let kits_dir = bluekit_dir.join("kits");
+    
+    // Create directories if they don't exist
+    fs::create_dir_all(&kits_dir)
+        .map_err(|e| format!("Failed to create .bluekit/kits directory: {}", e))?;
+    
+    // Construct the full target file path
+    let target_file_path = kits_dir.join(&file_name);
+    
+    // Read source file contents
+    let contents = fs::read_to_string(&source_path)
+        .map_err(|e| format!("Failed to read source file: {}", e))?;
+    
+    // Write to target file
+    fs::write(&target_file_path, contents)
+        .map_err(|e| format!("Failed to write target file: {}", e))?;
+    
+    // Return the target file path as a string
+    target_file_path
+        .to_str()
+        .ok_or_else(|| "Invalid target file path encoding".to_string())
+        .map(|s| s.to_string())
+}
+
 // How to add a new command:
 // 
 // 1. Create a new async function in this file
