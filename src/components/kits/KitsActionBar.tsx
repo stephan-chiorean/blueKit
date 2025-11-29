@@ -9,6 +9,7 @@ import { LuLibrary, LuFolderPlus, LuTrash2 } from 'react-icons/lu';
 import { useSelection } from '../../contexts/SelectionContext';
 import { invokeCopyKitToProject } from '../../ipc';
 import { open } from '@tauri-apps/api/dialog';
+import { toaster } from '../ui/toaster';
 
 export default function KitsActionBar() {
   const { selectedItems, hasSelection, clearSelection, removeItem } = useSelection();
@@ -60,19 +61,39 @@ export default function KitsActionBar() {
       }
 
       if (successCount > 0) {
-        const message = errors.length > 0
-          ? `Copied ${successCount} kit${successCount > 1 ? 's' : ''} to project. Errors: ${errors.join(', ')}`
-          : `Successfully copied ${successCount} kit${successCount > 1 ? 's' : ''} to project`;
-        alert(message);
+        // Show success toast
+        toaster.create({
+          type: 'success',
+          title: 'Success',
+          description: `Successfully copied ${successCount} kit${successCount > 1 ? 's' : ''} to project`,
+        });
+        
+        // If there were errors, show them separately
+        if (errors.length > 0) {
+          toaster.create({
+            type: 'error',
+            title: 'Some kits failed',
+            description: `Errors: ${errors.join(', ')}`,
+          });
+        }
       } else if (errors.length > 0) {
-        alert(`Failed to copy kits: ${errors.join(', ')}`);
+        // Only errors, no successes
+        toaster.create({
+          type: 'error',
+          title: 'Failed to copy kits',
+          description: errors.join(', '),
+        });
       }
 
       // Clear selection after operation
       clearSelection();
     } catch (error) {
       console.error('[KitsActionBar] Error in Add to Project:', error);
-      alert(`Failed to add to project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toaster.create({
+        type: 'error',
+        title: 'Error',
+        description: `Failed to add to project: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
     }
   };
 
