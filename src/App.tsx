@@ -36,7 +36,11 @@ function App() {
             {currentView === 'welcome' ? (
               <WelcomeScreen onGetStarted={handleGetStarted} />
             ) : currentView === 'project-detail' && selectedProject ? (
-              <ProjectDetailPage project={selectedProject} onBack={handleBackToHome} />
+              <ProjectDetailPage 
+                project={selectedProject} 
+                onBack={handleBackToHome}
+                onProjectSelect={handleProjectSelect}
+              />
             ) : (
               <HomePage onProjectSelect={handleProjectSelect} />
             )}

@@ -9,6 +9,9 @@ import {
   HStack,
   Heading,
   Button,
+  Select,
+  Portal,
+  createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
 import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot } from 'react-icons/lu';
@@ -20,22 +23,37 @@ import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent'
 import AgentsTabContent from '../components/agents/AgentsTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
-import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
+import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
   onBack: () => void;
+  onProjectSelect?: (project: ProjectEntry) => void;
 }
 
-export default function ProjectDetailPage({ project, onBack }: ProjectDetailPageProps) {
+export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
   const [kits, setKits] = useState<KitFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
   
   // Kit view state - for viewing a kit/walkthrough in split view
   const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
   const [kitViewContent, setKitViewContent] = useState<string | null>(null);
+
+  // Load all projects for the dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const projects = await invokeGetProjectRegistry();
+        setAllProjects(projects);
+      } catch (err) {
+        console.error('Failed to load projects:', err);
+      }
+    };
+    loadProjects();
+  }, []);
 
   // Load kits from this project only
   const loadProjectKits = async () => {
@@ -149,6 +167,24 @@ export default function ProjectDetailPage({ project, onBack }: ProjectDetailPage
     setKitViewContent(null);
   };
 
+  // Create collection for Select component
+  const projectsCollection = useMemo(() => {
+    return createListCollection({
+      items: allProjects,
+      itemToString: (item) => item.title,
+      itemToValue: (item) => item.id,
+    });
+  }, [allProjects]);
+
+  // Handler for project selection from dropdown
+  const handleProjectChange = (details: { value: string[] }) => {
+    const selectedProjectId = details.value[0];
+    const selectedProject = allProjects.find(p => p.id === selectedProjectId);
+    if (selectedProject && onProjectSelect) {
+      onProjectSelect(selectedProject);
+    }
+  };
+
   // If viewing a kit or walkthrough, show the appropriate view page
   if (viewingKit && kitViewContent) {
     const isWalkthrough = viewingKit.frontMatter?.type === 'walkthrough';
@@ -207,12 +243,47 @@ export default function ProjectDetailPage({ project, onBack }: ProjectDetailPage
                     <Text>Back</Text>
                   </HStack>
                 </Button>
-                <HStack gap={2} align="center">
-                  <Icon boxSize={5} color="primary.500">
-                    <LuFolder />
-                  </Icon>
-                  <Heading size="lg">{project.title}</Heading>
-                </HStack>
+                <Select.Root
+                  collection={projectsCollection}
+                  value={[project.id]}
+                  onValueChange={handleProjectChange}
+                  size="sm"
+                  variant="subtle"
+                  width="auto"
+                  minW="180px"
+                >
+                  <Select.HiddenSelect />
+                  <Select.Control cursor="pointer">
+                    <Select.Trigger>
+                      <HStack gap={2} align="center">
+                        <Icon boxSize={4} color="primary.500">
+                          <LuFolder />
+                        </Icon>
+                        <Select.ValueText />
+                      </HStack>
+                    </Select.Trigger>
+                    <Select.IndicatorGroup>
+                      <Select.Indicator />
+                    </Select.IndicatorGroup>
+                  </Select.Control>
+                  <Portal>
+                    <Select.Positioner>
+                      <Select.Content>
+                        {projectsCollection.items.map((item) => (
+                          <Select.Item item={item} key={item.id}>
+                            <HStack gap={2} align="center">
+                              <Icon boxSize={4} color="primary.500">
+                                <LuFolder />
+                              </Icon>
+                              <Select.ItemText>{item.title}</Select.ItemText>
+                            </HStack>
+                            <Select.ItemIndicator />
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Positioner>
+                  </Portal>
+                </Select.Root>
               </Flex>
               
               {/* Centered: Tabs */}

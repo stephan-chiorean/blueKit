@@ -177,7 +177,7 @@ export default function KitsTabContent({
                   cursor="pointer"
                 >
                   <Checkbox.HiddenInput />
-                  <Checkbox.Control>
+                  <Checkbox.Control cursor="pointer">
                     <Checkbox.Indicator />
                   </Checkbox.Control>
                 </Checkbox.Root>
@@ -220,9 +220,10 @@ export default function KitsTabContent({
                   }
                 });
               }}
+              cursor="pointer"
             >
               <Checkbox.HiddenInput />
-              <Checkbox.Control>
+              <Checkbox.Control cursor="pointer">
                 <Checkbox.Indicator />
               </Checkbox.Control>
             </Checkbox.Root>
@@ -257,9 +258,10 @@ export default function KitsTabContent({
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
+                  cursor="pointer"
                 >
                   <Checkbox.HiddenInput />
-                  <Checkbox.Control>
+                  <Checkbox.Control cursor="pointer">
                     <Checkbox.Indicator />
                   </Checkbox.Control>
                 </Checkbox.Root>
