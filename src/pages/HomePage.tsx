@@ -10,12 +10,11 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen, LuBot } from 'react-icons/lu';
-import { BiMinusFront } from 'react-icons/bi';
+import { LuMenu, LuPackage, LuBookOpen, LuFolderOpen, LuBot, LuFolder } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
-import TemplatesTabContent from '../components/templates/TemplatesTabContent';
+import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
@@ -27,23 +26,18 @@ import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits,
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
 import { Collection } from '../components/collections/AddCollectionDialog';
-import { Branch } from '../components/templates/AddBranchDialog';
 
 interface HomePageProps {
 }
 
 export default function HomePage({}: HomePageProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [kits, setKits] = useState<KitFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selectedItems } = useSelection();
-  
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [isFeaturedTemplatesModalOpen, setIsFeaturedTemplatesModalOpen] = useState(false);
-  
-  // Branches state - each branch has a name and an array of template IDs
-  const [branches, setBranches] = useState<Branch[]>([]);
   
   // Collections state - store selectedItemIds with each collection
   interface CollectionWithItems extends Collection {
@@ -67,23 +61,20 @@ export default function HomePage({}: HomePageProps) {
     ));
   };
 
-  // Featured templates data - these are foundational templates for spinning up new apps
-  const featuredTemplates = [
-    { id: '1', name: 'React + TypeScript', description: 'Modern React app with TypeScript' },
-    { id: '2', name: 'Next.js Starter', description: 'Full-stack Next.js application' },
-    { id: '3', name: 'Vite + React', description: 'Fast Vite-based React setup' },
-    { id: '4', name: 'Tauri Desktop', description: 'Cross-platform desktop app' },
-  ];
-
   // Load projects from registry
   const loadProjects = async () => {
     try {
+      setProjectsLoading(true);
+      setProjectsError(null);
       console.log('Loading projects from registry...');
       const registryProjects = await invokeGetProjectRegistry();
       console.log('Loaded projects:', registryProjects);
       setProjects(registryProjects);
     } catch (error) {
       console.error('Error loading project registry:', error);
+      setProjectsError(error instanceof Error ? error.message : 'Failed to load projects');
+    } finally {
+      setProjectsLoading(false);
     }
   };
 
@@ -298,12 +289,12 @@ export default function HomePage({}: HomePageProps) {
                 style={{ transform: 'translateX(-50%)' }}
               >
                 <Tabs.List>
-                  <Tabs.Trigger value="templates">
+                  <Tabs.Trigger value="projects">
                     <HStack gap={2}>
                       <Icon>
-                        <BiMinusFront />
+                        <LuFolder />
                       </Icon>
-                      <Text>Templates</Text>
+                      <Text>Projects</Text>
                     </HStack>
                   </Tabs.Trigger>
                   <Tabs.Trigger value="kits">
@@ -350,31 +341,11 @@ export default function HomePage({}: HomePageProps) {
               </Box>
             </Flex>
 
-            <Tabs.Content value="templates">
-              <TemplatesTabContent
-                selectedTemplate={selectedTemplate}
-                onSelectTemplate={(templateId) => {
-                  setSelectedTemplate(templateId);
-                  setBranches([]);
-                }}
-                onDeselectTemplate={() => {
-                  setSelectedTemplate(null);
-                  setBranches([]);
-                }}
-                featuredTemplates={featuredTemplates}
-                branches={branches}
-                onAddBranch={(branch) => setBranches([...branches, branch])}
-                onSelectTemplateForBranch={(branchId, templateId) => {
-                  setBranches(branches.map(branch =>
-                    branch.id === branchId
-                      ? { ...branch, templates: [...branch.templates, templateId] }
-                      : branch
-                  ));
-                }}
-                availableTemplates={featuredTemplates}
-                isFeaturedTemplatesModalOpen={isFeaturedTemplatesModalOpen}
-                onOpenFeaturedTemplatesModal={() => setIsFeaturedTemplatesModalOpen(true)}
-                onCloseFeaturedTemplatesModal={() => setIsFeaturedTemplatesModalOpen(false)}
+            <Tabs.Content value="projects">
+              <ProjectsTabContent
+                projects={projects}
+                projectsLoading={projectsLoading}
+                error={projectsError}
               />
             </Tabs.Content>
             <Tabs.Content value="kits">
