@@ -1,0 +1,128 @@
+{
+  "id": "react-tauri-rust-app-v1",
+  "name": "React/Tauri/Rust Desktop App",
+  "version": 1,
+  "description": "Complete blueprint for building a fully functional React + Tauri + Rust desktop application with type-safe IPC, file watching, and modern UI components",
+  "createdAt": "2025-01-27T00:00:00Z",
+  "layers": [
+    {
+      "id": "layer-1",
+      "order": 1,
+      "name": "Project Foundation",
+      "tasks": [
+        {
+          "id": "task-1",
+          "taskFile": "project-setup.md",
+          "description": "Initialize project structure, install dependencies, and configure build tools"
+        },
+        {
+          "id": "task-2",
+          "taskFile": "tauri-config.md",
+          "description": "Configure Tauri application settings, permissions, and build configuration"
+        }
+      ]
+    },
+    {
+      "id": "layer-2",
+      "order": 2,
+      "name": "Backend Foundation",
+      "tasks": [
+        {
+          "id": "task-3",
+          "taskFile": "rust-modules.md",
+          "description": "Create Rust module structure (commands, watcher, utils, state)"
+        },
+        {
+          "id": "task-4",
+          "taskFile": "main-entry.md",
+          "description": "Set up main.rs entry point with Tauri builder and command registration"
+        }
+      ]
+    },
+    {
+      "id": "layer-3",
+      "order": 3,
+      "name": "IPC Communication",
+      "tasks": [
+        {
+          "id": "task-5",
+          "taskFile": "ipc-commands.md",
+          "description": "Implement IPC command handlers in Rust with error handling"
+        },
+        {
+          "id": "task-6",
+          "taskFile": "ipc-typescript.md",
+          "description": "Create type-safe TypeScript IPC wrappers matching Rust commands"
+        }
+      ]
+    },
+    {
+      "id": "layer-4",
+      "order": 4,
+      "name": "File System Operations",
+      "tasks": [
+        {
+          "id": "task-7",
+          "taskFile": "file-operations.md",
+          "description": "Implement file reading, writing, and directory traversal commands"
+        },
+        {
+          "id": "task-8",
+          "taskFile": "file-watching.md",
+          "description": "Set up file system watcher with Tauri event emission"
+        }
+      ]
+    },
+    {
+      "id": "layer-5",
+      "order": 5,
+      "name": "Frontend Foundation",
+      "tasks": [
+        {
+          "id": "task-9",
+          "taskFile": "react-setup.md",
+          "description": "Set up React application structure, routing, and entry point"
+        },
+        {
+          "id": "task-10",
+          "taskFile": "context-providers.md",
+          "description": "Create React context providers for state management"
+        }
+      ]
+    },
+    {
+      "id": "layer-6",
+      "order": 6,
+      "name": "UI Components",
+      "tasks": [
+        {
+          "id": "task-11",
+          "taskFile": "chakra-ui-setup.md",
+          "description": "Configure Chakra UI theme and provider"
+        },
+        {
+          "id": "task-12",
+          "taskFile": "component-structure.md",
+          "description": "Build reusable UI components following project patterns"
+        }
+      ]
+    },
+    {
+      "id": "layer-7",
+      "order": 7,
+      "name": "Integration & Polish",
+      "tasks": [
+        {
+          "id": "task-13",
+          "taskFile": "frontend-backend-integration.md",
+          "description": "Connect frontend components to backend IPC commands"
+        },
+        {
+          "id": "task-14",
+          "taskFile": "error-handling.md",
+          "description": "Implement comprehensive error handling and user feedback"
+        }
+      ]
+    }
+  ]
+}

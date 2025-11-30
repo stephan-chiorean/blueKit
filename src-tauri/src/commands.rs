@@ -531,6 +531,119 @@ pub async fn copy_kit_to_project(
         .map(|s| s.to_string())
 }
 
+/// Copies a blueprint directory to a project's .bluekit/blueprints directory.
+/// 
+/// This command recursively copies the entire blueprint directory (including blueprint.json
+/// and all task files) to the target project's .bluekit/blueprints directory.
+/// 
+/// # Arguments
+/// 
+/// * `source_blueprint_path` - The absolute path to the source blueprint directory
+/// * `target_project_path` - The absolute path to the target project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with the path to the copied blueprint directory
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// const result = await invoke<string>('copy_blueprint_to_project', {
+///   sourceBlueprintPath: '/path/to/source/blueprint',
+///   targetProjectPath: '/path/to/target/project'
+/// });
+/// ```
+#[tauri::command]
+pub async fn copy_blueprint_to_project(
+    source_blueprint_path: String,
+    target_project_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let source_path = PathBuf::from(&source_blueprint_path);
+    let target_project = PathBuf::from(&target_project_path);
+    
+    // Check if source blueprint directory exists
+    if !source_path.exists() {
+        return Err(format!("Source blueprint directory does not exist: {}", source_blueprint_path));
+    }
+    
+    if !source_path.is_dir() {
+        return Err(format!("Source path is not a directory: {}", source_blueprint_path));
+    }
+    
+    // Check if target project directory exists
+    if !target_project.exists() {
+        return Err(format!("Target project directory does not exist: {}", target_project_path));
+    }
+    
+    // Get the blueprint directory name
+    let blueprint_name = source_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid blueprint directory name".to_string())?
+        .to_string();
+    
+    // Construct target path: target_project/.bluekit/blueprints/blueprint_name
+    let bluekit_dir = target_project.join(".bluekit");
+    let blueprints_dir = bluekit_dir.join("blueprints");
+    
+    // Create directories if they don't exist
+    fs::create_dir_all(&blueprints_dir)
+        .map_err(|e| format!("Failed to create .bluekit/blueprints directory: {}", e))?;
+    
+    // Construct the full target blueprint directory path
+    let target_blueprint_path = blueprints_dir.join(&blueprint_name);
+    
+    // Helper function to recursively copy directory
+    fn copy_dir_recursive(source: &PathBuf, target: &PathBuf) -> Result<(), String> {
+        use std::fs;
+        
+        // Create target directory
+        fs::create_dir_all(target)
+            .map_err(|e| format!("Failed to create directory {}: {}", target.display(), e))?;
+        
+        // Read source directory entries
+        let entries = fs::read_dir(source)
+            .map_err(|e| format!("Failed to read directory {}: {}", source.display(), e))?;
+        
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+            let entry_path = entry.path();
+            let entry_name = entry_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| "Invalid entry name".to_string())?;
+            
+            let target_path = target.join(entry_name);
+            
+            if entry_path.is_dir() {
+                // Recursively copy subdirectory
+                copy_dir_recursive(&entry_path, &target_path)?;
+            } else {
+                // Copy file
+                let contents = fs::read_to_string(&entry_path)
+                    .map_err(|e| format!("Failed to read file {}: {}", entry_path.display(), e))?;
+                fs::write(&target_path, contents)
+                    .map_err(|e| format!("Failed to write file {}: {}", target_path.display(), e))?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    // Copy the blueprint directory
+    copy_dir_recursive(&source_path, &target_blueprint_path)?;
+    
+    // Return the target blueprint directory path as a string
+    target_blueprint_path
+        .to_str()
+        .ok_or_else(|| "Invalid target blueprint path encoding".to_string())
+        .map(|s| s.to_string())
+}
+
 /// Gets scrapbook items (folders and loose .md files) from the .bluekit directory.
 ///
 /// This command scans the .bluekit directory and returns all folders and loose .md files

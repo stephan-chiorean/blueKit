@@ -26,7 +26,7 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import DiagramViewPage from './DiagramViewPage';
-import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, KitFile, ProjectEntry } from '../ipc';
+import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 
 interface ProjectDetailPageProps {
@@ -166,6 +166,28 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setKitViewContent(content);
     } catch (error) {
       console.error('Failed to load kit content:', error);
+    }
+  };
+
+  // Handler to navigate to blueprint task view
+  const handleViewTask = async (blueprintPath: string, taskFile: string, taskDescription: string) => {
+    try {
+      const content = await invokeGetBlueprintTaskFile(blueprintPath, taskFile);
+      
+      // Create a KitFile-like object for the task
+      const taskKit: KitFile = {
+        name: taskFile.replace('.md', ''),
+        path: `${blueprintPath}/${taskFile}`,
+        frontMatter: {
+          alias: taskDescription,
+          type: 'task',
+        },
+      };
+      
+      setViewingKit(taskKit);
+      setKitViewContent(content);
+    } catch (error) {
+      console.error('Failed to load task content:', error);
     }
   };
 
@@ -394,11 +416,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             </Tabs.Content>
             <Tabs.Content value="blueprints">
               <BlueprintsTabContent
-                kits={blueprints}
-                kitsLoading={kitsLoading}
-                error={error}
+                projectPath={project.path}
                 projectsCount={1}
-                onViewKit={handleViewKit}
+                onViewTask={handleViewTask}
               />
             </Tabs.Content>
             <Tabs.Content value="walkthroughs">

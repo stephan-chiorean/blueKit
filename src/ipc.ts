@@ -345,6 +345,35 @@ export async function invokeCopyKitToProject(
 }
 
 /**
+ * Copies a blueprint directory to a project's .bluekit/blueprints directory.
+ * 
+ * This command recursively copies the entire blueprint directory (including blueprint.json
+ * and all task files) to the target project's .bluekit/blueprints directory.
+ * 
+ * @param sourceBlueprintPath - The absolute path to the source blueprint directory
+ * @param targetProjectPath - The absolute path to the target project root directory
+ * @returns A promise that resolves to the path of the copied blueprint directory
+ * 
+ * @example
+ * ```typescript
+ * const result = await invokeCopyBlueprintToProject(
+ *   '/path/to/source/blueprint',
+ *   '/path/to/target/project'
+ * );
+ * console.log(result); // "/path/to/target/project/.bluekit/blueprints/blueprint-name"
+ * ```
+ */
+export async function invokeCopyBlueprintToProject(
+  sourceBlueprintPath: string,
+  targetProjectPath: string,
+): Promise<string> {
+  return await invoke<string>('copy_blueprint_to_project', {
+    sourceBlueprintPath,
+    targetProjectPath,
+  });
+}
+
+/**
  * Gets scrapbook items (folders and loose .md files) from the .bluekit directory.
  *
  * This command scans the .bluekit directory and returns all folders and loose .md files

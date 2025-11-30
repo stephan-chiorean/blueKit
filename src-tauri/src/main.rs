@@ -44,6 +44,7 @@ async fn main() {
             commands::watch_project_kits, // Watch project .bluekit directory for changes
             commands::read_file,        // Read file contents
             commands::copy_kit_to_project, // Copy kit file to project
+            commands::copy_blueprint_to_project, // Copy blueprint directory to project
             commands::get_scrapbook_items, // Get scrapbook folders and files
             commands::get_folder_markdown_files, // Get markdown files from a folder
             commands::get_blueprints, // Get blueprints from .bluekit/blueprints directory

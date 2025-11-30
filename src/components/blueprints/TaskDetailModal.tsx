@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Dialog,
   Button,
@@ -6,280 +8,269 @@ import {
   CloseButton,
   VStack,
   Text,
-  Card,
-  CardBody,
-  HStack,
-  Icon,
+  Box,
   Heading,
-  NativeSelect,
-  Field,
-  SimpleGrid,
+  Code,
+  Separator,
+  HStack,
+  Tag,
+  List,
+  Link,
+  Spinner,
 } from '@chakra-ui/react';
-import { LuBot, LuPackage, LuPlus } from 'react-icons/lu';
-
-// Agent interface matching AgentsTabContent
-interface Agent {
-  id: string;
-  alias: string;
-  type: 'agent';
-  version: number;
-  description: string;
-  tags: string[];
-  capabilities?: string[];
-  executionNotes?: string;
-}
-
-// Mock agents data (same as AgentsTabContent)
-const mockAgents: Agent[] = [
-  {
-    id: 'cursor',
-    alias: 'Cursor Agent',
-    type: 'agent',
-    version: 1,
-    description: 'Default agent for local code generation using Cursor.',
-    tags: ['local', 'coding', 'ide'],
-    capabilities: [
-      'Full access to local project files',
-      'Can run MCP tool calls',
-      'Ideal for: UI kits, API kits, utils',
-    ],
-    executionNotes: 'Use this agent to generate code inside your project. Not a long-running process; each kit is one atomic execution.',
-  },
-  {
-    id: 'frontend',
-    alias: 'Frontend Agent',
-    type: 'agent',
-    version: 1,
-    description: 'Specialized agent for frontend development and UI components.',
-    tags: ['frontend', 'ui', 'react'],
-    capabilities: [
-      'React component generation',
-      'Styling and theming',
-      'Component library integration',
-    ],
-  },
-  {
-    id: 'qa-bot',
-    alias: 'QA Bot',
-    type: 'agent',
-    version: 1,
-    description: 'Automated testing and quality assurance agent.',
-    tags: ['testing', 'qa', 'automation'],
-    capabilities: [
-      'Test generation',
-      'Code quality checks',
-      'Automated testing workflows',
-    ],
-  },
-  {
-    id: 'backend-ops',
-    alias: 'Backend Ops',
-    type: 'agent',
-    version: 1,
-    description: 'Infrastructure and backend operations agent.',
-    tags: ['backend', 'infrastructure', 'ops'],
-    capabilities: [
-      'Database setup',
-      'API configuration',
-      'Infrastructure provisioning',
-    ],
-  },
-];
-
-interface BlueprintTask {
-  id: string;
-  alias: string;
-  agent?: string;
-  kit: string;
-}
+import { Blueprint, BlueprintTask } from '../../ipc';
+import { invokeGetBlueprintTaskFile } from '../../ipc';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: BlueprintTask | null;
-  onUpdateTask?: (taskId: string, agentId: string | undefined) => void;
+  task: { blueprint: Blueprint; task: BlueprintTask } | null;
+  onViewTask: (blueprintPath: string, taskFile: string, taskDescription: string) => void;
 }
 
 export default function TaskDetailModal({
   isOpen,
   onClose,
   task,
-  onUpdateTask,
+  onViewTask,
 }: TaskDetailModalProps) {
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(
-    task?.agent || undefined
-  );
-  const [isSelectingAgent, setIsSelectingAgent] = useState(false);
+  const [taskContent, setTaskContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Update selected agent when task changes
+  // Load task content when task changes
   useEffect(() => {
-    if (task) {
-      setSelectedAgentId(task.agent || undefined);
-      setIsSelectingAgent(false);
+    if (task && isOpen) {
+      const loadTaskContent = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const content = await invokeGetBlueprintTaskFile(
+            task.blueprint.path,
+            task.task.taskFile
+          );
+          setTaskContent(content);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load task content');
+          console.error('Error loading task content:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadTaskContent();
+    } else {
+      setTaskContent(null);
+      setError(null);
     }
-  }, [task]);
+  }, [task, isOpen]);
 
   if (!task) return null;
 
-  const selectedAgent = selectedAgentId
-    ? mockAgents.find((a) => a.id === selectedAgentId)
-    : undefined;
-
-  const handleAgentSelect = (agentId: string) => {
-    setSelectedAgentId(agentId);
-    setIsSelectingAgent(false);
-    if (onUpdateTask && task) {
-      onUpdateTask(task.id, agentId);
-    }
+  const handleViewInMarkdown = () => {
+    onViewTask(task.blueprint.path, task.task.taskFile, task.task.description);
+    onClose();
   };
 
-  const handleAddAgent = () => {
-    setIsSelectingAgent(true);
-  };
+  // Remove front matter from content for display
+  const contentWithoutFrontMatter = taskContent
+    ? taskContent.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '')
+    : '';
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="700px">
+          <Dialog.Content maxW="900px" maxH="80vh">
             <Dialog.Header>
-              <Dialog.Title>{task.alias}</Dialog.Title>
+              <VStack align="start" gap={2}>
+                <Dialog.Title>{task.task.description}</Dialog.Title>
+                <HStack gap={2}>
+                  <Tag.Root size="sm" variant="subtle">
+                    <Tag.Label>{task.task.taskFile}</Tag.Label>
+                  </Tag.Root>
+                  <Tag.Root size="sm" variant="subtle" colorPalette="primary">
+                    <Tag.Label>{task.blueprint.metadata.name}</Tag.Label>
+                  </Tag.Root>
+                </HStack>
+              </VStack>
             </Dialog.Header>
             <Dialog.Body>
-              <SimpleGrid columns={2} gap={4}>
-                {/* Agent Card */}
-                {selectedAgent ? (
-                  <Card.Root
-                    variant="subtle"
-                    borderWidth="1px"
-                    cursor="pointer"
-                    _hover={{ bg: 'primary.50', borderColor: 'primary.300' }}
-                    onClick={() => setIsSelectingAgent(true)}
-                    h="100%"
+              <Box maxH="60vh" overflow="auto">
+                {loading ? (
+                  <Box textAlign="center" py={8}>
+                    <Spinner size="lg" />
+                    <Text mt={4} color="text.secondary">
+                      Loading task content...
+                    </Text>
+                  </Box>
+                ) : error ? (
+                  <Box textAlign="center" py={8}>
+                    <Text color="red.500">{error}</Text>
+                  </Box>
+                ) : taskContent ? (
+                  <Box
+                    css={{
+                      '& > *': {
+                        mb: 4,
+                      },
+                      '& > *:last-child': {
+                        mb: 0,
+                      },
+                      '& h1': {
+                        fontSize: '2xl',
+                        fontWeight: 'bold',
+                        mt: 6,
+                        mb: 4,
+                      },
+                      '& h2': {
+                        fontSize: 'xl',
+                        fontWeight: 'semibold',
+                        mt: 5,
+                        mb: 3,
+                      },
+                      '& h3': {
+                        fontSize: 'lg',
+                        fontWeight: 'semibold',
+                        mt: 4,
+                        mb: 2,
+                      },
+                      '& p': {
+                        lineHeight: '1.75',
+                        color: 'text',
+                      },
+                      '& ul, & ol': {
+                        pl: 4,
+                        mb: 4,
+                      },
+                      '& li': {
+                        mb: 2,
+                      },
+                      '& pre': {
+                        mb: 4,
+                      },
+                      '& code': {
+                        fontSize: '0.9em',
+                      },
+                      '& a': {
+                        color: 'primary.500',
+                        textDecoration: 'underline',
+                      },
+                      '& blockquote': {
+                        borderLeft: '4px solid',
+                        borderColor: 'border.emphasized',
+                        pl: 4,
+                        py: 2,
+                        my: 4,
+                        bg: 'bg.subtle',
+                        fontStyle: 'italic',
+                      },
+                    }}
                   >
-                    <CardBody>
-                      <VStack gap={3} align="center" py={4}>
-                        <Icon size="2xl" color="primary.500">
-                          <LuBot />
-                        </Icon>
-                        <Heading size="sm" textAlign="center">
-                          {selectedAgent.alias}
-                        </Heading>
-                      </VStack>
-                    </CardBody>
-                  </Card.Root>
-                ) : isSelectingAgent ? (
-                  <Card.Root
-                    variant="outline"
-                    borderWidth="1px"
-                    borderStyle="dashed"
-                    borderColor="border.subtle"
-                    h="100%"
-                  >
-                    <CardBody>
-                      <VStack gap={3} align="stretch">
-                        <Field.Root>
-                          <Field.Label>Select Agent</Field.Label>
-                          <NativeSelect.Root>
-                            <NativeSelect.Field
-                              value={selectedAgentId || ''}
-                              onChange={(e) => {
-                                const agentId = e.currentTarget.value;
-                                if (agentId) {
-                                  handleAgentSelect(agentId);
-                                } else {
-                                  // Remove agent
-                                  setSelectedAgentId(undefined);
-                                  setIsSelectingAgent(false);
-                                  if (onUpdateTask && task) {
-                                    onUpdateTask(task.id, undefined);
-                                  }
-                                }
-                              }}
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => <Heading as="h1" size="2xl" mt={6} mb={4}>{children}</Heading>,
+                        h2: ({ children }) => <Heading as="h2" size="xl" mt={5} mb={3}>{children}</Heading>,
+                        h3: ({ children }) => <Heading as="h3" size="lg" mt={4} mb={2}>{children}</Heading>,
+                        h4: ({ children }) => <Heading as="h4" size="md" mt={3} mb={2}>{children}</Heading>,
+                        p: ({ children }) => <Text mb={4} lineHeight="1.75">{children}</Text>,
+                        ul: ({ children }) => (
+                          <List.Root mb={4} pl={4}>
+                            {children}
+                          </List.Root>
+                        ),
+                        ol: ({ children }) => (
+                          <List.Root as="ol" mb={4} pl={4}>
+                            {children}
+                          </List.Root>
+                        ),
+                        li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
+                        code: ({ className, children, ...props }) => {
+                          const match = /language-(\w+)/.exec(className || '');
+                          const isInline = !match;
+                          const codeString = String(children).replace(/\n$/, '');
+                          
+                          if (isInline) {
+                            return (
+                              <Code
+                                px={1.5}
+                                py={0.5}
+                                bg="bg.subtle"
+                                borderRadius="sm"
+                                fontSize="0.9em"
+                                {...props}
+                              >
+                                {children}
+                              </Code>
+                            );
+                          }
+                          
+                          return (
+                            <Box
+                              as="pre"
+                              mb={4}
+                              p={4}
+                              bg="gray.900"
+                              color="gray.100"
+                              borderRadius="md"
+                              overflow="auto"
+                              fontSize="sm"
+                              fontFamily="mono"
+                              lineHeight="1.6"
+                              {...props}
                             >
-                              <option value="">-- Select an agent --</option>
-                              {mockAgents.map((agent) => (
-                                <option key={agent.id} value={agent.id}>
-                                  {agent.alias}
-                                </option>
-                              ))}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
-                        </Field.Root>
-                        <HStack gap={2}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setIsSelectingAgent(false);
-                              setSelectedAgentId(undefined);
-                            }}
+                              <Code
+                                as="code"
+                                display="block"
+                                whiteSpace="pre"
+                                color="inherit"
+                                bg="transparent"
+                                p={0}
+                              >
+                                {codeString}
+                              </Code>
+                            </Box>
+                          );
+                        },
+                        a: ({ href, children }) => (
+                          <Link href={href} color="primary.500" textDecoration="underline" _hover={{ color: 'primary.600' }}>
+                            {children}
+                          </Link>
+                        ),
+                        blockquote: ({ children }) => (
+                          <Box
+                            as="blockquote"
+                            borderLeft="4px solid"
+                            borderColor="border.emphasized"
+                            pl={4}
+                            py={2}
+                            my={4}
+                            bg="bg.subtle"
+                            fontStyle="italic"
                           >
-                            Cancel
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            colorPalette="red"
-                            onClick={() => {
-                              setSelectedAgentId(undefined);
-                              setIsSelectingAgent(false);
-                              if (onUpdateTask && task) {
-                                onUpdateTask(task.id, undefined);
-                              }
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </HStack>
-                      </VStack>
-                    </CardBody>
-                  </Card.Root>
-                ) : (
-                  <Card.Root
-                    variant="outline"
-                    borderWidth="1px"
-                    borderStyle="dashed"
-                    borderColor="border.subtle"
-                    cursor="pointer"
-                    _hover={{ borderColor: 'primary.300', bg: 'primary.50' }}
-                    onClick={handleAddAgent}
-                    h="100%"
-                  >
-                    <CardBody>
-                      <VStack gap={3} align="center" py={4}>
-                        <Icon size="2xl" color="primary.500">
-                          <LuPlus />
-                        </Icon>
-                        <Text color="primary.500" fontWeight="medium" textAlign="center">
-                          Add Agent
-                        </Text>
-                      </VStack>
-                    </CardBody>
-                  </Card.Root>
-                )}
-
-                {/* Kit Card */}
-                <Card.Root variant="subtle" borderWidth="1px" h="100%">
-                  <CardBody>
-                    <VStack gap={3} align="center" py={4}>
-                      <Icon size="2xl" color="primary.500">
-                        <LuPackage />
-                      </Icon>
-                      <Heading size="sm" textAlign="center">
-                        {task.kit}
-                      </Heading>
-                    </VStack>
-                  </CardBody>
-                </Card.Root>
-              </SimpleGrid>
+                            {children}
+                          </Box>
+                        ),
+                        hr: () => <Separator my={6} />,
+                      }}
+                    >
+                      {contentWithoutFrontMatter}
+                    </ReactMarkdown>
+                  </Box>
+                ) : null}
+              </Box>
             </Dialog.Body>
             <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Close</Button>
-              </Dialog.ActionTrigger>
+              <HStack gap={2}>
+                <Button variant="outline" onClick={handleViewInMarkdown}>
+                  View in Markdown
+                </Button>
+                <Dialog.ActionTrigger asChild>
+                  <Button variant="outline">Close</Button>
+                </Dialog.ActionTrigger>
+              </HStack>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
               <CloseButton size="sm" />

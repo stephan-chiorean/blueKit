@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -17,107 +17,53 @@ import {
   Icon,
   Collapsible,
 } from '@chakra-ui/react';
-import { LuBot, LuPackage, LuChevronDown, LuChevronRight } from 'react-icons/lu';
-import { KitFile } from '../../ipc';
+import { LuPackage, LuChevronDown, LuChevronRight, LuFolderPlus } from 'react-icons/lu';
+import { Blueprint, BlueprintTask } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
+import { invokeGetBlueprints, invokeGetBlueprintTaskFile, invokeCopyBlueprintToProject } from '../../ipc';
+import { open } from '@tauri-apps/api/dialog';
+import { toaster } from '../ui/toaster';
 import TaskDetailModal from './TaskDetailModal';
 
-// Blueprint structure matching the spec
-interface BlueprintTask {
-  id: string;
-  alias: string;
-  agent?: string;
-  kit: string;
-}
-
-interface BlueprintLayer {
-  id: string;
-  order: number;
-  name: string;
-  tasks: BlueprintTask[];
-}
-
-interface Blueprint {
-  id: string;
-  name: string;
-  version: number;
-  description?: string;
-  layers: BlueprintLayer[];
-}
-
-// Mock blueprints data
-const mockBlueprints: Blueprint[] = [
-  {
-    id: 'full-stack-app',
-    name: 'Full Stack App',
-    version: 1,
-    description: 'A complete full-stack application blueprint with database setup, frontend UI, authentication, and testing layers.',
-    layers: [
-      {
-        id: 'layer-1',
-        order: 1,
-        name: 'Initialization',
-        tasks: [
-          { id: 'task-db', alias: 'Database Setup', agent: 'backend-ops', kit: 'infra/db-setup' },
-          { id: 'task-ui', alias: 'UI Shell', agent: 'cursor', kit: 'frontend/ui-shell' },
-        ],
-      },
-      {
-        id: 'layer-2',
-        order: 2,
-        name: 'Business Logic',
-        tasks: [
-          { id: 'task-auth', alias: 'Authentication Flow', agent: 'cursor', kit: 'auth/auth-flow' },
-        ],
-      },
-      {
-        id: 'layer-3',
-        order: 3,
-        name: 'Testing',
-        tasks: [
-          { id: 'task-tests', alias: 'Test Suite', agent: 'qa-bot', kit: 'testing/test-suite' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'api-server',
-    name: 'API Server',
-    version: 1,
-    description: 'Blueprint for setting up a RESTful API server with comprehensive documentation.',
-    layers: [
-      {
-        id: 'layer-1',
-        order: 1,
-        name: 'Setup',
-        tasks: [
-          { id: 'task-api', alias: 'API Server', agent: 'cursor', kit: 'backend/api-server' },
-          { id: 'task-docs', alias: 'API Documentation', kit: 'docs/api-docs' },
-        ],
-      },
-    ],
-  },
-];
-
 interface BlueprintsTabContentProps {
-  kits: KitFile[];
-  kitsLoading: boolean;
-  error: string | null;
+  projectPath: string;
   projectsCount: number;
-  onViewKit: (kit: KitFile) => void;
+  onViewTask: (blueprintPath: string, taskFile: string, taskDescription: string) => void;
 }
 
 export default function BlueprintsTabContent({
-  kits: _kits,
-  kitsLoading,
-  error,
+  projectPath,
   projectsCount,
-  onViewKit: _onViewKit,
+  onViewTask,
 }: BlueprintsTabContentProps) {
   const { isSelected } = useSelection();
+  const [blueprints, setBlueprints] = useState<Blueprint[]>([]);
+  const [blueprintsLoading, setBlueprintsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedBlueprints, setExpandedBlueprints] = useState<Set<string>>(new Set());
-  const [selectedTask, setSelectedTask] = useState<BlueprintTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<{ blueprint: Blueprint; task: BlueprintTask } | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+
+  // Load blueprints from .bluekit/blueprints
+  useEffect(() => {
+    const loadBlueprints = async () => {
+      try {
+        setBlueprintsLoading(true);
+        setError(null);
+        const loadedBlueprints = await invokeGetBlueprints(projectPath);
+        setBlueprints(loadedBlueprints);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load blueprints');
+        console.error('Error loading blueprints:', err);
+      } finally {
+        setBlueprintsLoading(false);
+      }
+    };
+
+    if (projectPath) {
+      loadBlueprints();
+    }
+  }, [projectPath]);
 
   const toggleBlueprintExpansion = (blueprintId: string) => {
     setExpandedBlueprints((prev) => {
@@ -131,20 +77,45 @@ export default function BlueprintsTabContent({
     });
   };
 
-  const handleTaskClick = (task: BlueprintTask) => {
-    setSelectedTask(task);
+  const handleTaskClick = (blueprint: Blueprint, task: BlueprintTask) => {
+    setSelectedTask({ blueprint, task });
     setIsTaskModalOpen(true);
   };
 
-  const handleUpdateTask = (taskId: string, agentId: string | undefined) => {
-    // Update the selected task state to reflect the change
-    if (selectedTask && selectedTask.id === taskId) {
-      setSelectedTask({ ...selectedTask, agent: agentId });
+  const handleAddToProject = async (blueprint: Blueprint) => {
+    try {
+      // Open directory picker to select a project
+      const selectedPath = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Project',
+      });
+
+      if (!selectedPath || typeof selectedPath !== 'string') {
+        // User cancelled
+        return;
+      }
+
+      // Copy the blueprint directory to the target project
+      await invokeCopyBlueprintToProject(blueprint.path, selectedPath);
+
+      // Show success toast
+      toaster.create({
+        type: 'success',
+        title: 'Success',
+        description: `Successfully copied blueprint "${blueprint.metadata.name}" to project`,
+      });
+    } catch (error) {
+      console.error('[BlueprintsTabContent] Error in Add to Project:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Error',
+        description: `Failed to add blueprint to project: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
     }
-    // Note: In a real implementation, this would update the actual blueprint file
   };
 
-  if (kitsLoading) {
+  if (blueprintsLoading) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
         Loading blueprints...
@@ -168,9 +139,6 @@ export default function BlueprintsTabContent({
     );
   }
 
-  // Using mock data for now
-  const blueprints = mockBlueprints;
-
   if (blueprints.length === 0) {
     return (
       <EmptyState.Root>
@@ -193,13 +161,13 @@ export default function BlueprintsTabContent({
     <Box>
       <SimpleGrid columns={{ base: 1, md: 1, lg: 1 }} gap={4}>
         {blueprints.map((blueprint) => {
-          const isExpanded = expandedBlueprints.has(blueprint.id);
-          const blueprintSelected = isSelected(blueprint.id);
-          const totalTasks = blueprint.layers.reduce((sum, layer) => sum + layer.tasks.length, 0);
+          const isExpanded = expandedBlueprints.has(blueprint.metadata.id);
+          const blueprintSelected = isSelected(blueprint.metadata.id);
+          const totalTasks = blueprint.metadata.layers.reduce((sum, layer) => sum + layer.tasks.length, 0);
 
           return (
             <Card.Root
-              key={blueprint.id}
+              key={blueprint.metadata.id}
               variant="subtle"
               borderWidth={blueprintSelected ? "2px" : "1px"}
               borderColor={blueprintSelected ? "primary.500" : "border.subtle"}
@@ -212,29 +180,42 @@ export default function BlueprintsTabContent({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleBlueprintExpansion(blueprint.id)}
+                        onClick={() => toggleBlueprintExpansion(blueprint.metadata.id)}
                         p={1}
                       >
                         <Icon>
                           {isExpanded ? <LuChevronDown /> : <LuChevronRight />}
                         </Icon>
                       </Button>
-                      <VStack align="start" gap={0}>
-                        <Heading size="md">{blueprint.name}</Heading>
-                        {blueprint.description ? (
+                      <VStack align="start" gap={0} flex="1">
+                        <Heading size="md">{blueprint.metadata.name}</Heading>
+                        {blueprint.metadata.description ? (
                           <Text fontSize="xs" color="text.secondary">
-                            {blueprint.description}
+                            {blueprint.metadata.description}
                           </Text>
                         ) : (
                           <Text fontSize="xs" color="text.secondary">
-                            ID: {blueprint.id} • v{blueprint.version}
+                            ID: {blueprint.metadata.id} • v{blueprint.metadata.version}
                           </Text>
                         )}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          mt={2}
+                          onClick={() => handleAddToProject(blueprint)}
+                        >
+                          <HStack gap={1}>
+                            <Icon size="xs">
+                              <LuFolderPlus />
+                            </Icon>
+                            <Text>Add to Project</Text>
+                          </HStack>
+                        </Button>
                       </VStack>
                     </HStack>
                     <HStack gap={2}>
                       <Badge colorPalette="primary" variant="subtle">
-                        {blueprint.layers.length} layer{blueprint.layers.length !== 1 ? 's' : ''}
+                        {blueprint.metadata.layers.length} layer{blueprint.metadata.layers.length !== 1 ? 's' : ''}
                       </Badge>
                       <Badge colorPalette="blue" variant="subtle">
                         {totalTasks} task{totalTasks !== 1 ? 's' : ''}
@@ -247,7 +228,7 @@ export default function BlueprintsTabContent({
                 <Collapsible.Root open={isExpanded}>
                   <Collapsible.Content>
                     <VStack align="stretch" gap={4} mt={2}>
-                      {blueprint.layers
+                      {blueprint.metadata.layers
                         .sort((a, b) => a.order - b.order)
                         .map((layer) => (
                           <Box key={layer.id} pl={4} borderLeft="2px solid" borderColor="primary.200">
@@ -274,29 +255,19 @@ export default function BlueprintsTabContent({
                                     bg="bg.subtle"
                                     cursor="pointer"
                                     _hover={{ bg: 'primary.50', borderColor: 'primary.300' }}
-                                    onClick={() => handleTaskClick(task)}
+                                    onClick={() => handleTaskClick(blueprint, task)}
                                   >
                                     <CardBody py={2}>
                                       <VStack align="start" gap={1} flex="1">
                                         <Text fontSize="sm" fontWeight="medium">
-                                          {task.alias}
+                                          {task.description}
                                         </Text>
-                                        <HStack gap={2}>
-                                          {task.agent ? (
-                                            <Tag.Root size="sm" variant="subtle">
-                                              <Icon size="xs">
-                                                <LuBot />
-                                              </Icon>
-                                              <Tag.Label ml={1}>{task.agent}</Tag.Label>
-                                            </Tag.Root>
-                                          ) : null}
-                                          <Tag.Root size="sm" variant="subtle">
-                                            <Icon size="xs">
-                                              <LuPackage />
-                                            </Icon>
-                                            <Tag.Label ml={1}>{task.kit}</Tag.Label>
-                                          </Tag.Root>
-                                        </HStack>
+                                        <Tag.Root size="sm" variant="subtle">
+                                          <Icon size="xs">
+                                            <LuPackage />
+                                          </Icon>
+                                          <Tag.Label ml={1}>{task.taskFile}</Tag.Label>
+                                        </Tag.Root>
                                       </VStack>
                                     </CardBody>
                                   </Card.Root>
@@ -320,7 +291,7 @@ export default function BlueprintsTabContent({
           setSelectedTask(null);
         }}
         task={selectedTask}
-        onUpdateTask={handleUpdateTask}
+        onViewTask={onViewTask}
       />
     </Box>
   );
