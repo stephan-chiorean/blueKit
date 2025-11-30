@@ -558,7 +558,7 @@ pub async fn get_scrapbook_items(project_path: String) -> Result<Vec<ScrapbookIt
     }
 
     let mut items = Vec::new();
-    let known_folders = vec!["kits", "agents", "walkthroughs", "blueprints"];
+    let known_folders = vec!["kits", "agents", "walkthroughs", "blueprints", "diagrams"];
 
     // Read entries in .bluekit directory
     let entries = fs::read_dir(&bluekit_path)
