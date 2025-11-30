@@ -5,6 +5,8 @@ import {
   Heading,
   Text,
   VStack,
+  HStack,
+  Tag,
 } from '@chakra-ui/react';
 import { KitFile } from '../../ipc';
 
@@ -87,6 +89,17 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
             <Text fontSize="lg" color="text.secondary" mb={4}>
               {diagram.frontMatter.description}
             </Text>
+          )}
+          
+          {/* Metadata Tags */}
+          {diagram.frontMatter?.tags && diagram.frontMatter.tags.length > 0 && (
+            <HStack gap={2} flexWrap="wrap" mt={4}>
+              {diagram.frontMatter.tags.map((tag) => (
+                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                  <Tag.Label>{tag}</Tag.Label>
+                </Tag.Root>
+              ))}
+            </HStack>
           )}
         </Box>
 

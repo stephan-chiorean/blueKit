@@ -1,81 +1,147 @@
 ---
 alias: Backend Architecture
-description: BlueKit Tauri backend architecture showing modules, IPC communication, and file system interactions
+description: Complete BlueKit Tauri backend architecture showing Rust modules, IPC commands, file watching system, state management, and frontend communication
 tags:
   - architecture
   - backend
   - tauri
   - rust
+  - ipc
 ---
-
 ```mermaid
 graph TB
     subgraph Frontend["Frontend (React + TypeScript)"]
         UI[React Components]
-        IPC_TS[IPC Wrappers<br/>src/ipc.ts]
+        IPC_Wrapper[ipc.ts<br/>Type-safe wrappers]
     end
 
-    subgraph Tauri_Layer["Tauri IPC Layer"]
-        IPC_Handler[IPC Handler<br/>invoke_handler!]
+    subgraph Tauri_Layer["Tauri Framework"]
+        IPC_Bridge[IPC Bridge<br/>invoke handler]
         Event_System[Event System<br/>emit/listen]
     end
 
-    subgraph Backend_Modules["Backend Modules (Rust)"]
-        Main[main.rs<br/>Application Entry Point]
+    subgraph Main_Module["main.rs - Application Entry"]
+        Builder[Tauri Builder]
+        Setup[Setup Hook]
+        Handler[Command Handler<br/>generate_handler!]
+    end
+
+    subgraph Core_Modules["Core Modules"]
         Commands[commands.rs<br/>IPC Command Handlers]
         Watcher[watcher.rs<br/>File System Watcher]
         State[state.rs<br/>Application State]
         Utils[utils.rs<br/>Utility Functions]
     end
 
-    subgraph File_System["File System"]
-        Project_Dirs[Project Directories<br/>.bluekit/]
-        Registry[Project Registry<br/>~/.bluekit/projectRegistry.json]
-        Kits[Kits/Walkthroughs/Agents<br/>.bluekit/kits/]
-        Diagrams[Diagrams<br/>.bluekit/diagrams/]
-        Blueprints[Blueprints<br/>.bluekit/blueprints/]
+    subgraph IPC_Commands["IPC Commands"]
+        Ping[ping]
+        AppInfo[get_app_info]
+        ProjectKits[get_project_kits]
+        ProjectRegistry[get_project_registry]
+        WatchKits[watch_project_kits]
+        ReadFile[read_file]
+        CopyKit[copy_kit_to_project]
+        Scrapbook[get_scrapbook_items]
+        FolderFiles[get_folder_markdown_files]
+        Blueprints[get_blueprints]
+        BlueprintTask[get_blueprint_task_file]
+        Diagrams[get_project_diagrams]
     end
 
-    subgraph External["External"]
-        Notify[notify crate<br/>File Watching]
+    subgraph File_System["File System Operations"]
+        ProjectDir[Project Directories<br/>.bluekit/]
+        RegistryFile[~/.bluekit/<br/>projectRegistry.json]
+        KitFiles[Kit Files<br/>.md]
+        BlueprintFiles[Blueprint Files<br/>blueprint.json + tasks]
+        DiagramFiles[Diagram Files<br/>.mmd, .mermaid]
+    end
+
+    subgraph Watcher_System["File Watching System"]
+        FileWatcher[watch_file<br/>Single file monitoring]
+        DirWatcher[watch_directory<br/>Recursive directory monitoring]
+        Notify[notify crate<br/>File system events]
+    end
+
+    subgraph Dependencies["External Dependencies"]
+        Serde[serde + serde_json<br/>Serialization]
+        Tokio[Tokio<br/>Async runtime]
+        NotifyCrate[notify<br/>File watching]
     end
 
     %% Frontend to Tauri
-    UI -->|Calls| IPC_TS
-    IPC_TS -->|invoke| IPC_Handler
-    IPC_Handler -->|Routes to| Commands
+    UI -->|Calls| IPC_Wrapper
+    IPC_Wrapper -->|invoke| IPC_Bridge
+    IPC_Bridge -->|Routes| Handler
 
-    %% Backend module relationships
-    Main -->|Registers| Commands
-    Main -->|Sets up| Watcher
+    %% Tauri to Main
+    Handler -->|Registers| Commands
+    Setup -->|Initializes| Watcher
+
+    %% Main to Modules
+    Builder -->|Uses| Commands
+    Builder -->|Uses| Watcher
+    Builder -->|Uses| State
     Commands -->|Uses| Utils
-    Commands -->|Uses| State
-    Watcher -->|Uses| Notify
+    Commands -->|Uses| Watcher
 
-    %% File system interactions
-    Commands -->|Reads/Writes| Project_Dirs
-    Commands -->|Reads| Registry
-    Commands -->|Scans| Kits
-    Commands -->|Scans| Diagrams
-    Commands -->|Scans| Blueprints
+    %% Commands to IPC
+    Commands --> Ping
+    Commands --> AppInfo
+    Commands --> ProjectKits
+    Commands --> ProjectRegistry
+    Commands --> WatchKits
+    Commands --> ReadFile
+    Commands --> CopyKit
+    Commands --> Scrapbook
+    Commands --> FolderFiles
+    Commands --> Blueprints
+    Commands --> BlueprintTask
+    Commands --> Diagrams
 
-    %% Watcher interactions
-    Watcher -->|Monitors| Project_Dirs
-    Watcher -->|Monitors| Registry
-    Watcher -->|Emits Events| Event_System
-    Event_System -->|Notifies| IPC_TS
+    %% Commands to File System
+    ProjectKits -->|Reads| ProjectDir
+    ProjectRegistry -->|Reads| RegistryFile
+    ReadFile -->|Reads| KitFiles
+    ReadFile -->|Reads| BlueprintFiles
+    ReadFile -->|Reads| DiagramFiles
+    CopyKit -->|Writes| ProjectDir
+    Blueprints -->|Reads| BlueprintFiles
+    BlueprintTask -->|Reads| BlueprintFiles
+    Diagrams -->|Reads| DiagramFiles
+
+    %% Watcher System
+    WatchKits -->|Starts| DirWatcher
+    Setup -->|Starts| FileWatcher
+    FileWatcher -->|Uses| Notify
+    DirWatcher -->|Uses| Notify
+    Notify -->|Monitors| RegistryFile
+    Notify -->|Monitors| ProjectDir
+    DirWatcher -->|Emits| Event_System
+    FileWatcher -->|Emits| Event_System
+    Event_System -->|Notifies| UI
+
+    %% Dependencies
+    Commands -.->|Uses| Serde
+    Commands -.->|Uses| Tokio
+    Watcher -.->|Uses| NotifyCrate
+    Main_Module -.->|Uses| Tokio
 
     %% Styling
-    classDef frontend fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    classDef tauri fill:#ffecb3,stroke:#f57f17,stroke-width:2px
-    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    classDef filesystem fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef tauri fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef main fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef module fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef command fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef filesystem fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef watcher fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef dependency fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
 
-    class UI,IPC_TS frontend
-    class IPC_Handler,Event_System tauri
-    class Main,Commands,Watcher,State,Utils backend
-    class Project_Dirs,Registry,Kits,Diagrams,Blueprints filesystem
-    class Notify external
+    class UI,IPC_Wrapper frontend
+    class IPC_Bridge,Event_System tauri
+    class Builder,Setup,Handler main
+    class Commands,Watcher,State,Utils module
+    class Ping,AppInfo,ProjectKits,ProjectRegistry,WatchKits,ReadFile,CopyKit,Scrapbook,FolderFiles,Blueprints,BlueprintTask,Diagrams command
+    class ProjectDir,RegistryFile,KitFiles,BlueprintFiles,DiagramFiles filesystem
+    class FileWatcher,DirWatcher,Notify watcher
+    class Serde,Tokio,NotifyCrate dependency
 ```
-
