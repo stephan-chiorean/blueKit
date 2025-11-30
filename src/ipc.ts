@@ -434,6 +434,25 @@ export async function invokeGetBlueprintTaskFile(
 }
 
 /**
+ * Gets all diagram files (.mmd and .mermaid) from the .bluekit/diagrams directory.
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to an array of KitFile objects
+ *
+ * @example
+ * ```typescript
+ * const diagrams = await invokeGetProjectDiagrams('/path/to/project');
+ * diagrams.forEach(diagram => {
+ *   console.log(diagram.name); // "my-diagram" (without extension)
+ *   console.log(diagram.path); // "/path/to/project/.bluekit/diagrams/my-diagram.mmd"
+ * });
+ * ```
+ */
+export async function invokeGetProjectDiagrams(projectPath: string): Promise<KitFile[]> {
+  return await invoke<KitFile[]>('get_project_diagrams', { projectPath });
+}
+
+/**
  * How to add a new IPC command:
  *
  * 1. Add the command handler in `src-tauri/src/commands.rs`:

@@ -1,0 +1,81 @@
+---
+alias: Backend Architecture
+description: BlueKit Tauri backend architecture showing modules, IPC communication, and file system interactions
+tags:
+  - architecture
+  - backend
+  - tauri
+  - rust
+---
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (React + TypeScript)"]
+        UI[React Components]
+        IPC_TS[IPC Wrappers<br/>src/ipc.ts]
+    end
+
+    subgraph Tauri_Layer["Tauri IPC Layer"]
+        IPC_Handler[IPC Handler<br/>invoke_handler!]
+        Event_System[Event System<br/>emit/listen]
+    end
+
+    subgraph Backend_Modules["Backend Modules (Rust)"]
+        Main[main.rs<br/>Application Entry Point]
+        Commands[commands.rs<br/>IPC Command Handlers]
+        Watcher[watcher.rs<br/>File System Watcher]
+        State[state.rs<br/>Application State]
+        Utils[utils.rs<br/>Utility Functions]
+    end
+
+    subgraph File_System["File System"]
+        Project_Dirs[Project Directories<br/>.bluekit/]
+        Registry[Project Registry<br/>~/.bluekit/projectRegistry.json]
+        Kits[Kits/Walkthroughs/Agents<br/>.bluekit/kits/]
+        Diagrams[Diagrams<br/>.bluekit/diagrams/]
+        Blueprints[Blueprints<br/>.bluekit/blueprints/]
+    end
+
+    subgraph External["External"]
+        Notify[notify crate<br/>File Watching]
+    end
+
+    %% Frontend to Tauri
+    UI -->|Calls| IPC_TS
+    IPC_TS -->|invoke| IPC_Handler
+    IPC_Handler -->|Routes to| Commands
+
+    %% Backend module relationships
+    Main -->|Registers| Commands
+    Main -->|Sets up| Watcher
+    Commands -->|Uses| Utils
+    Commands -->|Uses| State
+    Watcher -->|Uses| Notify
+
+    %% File system interactions
+    Commands -->|Reads/Writes| Project_Dirs
+    Commands -->|Reads| Registry
+    Commands -->|Scans| Kits
+    Commands -->|Scans| Diagrams
+    Commands -->|Scans| Blueprints
+
+    %% Watcher interactions
+    Watcher -->|Monitors| Project_Dirs
+    Watcher -->|Monitors| Registry
+    Watcher -->|Emits Events| Event_System
+    Event_System -->|Notifies| IPC_TS
+
+    %% Styling
+    classDef frontend fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef tauri fill:#ffecb3,stroke:#f57f17,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef filesystem fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class UI,IPC_TS frontend
+    class IPC_Handler,Event_System tauri
+    class Main,Commands,Watcher,State,Utils backend
+    class Project_Dirs,Registry,Kits,Diagrams,Blueprints filesystem
+    class Notify external
+```
+

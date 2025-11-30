@@ -166,15 +166,15 @@ pub fn watch_directory(
                 Ok(Event { kind: EventKind::Modify(_), paths, .. }) |
                 Ok(Event { kind: EventKind::Create(_), paths, .. }) |
                 Ok(Event { kind: EventKind::Remove(_), paths, .. }) => {
-                    // Check if any of the changed files are .md files
-                    let has_md_file = paths.iter().any(|p| {
+                    // Check if any of the changed files are .md, .mmd, or .mermaid files
+                    let has_relevant_file = paths.iter().any(|p| {
                         p.extension()
                             .and_then(|ext| ext.to_str())
-                            .map(|ext| ext == "md")
+                            .map(|ext| ext == "md" || ext == "mmd" || ext == "mermaid")
                             .unwrap_or(false)
                     });
                     
-                    if has_md_file {
+                    if has_relevant_file {
                         // Emit Tauri event to frontend
                         app_handle_clone.emit_all(&event_name, ()).unwrap_or_else(|e| {
                             eprintln!("Failed to emit directory change event: {}", e);

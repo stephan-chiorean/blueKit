@@ -14,7 +14,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -22,8 +22,10 @@ import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabCo
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
 import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
+import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
+import DiagramViewPage from './DiagramViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, KitFile, ProjectEntry } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 
@@ -42,6 +44,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // Kit view state - for viewing a kit/walkthrough in split view
   const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
   const [kitViewContent, setKitViewContent] = useState<string | null>(null);
+  
+  // Diagram view state - for viewing a diagram
+  const [viewingDiagram, setViewingDiagram] = useState<KitFile | null>(null);
+  const [diagramViewContent, setDiagramViewContent] = useState<string | null>(null);
 
   // Load all projects for the dropdown
   useEffect(() => {
@@ -168,6 +174,23 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     setKitViewContent(null);
   };
 
+  // Handler to navigate to diagram view
+  const handleViewDiagram = async (diagram: KitFile) => {
+    try {
+      const content = await invokeReadFile(diagram.path);
+      setViewingDiagram(diagram);
+      setDiagramViewContent(content);
+    } catch (error) {
+      console.error('Failed to load diagram content:', error);
+    }
+  };
+
+  // Handler to go back from diagram view
+  const handleBackFromDiagramView = () => {
+    setViewingDiagram(null);
+    setDiagramViewContent(null);
+  };
+
   // Create collection for Select component
   const projectsCollection = useMemo(() => {
     return createListCollection({
@@ -185,6 +208,17 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       onProjectSelect(selectedProject);
     }
   };
+
+  // If viewing a diagram, show the diagram view page
+  if (viewingDiagram && diagramViewContent) {
+    return (
+      <DiagramViewPage 
+        diagram={viewingDiagram} 
+        diagramContent={diagramViewContent}
+        onBack={handleBackFromDiagramView}
+      />
+    );
+  }
 
   // If viewing a kit or walkthrough, show the appropriate view page
   if (viewingKit && kitViewContent) {
@@ -334,6 +368,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Scrapbook</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="diagrams">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuNetwork />
+                      </Icon>
+                      <Text>Diagrams</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -378,6 +420,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               <ScrapbookTabContent
                 projectPath={project.path}
                 onViewKit={handleViewKit}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="diagrams">
+              <DiagramsTabContent
+                projectPath={project.path}
+                onViewDiagram={handleViewDiagram}
               />
             </Tabs.Content>
           </Tabs.Root>

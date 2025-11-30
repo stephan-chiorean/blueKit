@@ -48,6 +48,7 @@ async fn main() {
             commands::get_folder_markdown_files, // Get markdown files from a folder
             commands::get_blueprints, // Get blueprints from .bluekit/blueprints directory
             commands::get_blueprint_task_file, // Get task file content from blueprint
+            commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory
         ])
         .setup(|app| {
             // Set up file watcher for project registry

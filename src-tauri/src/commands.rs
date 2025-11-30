@@ -797,6 +797,85 @@ pub async fn get_blueprint_task_file(
     Ok(contents)
 }
 
+/// Gets all diagram files (.mmd and .mermaid) from the .bluekit/diagrams directory.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<Vec<KitFile>, String>` containing either:
+/// - `Ok(Vec<KitFile>)` - Success case with list of diagram files
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_project_diagrams(project_path: String) -> Result<Vec<KitFile>, String> {
+    use std::fs;
+
+    // Construct the path to .bluekit/diagrams directory
+    let diagrams_path = PathBuf::from(&project_path).join(".bluekit").join("diagrams");
+
+    // Check if diagrams directory exists
+    if !diagrams_path.exists() {
+        return Ok(Vec::new()); // Return empty vector if directory doesn't exist
+    }
+
+    let mut diagrams = Vec::new();
+
+    // Helper function to read mermaid files from a directory recursively
+    fn read_mermaid_files_from_dir(dir_path: &PathBuf, diagrams: &mut Vec<KitFile>) -> Result<(), String> {
+        if !dir_path.exists() {
+            return Ok(()); // Directory doesn't exist, skip it
+        }
+
+        let entries = fs::read_dir(dir_path)
+            .map_err(|e| format!("Failed to read directory: {}", e))?;
+        
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+            let path = entry.path();
+            
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    // Accept both .mmd and .mermaid extensions
+                    if extension == "mmd" || extension == "mermaid" {
+                        // Get the file name without extension
+                        let name = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        
+                        // Get the full path as a string
+                        let path_str = path
+                            .to_str()
+                            .ok_or_else(|| "Invalid path encoding".to_string())?
+                            .to_string();
+                        
+                        diagrams.push(KitFile {
+                            name,
+                            path: path_str,
+                        });
+                    }
+                }
+            } else if path.is_dir() {
+                // Recursively read subdirectories
+                read_mermaid_files_from_dir(&path, diagrams)?;
+            }
+        }
+        
+        Ok(())
+    }
+
+    // Read from diagrams directory
+    read_mermaid_files_from_dir(&diagrams_path, &mut diagrams)?;
+
+    // Sort alphabetically
+    diagrams.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(diagrams)
+}
+
 // How to add a new command:
 //
 // 1. Create a new async function in this file
