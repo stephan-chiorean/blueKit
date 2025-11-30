@@ -75,7 +75,7 @@ export interface KitFrontMatter {
 
 /**
  * Type definition for a project entry in the project registry.
- * 
+ *
  * This interface must match the `ProjectEntry` struct in `src-tauri/src/commands.rs`.
  */
 export interface ProjectEntry {
@@ -87,6 +87,84 @@ export interface ProjectEntry {
   description: string;
   /** Absolute path to the project directory */
   path: string;
+}
+
+/**
+ * Type definition for a scrapbook item (folder or file).
+ *
+ * This interface must match the `ScrapbookItem` struct in `src-tauri/src/commands.rs`.
+ */
+export interface ScrapbookItem {
+  /** Name of the folder or file */
+  name: string;
+  /** Full path to the folder or file */
+  path: string;
+  /** Whether this is a folder (true) or file (false) */
+  is_folder: boolean;
+}
+
+/**
+ * Type definition for a blueprint task.
+ *
+ * This interface must match the `BlueprintTask` struct in `src-tauri/src/commands.rs`.
+ */
+export interface BlueprintTask {
+  /** Task ID */
+  id: string;
+  /** Task markdown file name (e.g., "project-setup.md") */
+  taskFile: string;
+  /** Task description */
+  description: string;
+}
+
+/**
+ * Type definition for a blueprint layer.
+ *
+ * This interface must match the `BlueprintLayer` struct in `src-tauri/src/commands.rs`.
+ */
+export interface BlueprintLayer {
+  /** Layer ID */
+  id: string;
+  /** Layer order */
+  order: number;
+  /** Layer name */
+  name: string;
+  /** Tasks in this layer */
+  tasks: BlueprintTask[];
+}
+
+/**
+ * Type definition for blueprint metadata from blueprint.json.
+ *
+ * This interface must match the `BlueprintMetadata` struct in `src-tauri/src/commands.rs`.
+ */
+export interface BlueprintMetadata {
+  /** Blueprint ID */
+  id: string;
+  /** Blueprint name */
+  name: string;
+  /** Blueprint version */
+  version: number;
+  /** Blueprint description */
+  description: string;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Layers in this blueprint */
+  layers: BlueprintLayer[];
+}
+
+/**
+ * Type definition for a blueprint with metadata.
+ *
+ * This interface must match the `Blueprint` struct in `src-tauri/src/commands.rs`.
+ */
+export interface Blueprint {
+  /** Blueprint directory name */
+  name: string;
+  /** Full path to the blueprint directory */
+  path: string;
+  /** Blueprint metadata from blueprint.json */
+  metadata: BlueprintMetadata;
 }
 
 /**
@@ -267,8 +345,97 @@ export async function invokeCopyKitToProject(
 }
 
 /**
+ * Gets scrapbook items (folders and loose .md files) from the .bluekit directory.
+ *
+ * This command scans the .bluekit directory and returns all folders and loose .md files
+ * that are not in the known subdirectories (kits, agents, walkthroughs).
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to an array of ScrapbookItem objects
+ *
+ * @example
+ * ```typescript
+ * const items = await invokeGetScrapbookItems('/path/to/project');
+ * items.forEach(item => {
+ *   if (item.is_folder) {
+ *     console.log('Folder:', item.name);
+ *   } else {
+ *     console.log('File:', item.name);
+ *   }
+ * });
+ * ```
+ */
+export async function invokeGetScrapbookItems(projectPath: string): Promise<ScrapbookItem[]> {
+  return await invoke<ScrapbookItem[]>('get_scrapbook_items', { projectPath });
+}
+
+/**
+ * Gets markdown files from a specific folder in the .bluekit directory.
+ *
+ * @param folderPath - The absolute path to the folder
+ * @returns A promise that resolves to an array of KitFile objects
+ *
+ * @example
+ * ```typescript
+ * const files = await invokeGetFolderMarkdownFiles('/path/to/project/.bluekit/custom');
+ * files.forEach(file => {
+ *   console.log(file.name); // "my-file" (without .md extension)
+ *   console.log(file.path); // "/path/to/project/.bluekit/custom/my-file.md"
+ * });
+ * ```
+ */
+export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<KitFile[]> {
+  return await invoke<KitFile[]>('get_folder_markdown_files', { folderPath });
+}
+
+/**
+ * Gets all blueprints from the .bluekit/blueprints directory.
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to an array of Blueprint objects
+ *
+ * @example
+ * ```typescript
+ * const blueprints = await invokeGetBlueprints('/path/to/project');
+ * blueprints.forEach(blueprint => {
+ *   console.log(blueprint.metadata.name); // "BlueKit Backend"
+ *   console.log(blueprint.metadata.layers.length); // Number of layers
+ * });
+ * ```
+ */
+export async function invokeGetBlueprints(projectPath: string): Promise<Blueprint[]> {
+  return await invoke<Blueprint[]>('get_blueprints', { projectPath });
+}
+
+/**
+ * Gets the content of a task file from a blueprint directory.
+ *
+ * @param blueprintPath - The path to the blueprint directory
+ * @param taskFile - The name of the task markdown file (e.g., "project-setup.md")
+ * @returns A promise that resolves to the task file contents as a string
+ *
+ * @example
+ * ```typescript
+ * const content = await invokeGetBlueprintTaskFile(
+ *   '/path/to/project/.bluekit/blueprints/backend-v1',
+ *   'project-setup.md'
+ * );
+ * console.log(content); // Markdown content of the task file
+ * ```
+ */
+export async function invokeGetBlueprintTaskFile(
+  blueprintPath: string,
+  taskFile: string,
+): Promise<string> {
+  return await invoke<string>('get_blueprint_task_file', {
+    blueprintPath,
+    taskFile,
+  });
+}
+
+/**
  * How to add a new IPC command:
- * 
+ *
  * 1. Add the command handler in `src-tauri/src/commands.rs`:
  *    ```rust
  *    #[tauri::command]
@@ -276,17 +443,17 @@ export async function invokeCopyKitToProject(
  *        Ok(format!("Received: {}", param))
  *    }
  *    ```
- * 
+ *
  * 2. Register it in `src-tauri/src/main.rs`:
  *    Add `commands::my_command` to the `invoke_handler![]` macro
- * 
+ *
  * 3. Add a typed wrapper function in this file:
  *    ```typescript
  *    export async function invokeMyCommand(param: string): Promise<string> {
  *        return await invoke<string>('my_command', { param });
  *    }
  *    ```
- * 
+ *
  * 4. Use it in your React components:
  *    ```typescript
  *    import { invokeMyCommand } from './ipc';

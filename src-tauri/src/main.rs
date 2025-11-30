@@ -44,6 +44,10 @@ async fn main() {
             commands::watch_project_kits, // Watch project .bluekit directory for changes
             commands::read_file,        // Read file contents
             commands::copy_kit_to_project, // Copy kit file to project
+            commands::get_scrapbook_items, // Get scrapbook folders and files
+            commands::get_folder_markdown_files, // Get markdown files from a folder
+            commands::get_blueprints, // Get blueprints from .bluekit/blueprints directory
+            commands::get_blueprint_task_file, // Get task file content from blueprint
         ])
         .setup(|app| {
             // Set up file watcher for project registry

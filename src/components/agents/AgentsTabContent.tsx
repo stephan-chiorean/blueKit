@@ -6,16 +6,14 @@ import {
   CardHeader,
   Heading,
   SimpleGrid,
-  Flex,
   Text,
   HStack,
   Tag,
   VStack,
   EmptyState,
-  Button,
   Icon,
 } from '@chakra-ui/react';
-import { LuBot, LuPlus } from 'react-icons/lu';
+import { LuBot } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
 
 interface AgentsTabContentProps {
@@ -83,21 +81,6 @@ export default function AgentsTabContent({
 
   return (
     <Box>
-      <Flex mb={4} justify="flex-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            // TODO: Open create agent modal
-            console.log('Create agent');
-          }}
-        >
-          <Icon>
-            <LuPlus />
-          </Icon>
-          Add Agent
-        </Button>
-      </Flex>
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
         {agents.map((agent) => {
           const frontMatter = agent.frontMatter || {};

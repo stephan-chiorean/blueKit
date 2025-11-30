@@ -56,15 +56,22 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
     try {
       setProjectsLoading(true);
       setProjectsError(null);
-      console.log('Loading projects from registry...');
+      console.log('[loadProjects] Starting to load projects from registry...');
       const registryProjects = await invokeGetProjectRegistry();
-      console.log('Loaded projects:', registryProjects);
+      console.log('[loadProjects] Successfully loaded projects:', registryProjects);
+      console.log('[loadProjects] Number of projects:', registryProjects.length);
       setProjects(registryProjects);
+      console.log('[loadProjects] State updated with projects');
     } catch (error) {
-      console.error('Error loading project registry:', error);
-      setProjectsError(error instanceof Error ? error.message : 'Failed to load projects');
+      console.error('[loadProjects] ERROR loading project registry:', error);
+      console.error('[loadProjects] Error type:', typeof error);
+      console.error('[loadProjects] Error details:', JSON.stringify(error, null, 2));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[loadProjects] Error message:', errorMessage);
+      setProjectsError(errorMessage || 'Failed to load projects');
     } finally {
       setProjectsLoading(false);
+      console.log('[loadProjects] Loading complete, projectsLoading set to false');
     }
   };
 

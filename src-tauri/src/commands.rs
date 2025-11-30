@@ -145,38 +145,90 @@ pub struct KitFile {
     pub path: String,
 }
 
+/// Scrapbook item structure - can be either a folder or a file.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScrapbookItem {
+    /// Name of the folder or file
+    pub name: String,
+    /// Full path to the folder or file
+    pub path: String,
+    /// Whether this is a folder (true) or file (false)
+    pub is_folder: bool,
+}
+
+/// Blueprint metadata structure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Blueprint {
+    /// Blueprint directory name
+    pub name: String,
+    /// Full path to the blueprint directory
+    pub path: String,
+    /// Blueprint metadata from blueprint.json
+    pub metadata: BlueprintMetadata,
+}
+
+/// Blueprint metadata from blueprint.json file.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlueprintMetadata {
+    pub id: String,
+    pub name: String,
+    pub version: i32,
+    pub description: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    pub layers: Vec<BlueprintLayer>,
+}
+
+/// Blueprint layer structure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlueprintLayer {
+    pub id: String,
+    pub order: i32,
+    pub name: String,
+    pub tasks: Vec<BlueprintTask>,
+}
+
+/// Blueprint task structure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlueprintTask {
+    pub id: String,
+    #[serde(rename = "taskFile")]
+    pub task_file: String,
+    pub description: String,
+}
+
 /// Reads the .bluekit directory and returns a list of .md files (kits).
 /// 
 /// # Arguments
 /// 
 /// * `project_path` - The path to the project root directory
-/// 
+///
 /// # Returns
-/// 
+///
 /// A `Result<Vec<KitFile>, String>` containing either:
 /// - `Ok(Vec<KitFile>)` - Success case with list of kit files
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
 pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, String> {
-    use std::fs;
-    
     // Construct the path to .bluekit directory
     let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
-    
+
     // Check if .bluekit directory exists
     if !bluekit_path.exists() {
         return Ok(Vec::new()); // Return empty vector if directory doesn't exist
     }
-    
+
     let mut kits = Vec::new();
-    
+
     // Helper function to read markdown files from a directory recursively
     fn read_md_files_from_dir(dir_path: &PathBuf, kits: &mut Vec<KitFile>) -> Result<(), String> {
+        use std::fs;
+
         if !dir_path.exists() {
             return Ok(()); // Directory doesn't exist, skip it
         }
-        
-        let entries = std::fs::read_dir(dir_path)
+
+        let entries = fs::read_dir(dir_path)
             .map_err(|e| format!("Failed to read directory: {}", e))?;
         
         for entry in entries {
@@ -250,43 +302,66 @@ pub struct ProjectEntry {
 #[tauri::command]
 pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
     use std::fs;
-    
+
+    eprintln!("[get_project_registry] Starting to load project registry...");
+
     // Get home directory
     let home_dir = env::var("HOME")
         .or_else(|_| env::var("USERPROFILE")) // Windows fallback
-        .map_err(|_| "Could not determine home directory".to_string())?;
-    
+        .map_err(|e| {
+            let error_msg = format!("Could not determine home directory: {:?}", e);
+            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            error_msg
+        })?;
+
+    eprintln!("[get_project_registry] Home directory: {}", home_dir);
+
     // Construct path to project registry
     let registry_path = PathBuf::from(&home_dir)
         .join(".bluekit")
         .join("projectRegistry.json");
-    
+
+    eprintln!("[get_project_registry] Looking for registry at: {:?}", registry_path);
+
     // Check if registry file exists
     if !registry_path.exists() {
-        eprintln!("Project registry file does not exist: {:?}", registry_path);
+        eprintln!("[get_project_registry] WARNING: Project registry file does not exist at {:?}", registry_path);
         return Ok(Vec::new()); // Return empty vector if file doesn't exist
     }
-    
+
+    eprintln!("[get_project_registry] Registry file exists, reading contents...");
+
     // Read the file
     let contents = fs::read_to_string(&registry_path)
-        .map_err(|e| format!("Failed to read project registry: {}", e))?;
-    
+        .map_err(|e| {
+            let error_msg = format!("Failed to read project registry at {:?}: {}", registry_path, e);
+            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            error_msg
+        })?;
+
     // Handle empty file
     if contents.trim().is_empty() {
-        eprintln!("Project registry file is empty");
+        eprintln!("[get_project_registry] WARNING: Project registry file is empty");
         return Ok(Vec::new());
     }
-    
-    eprintln!("Read project registry file, contents length: {}", contents.len());
-    
+
+    eprintln!("[get_project_registry] Read {} bytes from registry file", contents.len());
+    eprintln!("[get_project_registry] Contents preview: {}", &contents[..contents.len().min(200)]);
+
     // Parse JSON
     let projects: Vec<ProjectEntry> = serde_json::from_str(&contents)
         .map_err(|e| {
-            eprintln!("Failed to parse project registry JSON. Content: {}", contents);
-            format!("Failed to parse project registry JSON: {}", e)
+            let error_msg = format!("Failed to parse project registry JSON: {}. Content: {}", e, contents);
+            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            error_msg
         })?;
-    
-    eprintln!("Successfully parsed {} projects from registry", projects.len());
+
+    eprintln!("[get_project_registry] SUCCESS: Parsed {} projects from registry", projects.len());
+    for (i, project) in projects.iter().enumerate() {
+        eprintln!("[get_project_registry]   Project {}: id={}, title={}, path={}",
+            i + 1, project.id, project.title, project.path);
+    }
+
     Ok(projects)
 }
 
@@ -456,8 +531,274 @@ pub async fn copy_kit_to_project(
         .map(|s| s.to_string())
 }
 
+/// Gets scrapbook items (folders and loose .md files) from the .bluekit directory.
+///
+/// This command scans the .bluekit directory and returns all folders and loose .md files
+/// that are not in the known subdirectories (kits, agents, walkthroughs).
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<Vec<ScrapbookItem>, String>` containing either:
+/// - `Ok(Vec<ScrapbookItem>)` - Success case with list of scrapbook items
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_scrapbook_items(project_path: String) -> Result<Vec<ScrapbookItem>, String> {
+    use std::fs;
+
+    // Construct the path to .bluekit directory
+    let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
+
+    // Check if .bluekit directory exists
+    if !bluekit_path.exists() {
+        return Ok(Vec::new()); // Return empty vector if directory doesn't exist
+    }
+
+    let mut items = Vec::new();
+    let known_folders = vec!["kits", "agents", "walkthroughs", "blueprints"];
+
+    // Read entries in .bluekit directory
+    let entries = fs::read_dir(&bluekit_path)
+        .map_err(|e| format!("Failed to read .bluekit directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Skip known folders
+        if known_folders.contains(&name.as_str()) {
+            continue;
+        }
+
+        // Skip hidden files
+        if name.starts_with('.') {
+            continue;
+        }
+
+        if path.is_dir() {
+            // Add folder to scrapbook
+            items.push(ScrapbookItem {
+                name: name.clone(),
+                path: path.to_str().unwrap_or("").to_string(),
+                is_folder: true,
+            });
+        } else if path.is_file() {
+            // Only add .md files
+            if let Some(extension) = path.extension() {
+                if extension == "md" {
+                    let file_name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    items.push(ScrapbookItem {
+                        name: file_name,
+                        path: path.to_str().unwrap_or("").to_string(),
+                        is_folder: false,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort items: folders first, then files, alphabetically
+    items.sort_by(|a, b| {
+        match (a.is_folder, b.is_folder) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
+        }
+    });
+
+    Ok(items)
+}
+
+/// Gets markdown files from a specific folder in the .bluekit directory.
+///
+/// # Arguments
+///
+/// * `folder_path` - The absolute path to the folder
+///
+/// # Returns
+///
+/// A `Result<Vec<KitFile>, String>` containing either:
+/// - `Ok(Vec<KitFile>)` - Success case with list of markdown files
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<KitFile>, String> {
+    use std::fs;
+
+    let path = PathBuf::from(&folder_path);
+
+    // Check if folder exists
+    if !path.exists() || !path.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+
+    // Read entries in the folder
+    let entries = fs::read_dir(&path)
+        .map_err(|e| format!("Failed to read folder: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let entry_path = entry.path();
+
+        if entry_path.is_file() {
+            if let Some(extension) = entry_path.extension() {
+                if extension == "md" {
+                    let name = entry_path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let path_str = entry_path
+                        .to_str()
+                        .ok_or_else(|| "Invalid path encoding".to_string())?
+                        .to_string();
+
+                    files.push(KitFile {
+                        name,
+                        path: path_str,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort alphabetically
+    files.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(files)
+}
+
+/// Gets all blueprints from the .bluekit/blueprints directory.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<Vec<Blueprint>, String>` containing either:
+/// - `Ok(Vec<Blueprint>)` - Success case with list of blueprints
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_blueprints(project_path: String) -> Result<Vec<Blueprint>, String> {
+    use std::fs;
+
+    // Construct the path to .bluekit/blueprints directory
+    let blueprints_path = PathBuf::from(&project_path).join(".bluekit").join("blueprints");
+
+    // Check if blueprints directory exists
+    if !blueprints_path.exists() {
+        return Ok(Vec::new()); // Return empty vector if directory doesn't exist
+    }
+
+    let mut blueprints = Vec::new();
+
+    // Read entries in blueprints directory
+    let entries = fs::read_dir(&blueprints_path)
+        .map_err(|e| format!("Failed to read blueprints directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+
+        // Only process directories
+        if !path.is_dir() {
+            continue;
+        }
+
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Skip hidden directories
+        if name.starts_with('.') {
+            continue;
+        }
+
+        // Try to read blueprint.json from this directory
+        let blueprint_json_path = path.join("blueprint.json");
+        if blueprint_json_path.exists() {
+            match fs::read_to_string(&blueprint_json_path) {
+                Ok(contents) => {
+                    match serde_json::from_str::<BlueprintMetadata>(&contents) {
+                        Ok(metadata) => {
+                            blueprints.push(Blueprint {
+                                name: name.clone(),
+                                path: path.to_str().unwrap_or("").to_string(),
+                                metadata,
+                            });
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to parse blueprint.json in {}: {}", name, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to read blueprint.json in {}: {}", name, e);
+                }
+            }
+        }
+    }
+
+    // Sort blueprints alphabetically by name
+    blueprints.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(blueprints)
+}
+
+/// Gets the content of a task file from a blueprint directory.
+///
+/// # Arguments
+///
+/// * `blueprint_path` - The path to the blueprint directory
+/// * `task_file` - The name of the task markdown file (e.g., "project-setup.md")
+///
+/// # Returns
+///
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with task file contents
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_blueprint_task_file(
+    blueprint_path: String,
+    task_file: String,
+) -> Result<String, String> {
+    use std::fs;
+
+    let blueprint_dir = PathBuf::from(&blueprint_path);
+    let task_file_path = blueprint_dir.join(&task_file);
+
+    // Check if task file exists
+    if !task_file_path.exists() {
+        return Err(format!("Task file does not exist: {}", task_file));
+    }
+
+    // Read the task file
+    let contents = fs::read_to_string(&task_file_path)
+        .map_err(|e| format!("Failed to read task file {}: {}", task_file, e))?;
+
+    Ok(contents)
+}
+
 // How to add a new command:
-// 
+//
 // 1. Create a new async function in this file
 // 2. Add the `#[tauri::command]` attribute above it
 // 3. Define the function signature with parameters and return type
@@ -465,9 +806,9 @@ pub async fn copy_kit_to_project(
 // 5. Register the command in `main.rs` (see the `main.rs` file)
 // 6. Create a typed wrapper in `src/ipc.ts` on the frontend
 // 7. Use the wrapper function in your React components
-// 
+//
 // Example:
-// 
+//
 // ```rust
 // #[tauri::command]
 // pub async fn my_new_command(param: String) -> Result<String, String> {

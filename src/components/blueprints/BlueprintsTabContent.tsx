@@ -17,7 +17,7 @@ import {
   Icon,
   Collapsible,
 } from '@chakra-ui/react';
-import { LuBot, LuPackage, LuChevronDown, LuChevronRight, LuPlus } from 'react-icons/lu';
+import { LuBot, LuPackage, LuChevronDown, LuChevronRight } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import TaskDetailModal from './TaskDetailModal';
@@ -191,23 +191,6 @@ export default function BlueprintsTabContent({
 
   return (
     <Box>
-      <Flex mb={4} justify="flex-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            // TODO: Open create blueprint modal
-            console.log('Create blueprint');
-          }}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuPlus />
-            </Icon>
-            <Text>Add Blueprint</Text>
-          </HStack>
-        </Button>
-      </Flex>
       <SimpleGrid columns={{ base: 1, md: 1, lg: 1 }} gap={4}>
         {blueprints.map((blueprint) => {
           const isExpanded = expandedBlueprints.has(blueprint.id);

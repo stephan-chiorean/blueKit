@@ -27,7 +27,10 @@ export default function ProjectsTabContent({
   error,
   onProjectSelect,
 }: ProjectsTabContentProps) {
+  console.log('[ProjectsTabContent] Render - projectsLoading:', projectsLoading, 'projects.length:', projects.length, 'error:', error);
+
   if (projectsLoading) {
+    console.log('[ProjectsTabContent] Showing loading state');
     return (
       <Box textAlign="center" py={12} color="text.secondary">
         Loading projects...

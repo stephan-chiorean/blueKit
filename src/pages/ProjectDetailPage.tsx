@@ -14,13 +14,14 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
 import AgentsTabContent from '../components/agents/AgentsTabContent';
+import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, KitFile, ProjectEntry } from '../ipc';
@@ -325,6 +326,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Agents</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="scrapbook">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuNotebook />
+                      </Icon>
+                      <Text>Scrapbook</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -362,6 +371,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 kitsLoading={kitsLoading}
                 error={error}
                 projectsCount={1}
+                onViewKit={handleViewKit}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="scrapbook">
+              <ScrapbookTabContent
+                projectPath={project.path}
                 onViewKit={handleViewKit}
               />
             </Tabs.Content>
