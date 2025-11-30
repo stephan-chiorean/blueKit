@@ -40,11 +40,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [kitsLoading, setKitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
-  
+  const [currentTab, setCurrentTab] = useState<string>("kits");
+
   // Kit view state - for viewing a kit/walkthrough in split view
   const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
   const [kitViewContent, setKitViewContent] = useState<string | null>(null);
-  
+
   // Diagram view state - for viewing a diagram
   const [viewingDiagram, setViewingDiagram] = useState<KitFile | null>(null);
   const [diagramViewContent, setDiagramViewContent] = useState<string | null>(null);
@@ -189,6 +190,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const handleBackFromDiagramView = () => {
     setViewingDiagram(null);
     setDiagramViewContent(null);
+    setCurrentTab("diagrams");
   };
 
   // Create collection for Select component
@@ -253,8 +255,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       {/* Full screen content area */}
       <Box flex="1" minH={0} overflow="hidden">
         <Box h="100%" p={6} position="relative" overflow="auto">
-          <Tabs.Root 
-            defaultValue="kits" 
+          <Tabs.Root
+            value={currentTab}
+            onValueChange={(details) => setCurrentTab(details.value)}
             variant="enclosed"
             css={{
               '& [data-selected]': {
