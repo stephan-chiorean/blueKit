@@ -1,2 +1,2 @@
-Start with making blueprints exact copies, then chip away.
+Workflow of do a bug walkthrough and generate tasks and plan out fixes
 
