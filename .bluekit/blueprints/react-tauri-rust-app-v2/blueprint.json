@@ -1,0 +1,82 @@
+{
+  "id": "react-tauri-rust-app-v2",
+  "name": "React + Tauri + Rust Desktop App",
+  "version": 2,
+  "description": "Complete blueprint for building a React/Tauri/Rust desktop application with type-safe IPC communication, Chakra UI v3, file operations, and real-time file watching",
+  "createdAt": "2025-01-27T00:00:00Z",
+  "layers": [
+    {
+      "id": "layer-1",
+      "order": 1,
+      "name": "Project Initialization",
+      "tasks": [
+        {
+          "id": "task-1",
+          "taskFile": "project-setup.md",
+          "description": "Initialize Tauri project with React, TypeScript, Vite, and configure all build tools"
+        }
+      ]
+    },
+    {
+      "id": "layer-2",
+      "order": 2,
+      "name": "Backend Foundation",
+      "tasks": [
+        {
+          "id": "task-2",
+          "taskFile": "backend-foundation.md",
+          "description": "Complete Rust backend with modules, main entry point, and command handlers"
+        }
+      ]
+    },
+    {
+      "id": "layer-3",
+      "order": 3,
+      "name": "Frontend Foundation",
+      "tasks": [
+        {
+          "id": "task-3",
+          "taskFile": "frontend-foundation.md",
+          "description": "Complete React frontend setup with Chakra UI v3 theme, routing, and context providers"
+        }
+      ]
+    },
+    {
+      "id": "layer-4",
+      "order": 4,
+      "name": "IPC Communication",
+      "tasks": [
+        {
+          "id": "task-4",
+          "taskFile": "ipc-system.md",
+          "description": "Type-safe IPC layer with TypeScript wrapper functions matching Rust commands"
+        }
+      ]
+    },
+    {
+      "id": "layer-5",
+      "order": 5,
+      "name": "File Watching",
+      "tasks": [
+        {
+          "id": "task-5",
+          "taskFile": "file-watching.md",
+          "description": "File system watching with notify crate and Tauri event emission"
+        }
+      ]
+    },
+    {
+      "id": "layer-6",
+      "order": 6,
+      "name": "UI Components",
+      "tasks": [
+        {
+          "id": "task-6",
+          "taskFile": "ui-components.md",
+          "description": "Complete UI component structure with pages, navigation, and feature components"
+        }
+      ]
+    }
+  ]
+}
+
