@@ -50,6 +50,8 @@ async fn main() {
             commands::get_blueprints, // Get blueprints from .bluekit/blueprints directory
             commands::get_blueprint_task_file, // Get task file content from blueprint
             commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory
+            commands::get_project_clones, // Get clones from .bluekit/clones.json
+            commands::create_project_from_clone, // Create project from clone
         ])
         .setup(|app| {
             // Set up file watcher for project registry

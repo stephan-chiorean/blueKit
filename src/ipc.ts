@@ -168,6 +168,34 @@ export interface Blueprint {
 }
 
 /**
+ * Type definition for clone metadata from clones.json.
+ *
+ * This interface must match the `CloneMetadata` struct in `src-tauri/src/commands.rs`.
+ */
+export interface CloneMetadata {
+  /** Unique clone ID (format: slugified-name-YYYYMMDD) */
+  id: string;
+  /** Display name (e.g., "BlueKit Foundation") */
+  name: string;
+  /** Description of what this clone represents */
+  description: string;
+  /** Git repository URL */
+  gitUrl: string;
+  /** Full commit hash (40 chars) */
+  gitCommit: string;
+  /** Branch name (if not detached HEAD) */
+  gitBranch?: string;
+  /** Git tag (if HEAD is on a tag) */
+  gitTag?: string;
+  /** Array of tags for categorization */
+  tags: string[];
+  /** ISO 8601 timestamp */
+  createdAt: string;
+  /** Optional additional metadata */
+  metadata?: Record<string, any>;
+}
+
+/**
  * Simple ping command to test IPC communication.
  * 
  * This is the simplest IPC command - it takes no parameters and returns a string.
@@ -479,6 +507,68 @@ export async function invokeGetBlueprintTaskFile(
  */
 export async function invokeGetProjectDiagrams(projectPath: string): Promise<KitFile[]> {
   return await invoke<KitFile[]>('get_project_diagrams', { projectPath });
+}
+
+/**
+ * Gets all clones from the .bluekit/clones.json file.
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to an array of CloneMetadata objects
+ *
+ * @example
+ * ```typescript
+ * const clones = await invokeGetProjectClones('/path/to/project');
+ * clones.forEach(clone => {
+ *   console.log(clone.name); // "BlueKit Foundation"
+ *   console.log(clone.gitUrl); // "https://github.com/user/blueKit.git"
+ *   console.log(clone.gitCommit); // "1ab1a39712c2e5c765182525ccf497b0cdddc91b"
+ * });
+ * ```
+ */
+export async function invokeGetProjectClones(projectPath: string): Promise<CloneMetadata[]> {
+  return await invoke<CloneMetadata[]>('get_project_clones', { projectPath });
+}
+
+/**
+ * Creates a new project from a clone.
+ *
+ * This command:
+ * 1. Finds the clone by ID across all projects
+ * 2. Clones the git repository to a temporary directory
+ * 3. Checks out the specific commit
+ * 4. Copies files to the target location (excluding .git)
+ * 5. Optionally registers the new project in the registry
+ * 6. Cleans up the temporary directory
+ *
+ * @param cloneId - The unique clone ID
+ * @param targetPath - Absolute path where the new project should be created
+ * @param projectTitle - Optional title for the new project (used if registering)
+ * @param registerProject - Whether to automatically register the new project (default: true)
+ * @returns A promise that resolves to a success message with project path
+ *
+ * @example
+ * ```typescript
+ * const result = await invokeCreateProjectFromClone(
+ *   'bluekit-foundation-20251201',
+ *   '/path/to/new/project',
+ *   'My New Project',
+ *   true
+ * );
+ * console.log(result); // "Project created successfully at: /path/to/new/project"
+ * ```
+ */
+export async function invokeCreateProjectFromClone(
+  cloneId: string,
+  targetPath: string,
+  projectTitle?: string,
+  registerProject: boolean = true
+): Promise<string> {
+  return await invoke<string>('create_project_from_clone', {
+    cloneId,
+    targetPath,
+    projectTitle,
+    registerProject,
+  });
 }
 
 /**

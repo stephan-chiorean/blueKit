@@ -14,7 +14,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -23,6 +23,7 @@ import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent'
 import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
+import ClonesTabContent from '../components/clones/ClonesTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import DiagramViewPage from './DiagramViewPage';
@@ -401,6 +402,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Diagrams</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="clones">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuCopy />
+                      </Icon>
+                      <Text>Clones</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -449,6 +458,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               <DiagramsTabContent
                 projectPath={project.path}
                 onViewDiagram={handleViewDiagram}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="clones">
+              <ClonesTabContent
+                projectPath={project.path}
               />
             </Tabs.Content>
           </Tabs.Root>

@@ -292,6 +292,37 @@ pub struct ProjectEntry {
     pub path: String,
 }
 
+/// Clone metadata structure matching the clones.json format.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CloneMetadata {
+    /// Unique clone ID (format: slugified-name-YYYYMMDD)
+    pub id: String,
+    /// Display name (e.g., "BlueKit Foundation")
+    pub name: String,
+    /// Description of what this clone represents
+    pub description: String,
+    /// Git repository URL
+    #[serde(rename = "gitUrl")]
+    pub git_url: String,
+    /// Full commit hash (40 chars)
+    #[serde(rename = "gitCommit")]
+    pub git_commit: String,
+    /// Branch name (if not detached HEAD)
+    #[serde(rename = "gitBranch", skip_serializing_if = "Option::is_none")]
+    pub git_branch: Option<String>,
+    /// Git tag (if HEAD is on a tag)
+    #[serde(rename = "gitTag", skip_serializing_if = "Option::is_none")]
+    pub git_tag: Option<String>,
+    /// Array of tags for categorization
+    pub tags: Vec<String>,
+    /// ISO 8601 timestamp
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    /// Optional additional metadata
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
 /// Reads the project registry from ~/.bluekit/projectRegistry.json.
 /// 
 /// # Returns
@@ -691,6 +722,11 @@ pub async fn get_scrapbook_items(project_path: String) -> Result<Vec<ScrapbookIt
             continue;
         }
 
+        // Skip clones.json file
+        if name == "clones.json" {
+            continue;
+        }
+
         // Skip hidden files
         if name.starts_with('.') {
             continue;
@@ -987,6 +1023,359 @@ pub async fn get_project_diagrams(project_path: String) -> Result<Vec<KitFile>, 
     diagrams.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(diagrams)
+}
+
+/// Gets all clones from the .bluekit/clones.json file.
+///
+/// This command reads the clones.json file from the specified project's .bluekit directory
+/// and returns a list of all registered clones.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<Vec<CloneMetadata>, String>` containing either:
+/// - `Ok(Vec<CloneMetadata>)` - Success case with list of clones
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_project_clones(project_path: String) -> Result<Vec<CloneMetadata>, String> {
+    use std::fs;
+
+    // Construct the path to clones.json
+    let clones_path = PathBuf::from(&project_path).join(".bluekit").join("clones.json");
+
+    // Check if clones.json exists
+    if !clones_path.exists() {
+        return Ok(Vec::new()); // Return empty vector if file doesn't exist
+    }
+
+    // Read the file
+    let content = fs::read_to_string(&clones_path)
+        .map_err(|e| format!("Failed to read clones.json: {}", e))?;
+
+    // Parse JSON
+    let clones: Vec<CloneMetadata> = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse clones.json: {}", e))?;
+
+    Ok(clones)
+}
+
+/// Finds a clone by ID across all projects in the registry.
+///
+/// This function searches through all projects' clones.json files to find
+/// a clone with the matching ID.
+///
+/// # Arguments
+///
+/// * `clone_id` - The unique clone ID to search for
+///
+/// # Returns
+///
+/// A `Result<(CloneMetadata, String), String>` containing either:
+/// - `Ok((CloneMetadata, String))` - Success case with clone and source project path
+/// - `Err(String)` - Error case with an error message
+fn find_clone_by_id(clone_id: &str) -> Result<(CloneMetadata, String), String> {
+    use std::fs;
+
+    // Get home directory
+    let home_dir = env::var("HOME")
+        .or_else(|_| env::var("USERPROFILE"))
+        .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
+
+    // Construct path to project registry
+    let registry_path = PathBuf::from(&home_dir)
+        .join(".bluekit")
+        .join("projectRegistry.json");
+
+    // Read project registry
+    let projects: Vec<ProjectEntry> = if registry_path.exists() {
+        let content = fs::read_to_string(&registry_path)
+            .map_err(|e| format!("Failed to read project registry: {}", e))?;
+        
+        if content.trim().is_empty() {
+            Vec::new()
+        } else {
+            serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse project registry: {}", e))?
+        }
+    } else {
+        Vec::new()
+    };
+
+    // Search each project's clones.json
+    for project in projects {
+        let clones_path = PathBuf::from(&project.path)
+            .join(".bluekit")
+            .join("clones.json");
+
+        if !clones_path.exists() {
+            continue;
+        }
+
+        // Read and parse clones.json
+        let content = fs::read_to_string(&clones_path)
+            .map_err(|e| format!("Failed to read clones.json: {}", e))?;
+
+        let clones: Vec<CloneMetadata> = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse clones.json: {}", e))?;
+
+        // Find matching clone
+        if let Some(clone) = clones.iter().find(|c| c.id == clone_id) {
+            return Ok((clone.clone(), project.path));
+        }
+    }
+
+    Err(format!("Clone not found: {}", clone_id))
+}
+
+/// Copies a directory recursively, excluding specified paths.
+///
+/// # Arguments
+///
+/// * `source` - Source directory path
+/// * `destination` - Destination directory path
+/// * `exclude` - Vector of path names to exclude (e.g., [".git"])
+///
+/// # Returns
+///
+/// A `Result<(), String>` indicating success or failure
+fn copy_directory_excluding(
+    source: &PathBuf,
+    destination: &PathBuf,
+    exclude: &[&str],
+) -> Result<(), String> {
+    use std::fs;
+
+    // Helper function to check if a path should be excluded
+    let should_exclude = |path: &PathBuf| -> bool {
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            exclude.iter().any(|&ex| ex == name)
+        } else {
+            false
+        }
+    };
+
+    // Recursive copy function
+    fn copy_recursive(
+        src: &PathBuf,
+        dst: &PathBuf,
+        exclude: &[&str],
+        should_exclude: &dyn Fn(&PathBuf) -> bool,
+    ) -> Result<(), String> {
+        use std::fs;
+
+        if should_exclude(src) {
+            return Ok(()); // Skip excluded paths
+        }
+
+        if src.is_dir() {
+            // Create destination directory
+            fs::create_dir_all(dst)
+                .map_err(|e| format!("Failed to create directory {:?}: {}", dst, e))?;
+
+            // Read directory entries
+            let entries = fs::read_dir(src)
+                .map_err(|e| format!("Failed to read directory {:?}: {}", src, e))?;
+
+            for entry in entries {
+                let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+                let src_path = entry.path();
+                let file_name = src_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .ok_or_else(|| "Invalid file name".to_string())?;
+                let dst_path = dst.join(file_name);
+
+                copy_recursive(&src_path, &dst_path, exclude, should_exclude)?;
+            }
+        } else if src.is_file() {
+            // Copy file
+            fs::copy(src, dst)
+                .map_err(|e| format!("Failed to copy file {:?} to {:?}: {}", src, dst, e))?;
+        }
+
+        Ok(())
+    }
+
+    copy_recursive(source, destination, exclude, &should_exclude)
+}
+
+/// Creates a new project from a clone.
+///
+/// This command:
+/// 1. Finds the clone by ID across all projects
+/// 2. Clones the git repository to a temporary directory
+/// 3. Checks out the specific commit
+/// 4. Copies files to the target location (excluding .git)
+/// 5. Optionally registers the new project in the registry
+/// 6. Cleans up the temporary directory
+///
+/// # Arguments
+///
+/// * `clone_id` - The unique clone ID
+/// * `target_path` - Absolute path where the new project should be created
+/// * `project_title` - Optional title for the new project (used if registering)
+/// * `register_project` - Whether to automatically register the new project
+///
+/// # Returns
+///
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success message with project path
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn create_project_from_clone(
+    clone_id: String,
+    target_path: String,
+    project_title: Option<String>,
+    register_project: bool,
+) -> Result<String, String> {
+    use std::fs;
+    use std::process::Command;
+
+    // 1. Find clone
+    let (clone, _source_project) = find_clone_by_id(&clone_id)?;
+
+    // 2. Validate target path
+    let target = PathBuf::from(&target_path);
+    if target.exists() {
+        return Err(format!("Target path already exists: {}", target_path));
+    }
+
+    // Ensure target path is absolute
+    let target = if target.is_absolute() {
+        target
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?
+            .join(target)
+    };
+
+    // 3. Create temp directory
+    let temp_dir = std::env::temp_dir().join(format!("bluekit-clone-{}", std::process::id()));
+
+    // Ensure temp directory doesn't exist
+    if temp_dir.exists() {
+        fs::remove_dir_all(&temp_dir)
+            .map_err(|e| format!("Failed to remove existing temp directory: {}", e))?;
+    }
+
+    // Ensure cleanup happens
+    let cleanup_temp = || {
+        if temp_dir.exists() {
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
+    };
+
+    // 4. Clone repository
+    let clone_output = Command::new("git")
+        .arg("clone")
+        .arg("--quiet")
+        .arg(&clone.git_url)
+        .arg(&temp_dir)
+        .output()
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to clone repository: {}", e)
+        })?;
+
+    if !clone_output.status.success() {
+        cleanup_temp();
+        let error = String::from_utf8_lossy(&clone_output.stderr);
+        return Err(format!("Git clone failed: {}", error));
+    }
+
+    // 5. Checkout commit
+    let checkout_output = Command::new("git")
+        .arg("-C")
+        .arg(&temp_dir)
+        .arg("checkout")
+        .arg("--quiet")
+        .arg(&clone.git_commit)
+        .output()
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to checkout commit: {}", e)
+        })?;
+
+    if !checkout_output.status.success() {
+        cleanup_temp();
+        let error = String::from_utf8_lossy(&checkout_output.stderr);
+        return Err(format!("Git checkout failed: {}", error));
+    }
+
+    // 6. Create target directory
+    fs::create_dir_all(&target).map_err(|e| {
+        cleanup_temp();
+        format!("Failed to create target directory: {}", e)
+    })?;
+
+    // 7. Copy files (excluding .git)
+    copy_directory_excluding(&temp_dir, &target, &[".git"]).map_err(|e| {
+        cleanup_temp();
+        format!("Failed to copy files: {}", e)
+    })?;
+
+    // 8. Clean up temp directory
+    cleanup_temp();
+
+    // 9. Register project (optional)
+    if register_project {
+        let title = project_title.unwrap_or_else(|| {
+            target
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "New Project".to_string())
+        });
+
+        let project_entry = ProjectEntry {
+            id: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                .to_string(),
+            title,
+            description: format!("Created from clone: {}", clone.name),
+            path: target_path.clone(),
+        };
+
+        // Read existing registry
+        let home_dir = env::var("HOME")
+            .or_else(|_| env::var("USERPROFILE"))
+            .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
+
+        let registry_path = PathBuf::from(&home_dir)
+            .join(".bluekit")
+            .join("projectRegistry.json");
+
+        let mut projects = if registry_path.exists() {
+            let content = fs::read_to_string(&registry_path)
+                .map_err(|e| format!("Failed to read registry: {}", e))?;
+            serde_json::from_str::<Vec<ProjectEntry>>(&content)
+                .unwrap_or_else(|_| Vec::new())
+        } else {
+            Vec::new()
+        };
+
+        // Add new project
+        projects.push(project_entry);
+
+        // Ensure .bluekit directory exists
+        if let Some(parent) = registry_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
+        }
+
+        // Write back to registry
+        let json = serde_json::to_string_pretty(&projects)
+            .map_err(|e| format!("Failed to serialize registry: {}", e))?;
+        fs::write(&registry_path, json)
+            .map_err(|e| format!("Failed to write registry: {}", e))?;
+    }
+
+    Ok(format!("Project created successfully at: {}", target_path))
 }
 
 // How to add a new command:
