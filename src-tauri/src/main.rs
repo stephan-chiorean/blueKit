@@ -20,11 +20,18 @@ mod watcher;  // File watching functionality
 /// which is required because Tauri uses async/await for handling IPC commands.
 /// 
 /// This function:
-/// 1. Creates a Tauri application builder
-/// 2. Registers all IPC commands (functions that can be called from the frontend)
-/// 3. Runs the application, which opens the window and starts the event loop
+/// 1. Initializes logging infrastructure
+/// 2. Creates a Tauri application builder
+/// 3. Registers all IPC commands (functions that can be called from the frontend)
+/// 4. Runs the application, which opens the window and starts the event loop
 #[tokio::main]
 async fn main() {
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
+
     // `tauri::Builder` is used to configure and create a Tauri application
     // The `default()` method creates a builder with default settings
     tauri::Builder::default()
@@ -52,6 +59,7 @@ async fn main() {
             commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory
             commands::get_project_clones, // Get clones from .bluekit/clones.json
             commands::create_project_from_clone, // Create project from clone
+            commands::get_watcher_health, // Get health status of all active file watchers
         ])
         .setup(|app| {
             // Set up file watcher for project registry

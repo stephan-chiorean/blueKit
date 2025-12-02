@@ -17,6 +17,7 @@ import {
   KitFile,
   invokeGetProjectDiagrams,
   invokeReadFile,
+  TimeoutError,
 } from '../../ipc';
 import { parseFrontMatter } from '../../utils/parseFrontMatter';
 
@@ -85,6 +86,9 @@ export default function DiagramsTabContent({
   useEffect(() => {
     loadDiagrams();
 
+    let isMounted = true;
+    let unlisten: (() => void) | null = null;
+
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
@@ -98,24 +102,26 @@ export default function DiagramsTabContent({
         const eventName = `project-kits-changed-${sanitizedPath}`;
 
         // Listen for file change events
-        const unlisten = await listen(eventName, () => {
-          console.log(`Diagrams directory changed for ${projectPath}, reloading...`);
-          loadDiagrams();
+        unlisten = await listen(eventName, () => {
+          if (isMounted) {
+            console.log(`Diagrams directory changed for ${projectPath}, reloading...`);
+            loadDiagrams();
+          }
         });
-
-        // Cleanup: unlisten when component unmounts
-        return () => {
-          unlisten();
-        };
       } catch (error) {
         console.error(`Failed to set up file watcher for ${projectPath}:`, error);
+        if (error instanceof TimeoutError) {
+          console.warn('File watcher setup timed out - watchers may not work');
+        }
       }
     };
 
-    const cleanup = setupWatcher();
-    
+    setupWatcher();
+
+    // Synchronous cleanup
     return () => {
-      cleanup.then(cleanupFn => cleanupFn?.());
+      isMounted = false;
+      if (unlisten) unlisten();
     };
   }, [projectPath]);
 

@@ -27,7 +27,7 @@ import ClonesTabContent from '../components/clones/ClonesTabContent';
 import KitViewPage from './KitViewPage';
 import WalkthroughViewPage from './WalkthroughViewPage';
 import DiagramViewPage from './DiagramViewPage';
-import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry } from '../ipc';
+import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 
 interface ProjectDetailPageProps {
@@ -103,6 +103,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // Load kits on mount
     loadProjectKits();
 
+    let isMounted = true;
+    let unlisten: (() => void) | null = null;
+
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
@@ -118,24 +121,26 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         const eventName = `project-kits-changed-${sanitizedPath}`;
 
         // Listen for file change events
-        const unlisten = await listen(eventName, () => {
-          console.log(`Kits directory changed for ${project.path}, reloading...`);
-          loadProjectKits();
+        unlisten = await listen(eventName, () => {
+          if (isMounted) {
+            console.log(`Kits directory changed for ${project.path}, reloading...`);
+            loadProjectKits();
+          }
         });
-
-        // Cleanup: unlisten when component unmounts
-        return () => {
-          unlisten();
-        };
       } catch (error) {
         console.error(`Failed to set up file watcher for ${project.path}:`, error);
+        if (error instanceof TimeoutError) {
+          console.warn('File watcher setup timed out - watchers may not work');
+        }
       }
     };
 
-    const cleanup = setupWatcher();
-    
+    setupWatcher();
+
+    // Synchronous cleanup
     return () => {
-      cleanup.then(cleanupFn => cleanupFn?.());
+      isMounted = false;
+      if (unlisten) unlisten();
     };
   }, [project.path]);
 

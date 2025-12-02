@@ -16,7 +16,7 @@ import Header from '../components/Header';
 import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
-import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry } from '../ipc';
+import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
 import { Collection } from '../components/collections/AddCollectionDialog';
@@ -53,22 +53,39 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
 
   // Load projects from registry
   const loadProjects = async () => {
+    // Add timeout protection to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setProjectsError('Loading projects is taking longer than expected. The backend may be unresponsive.');
+      setProjectsLoading(false);
+    }, 30000); // 30 second timeout
+
     try {
       setProjectsLoading(true);
       setProjectsError(null);
       console.log('[loadProjects] Starting to load projects from registry...');
       const registryProjects = await invokeGetProjectRegistry();
+      clearTimeout(timeoutId);
       console.log('[loadProjects] Successfully loaded projects:', registryProjects);
       console.log('[loadProjects] Number of projects:', registryProjects.length);
       setProjects(registryProjects);
       console.log('[loadProjects] State updated with projects');
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('[loadProjects] ERROR loading project registry:', error);
       console.error('[loadProjects] Error type:', typeof error);
       console.error('[loadProjects] Error details:', JSON.stringify(error, null, 2));
-      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      let errorMessage = 'Failed to load projects';
+      if (error instanceof TimeoutError) {
+        errorMessage = 'Loading projects timed out. The backend may be unresponsive.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = String(error);
+      }
+
       console.error('[loadProjects] Error message:', errorMessage);
-      setProjectsError(errorMessage || 'Failed to load projects');
+      setProjectsError(errorMessage);
     } finally {
       setProjectsLoading(false);
       console.log('[loadProjects] Loading complete, projectsLoading set to false');
@@ -161,10 +178,13 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
   useEffect(() => {
     if (projects.length === 0) return;
 
-    const setupWatchers = async () => {
-      const unlistenFunctions: (() => void)[] = [];
+    let isMounted = true;
+    const unlistenFunctions: (() => void)[] = [];
 
+    const setupWatchers = async () => {
       for (const project of projects) {
+        if (!isMounted) break; // Early exit if unmounted
+
         try {
           await invokeWatchProjectKits(project.path);
 
@@ -179,25 +199,28 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
 
           // Listen for file change events
           const unlisten = await listen(eventName, () => {
-            console.log(`Kits directory changed for ${project.path}, reloading...`);
-            loadAllKits();
+            if (isMounted) {
+              console.log(`Kits directory changed for ${project.path}, reloading...`);
+              loadAllKits();
+            }
           });
+
           unlistenFunctions.push(unlisten);
         } catch (error) {
           console.error(`Failed to set up file watcher for ${project.path}:`, error);
+          if (error instanceof TimeoutError) {
+            console.warn('File watcher setup timed out - watchers may not work');
+          }
         }
       }
-
-      // Cleanup: unlisten all watchers when component unmounts or projects change
-      return () => {
-        unlistenFunctions.forEach(unlisten => unlisten());
-      };
     };
 
-    const cleanup = setupWatchers();
-    
+    setupWatchers();
+
+    // Synchronous cleanup
     return () => {
-      cleanup.then(cleanupFn => cleanupFn?.());
+      isMounted = false;
+      unlistenFunctions.forEach(unlisten => unlisten());
     };
   }, [projects]);
 

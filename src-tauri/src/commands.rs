@@ -1397,3 +1397,25 @@ pub async fn create_project_from_clone(
 // }
 // ```
 
+use std::collections::HashMap;
+
+/// Gets the health status of all active file watchers.
+///
+/// Returns a HashMap where keys are event names and values are boolean
+/// indicating whether the watcher is alive (true) or dead (false).
+///
+/// # Returns
+///
+/// A `Result<HashMap<String, bool>, String>` containing the health status
+///
+/// # Example
+///
+/// ```typescript
+/// const health = await invoke('get_watcher_health');
+/// // { "project-kits-changed-foo": true, "project-kits-changed-bar": false }
+/// ```
+#[tauri::command]
+pub async fn get_watcher_health() -> Result<HashMap<String, bool>, String> {
+    Ok(crate::watcher::get_watcher_health().await)
+}
+

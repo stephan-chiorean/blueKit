@@ -19,6 +19,10 @@
  */
 
 import { invoke } from '@tauri-apps/api/tauri';
+import { invokeWithTimeout, TimeoutError } from './utils/ipcTimeout';
+
+// Re-export TimeoutError for convenience
+export { TimeoutError };
 
 /**
  * Type definition for the AppInfo structure returned by `get_app_info`.
@@ -214,7 +218,7 @@ export async function invokePing(): Promise<string> {
   // The generic type parameter `<string>` tells TypeScript the return type
   // The first argument is the command name (must match the function name in Rust)
   // The second argument is an optional object with parameters (none needed here)
-  return await invoke<string>('ping');
+  return await invokeWithTimeout<string>('ping', {}, 5000); // Quick timeout for ping
 }
 
 /**
@@ -236,7 +240,7 @@ export async function invokePing(): Promise<string> {
 export async function invokeGetAppInfo(): Promise<AppInfo> {
   // The return type is `Promise<AppInfo>`, which means TypeScript knows
   // the structure of the returned object and will provide autocomplete
-  return await invoke<AppInfo>('get_app_info');
+  return await invokeWithTimeout<AppInfo>('get_app_info');
 }
 
 /**
@@ -261,7 +265,7 @@ export async function invokeGetAppInfo(): Promise<AppInfo> {
 export async function invokeExampleError(shouldFail: boolean): Promise<string> {
   // Commands can accept parameters by passing an object as the second argument
   // The keys must match the parameter names in the Rust function
-  return await invoke<string>('example_error', { shouldFail });
+  return await invokeWithTimeout<string>('example_error', { shouldFail });
 }
 
 /**
@@ -283,17 +287,17 @@ export async function invokeExampleError(shouldFail: boolean): Promise<string> {
  * ```
  */
 export async function invokeGetProjectKits(projectPath: string): Promise<KitFile[]> {
-  return await invoke<KitFile[]>('get_project_kits', { projectPath });
+  return await invokeWithTimeout<KitFile[]>('get_project_kits', { projectPath });
 }
 
 /**
  * Gets the project registry from ~/.bluekit/projectRegistry.json.
- * 
+ *
  * This command reads the project registry file from the user's home directory
  * and returns a list of all registered projects.
- * 
+ *
  * @returns A promise that resolves to an array of ProjectEntry objects
- * 
+ *
  * @example
  * ```typescript
  * const projects = await invokeGetProjectRegistry();
@@ -304,19 +308,19 @@ export async function invokeGetProjectKits(projectPath: string): Promise<KitFile
  * ```
  */
 export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
-  return await invoke<ProjectEntry[]>('get_project_registry');
+  return await invokeWithTimeout<ProjectEntry[]>('get_project_registry');
 }
 
 /**
  * Starts watching a project's .bluekit directory for kit file changes.
- * 
+ *
  * This command sets up a file watcher that monitors the .bluekit directory
  * in the specified project path. When any .md file is added, modified, or
  * removed, it emits a Tauri event that the frontend can listen to.
- * 
+ *
  * @param projectPath - The path to the project root directory
  * @returns A promise that resolves when the watcher is set up
- * 
+ *
  * @example
  * ```typescript
  * await invokeWatchProjectKits('/path/to/project');
@@ -324,15 +328,15 @@ export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
  * ```
  */
 export async function invokeWatchProjectKits(projectPath: string): Promise<void> {
-  return await invoke<void>('watch_project_kits', { projectPath });
+  return await invokeWithTimeout<void>('watch_project_kits', { projectPath }, 5000); // Shorter timeout for watcher setup
 }
 
 /**
  * Reads the contents of a file.
- * 
+ *
  * @param filePath - The absolute path to the file to read
  * @returns A promise that resolves to the file contents as a string
- * 
+ *
  * @example
  * ```typescript
  * const contents = await invokeReadFile('/path/to/file.md');
@@ -340,7 +344,7 @@ export async function invokeWatchProjectKits(projectPath: string): Promise<void>
  * ```
  */
 export async function invokeReadFile(filePath: string): Promise<string> {
-  return await invoke<string>('read_file', { filePath });
+  return await invokeWithTimeout<string>('read_file', { filePath });
 }
 
 /**
@@ -366,7 +370,7 @@ export async function invokeCopyKitToProject(
   sourceFilePath: string,
   targetProjectPath: string,
 ): Promise<string> {
-  return await invoke<string>('copy_kit_to_project', {
+  return await invokeWithTimeout<string>('copy_kit_to_project', {
     sourceFilePath,
     targetProjectPath,
   });
@@ -374,14 +378,14 @@ export async function invokeCopyKitToProject(
 
 /**
  * Copies a blueprint directory to a project's .bluekit/blueprints directory.
- * 
+ *
  * This command recursively copies the entire blueprint directory (including blueprint.json
  * and all task files) to the target project's .bluekit/blueprints directory.
- * 
+ *
  * @param sourceBlueprintPath - The absolute path to the source blueprint directory
  * @param targetProjectPath - The absolute path to the target project root directory
  * @returns A promise that resolves to the path of the copied blueprint directory
- * 
+ *
  * @example
  * ```typescript
  * const result = await invokeCopyBlueprintToProject(
@@ -395,7 +399,7 @@ export async function invokeCopyBlueprintToProject(
   sourceBlueprintPath: string,
   targetProjectPath: string,
 ): Promise<string> {
-  return await invoke<string>('copy_blueprint_to_project', {
+  return await invokeWithTimeout<string>('copy_blueprint_to_project', {
     sourceBlueprintPath,
     targetProjectPath,
   });
@@ -423,7 +427,7 @@ export async function invokeCopyBlueprintToProject(
  * ```
  */
 export async function invokeGetScrapbookItems(projectPath: string): Promise<ScrapbookItem[]> {
-  return await invoke<ScrapbookItem[]>('get_scrapbook_items', { projectPath });
+  return await invokeWithTimeout<ScrapbookItem[]>('get_scrapbook_items', { projectPath });
 }
 
 /**
@@ -442,7 +446,7 @@ export async function invokeGetScrapbookItems(projectPath: string): Promise<Scra
  * ```
  */
 export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<KitFile[]> {
-  return await invoke<KitFile[]>('get_folder_markdown_files', { folderPath });
+  return await invokeWithTimeout<KitFile[]>('get_folder_markdown_files', { folderPath });
 }
 
 /**
@@ -461,7 +465,7 @@ export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<
  * ```
  */
 export async function invokeGetBlueprints(projectPath: string): Promise<Blueprint[]> {
-  return await invoke<Blueprint[]>('get_blueprints', { projectPath });
+  return await invokeWithTimeout<Blueprint[]>('get_blueprints', { projectPath });
 }
 
 /**
@@ -484,7 +488,7 @@ export async function invokeGetBlueprintTaskFile(
   blueprintPath: string,
   taskFile: string,
 ): Promise<string> {
-  return await invoke<string>('get_blueprint_task_file', {
+  return await invokeWithTimeout<string>('get_blueprint_task_file', {
     blueprintPath,
     taskFile,
   });
@@ -506,7 +510,7 @@ export async function invokeGetBlueprintTaskFile(
  * ```
  */
 export async function invokeGetProjectDiagrams(projectPath: string): Promise<KitFile[]> {
-  return await invoke<KitFile[]>('get_project_diagrams', { projectPath });
+  return await invokeWithTimeout<KitFile[]>('get_project_diagrams', { projectPath });
 }
 
 /**
@@ -526,7 +530,7 @@ export async function invokeGetProjectDiagrams(projectPath: string): Promise<Kit
  * ```
  */
 export async function invokeGetProjectClones(projectPath: string): Promise<CloneMetadata[]> {
-  return await invoke<CloneMetadata[]>('get_project_clones', { projectPath });
+  return await invokeWithTimeout<CloneMetadata[]>('get_project_clones', { projectPath });
 }
 
 /**
@@ -563,12 +567,29 @@ export async function invokeCreateProjectFromClone(
   projectTitle?: string,
   registerProject: boolean = true
 ): Promise<string> {
-  return await invoke<string>('create_project_from_clone', {
+  return await invokeWithTimeout<string>('create_project_from_clone', {
     cloneId,
     targetPath,
     projectTitle,
     registerProject,
-  });
+  }, 60000); // 60 second timeout for git operations
+}
+
+/**
+ * Gets the health status of all active file watchers.
+ *
+ * @returns A promise that resolves to a map of watcher names to their health status
+ *
+ * @example
+ * ```typescript
+ * const health = await invokeGetWatcherHealth();
+ * Object.entries(health).forEach(([name, isAlive]) => {
+ *   console.log(`${name}: ${isAlive ? 'alive' : 'dead'}`);
+ * });
+ * ```
+ */
+export async function invokeGetWatcherHealth(): Promise<Record<string, boolean>> {
+  return await invokeWithTimeout<Record<string, boolean>>('get_watcher_health', {}, 3000); // Quick health check
 }
 
 /**
