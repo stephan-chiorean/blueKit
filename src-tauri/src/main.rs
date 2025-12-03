@@ -5,13 +5,14 @@
 // Module declarations: tell Rust about other modules in this crate
 // These must match the file names in the `src/` directory
 mod commands; // IPC command handlers
+mod db;       // Database layer (SeaORM + SQLite)
 mod state;    // Application state management
 mod utils;    // Utility functions
 mod watcher;  // File watching functionality
 
 // Import statements: bring items from other modules into scope
 // `use` statements allow us to reference items without their full path
-// (No imports needed for basic Tauri setup)
+use tauri::Manager;
 
 /// Main entry point of the Rust application.
 /// 
@@ -67,8 +68,30 @@ async fn main() {
             commands::update_project_task, // Update an existing task
             commands::delete_project_task, // Delete a task from the project
             commands::watch_project_tasks, // Watch tasks.json for changes
+            commands::db_get_tasks, // Get all tasks (database)
+            commands::db_get_project_tasks, // Get tasks for a project (database)
+            commands::db_get_task, // Get a single task (database)
+            commands::db_create_task, // Create a new task (database)
+            commands::db_update_task, // Update a task (database)
+            commands::db_delete_task, // Delete a task (database)
         ])
         .setup(|app| {
+            // Initialize database synchronously before app starts accepting commands
+            // Use a channel to wait for the async initialization to complete
+            let (tx, rx) = std::sync::mpsc::channel();
+
+            tauri::async_runtime::spawn(async move {
+                let result = db::initialize_database().await;
+                let _ = tx.send(result);
+            });
+
+            // Wait for initialization to complete
+            let db = rx.recv()
+                .expect("Database initialization channel closed unexpectedly")
+                .expect("Failed to initialize database");
+
+            app.manage(db);
+
             // Set up file watcher for project registry
             let app_handle = app.handle();
             if let Ok(registry_path) = watcher::get_registry_path() {

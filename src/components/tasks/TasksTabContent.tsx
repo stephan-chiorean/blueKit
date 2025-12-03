@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -16,133 +16,30 @@ import {
   Button,
   Icon,
   NativeSelect,
+  Spinner,
 } from '@chakra-ui/react';
-import { LuPlus, LuArrowUpDown } from 'react-icons/lu';
+import { LuPlus, LuArrowUpDown, LuFolder } from 'react-icons/lu';
 import { Task } from '../../types/task';
+import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks, invokeDbDeleteTask } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import TaskDialog from './TaskDialog';
+import TaskCreateDialog from './TaskCreateDialog';
+import { toaster } from '../ui/toaster';
 
 interface TasksTabContentProps {
-  kits: any[]; // Not used anymore, kept for compatibility
-  kitsLoading: boolean; // Not used anymore, kept for compatibility
-  error: string | null; // Not used anymore, kept for compatibility
-  projectsCount: number;
-  onViewTask: (task: any) => void; // Not used anymore, kept for compatibility
+  context: 'workspace' | ProjectEntry;  // workspace view or specific project
+  projects: ProjectEntry[];  // All projects for multi-select
 }
-
-// Mock task data
-const MOCK_TASKS: Task[] = [
-  {
-    id: '1',
-    name: 'Implement user authentication',
-    description: 'Add login and registration functionality with JWT tokens',
-    priority: 'high',
-    status: 'in_progress',
-    complexity: 7,
-    tags: ['backend', 'security', 'auth'],
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-20T14:30:00Z',
-    acceptanceCriteria: `- User can register with email and password
-- User can login with credentials
-- JWT tokens are generated and validated
-- Password is hashed using bcrypt
-- Session management is implemented
-- Error handling for invalid credentials`,
-  },
-  {
-    id: '2',
-    name: 'Design landing page',
-    description: 'Create a modern and responsive landing page design',
-    priority: 'standard',
-    status: 'pending',
-    complexity: 4,
-    tags: ['frontend', 'design', 'ui'],
-    createdAt: '2024-01-18T09:00:00Z',
-    updatedAt: '2024-01-18T09:00:00Z',
-    acceptanceCriteria: `- Responsive design for mobile, tablet, and desktop
-- Hero section with clear call-to-action
-- Feature highlights section
-- Testimonials section
-- Footer with links and contact info
-- Smooth animations and transitions`,
-  },
-  {
-    id: '3',
-    name: 'Set up CI/CD pipeline',
-    description: 'Configure automated testing and deployment',
-    priority: 'pinned',
-    status: 'pending',
-    complexity: 8,
-    tags: ['devops', 'ci-cd', 'automation'],
-    createdAt: '2024-01-10T08:00:00Z',
-    updatedAt: '2024-01-22T16:00:00Z',
-    acceptanceCriteria: `- Automated tests run on every push
-- Build process is automated
-- Deployment to staging environment
-- Deployment to production with approval
-- Rollback capability
-- Build notifications in Slack`,
-  },
-  {
-    id: '4',
-    name: 'Optimize database queries',
-    description: 'Improve query performance and add proper indexing',
-    priority: 'high',
-    status: 'in_progress',
-    complexity: 6,
-    tags: ['backend', 'database', 'performance'],
-    createdAt: '2024-01-12T11:00:00Z',
-    updatedAt: '2024-01-21T10:15:00Z',
-    acceptanceCriteria: `- All slow queries identified and optimized
-- Proper indexes added to frequently queried columns
-- Query execution time reduced by 50%
-- Database connection pooling configured
-- Query monitoring and logging in place`,
-  },
-  {
-    id: '5',
-    name: 'Add dark mode support',
-    description: 'Implement theme switching between light and dark modes',
-    priority: 'long term',
-    status: 'completed',
-    complexity: 3,
-    tags: ['frontend', 'ui', 'theme'],
-    createdAt: '2024-01-20T13:00:00Z',
-    updatedAt: '2024-01-25T15:30:00Z',
-    acceptanceCriteria: `- Theme toggle button in header
-- All components support dark mode
-- Theme preference saved to localStorage
-- Smooth transition between themes
-- System preference detection`,
-  },
-  {
-    id: '6',
-    name: 'Refactor API endpoints',
-    description: 'Clean up and organize API endpoint structure',
-    priority: 'standard',
-    status: 'pending',
-    complexity: 5,
-    tags: ['backend', 'refactoring'],
-    createdAt: '2024-01-19T10:00:00Z',
-    updatedAt: '2024-01-19T10:00:00Z',
-    acceptanceCriteria: `- All endpoints follow RESTful conventions
-- Consistent error handling
-- Proper status codes
-- API documentation updated`,
-  },
-];
 
 type SortOption = 'priority' | 'time';
 
 export default function TasksTabContent({
-  kits: _kits,
-  kitsLoading: _kitsLoading,
-  error: _error,
-  projectsCount,
-  onViewTask: _onViewTask,
+  context,
+  projects,
 }: TasksTabContentProps) {
-  // Local state for tasks (using mock data)
-  const [tasks] = useState<Task[]>(MOCK_TASKS);
+  // Local state for tasks (loaded from database)
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Local state for selected tasks
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -150,9 +47,36 @@ export default function TasksTabContent({
   // Dialog state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
   // Sort state
   const [sortBy, setSortBy] = useState<SortOption>('priority');
+
+  // Load tasks from database
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const loadedTasks: Task[] = context === 'workspace'
+        ? await invokeDbGetTasks()
+        : await invokeDbGetProjectTasks((context as ProjectEntry).id);
+      setTasks(loadedTasks);
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to load tasks',
+        description: String(error),
+        closable: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load tasks on mount and when context changes
+  useEffect(() => {
+    loadTasks();
+  }, [context]);
 
   // Get selected tasks
   const selectedTasks = useMemo(() => {
@@ -193,34 +117,68 @@ export default function TasksTabContent({
   };
 
   const handleAddTask = () => {
-    // TODO: Implement add task functionality
-    console.log('Add task clicked');
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleTaskCreated = (task: Task) => {
+    // Reload tasks from database
+    loadTasks();
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    try {
+      await invokeDbDeleteTask(id);
+      toaster.create({
+        type: 'success',
+        title: 'Task deleted',
+      });
+      // Remove from selected if it was selected
+      setSelectedTaskIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      // Reload tasks
+      loadTasks();
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete task',
+        description: String(error),
+        closable: true,
+      });
+    }
   };
 
   // Get priority order for sorting (lower number = higher priority)
-  const getPriorityOrder = (priority?: string): number => {
+  const getPriorityOrder = (priority: string): number => {
     switch (priority) {
       case 'pinned':
         return 0;
       case 'high':
         return 1;
-      case 'long term':
-        return 2;
       case 'standard':
+        return 2;
+      case 'long term':
         return 3;
+      case 'nit':
+        return 4;
       default:
-        return 4; // Unknown priorities go last
+        return 5; // Unknown priorities go last
     }
   };
 
   // Get priority color
-  const getPriorityColor = (priority?: string) => {
-    if (!priority || priority === 'standard') return 'gray';
+  const getPriorityColor = (priority: string) => {
+    if (priority === 'nit') return 'gray';
     switch (priority.toLowerCase()) {
       case 'pinned':
         return 'purple';
       case 'high':
         return 'orange';
+      case 'standard':
+        return 'green';
       case 'long term':
         return 'blue';
       default:
@@ -257,27 +215,10 @@ export default function TasksTabContent({
     return tasksCopy;
   }, [tasks, sortBy]);
 
-  // Get status color
-  const getStatusColor = (status?: string) => {
-    if (!status) return 'gray';
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'green';
-      case 'in_progress':
-        return 'blue';
-      case 'blocked':
-        return 'red';
-      case 'pending':
-        return 'gray';
-      default:
-        return 'gray';
-    }
-  };
-
-  if (projectsCount === 0) {
+  if (loading) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
-        No projects linked. Projects are managed via CLI and will appear here automatically.
+      <Box textAlign="center" py={12}>
+        <Spinner size="lg" />
       </Box>
     );
   }
@@ -285,12 +226,25 @@ export default function TasksTabContent({
   if (tasks.length === 0) {
     return (
       <VStack py={12} gap={3}>
+        <TaskCreateDialog
+          isOpen={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onTaskCreated={handleTaskCreated}
+          projects={projects}
+          defaultProjectId={context !== 'workspace' ? (context as ProjectEntry).id : undefined}
+        />
         <Text color="text.secondary" fontSize="lg">
           No tasks yet
         </Text>
         <Text color="text.tertiary" fontSize="sm">
           Click "Add Task" to create your first task
         </Text>
+        <Button colorPalette="primary" onClick={handleAddTask}>
+          <HStack gap={2}>
+            <LuPlus />
+            <Text>Add Task</Text>
+          </HStack>
+        </Button>
       </VStack>
     );
   }
@@ -304,6 +258,14 @@ export default function TasksTabContent({
           setIsDialogOpen(false);
           setSelectedTask(null);
         }}
+      />
+
+      <TaskCreateDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onTaskCreated={handleTaskCreated}
+        projects={projects}
+        defaultProjectId={context !== 'workspace' ? (context as ProjectEntry).id : undefined}
       />
 
       <TasksActionBar 
@@ -357,7 +319,6 @@ export default function TasksTabContent({
         {sortedTasks.map((task) => {
           const taskSelected = isSelected(task.id);
           const priorityColor = getPriorityColor(task.priority);
-          const statusColor = getStatusColor(task.status);
 
           return (
             <Card.Root
@@ -374,7 +335,7 @@ export default function TasksTabContent({
               <CardHeader>
                 <VStack align="stretch" gap={2}>
                   <Flex justify="space-between" align="start" gap={2}>
-                    <Heading size="sm" flex="1">{task.name}</Heading>
+                    <Heading size="sm" flex="1">{task.title}</Heading>
                     <Checkbox.Root
                       checked={taskSelected}
                       colorPalette="blue"
@@ -394,23 +355,30 @@ export default function TasksTabContent({
                   </Flex>
 
                   <HStack gap={2} flexWrap="wrap">
-                    {/* Only show priority badge if not standard */}
-                    {task.priority && task.priority !== 'standard' && (
+                    {/* Only show priority badge if not nit */}
+                    {task.priority !== 'nit' && (
                       <Badge colorPalette={priorityColor} size="sm">
                         {task.priority}
                       </Badge>
                     )}
-                    {task.status && (
-                      <Badge colorPalette={statusColor} size="sm">
-                        {task.status.replace('_', ' ')}
-                      </Badge>
-                    )}
-                    {task.complexity !== undefined && (
-                      <Badge colorPalette="gray" size="sm">
-                        Complexity: {task.complexity}/10
-                      </Badge>
-                    )}
                   </HStack>
+
+                  {/* Project badges */}
+                  {task.projectIds.length > 0 && (
+                    <HStack gap={1} flexWrap="wrap">
+                      {task.projectIds.map(projectId => {
+                        const project = projects.find(p => p.id === projectId);
+                        return project ? (
+                          <Badge key={projectId} size="xs" colorPalette="blue" variant="outline">
+                            <HStack gap={1}>
+                              <LuFolder size={10} />
+                              <Text>{project.title}</Text>
+                            </HStack>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </HStack>
+                  )}
                 </VStack>
               </CardHeader>
 

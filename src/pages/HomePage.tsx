@@ -10,12 +10,13 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuLibrary, LuFolder, LuWorkflow } from 'react-icons/lu';
+import { LuMenu, LuLibrary, LuFolder, LuWorkflow, LuListTodo } from 'react-icons/lu';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
+import TasksTabContent from '../components/tasks/TasksTabContent';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
@@ -292,6 +293,14 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
                       <Text>Workflows</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="tasks">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuListTodo />
+                      </Icon>
+                      <Text>Tasks</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -315,6 +324,12 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
             </Tabs.Content>
             <Tabs.Content value="workflows">
               <WorkflowsTabContent />
+            </Tabs.Content>
+            <Tabs.Content value="tasks">
+              <TasksTabContent
+                context="workspace"
+                projects={projects}
+              />
             </Tabs.Content>
           </Tabs.Root>
         </Box>

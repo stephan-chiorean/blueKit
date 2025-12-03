@@ -449,11 +449,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             </Tabs.Content>
             <Tabs.Content value="tasks">
               <TasksTabContent
-                kits={kits}
-                kitsLoading={kitsLoading}
-                error={error}
-                projectsCount={1}
-                onViewTask={handleViewKit}
+                context={project}
+                projects={allProjects}
               />
             </Tabs.Content>
           </Tabs.Root>

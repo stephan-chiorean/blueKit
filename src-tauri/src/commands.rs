@@ -13,7 +13,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::env;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 /// Response structure for the `get_app_info` command.
 /// 
@@ -1720,5 +1720,99 @@ pub async fn watch_project_tasks(
 
     // Watch the tasks.json file
     crate::watcher::watch_file(app, tasks_path, event_name)
+}
+
+// ============================================================================
+// DATABASE-BACKED TASK COMMANDS
+// ============================================================================
+
+/// Get all tasks, optionally filtered by project IDs
+#[tauri::command]
+pub async fn db_get_tasks(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_ids: Option<Vec<String>>,
+) -> Result<Vec<crate::db::task_operations::TaskDto>, String> {
+    crate::db::task_operations::get_tasks(db.inner(), project_ids)
+        .await
+        .map_err(|e| format!("Failed to get tasks: {}", e))
+}
+
+/// Get tasks for a specific project
+#[tauri::command]
+pub async fn db_get_project_tasks(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+) -> Result<Vec<crate::db::task_operations::TaskDto>, String> {
+    crate::db::task_operations::get_tasks(db.inner(), Some(vec![project_id]))
+        .await
+        .map_err(|e| format!("Failed to get project tasks: {}", e))
+}
+
+/// Get a single task by ID
+#[tauri::command]
+pub async fn db_get_task(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    task_id: String,
+) -> Result<Option<crate::db::task_operations::TaskDto>, String> {
+    crate::db::task_operations::get_task(db.inner(), &task_id)
+        .await
+        .map_err(|e| format!("Failed to get task: {}", e))
+}
+
+/// Create a new task
+#[tauri::command]
+pub async fn db_create_task(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    title: String,
+    description: Option<String>,
+    priority: String,
+    tags: Vec<String>,
+    project_ids: Vec<String>,
+) -> Result<crate::db::task_operations::TaskDto, String> {
+    crate::db::task_operations::create_task(
+        db.inner(),
+        title,
+        description,
+        priority,
+        tags,
+        project_ids,
+    )
+    .await
+    .map_err(|e| format!("Failed to create task: {}", e))
+}
+
+/// Update an existing task
+#[tauri::command]
+pub async fn db_update_task(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    task_id: String,
+    title: Option<String>,
+    description: Option<Option<String>>,
+    priority: Option<String>,
+    tags: Option<Vec<String>>,
+    project_ids: Option<Vec<String>>,
+) -> Result<crate::db::task_operations::TaskDto, String> {
+    crate::db::task_operations::update_task(
+        db.inner(),
+        task_id,
+        title,
+        description,
+        priority,
+        tags,
+        project_ids,
+    )
+    .await
+    .map_err(|e| format!("Failed to update task: {}", e))
+}
+
+/// Delete a task
+#[tauri::command]
+pub async fn db_delete_task(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    task_id: String,
+) -> Result<(), String> {
+    crate::db::task_operations::delete_task(db.inner(), &task_id)
+        .await
+        .map_err(|e| format!("Failed to delete task: {}", e))
 }
 
