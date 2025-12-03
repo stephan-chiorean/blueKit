@@ -145,6 +145,57 @@ pub struct KitFile {
     pub path: String,
 }
 
+/// Task acceptance criteria structure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskAcceptanceCriteria {
+    /// Unique identifier for the acceptance criterion
+    pub id: String,
+    /// Description of the acceptance criterion
+    pub description: String,
+    /// Whether this criterion has been met
+    pub completed: bool,
+}
+
+/// Task item structure with full metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Task {
+    /// Unique identifier for the task
+    pub id: String,
+    /// Task title/summary
+    pub title: String,
+    /// Detailed task description
+    pub description: Option<String>,
+    /// Task status: "backlog", "in_progress", "completed", "blocked"
+    pub status: String,
+    /// Priority level: "low", "medium", "high", "critical"
+    pub priority: String,
+    /// Complexity score (1-10, where 1 is simplest)
+    pub complexity: u8,
+    /// List of acceptance criteria
+    pub acceptance_criteria: Vec<TaskAcceptanceCriteria>,
+    /// Optional tags for categorization
+    pub tags: Vec<String>,
+    /// Creation timestamp (ISO 8601)
+    pub created_at: String,
+    /// Last updated timestamp (ISO 8601)
+    pub updated_at: String,
+    /// Optional assignee
+    pub assignee: Option<String>,
+    /// Optional due date (ISO 8601)
+    pub due_date: Option<String>,
+}
+
+/// Task list structure containing all tasks for a project.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskList {
+    /// Version of the task list schema
+    pub version: u8,
+    /// List of all tasks
+    pub tasks: Vec<Task>,
+    /// Last updated timestamp (ISO 8601)
+    pub updated_at: String,
+}
+
 /// Scrapbook item structure - can be either a folder or a file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScrapbookItem {
@@ -266,16 +317,19 @@ pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, Stri
         Ok(())
     }
     
-    // Read from subdirectories: kits, walkthroughs, and agents
+    // Read from subdirectories: kits, walkthroughs, agents, and tasks
     let kits_dir = bluekit_path.join("kits");
     read_md_files_from_dir(&kits_dir, &mut kits)?;
-    
+
     let walkthroughs_dir = bluekit_path.join("walkthroughs");
     read_md_files_from_dir(&walkthroughs_dir, &mut kits)?;
-    
+
     let agents_dir = bluekit_path.join("agents");
     read_md_files_from_dir(&agents_dir, &mut kits)?;
-    
+
+    let tasks_dir = bluekit_path.join("tasks");
+    read_md_files_from_dir(&tasks_dir, &mut kits)?;
+
     Ok(kits)
 }
 
@@ -485,6 +539,40 @@ pub async fn read_file(file_path: String) -> Result<String, String> {
     Ok(contents)
 }
 
+/// Writes content to a file.
+///
+/// This command writes the provided content to the specified file path.
+/// The file will be created if it doesn't exist, or overwritten if it does.
+///
+/// # Arguments
+///
+/// * `file_path` - The absolute path to the file to write
+/// * `content` - The content to write to the file
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case
+/// - `Err(String)` - Error case with an error message
+///
+/// # Example Usage (from frontend)
+///
+/// ```typescript
+/// await invoke('write_file', { filePath: '/path/to/file.md', content: 'Hello world' });
+/// ```
+#[tauri::command]
+pub async fn write_file(file_path: String, content: String) -> Result<(), String> {
+    use std::fs;
+
+    let path = PathBuf::from(&file_path);
+
+    // Write the file
+    fs::write(&path, content)
+        .map_err(|e| format!("Failed to write file {}: {}", file_path, e))?;
+
+    Ok(())
+}
+
 /// Copies a kit file to a project's .bluekit directory.
 /// 
 /// This command reads the source kit file and writes it to the target project's
@@ -678,7 +766,7 @@ pub async fn copy_blueprint_to_project(
 /// Gets scrapbook items (folders and loose .md files) from the .bluekit directory.
 ///
 /// This command scans the .bluekit directory and returns all folders and loose .md files
-/// that are not in the known subdirectories (kits, agents, walkthroughs).
+/// that are not in the known subdirectories (kits, agents, walkthroughs, tasks, blueprints, diagrams).
 ///
 /// # Arguments
 ///
@@ -702,7 +790,7 @@ pub async fn get_scrapbook_items(project_path: String) -> Result<Vec<ScrapbookIt
     }
 
     let mut items = Vec::new();
-    let known_folders = vec!["kits", "agents", "walkthroughs", "blueprints", "diagrams"];
+    let known_folders = vec!["kits", "agents", "walkthroughs", "blueprints", "diagrams", "tasks"];
 
     // Read entries in .bluekit directory
     let entries = fs::read_dir(&bluekit_path)
@@ -1417,5 +1505,220 @@ use std::collections::HashMap;
 #[tauri::command]
 pub async fn get_watcher_health() -> Result<HashMap<String, bool>, String> {
     Ok(crate::watcher::get_watcher_health().await)
+}
+
+// ============================================================================
+// TASK MANAGEMENT COMMANDS
+// ============================================================================
+
+/// Gets the task list for a project from .bluekit/tasks.json.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<TaskList, String>` containing either:
+/// - `Ok(TaskList)` - Success case with task list
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_project_tasks(project_path: String) -> Result<TaskList, String> {
+    use std::fs;
+    use chrono::Utc;
+
+    let tasks_path = PathBuf::from(&project_path).join(".bluekit").join("tasks.json");
+
+    // If tasks.json doesn't exist, return empty task list
+    if !tasks_path.exists() {
+        return Ok(TaskList {
+            version: 1,
+            tasks: Vec::new(),
+            updated_at: Utc::now().to_rfc3339(),
+        });
+    }
+
+    // Read and parse tasks.json
+    let contents = fs::read_to_string(&tasks_path)
+        .map_err(|e| format!("Failed to read tasks.json: {}", e))?;
+
+    let task_list: TaskList = serde_json::from_str(&contents)
+        .map_err(|e| format!("Failed to parse tasks.json: {}", e))?;
+
+    Ok(task_list)
+}
+
+/// Saves the task list for a project to .bluekit/tasks.json.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+/// * `task_list` - The task list to save
+///
+/// # Returns
+///
+/// A `Result<(), String>` indicating success or failure
+#[tauri::command]
+pub async fn save_project_tasks(
+    project_path: String,
+    mut task_list: TaskList,
+) -> Result<(), String> {
+    use std::fs;
+    use chrono::Utc;
+
+    let bluekit_dir = PathBuf::from(&project_path).join(".bluekit");
+    let tasks_path = bluekit_dir.join("tasks.json");
+
+    // Ensure .bluekit directory exists
+    if !bluekit_dir.exists() {
+        fs::create_dir_all(&bluekit_dir)
+            .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
+    }
+
+    // Update the timestamp
+    task_list.updated_at = Utc::now().to_rfc3339();
+
+    // Serialize to pretty JSON
+    let json_content = serde_json::to_string_pretty(&task_list)
+        .map_err(|e| format!("Failed to serialize task list: {}", e))?;
+
+    // Write to file
+    fs::write(&tasks_path, json_content)
+        .map_err(|e| format!("Failed to write tasks.json: {}", e))?;
+
+    Ok(())
+}
+
+/// Adds a new task to the project's task list.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+/// * `task` - The task to add
+///
+/// # Returns
+///
+/// A `Result<Task, String>` containing the added task with updated timestamps
+#[tauri::command]
+pub async fn add_project_task(
+    project_path: String,
+    mut task: Task,
+) -> Result<Task, String> {
+    use chrono::Utc;
+
+    // Get existing task list
+    let mut task_list = get_project_tasks(project_path.clone()).await?;
+
+    // Ensure task has unique ID
+    if task.id.is_empty() {
+        task.id = uuid::Uuid::new_v4().to_string();
+    }
+
+    // Set timestamps
+    let now = Utc::now().to_rfc3339();
+    task.created_at = now.clone();
+    task.updated_at = now;
+
+    // Add task to list
+    task_list.tasks.push(task.clone());
+
+    // Save task list
+    save_project_tasks(project_path, task_list).await?;
+
+    Ok(task)
+}
+
+/// Updates an existing task in the project's task list.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+/// * `task` - The updated task
+///
+/// # Returns
+///
+/// A `Result<Task, String>` containing the updated task
+#[tauri::command]
+pub async fn update_project_task(
+    project_path: String,
+    mut task: Task,
+) -> Result<Task, String> {
+    use chrono::Utc;
+
+    // Get existing task list
+    let mut task_list = get_project_tasks(project_path.clone()).await?;
+
+    // Find and update the task
+    let task_index = task_list
+        .tasks
+        .iter()
+        .position(|t| t.id == task.id)
+        .ok_or_else(|| format!("Task not found: {}", task.id))?;
+
+    // Update timestamp
+    task.updated_at = Utc::now().to_rfc3339();
+
+    task_list.tasks[task_index] = task.clone();
+
+    // Save task list
+    save_project_tasks(project_path, task_list).await?;
+
+    Ok(task)
+}
+
+/// Deletes a task from the project's task list.
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+/// * `task_id` - The ID of the task to delete
+///
+/// # Returns
+///
+/// A `Result<(), String>` indicating success or failure
+#[tauri::command]
+pub async fn delete_project_task(
+    project_path: String,
+    task_id: String,
+) -> Result<(), String> {
+    // Get existing task list
+    let mut task_list = get_project_tasks(project_path.clone()).await?;
+
+    // Find the task
+    let task_index = task_list
+        .tasks
+        .iter()
+        .position(|t| t.id == task_id)
+        .ok_or_else(|| format!("Task not found: {}", task_id))?;
+
+    // Remove task
+    task_list.tasks.remove(task_index);
+
+    // Save task list
+    save_project_tasks(project_path, task_list).await?;
+
+    Ok(())
+}
+
+/// Watches the tasks.json file for changes and emits events.
+///
+/// # Arguments
+///
+/// * `app` - The Tauri application handle
+/// * `project_path` - The path to the project root directory
+///
+/// # Returns
+///
+/// A `Result<(), String>` indicating success or failure
+#[tauri::command]
+pub async fn watch_project_tasks(
+    app: AppHandle,
+    project_path: String,
+) -> Result<(), String> {
+    let tasks_path = PathBuf::from(&project_path).join(".bluekit").join("tasks.json");
+    let event_name = "project-tasks-changed".to_string();
+
+    // Watch the tasks.json file
+    crate::watcher::watch_file(app, tasks_path, event_name)
 }
 

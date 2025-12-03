@@ -10,17 +10,11 @@ import {
   Heading,
   Text,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser, LuBriefcase } from 'react-icons/lu';
+import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
 import { useSelection } from '../contexts/SelectionContext';
-import { useTasks } from '../contexts/TaskContext';
-import { useState } from 'react';
-import TaskManagerDialog from './TaskManagerDialog';
 
 export default function Header() {
   const { selectedItems } = useSelection();
-  const { activeTasks } = useTasks();
-  const taskCount = activeTasks.length;
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
   return (
     <Box
@@ -57,35 +51,6 @@ export default function Header() {
 
         {/* Right side icons */}
         <HStack gap={2} flex="1" justify="flex-end">
-          <Box position="relative" cursor="pointer">
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label="Tasks"
-              onClick={() => setTaskDialogOpen(true)}
-            >
-              <LuBriefcase />
-            </IconButton>
-            {taskCount > 0 && (
-              <Badge
-                position="absolute"
-                top="-1"
-                right="-1"
-                colorPalette="primary"
-                variant="solid"
-                borderRadius="full"
-                minW="18px"
-                h="18px"
-                fontSize="xs"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                px={1}
-              >
-                {taskCount}
-              </Badge>
-            )}
-          </Box>
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />
           </IconButton>
@@ -96,10 +61,6 @@ export default function Header() {
           </Avatar.Root>
         </HStack>
       </Flex>
-      <TaskManagerDialog
-        open={taskDialogOpen}
-        onOpenChange={setTaskDialogOpen}
-      />
     </Box>
   );
 }

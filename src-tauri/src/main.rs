@@ -50,6 +50,7 @@ async fn main() {
             commands::get_project_registry, // Get projects from registry
             commands::watch_project_kits, // Watch project .bluekit directory for changes
             commands::read_file,        // Read file contents
+            commands::write_file,       // Write file contents
             commands::copy_kit_to_project, // Copy kit file to project
             commands::copy_blueprint_to_project, // Copy blueprint directory to project
             commands::get_scrapbook_items, // Get scrapbook folders and files
@@ -60,6 +61,12 @@ async fn main() {
             commands::get_project_clones, // Get clones from .bluekit/clones.json
             commands::create_project_from_clone, // Create project from clone
             commands::get_watcher_health, // Get health status of all active file watchers
+            commands::get_project_tasks, // Get tasks from .bluekit/tasks.json
+            commands::save_project_tasks, // Save tasks to .bluekit/tasks.json
+            commands::add_project_task, // Add a new task to the project
+            commands::update_project_task, // Update an existing task
+            commands::delete_project_task, // Delete a task from the project
+            commands::watch_project_tasks, // Watch tasks.json for changes
         ])
         .setup(|app| {
             // Set up file watcher for project registry

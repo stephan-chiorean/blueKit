@@ -13,7 +13,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -23,6 +23,7 @@ import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
+import TasksTabContent from '../components/tasks/TasksTabContent';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
@@ -45,6 +46,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
   const [resourceContent, setResourceContent] = useState<string | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType | null>(null);
+
 
   // Load all projects for the dropdown
   useEffect(() => {
@@ -143,7 +145,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const kitsOnly = useMemo(() => {
     return kits.filter(kit => {
       const type = kit.frontMatter?.type;
-      return !type || (type !== 'walkthrough' && type !== 'blueprint');
+      return !type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task');
     });
   }, [kits]);
 
@@ -382,6 +384,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Clones</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="tasks">
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuListTodo />
+                      </Icon>
+                      <Text>Tasks</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Box>
             </Flex>
@@ -435,6 +445,15 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             <Tabs.Content value="clones">
               <ClonesTabContent
                 projectPath={project.path}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="tasks">
+              <TasksTabContent
+                kits={kits}
+                kitsLoading={kitsLoading}
+                error={error}
+                projectsCount={1}
+                onViewTask={handleViewKit}
               />
             </Tabs.Content>
           </Tabs.Root>

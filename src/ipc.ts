@@ -60,6 +60,8 @@ export interface KitFrontMatter {
   id?: string;
   /** Display alias/name for the kit */
   alias?: string;
+  /** Title (used for tasks as alternative to alias) */
+  title?: string;
   /** Whether this is a base kit */
   is_base?: boolean;
   /** Version number */
@@ -68,12 +70,18 @@ export interface KitFrontMatter {
   tags?: string[];
   /** Description of the kit */
   description?: string;
-  /** Type of the kit (e.g., 'walkthrough', 'agent') */
+  /** Type of the kit (e.g., 'walkthrough', 'agent', 'task') */
   type?: string;
   /** Capabilities array (used for agents) */
   capabilities?: string[];
   /** Execution notes (used for agents) */
   executionNotes?: string;
+  /** Task priority (used for tasks) */
+  priority?: string;
+  /** Task status (used for tasks) */
+  status?: string;
+  /** Task complexity score 1-10 (used for tasks) */
+  complexity?: number;
 }
 
 /**
@@ -196,6 +204,66 @@ export interface CloneMetadata {
   createdAt: string;
   /** Optional additional metadata */
   metadata?: Record<string, any>;
+}
+
+/**
+ * Type definition for task acceptance criteria.
+ *
+ * This interface must match the `TaskAcceptanceCriteria` struct in `src-tauri/src/commands.rs`.
+ */
+export interface TaskAcceptanceCriteria {
+  /** Unique identifier for the acceptance criterion */
+  id: string;
+  /** Description of the acceptance criterion */
+  description: string;
+  /** Whether this criterion has been met */
+  completed: boolean;
+}
+
+/**
+ * Type definition for a task item.
+ *
+ * This interface must match the `Task` struct in `src-tauri/src/commands.rs`.
+ */
+export interface Task {
+  /** Unique identifier for the task */
+  id: string;
+  /** Task title/summary */
+  title: string;
+  /** Detailed task description */
+  description?: string;
+  /** Task status: "backlog", "in_progress", "completed", "blocked" */
+  status: string;
+  /** Priority level: "low", "medium", "high", "critical" */
+  priority: string;
+  /** Complexity score (1-10, where 1 is simplest) */
+  complexity: number;
+  /** List of acceptance criteria */
+  acceptance_criteria: TaskAcceptanceCriteria[];
+  /** Optional tags for categorization */
+  tags: string[];
+  /** Creation timestamp (ISO 8601) */
+  created_at: string;
+  /** Last updated timestamp (ISO 8601) */
+  updated_at: string;
+  /** Optional assignee */
+  assignee?: string;
+  /** Optional due date (ISO 8601) */
+  due_date?: string;
+}
+
+/**
+ * Type definition for task list structure.
+ *
+ * This interface must match the `TaskList` struct in `src-tauri/src/commands.rs`.
+ */
+export interface TaskList {
+  /** Version of the task list schema */
+  version: number;
+  /** List of all tasks */
+  tasks: Task[];
+  /** Last updated timestamp (ISO 8601) */
+  updated_at: string;
 }
 
 /**
@@ -344,6 +412,21 @@ export async function invokeWatchProjectKits(projectPath: string): Promise<void>
  */
 export async function invokeReadFile(filePath: string): Promise<string> {
   return await invokeWithTimeout<string>('read_file', { filePath });
+}
+
+/**
+ * Writes content to a file.
+ *
+ * This command writes the provided content to the specified file path.
+ * The file will be created if it doesn't exist, or overwritten if it does.
+ *
+ * @param filePath - The absolute path to the file to write
+ * @param content - The content to write to the file
+ * @returns Promise that resolves when the file is written
+ * @throws Error if the file cannot be written
+ */
+export async function invokeWriteFile(filePath: string, content: string): Promise<void> {
+  return await invokeWithTimeout<void>('write_file', { filePath, content });
 }
 
 /**
@@ -618,4 +701,138 @@ export async function invokeGetWatcherHealth(): Promise<Record<string, boolean>>
  *    const result = await invokeMyCommand('Hello');
  *    ```
  */
+
+// ============================================================================
+// TASK MANAGEMENT IPC FUNCTIONS
+// ============================================================================
+
+/**
+ * Gets the task list for a project from .bluekit/tasks.json.
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves to a TaskList object
+ *
+ * @example
+ * ```typescript
+ * const taskList = await invokeGetProjectTasks('/path/to/project');
+ * console.log(taskList.tasks.length); // Number of tasks
+ * ```
+ */
+export async function invokeGetProjectTasks(projectPath: string): Promise<TaskList> {
+  return await invokeWithTimeout<TaskList>('get_project_tasks', { projectPath }, 10000);
+}
+
+/**
+ * Saves the task list for a project to .bluekit/tasks.json.
+ *
+ * @param projectPath - The path to the project root directory
+ * @param taskList - The task list to save
+ * @returns A promise that resolves when the save is complete
+ *
+ * @example
+ * ```typescript
+ * await invokeSaveProjectTasks('/path/to/project', taskList);
+ * ```
+ */
+export async function invokeSaveProjectTasks(
+  projectPath: string,
+  taskList: TaskList
+): Promise<void> {
+  return await invokeWithTimeout<void>('save_project_tasks', { projectPath, taskList }, 10000);
+}
+
+/**
+ * Adds a new task to the project's task list.
+ *
+ * @param projectPath - The path to the project root directory
+ * @param task - The task to add
+ * @returns A promise that resolves to the added task with auto-generated fields
+ *
+ * @example
+ * ```typescript
+ * const newTask = await invokeAddProjectTask('/path/to/project', {
+ *   id: '',  // Will be auto-generated
+ *   title: 'Implement feature X',
+ *   description: 'Add feature X to the app',
+ *   status: 'backlog',
+ *   priority: 'high',
+ *   complexity: 7,
+ *   acceptance_criteria: [],
+ *   tags: ['feature'],
+ *   created_at: '',  // Will be auto-generated
+ *   updated_at: '',  // Will be auto-generated
+ * });
+ * console.log(newTask.id); // Auto-generated UUID
+ * ```
+ */
+export async function invokeAddProjectTask(
+  projectPath: string,
+  task: Task
+): Promise<Task> {
+  return await invokeWithTimeout<Task>('add_project_task', { projectPath, task }, 10000);
+}
+
+/**
+ * Updates an existing task in the project's task list.
+ *
+ * @param projectPath - The path to the project root directory
+ * @param task - The updated task
+ * @returns A promise that resolves to the updated task
+ *
+ * @example
+ * ```typescript
+ * const updatedTask = await invokeUpdateProjectTask('/path/to/project', {
+ *   ...existingTask,
+ *   status: 'completed'
+ * });
+ * ```
+ */
+export async function invokeUpdateProjectTask(
+  projectPath: string,
+  task: Task
+): Promise<Task> {
+  return await invokeWithTimeout<Task>('update_project_task', { projectPath, task }, 10000);
+}
+
+/**
+ * Deletes a task from the project's task list.
+ *
+ * @param projectPath - The path to the project root directory
+ * @param taskId - The ID of the task to delete
+ * @returns A promise that resolves when the deletion is complete
+ *
+ * @example
+ * ```typescript
+ * await invokeDeleteProjectTask('/path/to/project', 'task-uuid');
+ * ```
+ */
+export async function invokeDeleteProjectTask(
+  projectPath: string,
+  taskId: string
+): Promise<void> {
+  return await invokeWithTimeout<void>('delete_project_task', { projectPath, taskId }, 10000);
+}
+
+/**
+ * Watches the tasks.json file for changes and emits events.
+ *
+ * @param projectPath - The path to the project root directory
+ * @returns A promise that resolves when the watcher is started
+ *
+ * @example
+ * ```typescript
+ * // Start watching
+ * await invokeWatchProjectTasks('/path/to/project');
+ *
+ * // Listen for changes
+ * import { listen } from '@tauri-apps/api/event';
+ * listen('project-tasks-changed', () => {
+ *   console.log('Tasks changed!');
+ *   // Reload tasks
+ * });
+ * ```
+ */
+export async function invokeWatchProjectTasks(projectPath: string): Promise<void> {
+  return await invokeWithTimeout<void>('watch_project_tasks', { projectPath }, 10000);
+}
 
