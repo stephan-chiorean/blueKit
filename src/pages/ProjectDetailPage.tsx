@@ -7,7 +7,6 @@ import {
   Text,
   Icon,
   HStack,
-  Heading,
   Button,
   Select,
   Portal,
@@ -24,11 +23,10 @@ import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
-import KitViewPage from './KitViewPage';
-import WalkthroughViewPage from './WalkthroughViewPage';
-import DiagramViewPage from './DiagramViewPage';
+import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
+import { ResourceFile, ResourceType } from '../types/resource';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -43,13 +41,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
   const [currentTab, setCurrentTab] = useState<string>("kits");
 
-  // Kit view state - for viewing a kit/walkthrough in split view
-  const [viewingKit, setViewingKit] = useState<KitFile | null>(null);
-  const [kitViewContent, setKitViewContent] = useState<string | null>(null);
-
-  // Diagram view state - for viewing a diagram
-  const [viewingDiagram, setViewingDiagram] = useState<KitFile | null>(null);
-  const [diagramViewContent, setDiagramViewContent] = useState<string | null>(null);
+  // Generic resource view state - for viewing any resource type
+  const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
+  const [resourceContent, setResourceContent] = useState<string | null>(null);
+  const [resourceType, setResourceType] = useState<ResourceType | null>(null);
 
   // Load all projects for the dropdown
   useEffect(() => {
@@ -164,61 +159,55 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     return kits.filter(kit => kit.frontMatter?.type === 'agent');
   }, [kits]);
 
-  // Handler to navigate to kit view
-  const handleViewKit = async (kit: KitFile) => {
+  // Generic handler to view any resource type
+  const handleViewResource = async (resource: ResourceFile, type: ResourceType) => {
     try {
-      const content = await invokeReadFile(kit.path);
-      setViewingKit(kit);
-      setKitViewContent(content);
+      const content = await invokeReadFile(resource.path);
+      setViewingResource(resource);
+      setResourceContent(content);
+      setResourceType(type);
     } catch (error) {
-      console.error('Failed to load kit content:', error);
+      console.error('Failed to load resource content:', error);
     }
   };
 
-  // Handler to navigate to blueprint task view
+  // Convenience handlers for different resource types (backwards compatibility)
+  const handleViewKit = async (kit: KitFile) => {
+    await handleViewResource(kit, (kit.frontMatter?.type as ResourceType) || 'kit');
+  };
+
+  const handleViewDiagram = async (diagram: KitFile) => {
+    await handleViewResource(diagram, 'diagram');
+  };
+
   const handleViewTask = async (blueprintPath: string, taskFile: string, taskDescription: string) => {
     try {
       const content = await invokeGetBlueprintTaskFile(blueprintPath, taskFile);
-      
-      // Create a KitFile-like object for the task
-      const taskKit: KitFile = {
+
+      // Create a ResourceFile object for the task
+      const taskResource: ResourceFile = {
         name: taskFile.replace('.md', ''),
         path: `${blueprintPath}/${taskFile}`,
         frontMatter: {
           alias: taskDescription,
           type: 'task',
         },
+        resourceType: 'task',
       };
-      
-      setViewingKit(taskKit);
-      setKitViewContent(content);
+
+      setViewingResource(taskResource);
+      setResourceContent(content);
+      setResourceType('task');
     } catch (error) {
       console.error('Failed to load task content:', error);
     }
   };
 
-  // Handler to go back from kit view
-  const handleBackFromKitView = () => {
-    setViewingKit(null);
-    setKitViewContent(null);
-  };
-
-  // Handler to navigate to diagram view
-  const handleViewDiagram = async (diagram: KitFile) => {
-    try {
-      const content = await invokeReadFile(diagram.path);
-      setViewingDiagram(diagram);
-      setDiagramViewContent(content);
-    } catch (error) {
-      console.error('Failed to load diagram content:', error);
-    }
-  };
-
-  // Handler to go back from diagram view
-  const handleBackFromDiagramView = () => {
-    setViewingDiagram(null);
-    setDiagramViewContent(null);
-    setCurrentTab("diagrams");
+  // Handler to go back from resource view
+  const handleBackFromResourceView = () => {
+    setViewingResource(null);
+    setResourceContent(null);
+    setResourceType(null);
   };
 
   // Create collection for Select component
@@ -239,38 +228,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     }
   };
 
-  // If viewing a diagram, show the diagram view page
-  if (viewingDiagram && diagramViewContent) {
+  // If viewing any resource, show the generic resource view page
+  if (viewingResource && resourceContent && resourceType) {
     return (
-      <DiagramViewPage 
-        diagram={viewingDiagram} 
-        diagramContent={diagramViewContent}
-        onBack={handleBackFromDiagramView}
+      <ResourceViewPage
+        resource={viewingResource}
+        resourceContent={resourceContent}
+        resourceType={resourceType}
+        onBack={handleBackFromResourceView}
       />
     );
-  }
-
-  // If viewing a kit or walkthrough, show the appropriate view page
-  if (viewingKit && kitViewContent) {
-    const isWalkthrough = viewingKit.frontMatter?.type === 'walkthrough';
-    
-    if (isWalkthrough) {
-      return (
-        <WalkthroughViewPage 
-          kit={viewingKit} 
-          kitContent={kitViewContent}
-          onBack={handleBackFromKitView}
-        />
-      );
-    } else {
-      return (
-        <KitViewPage 
-          kit={viewingKit} 
-          kitContent={kitViewContent}
-          onBack={handleBackFromKitView}
-        />
-      );
-    }
   }
 
   return (

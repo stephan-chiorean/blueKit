@@ -6,7 +6,7 @@ import { SelectionProvider } from './contexts/SelectionContext';
 import { TaskProvider } from './contexts/TaskContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
-import { WorkstationProvider } from './contexts/WorkstationContext';
+import { ResourceProvider } from './contexts/ResourceContext';
 import { ProjectEntry } from './ipc';
 
 type View = 'welcome' | 'home' | 'project-detail';
@@ -32,14 +32,14 @@ function App() {
   return (
     <ColorModeProvider>
       <FeatureFlagsProvider>
-        <WorkstationProvider>
+        <ResourceProvider>
           <TaskProvider>
             <SelectionProvider>
               {currentView === 'welcome' ? (
                 <WelcomeScreen onGetStarted={handleGetStarted} />
               ) : currentView === 'project-detail' && selectedProject ? (
-                <ProjectDetailPage 
-                  project={selectedProject} 
+                <ProjectDetailPage
+                  project={selectedProject}
                   onBack={handleBackToHome}
                   onProjectSelect={handleProjectSelect}
                 />
@@ -48,7 +48,7 @@ function App() {
               )}
             </SelectionProvider>
           </TaskProvider>
-        </WorkstationProvider>
+        </ResourceProvider>
       </FeatureFlagsProvider>
     </ColorModeProvider>
   );

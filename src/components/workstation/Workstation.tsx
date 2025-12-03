@@ -3,11 +3,11 @@ import {
   Flex,
   EmptyState,
 } from '@chakra-ui/react';
-import { useWorkstation } from '../../contexts/WorkstationContext';
-import KitMarkdownViewer from './KitMarkdownViewer';
+import { useResource } from '../../contexts/ResourceContext';
+import ResourceMarkdownViewer from './ResourceMarkdownViewer';
 
 export default function Workstation() {
-  const { selectedKit, kitContent } = useWorkstation();
+  const { selectedResource, resourceContent } = useResource();
 
   return (
     <Flex
@@ -24,14 +24,14 @@ export default function Workstation() {
         position="relative"
         overflow="auto"
       >
-        {selectedKit && kitContent ? (
-          <KitMarkdownViewer kit={selectedKit} content={kitContent} />
+        {selectedResource && resourceContent ? (
+          <ResourceMarkdownViewer resource={selectedResource} content={resourceContent} />
         ) : (
           <EmptyState.Root>
             <EmptyState.Content>
-              <EmptyState.Title>No Kit Selected</EmptyState.Title>
+              <EmptyState.Title>No Resource Selected</EmptyState.Title>
               <EmptyState.Description>
-                Click "View" on a kit to see its content here
+                Click "View" on a resource to see its content here
               </EmptyState.Description>
             </EmptyState.Content>
           </EmptyState.Root>

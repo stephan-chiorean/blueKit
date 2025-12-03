@@ -18,7 +18,6 @@
  * 6. Promise resolves with the result
  */
 
-import { invoke } from '@tauri-apps/api/tauri';
 import { invokeWithTimeout, TimeoutError } from './utils/ipcTimeout';
 
 // Re-export TimeoutError for convenience

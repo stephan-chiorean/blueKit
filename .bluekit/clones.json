@@ -12,5 +12,19 @@
       "tauri"
     ],
     "createdAt": "2025-12-01T04:03:44.151Z"
+  },
+  {
+    "id": "bluekit-resource-viewer-refactor-20251203",
+    "name": "BlueKit - Resource Viewer Refactor",
+    "description": "BlueKit project after comprehensive resource viewer refactoring - generic resource system replacing kit-specific logic",
+    "gitUrl": "https://github.com/stephan-chiorean/blueKit.git",
+    "gitCommit": "4df14e987bebad6864fd677c050cd4cc3e822c8d",
+    "gitBranch": "main",
+    "tags": [
+      "refactored",
+      "resource-system",
+      "production"
+    ],
+    "createdAt": "2025-12-03T02:00:31.006Z"
   }
 ]
