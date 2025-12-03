@@ -1,0 +1,64 @@
+---
+alias: KitMarkdownViewer Import Chain
+description: Component dependency graph showing which files import KitMarkdownViewer and how it flows through the application architecture
+tags:
+  - frontend
+  - components
+  - markdown
+  - architecture
+---
+```mermaid
+graph TB
+    subgraph App_Root["Application Root"]
+        App[App.tsx<br/>Root Component]
+        WorkstationProvider[WorkstationContext.tsx<br/>WorkstationProvider<br/>Context Provider]
+    end
+
+    subgraph View_Pages["View Pages"]
+        KitViewPage[KitViewPage.tsx<br/>Kit Detail View]
+        WalkthroughViewPage[WalkthroughViewPage.tsx<br/>Walkthrough Detail View]
+    end
+
+    subgraph Workstation_Components["Workstation Components"]
+        Workstation[Workstation.tsx<br/>Main Workstation Container]
+        KitMarkdownViewer[KitMarkdownViewer.tsx<br/>Markdown Renderer<br/>Uses react-markdown]
+    end
+
+    subgraph Dependencies["External Dependencies"]
+        ReactMarkdown[react-markdown<br/>Markdown Parser]
+        RemarkGfm[remark-gfm<br/>GitHub Flavored Markdown]
+        ChakraUI[Chakra UI<br/>Component Library]
+    end
+
+    %% App to Context
+    App -->|wraps with| WorkstationProvider
+
+    %% Context to View Pages
+    WorkstationProvider -.->|provides context| KitViewPage
+    WorkstationProvider -.->|provides context| WalkthroughViewPage
+
+    %% View Pages to Workstation
+    KitViewPage -->|imports & renders| Workstation
+    WalkthroughViewPage -->|imports & renders| Workstation
+
+    %% Workstation to Markdown Viewer
+    Workstation -->|imports & renders| KitMarkdownViewer
+
+    %% Markdown Viewer Dependencies
+    KitMarkdownViewer -->|uses| ReactMarkdown
+    KitMarkdownViewer -->|uses| RemarkGfm
+    KitMarkdownViewer -->|uses| ChakraUI
+
+    %% Styling
+    classDef app fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef page fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef component fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef dependency fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef target fill:#ffebee,stroke:#c62828,stroke-width:3px
+
+    class App,WorkstationProvider app
+    class KitViewPage,WalkthroughViewPage page
+    class Workstation component
+    class KitMarkdownViewer target
+    class ReactMarkdown,RemarkGfm,ChakraUI dependency
+```

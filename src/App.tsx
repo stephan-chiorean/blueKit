@@ -3,6 +3,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import { SelectionProvider } from './contexts/SelectionContext';
+import { TaskProvider } from './contexts/TaskContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WorkstationProvider } from './contexts/WorkstationContext';
@@ -32,19 +33,21 @@ function App() {
     <ColorModeProvider>
       <FeatureFlagsProvider>
         <WorkstationProvider>
-          <SelectionProvider>
-            {currentView === 'welcome' ? (
-              <WelcomeScreen onGetStarted={handleGetStarted} />
-            ) : currentView === 'project-detail' && selectedProject ? (
-              <ProjectDetailPage 
-                project={selectedProject} 
-                onBack={handleBackToHome}
-                onProjectSelect={handleProjectSelect}
-              />
-            ) : (
-              <HomePage onProjectSelect={handleProjectSelect} />
-            )}
-          </SelectionProvider>
+          <TaskProvider>
+            <SelectionProvider>
+              {currentView === 'welcome' ? (
+                <WelcomeScreen onGetStarted={handleGetStarted} />
+              ) : currentView === 'project-detail' && selectedProject ? (
+                <ProjectDetailPage 
+                  project={selectedProject} 
+                  onBack={handleBackToHome}
+                  onProjectSelect={handleProjectSelect}
+                />
+              ) : (
+                <HomePage onProjectSelect={handleProjectSelect} />
+              )}
+            </SelectionProvider>
+          </TaskProvider>
         </WorkstationProvider>
       </FeatureFlagsProvider>
     </ColorModeProvider>

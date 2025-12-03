@@ -1,0 +1,144 @@
+---
+alias: Resource Viewer Refactoring Analysis
+description: Current state showing kit-specific logic (viewingKit, kitViewContent) being used across multiple resource types (kits, walkthroughs, agents, blueprints, scrapbook, diagrams) and proposed generic ResourceViewer refactoring
+tags:
+  - architecture
+  - refactoring
+  - frontend
+  - state-management
+---
+```mermaid
+graph TB
+    subgraph Current_State["🔴 CURRENT STATE - Kit-Specific Logic"]
+        ProjectDetailPage[ProjectDetailPage.tsx<br/>State Management]
+        
+        subgraph Kit_State["Kit-Specific State"]
+            ViewingKit[viewingKit: KitFile<br/>❌ Used for ALL markdown resources]
+            KitViewContent[kitViewContent: string<br/>❌ Used for ALL content]
+            ViewingDiagram[viewingDiagram: KitFile<br/>⚠️ Separate but still KitFile type]
+            DiagramContent[diagramViewContent: string<br/>⚠️ Duplicate pattern]
+        end
+        
+        subgraph Handlers["View Handlers"]
+            HandleViewKit[handleViewKit<br/>Reads file → setViewingKit<br/>setKitViewContent]
+            HandleViewTask[handleViewTask<br/>Creates fake KitFile<br/>Uses setViewingKit]
+            HandleViewDiagram[handleViewDiagram<br/>Separate handler<br/>Uses setViewingDiagram]
+        end
+        
+        subgraph Tab_Components["Tab Content Components"]
+            KitsTab[KitsTabContent<br/>onViewKit]
+            WalkthroughsTab[WalkthroughsTabContent<br/>onViewKit]
+            AgentsTab[AgentsTabContent<br/>onViewKit]
+            ScrapbookTab[ScrapbookTabContent<br/>onViewKit<br/>Creates KitFile from markdown]
+            BlueprintsTab[BlueprintsTabContent<br/>onViewTask]
+            DiagramsTab[DiagramsTabContent<br/>onViewDiagram]
+        end
+        
+        subgraph View_Pages["View Pages"]
+            KitViewPage[KitViewPage<br/>Receives: kit, kitContent]
+            WalkthroughViewPage[WalkthroughViewPage<br/>Receives: kit, kitContent<br/>❌ Not a kit!]
+            DiagramViewPage[DiagramViewPage<br/>Receives: diagram, diagramContent]
+        end
+        
+        subgraph Workstation["Workstation System"]
+            WorkstationComponent[Workstation.tsx]
+            KitMarkdownViewer[KitMarkdownViewer.tsx<br/>❌ Name suggests kits only]
+            WorkstationContext[WorkstationContext<br/>selectedKit, kitContent]
+        end
+    end
+    
+    subgraph Proposed_State["🟢 PROPOSED STATE - Generic Resource System"]
+        subgraph Generic_State["Generic Resource State"]
+            ViewingResource[viewingResource: ResourceFile<br/>✅ Generic type]
+            ResourceContent[resourceContent: string<br/>✅ Generic content]
+            ResourceType[resourceType: ResourceType<br/>kit, walkthrough, agent, task, diagram, scrapbook]
+        end
+        
+        subgraph Generic_Handlers["Generic View Handler"]
+            HandleViewResource[handleViewResource<br/>resource: ResourceFile<br/>type: string<br/>✅ Single handler for all]
+        end
+        
+        subgraph Generic_Tabs["Tab Components (Unchanged Interface)"]
+            GenericKitsTab[KitsTabContent<br/>onViewResource]
+            GenericWalkthroughsTab[WalkthroughsTabContent<br/>onViewResource]
+            GenericAgentsTab[AgentsTabContent<br/>onViewResource]
+            GenericScrapbookTab[ScrapbookTabContent<br/>onViewResource]
+            GenericBlueprintsTab[BlueprintsTabContent<br/>onViewResource]
+            GenericDiagramsTab[DiagramsTabContent<br/>onViewResource]
+        end
+        
+        subgraph Generic_Views["Generic View System"]
+            ResourceViewPage[ResourceViewPage<br/>Receives: resource, content, type<br/>Routes to appropriate viewer]
+            GenericWorkstation[Workstation.tsx<br/>Uses ResourceViewer]
+            ResourceMarkdownViewer[ResourceMarkdownViewer.tsx<br/>✅ Generic name]
+            ResourceContext[ResourceContext<br/>selectedResource, resourceContent, resourceType]
+        end
+    end
+    
+    %% Current State Connections
+    ProjectDetailPage --> ViewingKit
+    ProjectDetailPage --> KitViewContent
+    ProjectDetailPage --> ViewingDiagram
+    ProjectDetailPage --> DiagramContent
+    
+    ProjectDetailPage --> HandleViewKit
+    ProjectDetailPage --> HandleViewTask
+    ProjectDetailPage --> HandleViewDiagram
+    
+    HandleViewKit --> ViewingKit
+    HandleViewKit --> KitViewContent
+    HandleViewTask --> ViewingKit
+    HandleViewTask --> KitViewContent
+    HandleViewDiagram --> ViewingDiagram
+    HandleViewDiagram --> DiagramContent
+    
+    KitsTab -->|onViewKit| HandleViewKit
+    WalkthroughsTab -->|onViewKit| HandleViewKit
+    AgentsTab -->|onViewKit| HandleViewKit
+    ScrapbookTab -->|onViewKit| HandleViewKit
+    BlueprintsTab -->|onViewTask| HandleViewTask
+    DiagramsTab -->|onViewDiagram| HandleViewDiagram
+    
+    ViewingKit --> KitViewPage
+    ViewingKit --> WalkthroughViewPage
+    KitViewContent --> KitViewPage
+    KitViewContent --> WalkthroughViewPage
+    ViewingDiagram --> DiagramViewPage
+    DiagramContent --> DiagramViewPage
+    
+    KitViewPage --> WorkstationComponent
+    WalkthroughViewPage --> WorkstationComponent
+    WorkstationComponent --> KitMarkdownViewer
+    WorkstationComponent --> WorkstationContext
+    
+    %% Proposed State Connections
+    GenericKitsTab -->|onViewResource| HandleViewResource
+    GenericWalkthroughsTab -->|onViewResource| HandleViewResource
+    GenericAgentsTab -->|onViewResource| HandleViewResource
+    GenericScrapbookTab -->|onViewResource| HandleViewResource
+    GenericBlueprintsTab -->|onViewResource| HandleViewResource
+    GenericDiagramsTab -->|onViewResource| HandleViewResource
+    
+    HandleViewResource --> ViewingResource
+    HandleViewResource --> ResourceContent
+    HandleViewResource --> ResourceType
+    
+    ViewingResource --> ResourceViewPage
+    ResourceContent --> ResourceViewPage
+    ResourceType --> ResourceViewPage
+    
+    ResourceViewPage --> GenericWorkstation
+    GenericWorkstation --> ResourceMarkdownViewer
+    GenericWorkstation --> ResourceContext
+    
+    %% Styling
+    classDef problem fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef current fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef proposed fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef generic fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    
+    class ViewingKit,KitViewContent,KitMarkdownViewer,HandleViewTask problem
+    class ProjectDetailPage,HandleViewKit,HandleViewDiagram,ViewingDiagram,DiagramContent current
+    class ViewingResource,ResourceContent,ResourceType,HandleViewResource,ResourceViewPage,ResourceMarkdownViewer,ResourceContext proposed
+    class GenericKitsTab,GenericWalkthroughsTab,GenericAgentsTab,GenericScrapbookTab,GenericBlueprintsTab,GenericDiagramsTab generic
+```
