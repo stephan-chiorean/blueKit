@@ -175,7 +175,8 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               ),
               li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
               code: ({ className, children, ...props }) => {
-                const match = /language-(\w+)/.exec(className || '');
+                // Match language from className (e.g., "language-rust" or "language-78:93:src-tauri/src/main.rs")
+                const match = /language-(.+)/.exec(className || '');
                 const isInline = !match;
                 const codeString = String(children).replace(/\n$/, '');
 
@@ -196,7 +197,36 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                 }
 
                 // Code block with Shiki syntax highlighting
-                const language = match ? match[1] : 'text';
+                // Extract language, handling special formats like "78:93:src-tauri/src/main.rs"
+                let language = match ? match[1] : 'text';
+
+                // Handle file reference format (e.g., "78:93:src-tauri/src/main.rs")
+                // Extract file extension to infer language
+                if (language.includes(':') || language.includes('/') || language.includes('.')) {
+                  const fileExtMatch = language.match(/\.(\w+)$/);
+                  if (fileExtMatch) {
+                    const ext = fileExtMatch[1];
+                    // Map common extensions to languages
+                    const extToLang: Record<string, string> = {
+                      'rs': 'rust',
+                      'ts': 'typescript',
+                      'tsx': 'typescript',
+                      'js': 'javascript',
+                      'jsx': 'javascript',
+                      'py': 'python',
+                      'sh': 'bash',
+                      'yml': 'yaml',
+                      'yaml': 'yaml',
+                      'json': 'json',
+                      'md': 'markdown',
+                    };
+                    language = extToLang[ext] || ext;
+                  } else {
+                    // No file extension found, default to text
+                    language = 'text';
+                  }
+                }
+
                 return <ShikiCodeBlock code={codeString} language={language} />;
               },
               a: ({ href, children }) => (
