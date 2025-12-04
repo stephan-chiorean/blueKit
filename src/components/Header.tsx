@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Box,
   Flex,
@@ -6,15 +7,32 @@ import {
   Input,
   InputGroup,
   Avatar,
-  Badge,
   Heading,
   Text,
 } from '@chakra-ui/react';
 import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
-import { useSelection } from '../contexts/SelectionContext';
+import { Task } from '../types/task';
+import TaskManagerPopover from './tasks/TaskManagerPopover';
+import TaskDialog from './tasks/TaskDialog';
+import TaskCreateDialog from './tasks/TaskCreateDialog';
 
 export default function Header() {
-  const { selectedItems } = useSelection();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  const handleOpenTaskDialog = (task: Task) => {
+    setSelectedTask(task);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleOpenCreateDialog = () => {
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleTaskUpdated = () => {
+    // Dialogs will reload their own data
+  };
 
   return (
     <Box
@@ -51,6 +69,10 @@ export default function Header() {
 
         {/* Right side icons */}
         <HStack gap={2} flex="1" justify="flex-end">
+          <TaskManagerPopover
+            onOpenTaskDialog={handleOpenTaskDialog}
+            onOpenCreateDialog={handleOpenCreateDialog}
+          />
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />
           </IconButton>
@@ -61,6 +83,25 @@ export default function Header() {
           </Avatar.Root>
         </HStack>
       </Flex>
+
+      {/* Task Dialogs */}
+      <TaskDialog
+        task={selectedTask}
+        isOpen={isTaskDialogOpen}
+        onClose={() => {
+          setIsTaskDialogOpen(false);
+          setSelectedTask(null);
+        }}
+        onTaskUpdated={handleTaskUpdated}
+      />
+
+      <TaskCreateDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onTaskCreated={handleTaskUpdated}
+        projects={[]} // No project preselection from header
+        defaultProjectId={undefined}
+      />
     </Box>
   );
 }

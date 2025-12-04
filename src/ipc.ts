@@ -19,7 +19,7 @@
  */
 
 import { invokeWithTimeout, TimeoutError } from './utils/ipcTimeout';
-import { Task as DbTask, TaskPriority } from './types/task';
+import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity } from './types/task';
 
 // Re-export TimeoutError for convenience
 export { TimeoutError };
@@ -845,7 +845,7 @@ export async function invokeWatchProjectTasks(projectPath: string): Promise<void
  * Get all tasks, optionally filtered by project IDs
  */
 export async function invokeDbGetTasks(projectIds?: string[]): Promise<DbTask[]> {
-  return await invokeWithTimeout<DbTask[]>('db_get_tasks', { project_ids: projectIds }, 15000);
+  return await invokeWithTimeout<DbTask[]>('db_get_tasks', { projectIds }, 15000);
 }
 
 /**
@@ -859,7 +859,7 @@ export async function invokeDbGetProjectTasks(projectId: string): Promise<DbTask
  * Get a single task by ID
  */
 export async function invokeDbGetTask(taskId: string): Promise<DbTask | null> {
-  return await invokeWithTimeout<DbTask | null>('db_get_task', { task_id: taskId }, 10000);
+  return await invokeWithTimeout<DbTask | null>('db_get_task', { taskId }, 10000);
 }
 
 /**
@@ -870,16 +870,20 @@ export async function invokeDbCreateTask(
   description: string | undefined,
   priority: TaskPriority,
   tags: string[],
-  projectIds: string[]
+  projectIds: string[],
+  status?: TaskStatus,
+  complexity?: TaskComplexity
 ): Promise<DbTask> {
   return await invokeWithTimeout<DbTask>(
     'db_create_task',
-    { 
-      title, 
-      description: description ?? null, 
-      priority: priority || 'standard', 
-      tags, 
-      projectIds 
+    {
+      title,
+      description: description ?? null,
+      priority: priority || 'standard',
+      tags,
+      projectIds,
+      status: status ?? null,
+      complexity: complexity ?? null
     },
     10000
   );
@@ -894,11 +898,22 @@ export async function invokeDbUpdateTask(
   description?: string | null,
   priority?: TaskPriority,
   tags?: string[],
-  projectIds?: string[]
+  projectIds?: string[],
+  status?: TaskStatus,
+  complexity?: TaskComplexity | null
 ): Promise<DbTask> {
   return await invokeWithTimeout<DbTask>(
     'db_update_task',
-    { taskId, title, description, priority, tags, projectIds },
+    {
+      taskId,
+      title,
+      description,
+      priority,
+      tags,
+      projectIds,
+      status,
+      complexity
+    },
     10000
   );
 }

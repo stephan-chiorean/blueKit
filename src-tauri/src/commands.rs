@@ -1768,6 +1768,8 @@ pub async fn db_create_task(
     priority: String,
     tags: Vec<String>,
     project_ids: Vec<String>,
+    status: Option<String>,
+    complexity: Option<String>,
 ) -> Result<crate::db::task_operations::TaskDto, String> {
     crate::db::task_operations::create_task(
         db.inner(),
@@ -1776,6 +1778,8 @@ pub async fn db_create_task(
         priority,
         tags,
         project_ids,
+        status,
+        complexity,
     )
     .await
     .map_err(|e| format!("Failed to create task: {}", e))
@@ -1791,6 +1795,8 @@ pub async fn db_update_task(
     priority: Option<String>,
     tags: Option<Vec<String>>,
     project_ids: Option<Vec<String>>,
+    status: Option<String>,
+    complexity: Option<Option<String>>,
 ) -> Result<crate::db::task_operations::TaskDto, String> {
     crate::db::task_operations::update_task(
         db.inner(),
@@ -1800,6 +1806,8 @@ pub async fn db_update_task(
         priority,
         tags,
         project_ids,
+        status,
+        complexity,
     )
     .await
     .map_err(|e| format!("Failed to update task: {}", e))

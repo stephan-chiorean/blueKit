@@ -8,10 +8,12 @@ pub struct Model {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
-    pub priority: String, // "pinned", "high", "long term", "nit"
+    pub priority: String, // "pinned", "high", "standard", "long term", "nit"
     pub tags: String,     // JSON array stored as string
     pub created_at: String,
     pub updated_at: String,
+    pub status: String,   // "backlog", "in_progress", "completed", "blocked"
+    pub complexity: Option<String>, // Optional: "easy", "hard", "deep dive"
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

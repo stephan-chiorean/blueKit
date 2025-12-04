@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
-import { LuCircleCheck, LuTrash2 } from "react-icons/lu";
+import { LuCircleCheck, LuTrash2, LuPlay } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { Task } from "../../types/task";
+import { invokeDbUpdateTask, invokeDbDeleteTask } from "../../ipc";
 
 interface TasksActionBarProps {
   selectedTasks: Task[];
   hasSelection: boolean;
   clearSelection: () => void;
-  removeTask: (id: string) => void;
+  onTasksUpdated: () => void;
 }
 
 export default function TasksActionBar({
   selectedTasks,
   hasSelection,
   clearSelection,
-  removeTask,
+  onTasksUpdated,
 }: TasksActionBarProps) {
   const [loading, setLoading] = useState(false);
 
@@ -23,12 +24,70 @@ export default function TasksActionBar({
     return null;
   }
 
+  const handleSetInProgress = async () => {
+    try {
+      setLoading(true);
+
+      // Update each selected task to in_progress status
+      await Promise.all(
+        selectedTasks.map(task =>
+          invokeDbUpdateTask(
+            task.id,
+            task.title,
+            task.description,
+            task.priority,
+            task.tags,
+            task.projectIds,
+            'in_progress',
+            task.complexity
+          )
+        )
+      );
+
+      toaster.create({
+        type: "success",
+        title: "Tasks updated",
+        description: `Set ${selectedTasks.length} task${
+          selectedTasks.length !== 1 ? "s" : ""
+        } to In Progress`,
+      });
+
+      clearSelection();
+      onTasksUpdated();
+    } catch (error) {
+      console.error("[TasksActionBar] Error in Set to In Progress:", error);
+      toaster.create({
+        type: "error",
+        title: "Error",
+        description: `Failed to update tasks: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleComplete = async () => {
     try {
       setLoading(true);
-      
-      // For now, just show a success message
-      // In the future, this would update the task status in state
+
+      // Update each selected task to completed status
+      await Promise.all(
+        selectedTasks.map(task =>
+          invokeDbUpdateTask(
+            task.id,
+            task.title,
+            task.description,
+            task.priority,
+            task.tags,
+            task.projectIds,
+            'completed',
+            task.complexity
+          )
+        )
+      );
+
       toaster.create({
         type: "success",
         title: "Tasks completed",
@@ -37,8 +96,8 @@ export default function TasksActionBar({
         } as completed`,
       });
 
-      // Clear selection after operation
       clearSelection();
+      onTasksUpdated();
     } catch (error) {
       console.error("[TasksActionBar] Error in Complete:", error);
       toaster.create({
@@ -53,23 +112,37 @@ export default function TasksActionBar({
     }
   };
 
-  const handleDelete = () => {
-    console.log(
-      "[TasksActionBar] Delete clicked, tasks to remove:",
-      selectedTasks
-    );
-    // Remove selected tasks from selection
-    selectedTasks.forEach((task) => {
-      removeTask(task.id);
-    });
+  const handleDelete = async () => {
+    try {
+      setLoading(true);
 
-    toaster.create({
-      type: "info",
-      title: "Selection cleared",
-      description: `Cleared ${selectedTasks.length} task${
-        selectedTasks.length !== 1 ? "s" : ""
-      } from selection`,
-    });
+      // Delete each selected task from database
+      await Promise.all(
+        selectedTasks.map(task => invokeDbDeleteTask(task.id))
+      );
+
+      toaster.create({
+        type: "error",
+        title: "Tasks deleted",
+        description: `${selectedTasks.length} task${
+          selectedTasks.length !== 1 ? "s" : ""
+        } deleted`,
+      });
+
+      clearSelection();
+      onTasksUpdated();
+    } catch (error) {
+      console.error("[TasksActionBar] Error in Delete:", error);
+      toaster.create({
+        type: "error",
+        title: "Error",
+        description: `Failed to delete tasks: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,6 +150,32 @@ export default function TasksActionBar({
       <Portal>
         <ActionBar.Positioner>
           <ActionBar.Content>
+            <Button
+              variant="surface"
+              colorPalette="blue"
+              size="sm"
+              onClick={handleSetInProgress}
+              disabled={loading}
+            >
+              <HStack gap={2}>
+                <LuPlay />
+                <Text>Set to In Progress</Text>
+              </HStack>
+            </Button>
+            <ActionBar.Separator />
+            <Button
+              variant="surface"
+              colorPalette="green"
+              size="sm"
+              onClick={handleComplete}
+              disabled={loading}
+            >
+              <HStack gap={2}>
+                <LuCircleCheck />
+                <Text>Complete</Text>
+              </HStack>
+            </Button>
+            <ActionBar.Separator />
             <Button
               variant="surface"
               colorPalette="red"
@@ -87,19 +186,6 @@ export default function TasksActionBar({
               <HStack gap={2}>
                 <LuTrash2 />
                 <Text>Delete</Text>
-              </HStack>
-            </Button>
-            <ActionBar.Separator />
-            <Button
-              variant="surface"
-              colorPalette="green"
-              size="sm"
-              onClick={handleComplete}
-              loading={loading}
-            >
-              <HStack gap={2}>
-                <LuCircleCheck />
-                <Text>Complete</Text>
               </HStack>
             </Button>
           </ActionBar.Content>

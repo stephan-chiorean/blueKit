@@ -18,6 +18,8 @@ pub struct TaskDto {
     pub updated_at: String,
     #[serde(rename = "projectIds")]
     pub project_ids: Vec<String>,
+    pub status: String,
+    pub complexity: Option<String>,
 }
 
 /// Get all tasks (optionally filtered by project IDs)
@@ -85,6 +87,8 @@ pub async fn create_task(
     priority: String,
     tags: Vec<String>,
     project_ids: Vec<String>,
+    status: Option<String>,
+    complexity: Option<String>,
 ) -> Result<TaskDto, DbErr> {
     let now = Utc::now().to_rfc3339();
     let task_id = Uuid::new_v4().to_string();
@@ -101,6 +105,8 @@ pub async fn create_task(
         tags: Set(tags_json),
         created_at: Set(now.clone()),
         updated_at: Set(now),
+        status: Set(status.unwrap_or_else(|| "backlog".to_string())),
+        complexity: Set(complexity),
     };
 
     let task_model = task_active_model.insert(db).await?;
@@ -127,6 +133,8 @@ pub async fn update_task(
     priority: Option<String>,
     tags: Option<Vec<String>>,
     project_ids: Option<Vec<String>>,
+    status: Option<String>,
+    complexity: Option<Option<String>>,
 ) -> Result<TaskDto, DbErr> {
     // Find existing task
     let task_model = task::Entity::find_by_id(&task_id)
@@ -145,6 +153,12 @@ pub async fn update_task(
     }
     if let Some(p) = priority {
         task_active_model.priority = Set(p);
+    }
+    if let Some(s) = status {
+        task_active_model.status = Set(s);
+    }
+    if let Some(c) = complexity {
+        task_active_model.complexity = Set(c);
     }
     if let Some(t) = tags {
         let tags_json = serde_json::to_string(&t).unwrap_or_else(|_| "[]".to_string());
@@ -218,5 +232,7 @@ fn model_to_dto(model: task::Model, project_ids: Vec<String>) -> TaskDto {
         created_at: model.created_at,
         updated_at: model.updated_at,
         project_ids,
+        status: model.status,
+        complexity: model.complexity,
     }
 }

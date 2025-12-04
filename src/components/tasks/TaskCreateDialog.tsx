@@ -14,7 +14,7 @@ import {
   CloseButton,
 } from '@chakra-ui/react';
 import { LuPlus, LuPin } from 'react-icons/lu';
-import { Task, TaskPriority } from '../../types/task';
+import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task';
 import { ProjectEntry, invokeDbCreateTask } from '../../ipc';
 import ProjectMultiSelect from './ProjectMultiSelect';
 import { toaster } from '../ui/toaster';
@@ -37,6 +37,8 @@ export default function TaskCreateDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('standard');
+  const [status, setStatus] = useState<TaskStatus>('backlog');
+  const [complexity, setComplexity] = useState<TaskComplexity | ''>('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
     defaultProjectId ? [defaultProjectId] : []
   );
@@ -61,7 +63,9 @@ export default function TaskCreateDialog({
         description.trim() || undefined,
         priority,
         tags.split(',').map(t => t.trim()).filter(Boolean),
-        selectedProjectIds
+        selectedProjectIds,
+        status,
+        complexity || undefined
       );
 
       toaster.create({
@@ -76,6 +80,8 @@ export default function TaskCreateDialog({
       setTitle('');
       setDescription('');
       setPriority('standard');
+      setStatus('backlog');
+      setComplexity('');
       setSelectedProjectIds(defaultProjectId ? [defaultProjectId] : []);
       setTags('');
 
@@ -130,11 +136,11 @@ export default function TaskCreateDialog({
 
             <Field.Root required>
               <Field.Label>Priority</Field.Label>
-              <NativeSelect.Root
-                value={priority}
-                onChange={(e) => setPriority(e.currentTarget.value as typeof priority)}
-              >
-                <NativeSelect.Field>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={priority}
+                  onChange={(e) => setPriority(e.currentTarget.value as typeof priority)}
+                >
                   <option value="pinned">
                     Pinned (appears at top)
                   </option>
@@ -154,6 +160,36 @@ export default function TaskCreateDialog({
               <Field.HelperText>
                 Pinned tasks appear at the top of the list
               </Field.HelperText>
+            </Field.Root>
+
+            <Field.Root>
+              <Field.Label>Complexity (optional)</Field.Label>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={complexity}
+                  onChange={(e) => setComplexity(e.currentTarget.value as TaskComplexity | '')}
+                >
+                  <option value="">Not specified</option>
+                  <option value="easy">Easy</option>
+                  <option value="hard">Hard</option>
+                  <option value="deep dive">Deep dive</option>
+                </NativeSelect.Field>
+              </NativeSelect.Root>
+            </Field.Root>
+
+            <Field.Root required>
+              <Field.Label>Status</Field.Label>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={status}
+                  onChange={(e) => setStatus(e.currentTarget.value as TaskStatus)}
+                >
+                  <option value="backlog">Backlog</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="blocked">Blocked</option>
+                </NativeSelect.Field>
+              </NativeSelect.Root>
             </Field.Root>
 
             <ProjectMultiSelect

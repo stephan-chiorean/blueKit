@@ -8,6 +8,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Create task_projects junction table
     create_task_projects_table(db).await?;
 
+    // Add status and complexity columns to tasks table
+    add_task_status_and_complexity_columns(db).await?;
+
     Ok(())
 }
 
@@ -65,6 +68,78 @@ async fn create_task_projects_table(db: &DatabaseConnection) -> Result<(), DbErr
     .await?;
 
     info!("Task_projects table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn add_task_status_and_complexity_columns(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if status column exists
+    let check_status_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('tasks')
+        WHERE name='status'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_status_sql.to_string(),
+    )).await?;
+
+    let status_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    // Add status column if it doesn't exist
+    if !status_exists {
+        let add_status_sql = r#"
+            ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'backlog'
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_status_sql.to_string(),
+        )).await?;
+
+        info!("Added status column to tasks table");
+    } else {
+        info!("Status column already exists in tasks table");
+    }
+
+    // Check if complexity column exists
+    let check_complexity_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('tasks')
+        WHERE name='complexity'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_complexity_sql.to_string(),
+    )).await?;
+
+    let complexity_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    // Add complexity column if it doesn't exist
+    if !complexity_exists {
+        let add_complexity_sql = r#"
+            ALTER TABLE tasks ADD COLUMN complexity TEXT
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_complexity_sql.to_string(),
+        )).await?;
+
+        info!("Added complexity column to tasks table");
+    } else {
+        info!("Complexity column already exists in tasks table");
+    }
 
     Ok(())
 }
