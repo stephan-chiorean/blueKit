@@ -1,0 +1,112 @@
+---
+alias: Task Database Flow
+description: Complete flow of task operations from UI interaction through IPC commands to database operations, showing the three core operations (load, create, delete)
+tags:
+  - tasks
+  - database
+  - architecture
+  - flow
+---
+```mermaid
+graph TB
+    subgraph Frontend["Frontend Layer (React + TypeScript)"]
+        TasksTab[TasksTabContent<br/>Component]
+        CreateDialog[TaskCreateDialog<br/>Component]
+        ActionBar[TasksActionBar<br/>Component]
+        TaskState[Local State<br/>tasks array]
+        SelectionState[Selection State<br/>selectedTaskIds Set]
+    end
+
+    subgraph IPC_Layer["IPC Layer (src/ipc.ts)"]
+        GetTasks[invokeDbGetTasks<br/>timeout: 15s]
+        GetProjectTasks[invokeDbGetProjectTasks<br/>timeout: 15s]
+        CreateTask[invokeDbCreateTask<br/>timeout: 10s]
+        DeleteTask[invokeDbDeleteTask<br/>timeout: 10s]
+    end
+
+    subgraph Tauri_Commands["Tauri Commands (commands.rs)"]
+        DbGetTasks[db_get_tasks<br/>tauri command]
+        DbGetProjectTasks[db_get_project_tasks<br/>tauri command]
+        DbCreateTask[db_create_task<br/>tauri command]
+        DbDeleteTask[db_delete_task<br/>tauri command]
+    end
+
+    subgraph DB_Operations["Database Operations (task_operations.rs)"]
+        GetOp[get_tasks<br/>Query with optional filter]
+        CreateOp[create_task<br/>Insert + generate UUID]
+        DeleteOp[delete_task<br/>Remove with cascade]
+        GetProjectIds[get_task_project_ids<br/>Join query helper]
+    end
+
+    subgraph Database["SQLite Database"]
+        TaskTable[(task table<br/>id, title, description<br/>priority, tags<br/>createdAt, updatedAt)]
+        TaskProjectTable[(task_project table<br/>task_id, project_id<br/>Many-to-Many join)]
+    end
+
+    subgraph User_Actions["User Actions"]
+        LoadAction[Open Tasks Tab]
+        CreateAction[Click Add Task<br/>Fill Form and Submit]
+        DeleteAction[Open Task and Delete]
+    end
+
+    %% Load Flow
+    LoadAction -->|1. Mount| TasksTab
+    TasksTab -->|2. loadTasks| GetTasks
+    TasksTab -->|2. loadTasks| GetProjectTasks
+    GetTasks -->|3. invoke| DbGetTasks
+    GetProjectTasks -->|3. invoke| DbGetProjectTasks
+    DbGetTasks -->|4. call| GetOp
+    DbGetProjectTasks -->|4. call| GetOp
+    GetOp -->|5. SELECT| TaskTable
+    GetOp -->|5. JOIN| TaskProjectTable
+    GetOp -->|6. for each task| GetProjectIds
+    GetProjectIds -->|7. query| TaskProjectTable
+    GetOp -->|8. return| DbGetTasks
+    DbGetTasks -->|9. Task array| TasksTab
+    TasksTab -->|10. setState| TaskState
+
+    %% Create Flow
+    CreateAction -->|1. Open| CreateDialog
+    CreateDialog -->|2. Submit| CreateTask
+    CreateTask -->|3. invoke| DbCreateTask
+    DbCreateTask -->|4. call| CreateOp
+    CreateOp -->|5. Generate UUID| CreateOp
+    CreateOp -->|6. INSERT task| TaskTable
+    CreateOp -->|7. INSERT links| TaskProjectTable
+    CreateOp -->|8. return Task| DbCreateTask
+    DbCreateTask -->|9. Task object| CreateDialog
+    CreateDialog -->|10. onTaskCreated| TasksTab
+    TasksTab -->|11. loadTasks| GetTasks
+
+    %% Delete Flow
+    DeleteAction -->|1. Click Delete| ActionBar
+    ActionBar -->|2. handleDelete| DeleteTask
+    DeleteTask -->|3. invoke| DbDeleteTask
+    DbDeleteTask -->|4. call| DeleteOp
+    DeleteOp -->|5. DELETE links| TaskProjectTable
+    DeleteOp -->|6. DELETE task| TaskTable
+    DeleteOp -->|7. success| DbDeleteTask
+    DbDeleteTask -->|8. void| ActionBar
+    ActionBar -->|9. remove from selection| SelectionState
+    ActionBar -->|10. reload| TasksTab
+    TasksTab -->|11. loadTasks| GetTasks
+
+    %% Data Types
+    TaskState -.->|Task data| TasksTab
+    SelectionState -.->|Selected IDs| ActionBar
+
+    %% Styling
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef ipc fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef command fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef dbop fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef database fill:#fce4ec,stroke:#c2185b,stroke-width:3px
+    classDef action fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+
+    class TasksTab,CreateDialog,ActionBar,TaskState,SelectionState frontend
+    class GetTasks,GetProjectTasks,CreateTask,DeleteTask ipc
+    class DbGetTasks,DbGetProjectTasks,DbCreateTask,DbDeleteTask command
+    class GetOp,CreateOp,DeleteOp,GetProjectIds dbop
+    class TaskTable,TaskProjectTable database
+    class LoadAction,CreateAction,DeleteAction action
+```

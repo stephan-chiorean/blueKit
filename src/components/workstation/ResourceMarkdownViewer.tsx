@@ -14,6 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { ResourceFile } from '../../types/resource';
 import { getResourceDisplayName } from '../../types/resource';
+import ShikiCodeBlock from './ShikiCodeBlock';
 
 interface ResourceMarkdownViewerProps {
   resource: ResourceFile;
@@ -194,33 +195,9 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                   );
                 }
 
-                // Code block
-                return (
-                  <Box
-                    as="pre"
-                    mb={4}
-                    p={4}
-                    bg="gray.900"
-                    color="gray.100"
-                    borderRadius="md"
-                    overflow="auto"
-                    fontSize="sm"
-                    fontFamily="mono"
-                    lineHeight="1.6"
-                    {...props}
-                  >
-                    <Code
-                      as="code"
-                      display="block"
-                      whiteSpace="pre"
-                      color="inherit"
-                      bg="transparent"
-                      p={0}
-                    >
-                      {codeString}
-                    </Code>
-                  </Box>
-                );
+                // Code block with Shiki syntax highlighting
+                const language = match ? match[1] : 'text';
+                return <ShikiCodeBlock code={codeString} language={language} />;
               },
               a: ({ href, children }) => (
                 <Link href={href} color="primary.500" textDecoration="underline" _hover={{ color: 'primary.600' }}>
