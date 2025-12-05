@@ -25,7 +25,7 @@ import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
-import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon } from '../../utils/taskUtils';
+import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon, getPriorityHoverColors } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project
@@ -268,6 +268,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     const taskSelected = isSelected(task.id);
     const complexityLabel = getComplexityLabel(task.complexity);
     const priorityIcon = getPriorityIcon(task.priority);
+    const hoverColors = getPriorityHoverColors(task.priority);
 
     return (
       <Card.Root
@@ -279,7 +280,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         position="relative"
         cursor="pointer"
         onClick={() => handleViewTask(task)}
-        _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+        _hover={{ borderColor: hoverColors.borderColor, bg: hoverColors.bg }}
       >
         <CardHeader>
           <VStack align="stretch" gap={2}>
@@ -489,12 +490,13 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                 const taskSelected = isSelected(task.id);
                 const complexityLabel = getComplexityLabel(task.complexity);
                 const priorityIcon = getPriorityIcon(task.priority);
+                const hoverColors = getPriorityHoverColors(task.priority);
                 return (
                   <Table.Row
                     key={task.id}
                     cursor="pointer"
                     onClick={() => handleViewTask(task)}
-                    _hover={{ bg: "bg.subtle" }}
+                    _hover={{ bg: hoverColors.bg, borderColor: hoverColors.borderColor }}
                     data-selected={taskSelected ? "" : undefined}
                   >
                     <Table.Cell>
@@ -623,12 +625,13 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                 const taskSelected = isSelected(task.id);
                 const complexityLabel = getComplexityLabel(task.complexity);
                 const priorityIcon = getPriorityIcon(task.priority);
+                const hoverColors = getPriorityHoverColors(task.priority);
                 return (
                   <Table.Row
                     key={task.id}
                     cursor="pointer"
                     onClick={() => handleViewTask(task)}
-                    _hover={{ bg: "bg.subtle" }}
+                    _hover={{ bg: hoverColors.bg, borderColor: hoverColors.borderColor }}
                     data-selected={taskSelected ? "" : undefined}
                   >
                     <Table.Cell>
