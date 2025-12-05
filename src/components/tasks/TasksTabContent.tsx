@@ -25,7 +25,7 @@ import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
-import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon, getPriorityHoverColors } from '../../utils/taskUtils';
+import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project
@@ -283,12 +283,12 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         _hover={{ borderColor: hoverColors.borderColor, bg: hoverColors.bg }}
       >
         <CardHeader>
-          <VStack align="stretch" gap={2}>
-            <Flex justify="space-between" align="start" gap={2}>
-              <HStack gap={1.5} flex="1">
-                <Heading size="sm">{task.title}</Heading>
+          <VStack align="stretch" gap={3}>
+            <Flex justify="space-between" align="start" gap={3}>
+              <HStack gap={2} flex="1" align="center">
+                <Heading size="md">{task.title}</Heading>
                 {priorityIcon && (
-                  <Icon color={priorityIcon.color}>
+                  <Icon color={priorityIcon.color} boxSize={5}>
                     <priorityIcon.icon />
                   </Icon>
                 )}
@@ -340,18 +340,16 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         </CardHeader>
 
         <CardBody display="flex" flexDirection="column" gap={3}>
-          {/* Description */}
-          {task.description && (
-            <Text fontSize="sm" color="text.secondary" lineClamp={2}>
-              {task.description}
-            </Text>
-          )}
-
-          {/* Tags - colorless */}
+          {/* Tags - colored to match priority icon */}
           {task.tags && task.tags.length > 0 && (
-            <HStack gap={1} flexWrap="wrap" mt="auto">
+            <HStack gap={1} flexWrap="wrap">
               {task.tags.map((tag) => (
-                <Tag.Root key={tag} size="sm" variant="subtle">
+                <Tag.Root 
+                  key={tag} 
+                  size="sm" 
+                  variant="subtle"
+                  colorPalette={getPriorityColorPalette(task.priority)}
+                >
                   <Tag.Label>{tag}</Tag.Label>
                 </Tag.Root>
               ))}

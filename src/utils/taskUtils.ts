@@ -68,3 +68,23 @@ export function getPriorityHoverColors(priority: TaskPriority): { borderColor: s
   }
 }
 
+/**
+ * Gets the color palette name for Chakra UI components based on priority
+ */
+export function getPriorityColorPalette(priority: TaskPriority): string | undefined {
+  switch (priority) {
+    case 'pinned':
+      return 'blue';
+    case 'high':
+      return 'red';
+    case 'long term':
+      return 'purple';
+    case 'nit':
+      return 'yellow';
+    case 'standard':
+      return 'orange';
+    default:
+      return undefined;
+  }
+}
+
