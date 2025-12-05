@@ -62,12 +62,6 @@ async fn main() {
             commands::get_project_clones, // Get clones from .bluekit/clones.json
             commands::create_project_from_clone, // Create project from clone
             commands::get_watcher_health, // Get health status of all active file watchers
-            commands::get_project_tasks, // Get tasks from .bluekit/tasks.json
-            commands::save_project_tasks, // Save tasks to .bluekit/tasks.json
-            commands::add_project_task, // Add a new task to the project
-            commands::update_project_task, // Update an existing task
-            commands::delete_project_task, // Delete a task from the project
-            commands::watch_project_tasks, // Watch tasks.json for changes
             commands::db_get_tasks, // Get all tasks (database)
             commands::db_get_project_tasks, // Get tasks for a project (database)
             commands::db_get_task, // Get a single task (database)

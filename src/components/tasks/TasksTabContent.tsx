@@ -484,6 +484,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                       <Checkbox.Root
                         size="sm"
                         checked={taskSelected}
+                        colorPalette="blue"
                         onCheckedChange={() => {
                           handleTaskToggle(task);
                         }}
@@ -617,6 +618,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                       <Checkbox.Root
                         size="sm"
                         checked={taskSelected}
+                        colorPalette="blue"
                         onCheckedChange={() => {
                           handleTaskToggle(task);
                         }}

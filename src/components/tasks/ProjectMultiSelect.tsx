@@ -1,6 +1,6 @@
-import { Checkbox, VStack, Text, Box, HStack, Badge, Field } from '@chakra-ui/react';
+import { Menu, Button, HStack, Text, Field, Icon, Badge } from '@chakra-ui/react';
 import { ProjectEntry } from '../../ipc';
-import { LuFolder } from 'react-icons/lu';
+import { LuFolder, LuCheck } from 'react-icons/lu';
 
 interface ProjectMultiSelectProps {
   projects: ProjectEntry[];
@@ -21,54 +21,59 @@ export default function ProjectMultiSelect({
     }
   };
 
+  const selectedCount = selectedProjectIds.length;
+  const displayText = selectedCount === 0
+    ? 'Select projects...'
+    : selectedCount === 1
+    ? projects.find(p => p.id === selectedProjectIds[0])?.title || '1 project'
+    : `${selectedCount} projects`;
+
   return (
     <Field.Root>
       <Field.Label>Assign to Projects</Field.Label>
-      <Box
-        maxH="200px"
-        overflowY="auto"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        p={3}
-      >
-        <VStack align="stretch" gap={2}>
-          {projects.length === 0 ? (
-            <Text fontSize="sm" color="text.tertiary">
-              No projects available
-            </Text>
-          ) : (
-            projects.map((project) => {
-              const isChecked = selectedProjectIds.includes(project.id);
-              return (
-                <Checkbox.Root
-                  key={project.id}
-                  checked={isChecked}
-                  onCheckedChange={(details) => {
-                    // details.checked is the new checked state
-                    if (details.checked && !isChecked) {
-                      onChange([...selectedProjectIds, project.id]);
-                    } else if (!details.checked && isChecked) {
-                      onChange(selectedProjectIds.filter(id => id !== project.id));
-                    }
-                  }}
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Label>
-                    <HStack gap={2}>
-                      <LuFolder size={14} />
-                      <Text fontSize="sm">{project.title}</Text>
+      <Menu.Root closeOnSelect={false}>
+        <Menu.Trigger asChild>
+          <Button variant="outline" w="100%" justifyContent="space-between">
+            <Text>{displayText}</Text>
+          </Button>
+        </Menu.Trigger>
+        <Menu.Positioner>
+          <Menu.Content maxH="300px" overflowY="auto">
+            {projects.length === 0 ? (
+              <Menu.Item value="empty" disabled>
+                <Text fontSize="sm" color="text.tertiary">
+                  No projects available
+                </Text>
+              </Menu.Item>
+            ) : (
+              projects.map((project) => {
+                const isChecked = selectedProjectIds.includes(project.id);
+                return (
+                  <Menu.Item
+                    key={project.id}
+                    value={project.id}
+                    onSelect={() => handleToggle(project.id)}
+                  >
+                    <HStack gap={2} justify="space-between" width="100%">
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuFolder />
+                        </Icon>
+                        <Text>{project.title}</Text>
+                      </HStack>
+                      {isChecked && (
+                        <Icon color="blue.500">
+                          <LuCheck />
+                        </Icon>
+                      )}
                     </HStack>
-                  </Checkbox.Label>
-                </Checkbox.Root>
-              );
-            })
-          )}
-        </VStack>
-      </Box>
+                  </Menu.Item>
+                );
+              })
+            )}
+          </Menu.Content>
+        </Menu.Positioner>
+      </Menu.Root>
       {selectedProjectIds.length > 0 && (
         <HStack flexWrap="wrap" gap={1} mt={2}>
           <Text fontSize="xs" color="text.muted">Selected:</Text>

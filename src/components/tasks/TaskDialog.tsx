@@ -177,7 +177,11 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                                 </Icon>
                                 <Text>Pinned (appears at top)</Text>
                               </HStack>
-                              {priority === 'pinned' && <LuCheck />}
+                              {priority === 'pinned' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="high" onSelect={() => setPriority('high')}>
@@ -188,13 +192,21 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                                 </Icon>
                                 <Text>High</Text>
                               </HStack>
-                              {priority === 'high' && <LuCheck />}
+                              {priority === 'high' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="standard" onSelect={() => setPriority('standard')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Standard</Text>
-                              {priority === 'standard' && <LuCheck />}
+                              {priority === 'standard' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="long term" onSelect={() => setPriority('long term')}>
@@ -205,7 +217,11 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                                 </Icon>
                                 <Text>Long Term</Text>
                               </HStack>
-                              {priority === 'long term' && <LuCheck />}
+                              {priority === 'long term' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="nit" onSelect={() => setPriority('nit')}>
@@ -216,7 +232,11 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                                 </Icon>
                                 <Text>Nit</Text>
                               </HStack>
-                              {priority === 'nit' && <LuCheck />}
+                              {priority === 'nit' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                         </Menu.Content>
@@ -242,25 +262,41 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                           <Menu.Item value="" onSelect={() => setComplexity('')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Not specified</Text>
-                              {complexity === '' && <LuCheck />}
+                              {complexity === '' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="easy" onSelect={() => setComplexity('easy')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Easy</Text>
-                              {complexity === 'easy' && <LuCheck />}
+                              {complexity === 'easy' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="hard" onSelect={() => setComplexity('hard')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Hard</Text>
-                              {complexity === 'hard' && <LuCheck />}
+                              {complexity === 'hard' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="deep dive" onSelect={() => setComplexity('deep dive')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Deep dive</Text>
-                              {complexity === 'deep dive' && <LuCheck />}
+                              {complexity === 'deep dive' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                         </Menu.Content>
@@ -286,25 +322,41 @@ export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: Tas
                           <Menu.Item value="backlog" onSelect={() => setStatus('backlog')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Backlog</Text>
-                              {status === 'backlog' && <LuCheck />}
+                              {status === 'backlog' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="in_progress" onSelect={() => setStatus('in_progress')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>In Progress</Text>
-                              {status === 'in_progress' && <LuCheck />}
+                              {status === 'in_progress' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="completed" onSelect={() => setStatus('completed')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Completed</Text>
-                              {status === 'completed' && <LuCheck />}
+                              {status === 'completed' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                           <Menu.Item value="blocked" onSelect={() => setStatus('blocked')}>
                             <HStack gap={2} justify="space-between" width="100%">
                               <Text>Blocked</Text>
-                              {status === 'blocked' && <LuCheck />}
+                              {status === 'blocked' && (
+                                <Icon color="blue.500">
+                                  <LuCheck />
+                                </Icon>
+                              )}
                             </HStack>
                           </Menu.Item>
                         </Menu.Content>
