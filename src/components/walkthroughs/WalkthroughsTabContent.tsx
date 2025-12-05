@@ -23,7 +23,7 @@ import {
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
-import { useSelection } from '../../contexts/SelectionContext';
+import WalkthroughsActionBar from './WalkthroughsActionBar';
 
 interface WalkthroughsTabContentProps {
   kits: KitFile[];
@@ -42,17 +42,46 @@ export default function WalkthroughsTabContent({
   projectsCount,
   onViewKit,
 }: WalkthroughsTabContentProps) {
-  const { toggleItem, isSelected } = useSelection();
+  const [selectedWalkthroughPaths, setSelectedWalkthroughPaths] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const isSelected = (path: string) => selectedWalkthroughPaths.has(path);
+
+  const handleWalkthroughToggle = (walkthrough: KitFile) => {
+    setSelectedWalkthroughPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(walkthrough.path)) {
+        next.delete(walkthrough.path);
+      } else {
+        next.add(walkthrough.path);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedWalkthroughPaths(new Set());
+  };
 
   // Filter kits to only show those with type: walkthrough in front matter
   const walkthroughs = useMemo(() => 
     kits.filter(kit => kit.frontMatter?.type === 'walkthrough'),
     [kits]
   );
+
+  const selectedWalkthroughs = useMemo(() => {
+    return walkthroughs.filter(walkthrough => selectedWalkthroughPaths.has(walkthrough.path));
+  }, [walkthroughs, selectedWalkthroughPaths]);
+
+  const hasSelection = selectedWalkthroughPaths.size > 0;
+
+  const handleWalkthroughsUpdated = () => {
+    // Reload walkthroughs if needed - for now just clear selection
+    clearSelection();
+  };
 
   // Get all unique tags from walkthroughs
   const allTags = useMemo(() => {
@@ -90,16 +119,6 @@ export default function WalkthroughsTabContent({
         return [...prev, tag];
       }
     });
-  };
-
-  const handleWalkthroughToggle = (walkthrough: KitFile) => {
-    const itemToToggle = {
-      id: walkthrough.path,
-      name: walkthrough.name,
-      type: 'Kit' as const,
-      path: walkthrough.path,
-    };
-    toggleItem(itemToToggle);
   };
 
   const handleViewWalkthrough = (walkthrough: KitFile) => {
@@ -215,6 +234,7 @@ export default function WalkthroughsTabContent({
           <Table.ColumnHeader w="6">
             <Checkbox.Root
               size="sm"
+              colorPalette="blue"
               checked={filteredWalkthroughs.length > 0 && filteredWalkthroughs.every(walkthrough => isSelected(walkthrough.path))}
               onCheckedChange={(changes) => {
                 filteredWalkthroughs.forEach(walkthrough => {
@@ -255,6 +275,7 @@ export default function WalkthroughsTabContent({
               <Table.Cell>
                 <Checkbox.Root
                   size="sm"
+                  colorPalette="blue"
                   checked={walkthroughSelected}
                   onCheckedChange={() => {
                     handleWalkthroughToggle(walkthrough);
@@ -317,6 +338,12 @@ export default function WalkthroughsTabContent({
 
   return (
     <Box position="relative">
+      <WalkthroughsActionBar
+        selectedWalkthroughs={selectedWalkthroughs}
+        hasSelection={hasSelection}
+        clearSelection={clearSelection}
+        onWalkthroughsUpdated={handleWalkthroughsUpdated}
+      />
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">

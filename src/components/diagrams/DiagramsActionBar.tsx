@@ -4,19 +4,19 @@ import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { KitFile } from "../../ipc";
 
-interface KitsActionBarProps {
-  selectedKits: KitFile[];
+interface DiagramsActionBarProps {
+  selectedDiagrams: KitFile[];
   hasSelection: boolean;
   clearSelection: () => void;
-  onKitsUpdated: () => void;
+  onDiagramsUpdated: () => void;
 }
 
-export default function KitsActionBar({
-  selectedKits,
+export default function DiagramsActionBar({
+  selectedDiagrams,
   hasSelection,
   clearSelection,
-  onKitsUpdated,
-}: KitsActionBarProps) {
+  onDiagramsUpdated,
+}: DiagramsActionBarProps) {
   const [loading, setLoading] = useState(false);
 
   if (!hasSelection) {
@@ -27,24 +27,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement delete functionality
-      // await Promise.all(selectedKits.map(kit => invokeDeleteKit(kit.path)));
+      // await Promise.all(selectedDiagrams.map(diagram => invokeDeleteDiagram(diagram.path)));
 
       toaster.create({
         type: "error",
-        title: "Kits deleted",
-        description: `${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Diagrams deleted",
+        description: `${selectedDiagrams.length} diagram${
+          selectedDiagrams.length !== 1 ? "s" : ""
         } deleted`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onDiagramsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Delete:", error);
+      console.error("[DiagramsActionBar] Error in Delete:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to delete kits: ${
+        description: `Failed to delete diagrams: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -57,24 +57,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement publish to library functionality
-      // await Promise.all(selectedKits.map(kit => invokePublishKitToLibrary(kit.path)));
+      // await Promise.all(selectedDiagrams.map(diagram => invokePublishDiagramToLibrary(diagram.path)));
 
       toaster.create({
         type: "success",
-        title: "Kits published",
-        description: `Published ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Diagrams published",
+        description: `Published ${selectedDiagrams.length} diagram${
+          selectedDiagrams.length !== 1 ? "s" : ""
         } to library`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onDiagramsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Publish to Library:", error);
+      console.error("[DiagramsActionBar] Error in Publish to Library:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to publish kits: ${
+        description: `Failed to publish diagrams: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -87,24 +87,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement add to project functionality
-      // await Promise.all(selectedKits.map(kit => invokeAddKitToProject(kit.path)));
+      // await Promise.all(selectedDiagrams.map(diagram => invokeAddDiagramToProject(diagram.path)));
 
       toaster.create({
         type: "success",
-        title: "Kits added",
-        description: `Added ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Diagrams added",
+        description: `Added ${selectedDiagrams.length} diagram${
+          selectedDiagrams.length !== 1 ? "s" : ""
         } to project`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onDiagramsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Add to Project:", error);
+      console.error("[DiagramsActionBar] Error in Add to Project:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to add kits to project: ${
+        description: `Failed to add diagrams to project: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -159,3 +159,4 @@ export default function KitsActionBar({
     </ActionBar.Root>
   );
 }
+

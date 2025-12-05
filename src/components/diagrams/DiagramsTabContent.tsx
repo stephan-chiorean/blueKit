@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import {
   Box,
@@ -11,6 +11,8 @@ import {
   Icon,
   HStack,
   EmptyState,
+  Checkbox,
+  Flex,
 } from '@chakra-ui/react';
 import { LuNetwork } from 'react-icons/lu';
 import {
@@ -20,6 +22,7 @@ import {
   TimeoutError,
 } from '../../ipc';
 import { parseFrontMatter } from '../../utils/parseFrontMatter';
+import DiagramsActionBar from './DiagramsActionBar';
 
 interface DiagramsTabContentProps {
   projectPath: string;
@@ -33,6 +36,35 @@ export default function DiagramsTabContent({
   const [diagrams, setDiagrams] = useState<KitFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDiagramPaths, setSelectedDiagramPaths] = useState<Set<string>>(new Set());
+
+  const isSelected = (path: string) => selectedDiagramPaths.has(path);
+
+  const handleDiagramToggle = (diagram: KitFile) => {
+    setSelectedDiagramPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(diagram.path)) {
+        next.delete(diagram.path);
+      } else {
+        next.add(diagram.path);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedDiagramPaths(new Set());
+  };
+
+  const selectedDiagrams = useMemo(() => {
+    return diagrams.filter(diagram => selectedDiagramPaths.has(diagram.path));
+  }, [diagrams, selectedDiagramPaths]);
+
+  const hasSelection = selectedDiagramPaths.size > 0;
+
+  const handleDiagramsUpdated = () => {
+    clearSelection();
+  };
 
   // Load diagrams
   const loadDiagrams = async () => {
@@ -162,29 +194,56 @@ export default function DiagramsTabContent({
   }
 
   return (
-    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-      {diagrams.map((diagram) => {
-        const displayName = diagram.frontMatter?.alias || diagram.name;
-        const description = diagram.frontMatter?.description || diagram.path;
-        return (
-          <Card.Root
-            key={diagram.path}
-            variant="subtle"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            cursor="pointer"
-            onClick={() => handleDiagramClick(diagram)}
-            _hover={{ borderColor: "primary.400", bg: "primary.50" }}
-            transition="all 0.2s"
-          >
-            <CardHeader>
-              <HStack gap={2} align="center">
-                <Icon boxSize={5} color="primary.500">
-                  <LuNetwork />
-                </Icon>
-                <Heading size="md">{displayName}</Heading>
-              </HStack>
-            </CardHeader>
+    <Box position="relative">
+      <DiagramsActionBar
+        selectedDiagrams={selectedDiagrams}
+        hasSelection={hasSelection}
+        clearSelection={clearSelection}
+        onDiagramsUpdated={handleDiagramsUpdated}
+      />
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+        {diagrams.map((diagram) => {
+          const diagramSelected = isSelected(diagram.path);
+          const displayName = diagram.frontMatter?.alias || diagram.name;
+          const description = diagram.frontMatter?.description || diagram.path;
+          return (
+            <Card.Root
+              key={diagram.path}
+              variant="subtle"
+              borderWidth={diagramSelected ? "2px" : "1px"}
+              borderColor={diagramSelected ? "primary.500" : "border.subtle"}
+              bg={diagramSelected ? "primary.50" : undefined}
+              cursor="pointer"
+              onClick={() => handleDiagramClick(diagram)}
+              _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+              transition="all 0.2s"
+            >
+              <CardHeader>
+                <Flex align="center" justify="space-between" gap={4}>
+                  <HStack gap={2} align="center" flex="1">
+                    <Icon boxSize={5} color="primary.500">
+                      <LuNetwork />
+                    </Icon>
+                    <Heading size="md">{displayName}</Heading>
+                  </HStack>
+                  <Checkbox.Root
+                    checked={diagramSelected}
+                    colorPalette="blue"
+                    onCheckedChange={() => {
+                      handleDiagramToggle(diagram);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    cursor="pointer"
+                  >
+                    <Checkbox.HiddenInput />
+                    <Checkbox.Control cursor="pointer">
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                  </Checkbox.Root>
+                </Flex>
+              </CardHeader>
             <CardBody display="flex" flexDirection="column" flex="1">
               <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
                 {description}

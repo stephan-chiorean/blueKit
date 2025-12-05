@@ -23,7 +23,6 @@ import {
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { KitFile } from '../../ipc';
-import { useSelection } from '../../contexts/SelectionContext';
 import KitsActionBar from './KitsActionBar';
 
 interface KitsTabContentProps {
@@ -43,11 +42,40 @@ export default function KitsTabContent({
   projectsCount,
   onViewKit,
 }: KitsTabContentProps) {
-  const { toggleItem, isSelected } = useSelection();
+  const [selectedKitPaths, setSelectedKitPaths] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const isSelected = (path: string) => selectedKitPaths.has(path);
+
+  const handleKitToggle = (kit: KitFile) => {
+    setSelectedKitPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(kit.path)) {
+        next.delete(kit.path);
+      } else {
+        next.add(kit.path);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedKitPaths(new Set());
+  };
+
+  const selectedKits = useMemo(() => {
+    return kits.filter(kit => selectedKitPaths.has(kit.path));
+  }, [kits, selectedKitPaths]);
+
+  const hasSelection = selectedKitPaths.size > 0;
+
+  const handleKitsUpdated = () => {
+    // Reload kits if needed - for now just clear selection
+    clearSelection();
+  };
 
   // Get all unique tags from kits
   const allTags = useMemo(() => {
@@ -85,16 +113,6 @@ export default function KitsTabContent({
         return [...prev, tag];
       }
     });
-  };
-
-  const handleKitToggle = (kit: KitFile) => {
-    const itemToToggle = {
-      id: kit.path,
-      name: kit.name,
-      type: 'Kit' as const,
-      path: kit.path,
-    };
-    toggleItem(itemToToggle);
   };
 
   const handleViewKit = (kit: KitFile) => {
@@ -208,8 +226,9 @@ export default function KitsTabContent({
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader w="6">
-            <Checkbox.Root
+              <Checkbox.Root
               size="sm"
+              colorPalette="blue"
               checked={filteredKits.length > 0 && filteredKits.every(kit => isSelected(kit.path))}
               onCheckedChange={(changes) => {
                 filteredKits.forEach(kit => {
@@ -251,6 +270,7 @@ export default function KitsTabContent({
               <Table.Cell>
                 <Checkbox.Root
                   size="sm"
+                  colorPalette="blue"
                   checked={kitSelected}
                   onCheckedChange={() => {
                     handleKitToggle(kit);
@@ -314,7 +334,12 @@ export default function KitsTabContent({
 
   return (
     <Box position="relative">
-      <KitsActionBar />
+      <KitsActionBar
+        selectedKits={selectedKits}
+        hasSelection={hasSelection}
+        clearSelection={clearSelection}
+        onKitsUpdated={handleKitsUpdated}
+      />
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">

@@ -4,19 +4,19 @@ import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { KitFile } from "../../ipc";
 
-interface KitsActionBarProps {
-  selectedKits: KitFile[];
+interface WalkthroughsActionBarProps {
+  selectedWalkthroughs: KitFile[];
   hasSelection: boolean;
   clearSelection: () => void;
-  onKitsUpdated: () => void;
+  onWalkthroughsUpdated: () => void;
 }
 
-export default function KitsActionBar({
-  selectedKits,
+export default function WalkthroughsActionBar({
+  selectedWalkthroughs,
   hasSelection,
   clearSelection,
-  onKitsUpdated,
-}: KitsActionBarProps) {
+  onWalkthroughsUpdated,
+}: WalkthroughsActionBarProps) {
   const [loading, setLoading] = useState(false);
 
   if (!hasSelection) {
@@ -27,24 +27,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement delete functionality
-      // await Promise.all(selectedKits.map(kit => invokeDeleteKit(kit.path)));
+      // await Promise.all(selectedWalkthroughs.map(walkthrough => invokeDeleteWalkthrough(walkthrough.path)));
 
       toaster.create({
         type: "error",
-        title: "Kits deleted",
-        description: `${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Walkthroughs deleted",
+        description: `${selectedWalkthroughs.length} walkthrough${
+          selectedWalkthroughs.length !== 1 ? "s" : ""
         } deleted`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onWalkthroughsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Delete:", error);
+      console.error("[WalkthroughsActionBar] Error in Delete:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to delete kits: ${
+        description: `Failed to delete walkthroughs: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -57,24 +57,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement publish to library functionality
-      // await Promise.all(selectedKits.map(kit => invokePublishKitToLibrary(kit.path)));
+      // await Promise.all(selectedWalkthroughs.map(walkthrough => invokePublishWalkthroughToLibrary(walkthrough.path)));
 
       toaster.create({
         type: "success",
-        title: "Kits published",
-        description: `Published ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Walkthroughs published",
+        description: `Published ${selectedWalkthroughs.length} walkthrough${
+          selectedWalkthroughs.length !== 1 ? "s" : ""
         } to library`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onWalkthroughsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Publish to Library:", error);
+      console.error("[WalkthroughsActionBar] Error in Publish to Library:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to publish kits: ${
+        description: `Failed to publish walkthroughs: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -87,24 +87,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement add to project functionality
-      // await Promise.all(selectedKits.map(kit => invokeAddKitToProject(kit.path)));
+      // await Promise.all(selectedWalkthroughs.map(walkthrough => invokeAddWalkthroughToProject(walkthrough.path)));
 
       toaster.create({
         type: "success",
-        title: "Kits added",
-        description: `Added ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Walkthroughs added",
+        description: `Added ${selectedWalkthroughs.length} walkthrough${
+          selectedWalkthroughs.length !== 1 ? "s" : ""
         } to project`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onWalkthroughsUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Add to Project:", error);
+      console.error("[WalkthroughsActionBar] Error in Add to Project:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to add kits to project: ${
+        description: `Failed to add walkthroughs to project: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -159,3 +159,4 @@ export default function KitsActionBar({
     </ActionBar.Root>
   );
 }
+

@@ -2,21 +2,21 @@ import { useState } from "react";
 import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
 import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
-import { KitFile } from "../../ipc";
+import { CloneMetadata } from "../../ipc";
 
-interface KitsActionBarProps {
-  selectedKits: KitFile[];
+interface ClonesActionBarProps {
+  selectedClones: CloneMetadata[];
   hasSelection: boolean;
   clearSelection: () => void;
-  onKitsUpdated: () => void;
+  onClonesUpdated: () => void;
 }
 
-export default function KitsActionBar({
-  selectedKits,
+export default function ClonesActionBar({
+  selectedClones,
   hasSelection,
   clearSelection,
-  onKitsUpdated,
-}: KitsActionBarProps) {
+  onClonesUpdated,
+}: ClonesActionBarProps) {
   const [loading, setLoading] = useState(false);
 
   if (!hasSelection) {
@@ -27,24 +27,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement delete functionality
-      // await Promise.all(selectedKits.map(kit => invokeDeleteKit(kit.path)));
+      // await Promise.all(selectedClones.map(clone => invokeDeleteClone(clone.id)));
 
       toaster.create({
         type: "error",
-        title: "Kits deleted",
-        description: `${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Clones deleted",
+        description: `${selectedClones.length} clone${
+          selectedClones.length !== 1 ? "s" : ""
         } deleted`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onClonesUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Delete:", error);
+      console.error("[ClonesActionBar] Error in Delete:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to delete kits: ${
+        description: `Failed to delete clones: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -57,24 +57,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement publish to library functionality
-      // await Promise.all(selectedKits.map(kit => invokePublishKitToLibrary(kit.path)));
+      // await Promise.all(selectedClones.map(clone => invokePublishCloneToLibrary(clone.id)));
 
       toaster.create({
         type: "success",
-        title: "Kits published",
-        description: `Published ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Clones published",
+        description: `Published ${selectedClones.length} clone${
+          selectedClones.length !== 1 ? "s" : ""
         } to library`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onClonesUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Publish to Library:", error);
+      console.error("[ClonesActionBar] Error in Publish to Library:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to publish kits: ${
+        description: `Failed to publish clones: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -87,24 +87,24 @@ export default function KitsActionBar({
     try {
       setLoading(true);
       // TODO: Implement add to project functionality
-      // await Promise.all(selectedKits.map(kit => invokeAddKitToProject(kit.path)));
+      // await Promise.all(selectedClones.map(clone => invokeAddCloneToProject(clone.id)));
 
       toaster.create({
         type: "success",
-        title: "Kits added",
-        description: `Added ${selectedKits.length} kit${
-          selectedKits.length !== 1 ? "s" : ""
+        title: "Clones added",
+        description: `Added ${selectedClones.length} clone${
+          selectedClones.length !== 1 ? "s" : ""
         } to project`,
       });
 
       clearSelection();
-      onKitsUpdated();
+      onClonesUpdated();
     } catch (error) {
-      console.error("[KitsActionBar] Error in Add to Project:", error);
+      console.error("[ClonesActionBar] Error in Add to Project:", error);
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to add kits to project: ${
+        description: `Failed to add clones to project: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
@@ -159,3 +159,4 @@ export default function KitsActionBar({
     </ActionBar.Root>
   );
 }
+
