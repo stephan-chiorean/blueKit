@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -124,6 +124,33 @@ export default function WalkthroughsTabContent({
   const handleViewWalkthrough = (walkthrough: KitFile) => {
     onViewKit(walkthrough);
   };
+
+  // Refs for filter panel and button to detect outside clicks
+  const filterPanelRef = useRef<HTMLDivElement>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close filter panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isFilterOpen &&
+        filterPanelRef.current &&
+        filterButtonRef.current &&
+        !filterPanelRef.current.contains(event.target as Node) &&
+        !filterButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    if (isFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterOpen]);
 
   if (kitsLoading) {
     return (
@@ -349,6 +376,7 @@ export default function WalkthroughsTabContent({
         <Flex justify="space-between" align="center">
           {/* Filter Button */}
           <Button
+            ref={filterButtonRef}
             variant="ghost"
             size="sm"
             onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -401,6 +429,7 @@ export default function WalkthroughsTabContent({
         {/* Filter Overlay */}
         {isFilterOpen && (
           <Box
+            ref={filterPanelRef}
             position="absolute"
             top="50px"
             left={0}

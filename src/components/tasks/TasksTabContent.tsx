@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   Box,
   Card,
@@ -17,8 +17,13 @@ import {
   Icon,
   Spinner,
   Table,
+  Input,
+  InputGroup,
+  Field,
+  IconButton,
+  Menu,
 } from '@chakra-ui/react';
-import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter } from 'react-icons/lu';
+import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
 import { Task } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
@@ -61,6 +66,13 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('card');
 
+  // Filter state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [titleFilter, setTitleFilter] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
+  const [selectedComplexities, setSelectedComplexities] = useState<string[]>([]);
+
   // Load tasks from database
   const loadTasks = async () => {
     try {
@@ -82,10 +94,37 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     }
   };
 
+  // Ref for filter panel to detect outside clicks
+  const filterPanelRef = useRef<HTMLDivElement>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+
   // Load tasks on mount and when context changes
   useEffect(() => {
     loadTasks();
   }, [context]);
+
+  // Close filter panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isFilterOpen &&
+        filterPanelRef.current &&
+        filterButtonRef.current &&
+        !filterPanelRef.current.contains(event.target as Node) &&
+        !filterButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    if (isFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterOpen]);
 
   // Get selected tasks
   const selectedTasks = useMemo(() => {
@@ -165,6 +204,18 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     }
   };
 
+  // Get all unique tags, priorities, and complexities from tasks
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    tasks.forEach(task => {
+      task.tags?.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [tasks]);
+
+  const allPriorities: TaskPriority[] = ['pinned', 'high', 'standard', 'long term', 'nit'];
+  const allComplexities = ['easy', 'hard', 'deep dive'];
+
   // Sort tasks based on selected sort option, filtering out completed tasks
   const sortedTasks = useMemo(() => {
     // Filter out completed tasks first
@@ -213,14 +264,71 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     return tasksCopy;
   }, [tasks, sortBy]);
 
-  // Split tasks into In Progress and Backlog sections
+  // Apply filters to sorted tasks
+  const filteredTasks = useMemo(() => {
+    return sortedTasks.filter(task => {
+      // Title filter
+      const matchesTitle = !titleFilter || 
+        task.title.toLowerCase().includes(titleFilter.toLowerCase()) ||
+        (task.description && task.description.toLowerCase().includes(titleFilter.toLowerCase()));
+
+      // Tags filter
+      const matchesTags = selectedTags.length === 0 ||
+        selectedTags.some(selectedTag =>
+          task.tags?.some(tag => tag.toLowerCase() === selectedTag.toLowerCase())
+        );
+
+      // Priority filter
+      const matchesPriority = selectedPriorities.length === 0 ||
+        selectedPriorities.includes(task.priority);
+
+      // Complexity filter
+      const matchesComplexity = selectedComplexities.length === 0 ||
+        (task.complexity && selectedComplexities.includes(task.complexity));
+
+      return matchesTitle && matchesTags && matchesPriority && matchesComplexity;
+    });
+  }, [sortedTasks, titleFilter, selectedTags, selectedPriorities, selectedComplexities]);
+
+  // Split filtered tasks into In Progress and Backlog sections
   const inProgressTasks = useMemo(() => {
-    return sortedTasks.filter(task => task.status === 'in_progress');
-  }, [sortedTasks]);
+    return filteredTasks.filter(task => task.status === 'in_progress');
+  }, [filteredTasks]);
 
   const backlogTasks = useMemo(() => {
-    return sortedTasks.filter(task => task.status !== 'in_progress');
-  }, [sortedTasks]);
+    return filteredTasks.filter(task => task.status !== 'in_progress');
+  }, [filteredTasks]);
+
+  // Filter toggle functions
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  };
+
+  const togglePriority = (priority: TaskPriority) => {
+    setSelectedPriorities(prev => {
+      if (prev.includes(priority)) {
+        return prev.filter(p => p !== priority);
+      } else {
+        return [...prev, priority];
+      }
+    });
+  };
+
+  const toggleComplexity = (complexity: string) => {
+    setSelectedComplexities(prev => {
+      if (prev.includes(complexity)) {
+        return prev.filter(c => c !== complexity);
+      } else {
+        return [...prev, complexity];
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -388,20 +496,156 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       />
 
       {/* Controls Bar - Filter and View Mode */}
-      <Flex justify="space-between" align="center" mb={6}>
-        {/* Filter Button */}
+      <Flex justify="space-between" align="center" mb={6} position="relative">
+        {/* Filter Button - with gray subtle background */}
         <Button
+          ref={filterButtonRef}
           variant="ghost"
           size="sm"
-          onClick={() => {}}
+          onClick={() => setIsFilterOpen(!isFilterOpen)}
+          bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+          borderWidth="1px"
+          borderColor="border.subtle"
+          _hover={{ bg: "bg.subtle" }}
         >
           <HStack gap={2}>
             <Icon>
               <LuFilter />
             </Icon>
             <Text>Filter</Text>
+            {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
+              <Badge size="sm" colorPalette="primary" variant="solid">
+                {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
+                  .filter(Boolean)
+                  .reduce((a, b) => (a || 0) + (b || 0), 0)}
+              </Badge>
+            )}
           </HStack>
         </Button>
+
+        {/* Filter Overlay */}
+        {isFilterOpen && (
+          <Box
+            ref={filterPanelRef}
+            position="absolute"
+            top="100%"
+            left={0}
+            zIndex={10}
+            w="400px"
+            mt={2}
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="md"
+            p={4}
+            bg="white"
+            boxShadow="lg"
+          >
+            <VStack align="stretch" gap={4}>
+              <Field.Root>
+                <Field.Label>Title</Field.Label>
+                <InputGroup
+                  endElement={titleFilter ? (
+                    <IconButton
+                      size="xs"
+                      variant="ghost"
+                      aria-label="Clear title filter"
+                      onClick={() => setTitleFilter('')}
+                    >
+                      <Icon>
+                        <LuX />
+                      </Icon>
+                    </IconButton>
+                  ) : undefined}
+                >
+                  <Input
+                    placeholder="Search by title or description..."
+                    value={titleFilter}
+                    onChange={(e) => setTitleFilter(e.target.value)}
+                  />
+                </InputGroup>
+              </Field.Root>
+
+              {allTags.length > 0 && (
+                <Field.Root>
+                  <Field.Label>Tags</Field.Label>
+                  <HStack gap={1} flexWrap="wrap" mt={2}>
+                    {allTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <Tag.Root
+                          key={tag}
+                          size="sm"
+                          variant={isSelected ? 'solid' : 'subtle'}
+                          colorPalette={isSelected ? 'primary' : undefined}
+                          cursor="pointer"
+                          onClick={() => toggleTag(tag)}
+                          opacity={isSelected ? 1 : 0.6}
+                          _hover={{ opacity: 1 }}
+                        >
+                          <Tag.Label>{tag}</Tag.Label>
+                        </Tag.Root>
+                      );
+                    })}
+                  </HStack>
+                </Field.Root>
+              )}
+
+              <Field.Root>
+                <Field.Label>Priority</Field.Label>
+                <HStack gap={1} flexWrap="wrap" mt={2}>
+                  {allPriorities.map((priority) => {
+                    const isSelected = selectedPriorities.includes(priority);
+                    const priorityIcon = getPriorityIcon(priority);
+                    return (
+                      <Tag.Root
+                        key={priority}
+                        size="sm"
+                        variant={isSelected ? 'solid' : 'subtle'}
+                        colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
+                        cursor="pointer"
+                        onClick={() => togglePriority(priority)}
+                        opacity={isSelected ? 1 : 0.6}
+                        _hover={{ opacity: 1 }}
+                      >
+                        <HStack gap={1}>
+                          {priorityIcon && (
+                            <Icon color={priorityIcon.color} boxSize={3}>
+                              <priorityIcon.icon />
+                            </Icon>
+                          )}
+                          <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
+                        </HStack>
+                      </Tag.Root>
+                    );
+                  })}
+                </HStack>
+              </Field.Root>
+
+              <Field.Root>
+                <Field.Label>Complexity</Field.Label>
+                <HStack gap={1} flexWrap="wrap" mt={2}>
+                  {allComplexities.map((complexity) => {
+                    const isSelected = selectedComplexities.includes(complexity);
+                    return (
+                      <Tag.Root
+                        key={complexity}
+                        size="sm"
+                        variant={isSelected ? 'solid' : 'subtle'}
+                        colorPalette={isSelected ? 'primary' : undefined}
+                        cursor="pointer"
+                        onClick={() => toggleComplexity(complexity)}
+                        opacity={isSelected ? 1 : 0.6}
+                        _hover={{ opacity: 1 }}
+                      >
+                        <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
+                      </Tag.Root>
+                    );
+                  })}
+                </HStack>
+              </Field.Root>
+            </VStack>
+          </Box>
+        )}
 
         {/* View Mode Switcher */}
         <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
@@ -461,7 +705,9 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             textAlign="center"
           >
             <Text color="text.muted" fontSize="sm">
-              {context === 'workspace'
+              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0)
+                ? 'No tasks in progress match the current filters'
+                : context === 'workspace'
                 ? 'No tasks in progress'
                 : `No tasks in progress for ${(context as ProjectEntry).title}`
               }
@@ -599,7 +845,10 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             textAlign="center"
           >
             <Text color="text.muted" fontSize="sm">
-              No tasks in backlog
+              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0)
+                ? 'No tasks in backlog match the current filters'
+                : 'No tasks in backlog'
+              }
             </Text>
           </Box>
         ) : viewMode === 'card' ? (
