@@ -8,12 +8,13 @@ import {
   HStack,
   Text,
   Field,
-  NativeSelect,
   Icon,
   Portal,
   CloseButton,
+  Menu,
+  TagsInput,
 } from '@chakra-ui/react';
-import { LuPlus, LuPin } from 'react-icons/lu';
+import { LuPlus, LuPin, LuCheck, LuArrowUp, LuClock, LuSparkles } from 'react-icons/lu';
 import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task';
 import { ProjectEntry, invokeDbCreateTask } from '../../ipc';
 import ProjectMultiSelect from './ProjectMultiSelect';
@@ -42,7 +43,7 @@ export default function TaskCreateDialog({
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
     defaultProjectId ? [defaultProjectId] : []
   );
-  const [tags, setTags] = useState<string>('');
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -62,7 +63,7 @@ export default function TaskCreateDialog({
         title.trim(),
         description.trim() || undefined,
         priority,
-        tags.split(',').map(t => t.trim()).filter(Boolean),
+        tags,
         selectedProjectIds,
         status,
         complexity || undefined
@@ -83,7 +84,7 @@ export default function TaskCreateDialog({
       setStatus('backlog');
       setComplexity('');
       setSelectedProjectIds(defaultProjectId ? [defaultProjectId] : []);
-      setTags('');
+      setTags([]);
 
       onClose();
     } catch (error) {
@@ -136,27 +137,95 @@ export default function TaskCreateDialog({
 
             <Field.Root required>
               <Field.Label>Priority</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={priority}
-                  onChange={(e) => setPriority(e.currentTarget.value as typeof priority)}
-                >
-                  <option value="pinned">
-                    Pinned (appears at top)
-                  </option>
-                  <option value="high">High</option>
-                  <option value="standard">Standard</option>
-                  <option value="long term">Long Term</option>
-                  <option value="nit">Nit</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator>
-                  {priority === 'pinned' && (
-                    <Icon color="primary.500">
-                      <LuPin />
-                    </Icon>
-                  )}
-                </NativeSelect.Indicator>
-              </NativeSelect.Root>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="outline" w="100%" justifyContent="space-between">
+                    <HStack gap={2}>
+                      {priority === 'pinned' && (
+                        <Icon color="blue.500">
+                          <LuPin />
+                        </Icon>
+                      )}
+                      {priority === 'high' && (
+                        <Icon color="red.500">
+                          <LuArrowUp />
+                        </Icon>
+                      )}
+                      {priority === 'long term' && (
+                        <Icon color="purple.500">
+                          <LuClock />
+                        </Icon>
+                      )}
+                      {priority === 'nit' && (
+                        <Icon color="yellow.500">
+                          <LuSparkles />
+                        </Icon>
+                      )}
+                      <Text>
+                        {priority === 'pinned' && 'Pinned (appears at top)'}
+                        {priority === 'high' && 'High'}
+                        {priority === 'standard' && 'Standard'}
+                        {priority === 'long term' && 'Long Term'}
+                        {priority === 'nit' && 'Nit'}
+                      </Text>
+                    </HStack>
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Positioner>
+                  <Menu.Content>
+                      <Menu.Item value="pinned" onSelect={() => setPriority('pinned')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <HStack gap={2}>
+                            <Icon color="blue.500">
+                              <LuPin />
+                            </Icon>
+                            <Text>Pinned (appears at top)</Text>
+                          </HStack>
+                          {priority === 'pinned' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="high" onSelect={() => setPriority('high')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <HStack gap={2}>
+                            <Icon color="red.500">
+                              <LuArrowUp />
+                            </Icon>
+                            <Text>High</Text>
+                          </HStack>
+                          {priority === 'high' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="standard" onSelect={() => setPriority('standard')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Standard</Text>
+                          {priority === 'standard' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="long term" onSelect={() => setPriority('long term')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <HStack gap={2}>
+                            <Icon color="purple.500">
+                              <LuClock />
+                            </Icon>
+                            <Text>Long Term</Text>
+                          </HStack>
+                          {priority === 'long term' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="nit" onSelect={() => setPriority('nit')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <HStack gap={2}>
+                            <Icon color="yellow.500">
+                              <LuSparkles />
+                            </Icon>
+                            <Text>Nit</Text>
+                          </HStack>
+                          {priority === 'nit' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Positioner>
+              </Menu.Root>
               <Field.HelperText>
                 Pinned tasks appear at the top of the list
               </Field.HelperText>
@@ -164,32 +233,90 @@ export default function TaskCreateDialog({
 
             <Field.Root>
               <Field.Label>Complexity (optional)</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={complexity}
-                  onChange={(e) => setComplexity(e.currentTarget.value as TaskComplexity | '')}
-                >
-                  <option value="">Not specified</option>
-                  <option value="easy">Easy</option>
-                  <option value="hard">Hard</option>
-                  <option value="deep dive">Deep dive</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="outline" w="100%" justifyContent="space-between">
+                    <Text>
+                      {complexity === '' && 'Not specified'}
+                      {complexity === 'easy' && 'Easy'}
+                      {complexity === 'hard' && 'Hard'}
+                      {complexity === 'deep dive' && 'Deep dive'}
+                    </Text>
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Positioner>
+                  <Menu.Content>
+                      <Menu.Item value="" onSelect={() => setComplexity('')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Not specified</Text>
+                          {complexity === '' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="easy" onSelect={() => setComplexity('easy')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Easy</Text>
+                          {complexity === 'easy' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="hard" onSelect={() => setComplexity('hard')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Hard</Text>
+                          {complexity === 'hard' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="deep dive" onSelect={() => setComplexity('deep dive')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Deep dive</Text>
+                          {complexity === 'deep dive' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Positioner>
+              </Menu.Root>
             </Field.Root>
 
             <Field.Root required>
               <Field.Label>Status</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={status}
-                  onChange={(e) => setStatus(e.currentTarget.value as TaskStatus)}
-                >
-                  <option value="backlog">Backlog</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="blocked">Blocked</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="outline" w="100%" justifyContent="space-between">
+                    <Text>
+                      {status === 'backlog' && 'Backlog'}
+                      {status === 'in_progress' && 'In Progress'}
+                      {status === 'completed' && 'Completed'}
+                      {status === 'blocked' && 'Blocked'}
+                    </Text>
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Positioner>
+                  <Menu.Content>
+                      <Menu.Item value="backlog" onSelect={() => setStatus('backlog')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Backlog</Text>
+                          {status === 'backlog' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="in_progress" onSelect={() => setStatus('in_progress')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>In Progress</Text>
+                          {status === 'in_progress' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="completed" onSelect={() => setStatus('completed')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Completed</Text>
+                          {status === 'completed' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value="blocked" onSelect={() => setStatus('blocked')}>
+                        <HStack gap={2} justify="space-between" width="100%">
+                          <Text>Blocked</Text>
+                          {status === 'blocked' && <LuCheck />}
+                        </HStack>
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Positioner>
+              </Menu.Root>
             </Field.Root>
 
             <ProjectMultiSelect
@@ -199,13 +326,17 @@ export default function TaskCreateDialog({
             />
 
             <Field.Root>
-              <Field.Label>Tags</Field.Label>
-              <Input
+              <TagsInput.Root
                 value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="frontend, backend, bug"
-              />
-              <Field.HelperText>Comma-separated tags</Field.HelperText>
+                onValueChange={(details) => setTags(details.value)}
+              >
+                <TagsInput.Label>Tags</TagsInput.Label>
+                <TagsInput.Control>
+                  <TagsInput.Items />
+                  <TagsInput.Input placeholder="Add tag..." />
+                </TagsInput.Control>
+                <TagsInput.HiddenInput />
+              </TagsInput.Root>
             </Field.Root>
           </VStack>
             </Dialog.Body>

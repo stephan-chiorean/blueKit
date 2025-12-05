@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import {
   Box,
   Card,
@@ -15,28 +15,34 @@ import {
   Checkbox,
   Button,
   Icon,
-  NativeSelect,
   Spinner,
+  Table,
 } from '@chakra-ui/react';
-import { LuPlus, LuArrowUpDown, LuFolder, LuPin } from 'react-icons/lu';
+import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter } from 'react-icons/lu';
 import { Task } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import TaskDialog from './TaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
+import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project
   projects: ProjectEntry[];  // All projects for multi-select
 }
 
-type SortOption = 'priority' | 'time';
+export interface TasksTabContentRef {
+  openCreateDialog: () => void;
+}
 
-export default function TasksTabContent({
+type SortOption = 'priority' | 'time';
+type ViewMode = 'card' | 'table';
+
+const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   context,
   projects,
-}: TasksTabContentProps) {
+}, ref) => {
   // Local state for tasks (loaded from database)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +56,10 @@ export default function TasksTabContent({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Sort state
-  const [sortBy, setSortBy] = useState<SortOption>('priority');
+  const [sortBy, setSortBy] = useState<SortOption>('time');
+  
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
 
   // Load tasks from database
   const loadTasks = async () => {
@@ -112,6 +121,12 @@ export default function TasksTabContent({
     setIsCreateDialogOpen(true);
   };
 
+  useImperativeHandle(ref, () => ({
+    openCreateDialog: () => {
+      setIsCreateDialogOpen(true);
+    },
+  }));
+
   const handleTaskCreated = () => {
     // Reload tasks from database
     loadTasks();
@@ -135,20 +150,18 @@ export default function TasksTabContent({
     }
   };
 
-  // Get priority color
-  const getPriorityColor = (priority: string) => {
-    if (priority === 'nit') return 'gray';
-    switch (priority.toLowerCase()) {
-      case 'pinned':
-        return 'purple';
-      case 'high':
-        return 'orange';
-      case 'standard':
-        return 'green';
-      case 'long term':
-        return 'blue';
+  // Get complexity label
+  const getComplexityLabel = (complexity?: string) => {
+    if (!complexity) return null;
+    switch (complexity) {
+      case 'easy':
+        return 'Easy';
+      case 'hard':
+        return 'Hard';
+      case 'deep dive':
+        return 'Deep Dive';
       default:
-        return 'gray';
+        return complexity;
     }
   };
 
@@ -226,10 +239,18 @@ export default function TasksTabContent({
     );
   }
 
+  // Helper function to format date
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   // Helper function to render task card (used in both In Progress and Backlog sections)
   const renderTaskCard = (task: Task) => {
     const taskSelected = isSelected(task.id);
-    const priorityColor = getPriorityColor(task.priority);
+    const complexityLabel = getComplexityLabel(task.complexity);
+    const priorityIcon = getPriorityIcon(task.priority);
 
     return (
       <Card.Root
@@ -248,9 +269,9 @@ export default function TasksTabContent({
             <Flex justify="space-between" align="start" gap={2}>
               <HStack gap={1.5} flex="1">
                 <Heading size="sm">{task.title}</Heading>
-                {task.priority === 'pinned' && (
-                  <Icon color="purple.500">
-                    <LuPin />
+                {priorityIcon && (
+                  <Icon color={priorityIcon.color}>
+                    <priorityIcon.icon />
                   </Icon>
                 )}
               </HStack>
@@ -273,21 +294,21 @@ export default function TasksTabContent({
             </Flex>
 
             <HStack gap={2} flexWrap="wrap">
-              {/* Only show priority badge if not nit */}
-              {task.priority !== 'nit' && (
-                <Badge colorPalette={priorityColor} size="sm">
-                  {task.priority}
+              {/* Show complexity if available */}
+              {complexityLabel && (
+                <Badge size="sm" variant="outline" colorPalette="gray">
+                  {complexityLabel}
                 </Badge>
               )}
             </HStack>
 
-            {/* Project badges */}
+            {/* Project badges - gray/muted */}
             {task.projectIds.length > 0 && (
               <HStack gap={1} flexWrap="wrap">
                 {task.projectIds.map(projectId => {
                   const project = projects.find(p => p.id === projectId);
                   return project ? (
-                    <Badge key={projectId} size="xs" colorPalette="blue" variant="outline">
+                    <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
                       <HStack gap={1}>
                         <LuFolder size={10} />
                         <Text>{project.title}</Text>
@@ -308,11 +329,11 @@ export default function TasksTabContent({
             </Text>
           )}
 
-          {/* Tags */}
+          {/* Tags - colorless */}
           {task.tags && task.tags.length > 0 && (
             <HStack gap={1} flexWrap="wrap" mt="auto">
               {task.tags.map((tag) => (
-                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                <Tag.Root key={tag} size="sm" variant="subtle">
                   <Tag.Label>{tag}</Tag.Label>
                 </Tag.Root>
               ))}
@@ -350,40 +371,56 @@ export default function TasksTabContent({
         onTasksUpdated={loadTasks}
       />
 
-      {/* Header */}
+      {/* Controls Bar - Filter and View Mode */}
       <Flex justify="space-between" align="center" mb={6}>
-        <VStack align="start" gap={1}>
-          <Heading size="lg">Tasks</Heading>
-          <Text fontSize="sm" color="text.muted">
-            {inProgressTasks.length} in progress · {backlogTasks.length} in backlog
-          </Text>
-        </VStack>
-        <HStack gap={2}>
-          {/* Sort Select */}
-          <NativeSelect.Root size="sm" width="140px">
-            <NativeSelect.Field
-              value={sortBy}
-              onChange={(e) => setSortBy(e.currentTarget.value as SortOption)}
-            >
-              <option value="priority">Priority</option>
-              <option value="time">Time</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator>
-              <Icon>
-                <LuArrowUpDown />
-              </Icon>
-            </NativeSelect.Indicator>
-          </NativeSelect.Root>
-          
+        {/* Filter Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {}}
+        >
+          <HStack gap={2}>
+            <Icon>
+              <LuFilter />
+            </Icon>
+            <Text>Filter</Text>
+          </HStack>
+        </Button>
+
+        {/* View Mode Switcher */}
+        <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
           <Button
-            colorPalette="primary"
-            onClick={handleAddTask}
+            onClick={() => setViewMode('card')}
+            variant="ghost"
+            borderRadius={0}
+            borderRightWidth="1px"
+            borderRightColor="border.subtle"
+            bg={viewMode === 'card' ? 'white' : 'transparent'}
+            color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
+            _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+            size="sm"
           >
             <HStack gap={2}>
               <Icon>
-                <LuPlus />
+                <LuLayoutGrid />
               </Icon>
-              <Text>Add Task</Text>
+              <Text>Cards</Text>
+            </HStack>
+          </Button>
+          <Button
+            onClick={() => setViewMode('table')}
+            variant="ghost"
+            borderRadius={0}
+            bg={viewMode === 'table' ? 'white' : 'transparent'}
+            color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
+            _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+            size="sm"
+          >
+            <HStack gap={2}>
+              <Icon>
+                <LuTable />
+              </Icon>
+              <Text>Table</Text>
             </HStack>
           </Button>
         </HStack>
@@ -391,7 +428,12 @@ export default function TasksTabContent({
 
       {/* In Progress Section */}
       <Box mb={8}>
-        <Heading size="md" mb={4}>In Progress</Heading>
+        <Flex align="center" gap={2} mb={4}>
+          <Heading size="md">In Progress</Heading>
+          <Text fontSize="sm" color="text.muted">
+            {inProgressTasks.length}
+          </Text>
+        </Flex>
 
         {inProgressTasks.length === 0 ? (
           <Box
@@ -409,16 +451,125 @@ export default function TasksTabContent({
               }
             </Text>
           </Box>
-        ) : (
+        ) : viewMode === 'card' ? (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
             {inProgressTasks.map(renderTaskCard)}
           </SimpleGrid>
+        ) : (
+          <Table.Root size="sm" variant="outline">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
+                <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
+                <Table.ColumnHeader w="20%">Projects</Table.ColumnHeader>
+                <Table.ColumnHeader w="20%">Tags</Table.ColumnHeader>
+                <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {inProgressTasks.map((task) => {
+                const taskSelected = isSelected(task.id);
+                const complexityLabel = getComplexityLabel(task.complexity);
+                const priorityIcon = getPriorityIcon(task.priority);
+                return (
+                  <Table.Row
+                    key={task.id}
+                    cursor="pointer"
+                    onClick={() => handleViewTask(task)}
+                    _hover={{ bg: "bg.subtle" }}
+                    data-selected={taskSelected ? "" : undefined}
+                  >
+                    <Table.Cell>
+                      <Checkbox.Root
+                        size="sm"
+                        checked={taskSelected}
+                        onCheckedChange={() => {
+                          handleTaskToggle(task);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        cursor="pointer"
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control cursor="pointer">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox.Root>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        <Text fontWeight="medium">{task.title}</Text>
+                        {priorityIcon && (
+                          <Icon color={priorityIcon.color}>
+                            <priorityIcon.icon />
+                          </Icon>
+                        )}
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {complexityLabel ? (
+                        <Badge size="sm" variant="outline" colorPalette="gray">
+                          {complexityLabel}
+                        </Badge>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {task.projectIds.length > 0 ? (
+                        <HStack gap={1} flexWrap="wrap">
+                          {task.projectIds.map(projectId => {
+                            const project = projects.find(p => p.id === projectId);
+                            return project ? (
+                              <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
+                                <HStack gap={1}>
+                                  <LuFolder size={10} />
+                                  <Text>{project.title}</Text>
+                                </HStack>
+                              </Badge>
+                            ) : null;
+                          })}
+                        </HStack>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {task.tags && task.tags.length > 0 ? (
+                        <HStack gap={1} flexWrap="wrap">
+                          {task.tags.map((tag) => (
+                            <Tag.Root key={tag} size="sm" variant="subtle">
+                              <Tag.Label>{tag}</Tag.Label>
+                            </Tag.Root>
+                          ))}
+                        </HStack>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="sm" color="text.secondary">
+                        {formatDate(task.updatedAt)}
+                      </Text>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table.Root>
         )}
       </Box>
 
       {/* Backlog Section */}
       <Box>
-        <Heading size="md" mb={4}>Backlog</Heading>
+        <Flex align="center" gap={2} mb={4}>
+          <Heading size="md">Backlog</Heading>
+          <Text fontSize="sm" color="text.muted">
+            {backlogTasks.length}
+          </Text>
+        </Flex>
 
         {backlogTasks.length === 0 ? (
           <Box
@@ -433,12 +584,120 @@ export default function TasksTabContent({
               No tasks in backlog
             </Text>
           </Box>
-        ) : (
+        ) : viewMode === 'card' ? (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
             {backlogTasks.map(renderTaskCard)}
           </SimpleGrid>
+        ) : (
+          <Table.Root size="sm" variant="outline">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
+                <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
+                <Table.ColumnHeader w="20%">Projects</Table.ColumnHeader>
+                <Table.ColumnHeader w="20%">Tags</Table.ColumnHeader>
+                <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {backlogTasks.map((task) => {
+                const taskSelected = isSelected(task.id);
+                const complexityLabel = getComplexityLabel(task.complexity);
+                const priorityIcon = getPriorityIcon(task.priority);
+                return (
+                  <Table.Row
+                    key={task.id}
+                    cursor="pointer"
+                    onClick={() => handleViewTask(task)}
+                    _hover={{ bg: "bg.subtle" }}
+                    data-selected={taskSelected ? "" : undefined}
+                  >
+                    <Table.Cell>
+                      <Checkbox.Root
+                        size="sm"
+                        checked={taskSelected}
+                        onCheckedChange={() => {
+                          handleTaskToggle(task);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        cursor="pointer"
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control cursor="pointer">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox.Root>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        <Text fontWeight="medium">{task.title}</Text>
+                        {priorityIcon && (
+                          <Icon color={priorityIcon.color}>
+                            <priorityIcon.icon />
+                          </Icon>
+                        )}
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {complexityLabel ? (
+                        <Badge size="sm" variant="outline" colorPalette="gray">
+                          {complexityLabel}
+                        </Badge>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {task.projectIds.length > 0 ? (
+                        <HStack gap={1} flexWrap="wrap">
+                          {task.projectIds.map(projectId => {
+                            const project = projects.find(p => p.id === projectId);
+                            return project ? (
+                              <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
+                                <HStack gap={1}>
+                                  <LuFolder size={10} />
+                                  <Text>{project.title}</Text>
+                                </HStack>
+                              </Badge>
+                            ) : null;
+                          })}
+                        </HStack>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {task.tags && task.tags.length > 0 ? (
+                        <HStack gap={1} flexWrap="wrap">
+                          {task.tags.map((tag) => (
+                            <Tag.Root key={tag} size="sm" variant="subtle">
+                              <Tag.Label>{tag}</Tag.Label>
+                            </Tag.Root>
+                          ))}
+                        </HStack>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="sm" color="text.secondary">
+                        {formatDate(task.updatedAt)}
+                      </Text>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table.Root>
         )}
       </Box>
     </Box>
   );
-}
+});
+
+TasksTabContent.displayName = 'TasksTabContent';
+
+export default TasksTabContent;

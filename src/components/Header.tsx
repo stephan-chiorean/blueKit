@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Flex,
@@ -12,6 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
 import { Task } from '../types/task';
+import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
 import TaskDialog from './tasks/TaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
@@ -20,13 +21,28 @@ export default function Header() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+
+  // Load projects on mount
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const registryProjects = await invokeGetProjectRegistry();
+        setProjects(registryProjects);
+      } catch (error) {
+        console.error('Failed to load projects in Header:', error);
+      }
+    };
+    loadProjects();
+  }, []);
 
   const handleOpenTaskDialog = (task: Task) => {
     setSelectedTask(task);
     setIsTaskDialogOpen(true);
   };
 
-  const handleOpenCreateDialog = () => {
+  const handleOpenCreateDialog = (projectsToPass: ProjectEntry[]) => {
+    setProjects(projectsToPass);
     setIsCreateDialogOpen(true);
   };
 
@@ -73,6 +89,7 @@ export default function Header() {
             onOpenTaskDialog={handleOpenTaskDialog}
             onOpenCreateDialog={handleOpenCreateDialog}
           />
+
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />
           </IconButton>
@@ -99,7 +116,7 @@ export default function Header() {
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onTaskCreated={handleTaskUpdated}
-        projects={[]} // No project preselection from header
+        projects={projects}
         defaultProjectId={undefined}
       />
     </Box>

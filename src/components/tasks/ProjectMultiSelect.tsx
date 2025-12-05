@@ -38,24 +38,34 @@ export default function ProjectMultiSelect({
               No projects available
             </Text>
           ) : (
-            projects.map((project) => (
-              <Checkbox.Root
-                key={project.id}
-                checked={selectedProjectIds.includes(project.id)}
-                onCheckedChange={() => handleToggle(project.id)}
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Label>
-                  <HStack gap={2}>
-                    <LuFolder size={14} />
-                    <Text fontSize="sm">{project.title}</Text>
-                  </HStack>
-                </Checkbox.Label>
-              </Checkbox.Root>
-            ))
+            projects.map((project) => {
+              const isChecked = selectedProjectIds.includes(project.id);
+              return (
+                <Checkbox.Root
+                  key={project.id}
+                  checked={isChecked}
+                  onCheckedChange={(details) => {
+                    // details.checked is the new checked state
+                    if (details.checked && !isChecked) {
+                      onChange([...selectedProjectIds, project.id]);
+                    } else if (!details.checked && isChecked) {
+                      onChange(selectedProjectIds.filter(id => id !== project.id));
+                    }
+                  }}
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  <Checkbox.Label>
+                    <HStack gap={2}>
+                      <LuFolder size={14} />
+                      <Text fontSize="sm">{project.title}</Text>
+                    </HStack>
+                  </Checkbox.Label>
+                </Checkbox.Root>
+              );
+            })
           )}
         </VStack>
       </Box>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Tabs,
@@ -13,7 +13,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -23,7 +23,7 @@ import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
-import TasksTabContent from '../components/tasks/TasksTabContent';
+import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
@@ -41,6 +41,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [error, setError] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
   const [currentTab, setCurrentTab] = useState<string>("kits");
+  const tasksTabRef = useRef<TasksTabContentRef>(null);
 
   // Generic resource view state - for viewing any resource type
   const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
@@ -394,6 +395,21 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                   </Tabs.Trigger>
                 </Tabs.List>
               </Box>
+              {currentTab === 'tasks' && (
+                <Box position="absolute" right={0}>
+                  <Button
+                    colorPalette="primary"
+                    onClick={() => tasksTabRef.current?.openCreateDialog()}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPlus />
+                      </Icon>
+                      <Text>Add Task</Text>
+                    </HStack>
+                  </Button>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="kits">
@@ -449,6 +465,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             </Tabs.Content>
             <Tabs.Content value="tasks">
               <TasksTabContent
+                ref={tasksTabRef}
                 context={project}
                 projects={allProjects}
               />

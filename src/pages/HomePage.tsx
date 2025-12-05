@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Tabs,
@@ -8,15 +8,16 @@ import {
   IconButton,
   Icon,
   HStack,
+  Button,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuMenu, LuLibrary, LuFolder, LuWorkflow, LuListTodo } from 'react-icons/lu';
+import { LuMenu, LuLibrary, LuFolder, LuWorkflow, LuListTodo, LuPlus } from 'react-icons/lu';
 import NavigationMenu from '../components/NavigationDrawer';
 import Header from '../components/Header';
 import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
-import TasksTabContent from '../components/tasks/TasksTabContent';
+import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
@@ -33,6 +34,8 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
   const [kits, setKits] = useState<KitFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const { selectedItems } = useSelection();
+  const [activeTab, setActiveTab] = useState('projects');
+  const tasksTabRef = useRef<TasksTabContentRef>(null);
   
   // Collections state - store selectedItemIds with each collection
   interface CollectionWithItems extends Collection {
@@ -242,6 +245,8 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
           <Tabs.Root 
             defaultValue="projects" 
             variant="enclosed"
+            value={activeTab}
+            onValueChange={(e) => setActiveTab(e.value as string)}
             css={{
               '& [data-selected]': {
                 borderColor: 'colors.primary.300',
@@ -303,6 +308,21 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
                   </Tabs.Trigger>
                 </Tabs.List>
               </Box>
+              {activeTab === 'tasks' && (
+                <Box position="absolute" right={0}>
+                  <Button
+                    colorPalette="primary"
+                    onClick={() => tasksTabRef.current?.openCreateDialog()}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPlus />
+                      </Icon>
+                      <Text>Add Task</Text>
+                    </HStack>
+                  </Button>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="projects">
@@ -327,6 +347,7 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
             </Tabs.Content>
             <Tabs.Content value="tasks">
               <TasksTabContent
+                ref={tasksTabRef}
                 context="workspace"
                 projects={projects}
               />

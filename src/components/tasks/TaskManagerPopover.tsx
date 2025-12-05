@@ -10,13 +10,13 @@ import {
   Spinner,
   Badge,
 } from '@chakra-ui/react';
-import { LuPlus } from 'react-icons/lu';
+import { LuPlus, LuListTodo } from 'react-icons/lu';
 import { Task } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeGetProjectRegistry } from '../../ipc';
 
 interface TaskManagerPopoverProps {
   onOpenTaskDialog: (task: Task) => void;
-  onOpenCreateDialog: () => void;
+  onOpenCreateDialog: (projects: ProjectEntry[]) => void;
 }
 
 export default function TaskManagerPopover({
@@ -56,7 +56,7 @@ export default function TaskManagerPopover({
     <Popover.Root>
       <Popover.Trigger asChild>
         <Button variant="ghost" size="sm" position="relative">
-          <Text>Tasks</Text>
+          <LuListTodo />
           {inProgressCount > 0 && (
             <Badge
               position="absolute"
@@ -135,7 +135,7 @@ export default function TaskManagerPopover({
                 colorPalette="primary"
                 size="sm"
                 width="full"
-                onClick={onOpenCreateDialog}
+                onClick={() => onOpenCreateDialog(projects)}
               >
                 <HStack gap={2}>
                   <LuPlus />
