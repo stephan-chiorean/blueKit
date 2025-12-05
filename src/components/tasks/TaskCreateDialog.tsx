@@ -14,7 +14,7 @@ import {
   Menu,
   TagsInput,
 } from '@chakra-ui/react';
-import { LuPlus, LuPin, LuCheck, LuArrowUp, LuClock, LuSparkles } from 'react-icons/lu';
+import { LuPin, LuCheck, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
 import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task';
 import { ProjectEntry, invokeDbCreateTask } from '../../ipc';
 import ProjectMultiSelect from './ProjectMultiSelect';
@@ -141,11 +141,11 @@ export default function TaskCreateDialog({
                 <Menu.Trigger asChild>
                   <Button variant="outline" w="100%" justifyContent="space-between">
                     <HStack gap={2}>
-                      {priority === 'pinned' && (
+                  {priority === 'pinned' && (
                         <Icon color="blue.500">
-                          <LuPin />
-                        </Icon>
-                      )}
+                      <LuPin />
+                    </Icon>
+                  )}
                       {priority === 'high' && (
                         <Icon color="red.500">
                           <LuArrowUp />
@@ -161,8 +161,13 @@ export default function TaskCreateDialog({
                           <LuSparkles />
                         </Icon>
                       )}
+                      {priority === 'standard' && (
+                        <Icon color="orange.500">
+                          <LuMinus />
+                        </Icon>
+                      )}
                       <Text>
-                        {priority === 'pinned' && 'Pinned (appears at top)'}
+                        {priority === 'pinned' && 'Pinned'}
                         {priority === 'high' && 'High'}
                         {priority === 'standard' && 'Standard'}
                         {priority === 'long term' && 'Long Term'}
@@ -179,7 +184,7 @@ export default function TaskCreateDialog({
                             <Icon color="blue.500">
                               <LuPin />
                             </Icon>
-                            <Text>Pinned (appears at top)</Text>
+                            <Text>Pinned</Text>
                           </HStack>
                           {priority === 'pinned' && (
                             <Icon color="blue.500">
@@ -205,7 +210,12 @@ export default function TaskCreateDialog({
                       </Menu.Item>
                       <Menu.Item value="standard" onSelect={() => setPriority('standard')}>
                         <HStack gap={2} justify="space-between" width="100%">
-                          <Text>Standard</Text>
+                          <HStack gap={2}>
+                            <Icon color="orange.500">
+                              <LuMinus />
+                            </Icon>
+                            <Text>Standard</Text>
+                          </HStack>
                           {priority === 'standard' && (
                             <Icon color="blue.500">
                               <LuCheck />
@@ -404,10 +414,7 @@ export default function TaskCreateDialog({
                   loading={loading}
                   disabled={!title.trim()}
                 >
-                  <HStack gap={2}>
-                    <LuPlus />
-                    <Text>Add Task</Text>
-                  </HStack>
+                  Create
                 </Button>
               </HStack>
             </Dialog.Footer>

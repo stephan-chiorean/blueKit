@@ -19,14 +19,14 @@ import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task
 import { invokeDbUpdateTask } from '../../ipc';
 import { toaster } from '../ui/toaster';
 
-interface TaskDialogProps {
+interface EditTaskDialogProps {
   task: Task | null;
   isOpen: boolean;
   onClose: () => void;
   onTaskUpdated?: () => void;
 }
 
-export default function TaskDialog({ task, isOpen, onClose, onTaskUpdated }: TaskDialogProps) {
+export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }: EditTaskDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('standard');

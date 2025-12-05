@@ -1,5 +1,5 @@
 import { TaskPriority } from '../types/task';
-import { LuPin, LuArrowUp, LuClock, LuSparkles } from 'react-icons/lu';
+import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
 
 /**
  * Maps priority values to display labels
@@ -42,6 +42,7 @@ export function getPriorityIcon(priority: TaskPriority): { icon: React.Component
     case 'nit':
       return { icon: LuSparkles, color: 'yellow.500' };
     case 'standard':
+      return { icon: LuMinus, color: 'orange.500' };
     default:
       return null;
   }

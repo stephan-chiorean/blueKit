@@ -14,7 +14,7 @@ import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
 import { Task } from '../types/task';
 import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
-import TaskDialog from './tasks/TaskDialog';
+import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
 
 export default function Header() {
@@ -102,7 +102,7 @@ export default function Header() {
       </Flex>
 
       {/* Task Dialogs */}
-      <TaskDialog
+      <EditTaskDialog
         task={selectedTask}
         isOpen={isTaskDialogOpen}
         onClose={() => {

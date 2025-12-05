@@ -22,7 +22,7 @@ import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter } from 'react-icons/l
 import { Task } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
-import TaskDialog from './TaskDialog';
+import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
 import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon } from '../../utils/taskUtils';
@@ -171,9 +171,13 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     const visibleTasks = tasks.filter(task => task.status !== 'completed');
     const tasksCopy = [...visibleTasks];
 
+    // Always separate pinned tasks first, then sort the rest
+    const pinnedTasks = tasksCopy.filter(task => task.priority === 'pinned');
+    const otherTasks = tasksCopy.filter(task => task.priority !== 'pinned');
+
     if (sortBy === 'priority') {
       // Sort by priority order: pinned -> high -> long term -> standard
-      return tasksCopy.sort((a, b) => {
+      const sortedOther = otherTasks.sort((a, b) => {
         const orderA = getPriorityOrder(a.priority);
         const orderB = getPriorityOrder(b.priority);
         if (orderA !== orderB) {
@@ -184,13 +188,26 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return timeB - timeA;
       });
-    } else if (sortBy === 'time') {
-      // Sort by updatedAt (most recent first)
-      return tasksCopy.sort((a, b) => {
+      // Sort pinned tasks by updatedAt (most recent first)
+      const sortedPinned = pinnedTasks.sort((a, b) => {
         const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return timeB - timeA;
       });
+      return [...sortedPinned, ...sortedOther];
+    } else if (sortBy === 'time') {
+      // Sort by updatedAt (most recent first), but pinned tasks always first
+      const sortedOther = otherTasks.sort((a, b) => {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      const sortedPinned = pinnedTasks.sort((a, b) => {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      return [...sortedPinned, ...sortedOther];
     }
 
     return tasksCopy;
@@ -346,7 +363,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
 
   return (
     <Box position="relative">
-      <TaskDialog
+      <EditTaskDialog
         task={selectedTask}
         isOpen={isDialogOpen}
         onClose={() => {

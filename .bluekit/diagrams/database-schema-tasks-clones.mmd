@@ -1,0 +1,158 @@
+---
+alias: Database Schema - Tasks & Clones
+description: PostgreSQL schema showing tasks and proposed clones tables with relationships to projects, including indexes and foreign keys
+tags:
+  - database
+  - schema
+  - postgresql
+  - architecture
+---
+```mermaid
+erDiagram
+    %% PostgreSQL Tables (Database)
+    tasks {
+        TEXT id PK "UUID, Primary Key"
+        TEXT title "NOT NULL"
+        TEXT description "Optional"
+        TEXT priority "NOT NULL, DEFAULT 'nit'"
+        TEXT tags "JSON array as string"
+        TEXT created_at "ISO timestamp"
+        TEXT updated_at "ISO timestamp"
+        TEXT status "NOT NULL, DEFAULT 'backlog'"
+        TEXT complexity "Optional: easy, hard, deep dive"
+    }
+
+    task_projects {
+        INTEGER id PK "Auto-increment"
+        TEXT task_id FK "References tasks(id)"
+        TEXT project_id "NO FK - refs file system"
+    }
+
+    clones {
+        TEXT id PK "UUID or slugified format"
+        TEXT name "Display name, NOT NULL"
+        TEXT description "What clone represents"
+        TEXT git_url "Git repository URL, NOT NULL"
+        TEXT git_commit "40-char commit hash, NOT NULL"
+        TEXT git_branch "Branch name, Optional"
+        TEXT git_tag "Tag name, Optional"
+        TEXT tags "JSON array as string"
+        TEXT created_at "ISO timestamp, NOT NULL"
+        TEXT metadata "JSON object for extensibility"
+    }
+
+    clone_projects {
+        INTEGER id PK "Auto-increment"
+        TEXT clone_id FK "References clones(id)"
+        TEXT project_id "NO FK - refs file system"
+    }
+
+    %% File System (JSON)
+    project_registry["project_registry (FILE)"] {
+        TEXT id "UUID from JSON"
+        TEXT title "Project name"
+        TEXT path "File system path"
+        TEXT created_at "ISO timestamp"
+        TEXT updated_at "ISO timestamp"
+    }
+
+    %% Relationships
+    tasks ||--o{ task_projects : "has many"
+    task_projects }o..o| project_registry : "weak ref (project_id)"
+
+    clones ||--o{ clone_projects : "has many"
+    clone_projects }o..o| project_registry : "weak ref (project_id)"
+
+    %% Legend
+    %% Solid lines (||--o{): Database foreign keys with CASCADE
+    %% Dotted lines (}o..o|): Weak references to file system (no FK constraint)
+```
+
+## Schema Details
+
+### Data Storage Architecture
+
+**PostgreSQL (Database):**
+- `tasks` + `task_projects`: Task management with project associations
+- `clones` + `clone_projects`: Git repository snapshots (proposed migration)
+
+**File System (JSON):**
+- `~/.bluekit/projectRegistry.json`: Project list (id, title, path, timestamps)
+- Watched by file watcher for real-time updates
+- Intentionally kept as file - projects are filesystem entities
+
+### Current Implementation: Tasks
+
+**Tables:**
+- `tasks`: Main task entity with priority, status, complexity
+- `task_projects`: Junction table for many-to-many task ↔ project relationship
+
+**Key Features:**
+- UUID primary keys (client-generated)
+- JSON arrays stored as strings (tags field)
+- Cascade delete on foreign keys (tasks → task_projects)
+- Indexes on task_id and project_id in junction table
+- Status workflow: backlog → in_progress → completed/blocked
+- Priority levels: pinned, high, standard, long term, nit
+
+**Project References:**
+- `task_projects.project_id` stores project UUIDs
+- **No foreign key constraint** - projects exist in JSON file
+- Projects can be deleted outside BlueKit without breaking database
+
+**Migrated from:** `.bluekit/tasks.json` (file-based) → PostgreSQL
+
+### Proposed Implementation: Clones
+
+**Tables:**
+- `clones`: Git repository snapshots with commit metadata
+- `clone_projects`: Junction table for many-to-many clone ↔ project relationship
+
+**Key Features:**
+- Unique ID format: `slugified-name-YYYYMMDD` or UUID
+- Git metadata: url, commit (required), branch/tag (optional)
+- JSON storage: tags (array) and metadata (extensible object)
+- Same junction table pattern as tasks
+
+**Project References:**
+- `clone_projects.project_id` stores project UUIDs (same as tasks)
+- **No foreign key constraint** - weak reference to JSON file
+- Application validates project existence at query time
+
+**Current State:** `.bluekit/clones.json` (file-based)
+**Migration Target:** PostgreSQL (same pattern as tasks)
+
+### Why Project Registry Stays as File
+
+**Reasons to keep `projectRegistry.json` as file:**
+1. **Projects are filesystem entities** - fundamentally directories on disk
+2. **Low write frequency** - projects added/removed infrequently
+3. **User portability** - easy to backup, edit, share between machines
+4. **Independence** - if database corrupts, project list remains safe
+5. **No referential integrity needed** - projects can be deleted outside BlueKit anyway
+
+**Trade-off:**
+- No database foreign key constraints on `project_id` columns
+- Application must handle orphaned references (tasks/clones pointing to deleted projects)
+- Weak references visualized with dotted lines in diagram
+
+### Extensibility
+
+Both schemas follow the same patterns:
+1. **Main entity table**: Core data with required/optional fields
+2. **Junction table**: Many-to-many relationships with projects (weak refs)
+3. **JSON fields**: Flexible storage for arrays and metadata
+4. **Timestamps**: created_at, updated_at for audit trail
+5. **Foreign key cascades**: Only within database tables (tasks → task_projects, clones → clone_projects)
+
+### Migration Strategy
+
+**From tasks migration experience:**
+1. Create migration function in `migrations.rs`
+2. Create entity models in `src-tauri/src/db/entities/clone.rs`
+3. Create `clone_operations.rs` for CRUD functions
+4. Add IPC commands in `commands.rs`
+5. Create TypeScript wrappers in `src/ipc.ts`
+6. Update UI components to use database instead of file
+
+**Schema preservation:** The PostgreSQL schema matches the JSON structure exactly, ensuring zero data loss during migration.

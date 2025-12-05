@@ -256,6 +256,7 @@ export default function DiagramsTabContent({
         );
       })}
     </SimpleGrid>
+    </Box>
   );
 }
 
