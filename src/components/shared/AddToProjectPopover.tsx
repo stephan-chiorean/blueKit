@@ -10,7 +10,6 @@ import {
   Input,
   InputGroup,
   Icon,
-  Portal,
   Flex,
 } from '@chakra-ui/react';
 import { LuSearch, LuCheck, LuFolder, LuFolderOpen, LuPlus } from 'react-icons/lu';
@@ -23,7 +22,6 @@ interface AddToProjectPopoverProps {
   itemType: 'kit' | 'walkthrough' | 'diagram';
   itemCount: number;
   trigger: React.ReactNode;
-  disabled?: boolean;
   sourceFiles: Array<{ path: string; name: string }>;
 }
 
@@ -32,7 +30,6 @@ export default function AddToProjectPopover({
   itemType,
   itemCount,
   trigger,
-  disabled,
   sourceFiles,
 }: AddToProjectPopoverProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
@@ -255,12 +252,12 @@ export default function AddToProjectPopover({
         {trigger}
       </Menu.Trigger>
       <Menu.Positioner>
-        <Menu.Content width="400px" maxH="500px">
+        <Menu.Content width="400px" maxH="500px" position="relative">
           {/* Header */}
           <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
             <Flex justify="space-between" align="center" gap={2}>
               <Text fontSize="sm" fontWeight="semibold">
-                Add to Project{selectedProjectIds.size > 0 ? ` (${selectedProjectIds.size} selected)` : ''}
+                Add to Project
               </Text>
               <HStack gap={1}>
                 <Button
@@ -302,13 +299,13 @@ export default function AddToProjectPopover({
 
           {/* Search Input */}
           <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-            <InputGroup size="sm">
+            <InputGroup startElement={<LuSearch />}>
               <Input
                 ref={searchInputRef}
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                startElement={<LuSearch />}
+                size="sm"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               />
@@ -369,30 +366,44 @@ export default function AddToProjectPopover({
           </Box>
 
           {/* Footer with Confirm Button */}
-          {selectedProjectIds.size > 0 && (
-            <Box px={3} py={2} borderTopWidth="1px" borderColor="border.subtle">
-              <Button
-                variant="solid"
-                colorPalette="primary"
-                size="sm"
-                width="100%"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleConfirm();
-                }}
-                disabled={copying}
-              >
-                {copying ? (
-                  <HStack gap={2}>
-                    <Spinner size="xs" />
-                    <Text>Adding...</Text>
-                  </HStack>
-                ) : (
-                  `Add to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
-                )}
-              </Button>
-            </Box>
-          )}
+          <Box 
+            position="absolute"
+            bottom={0}
+            left={0}
+            right={0}
+            px={3} 
+            py={2} 
+            borderTopWidth="1px" 
+            borderColor="border.subtle"
+            bg="bg.panel"
+            boxShadow="lg"
+            opacity={selectedProjectIds.size > 0 ? 1 : 0}
+            transform={selectedProjectIds.size > 0 ? 'translateY(0)' : 'translateY(100%)'}
+            transition="opacity 0.2s ease-out, transform 0.2s ease-out"
+            pointerEvents={selectedProjectIds.size > 0 ? 'auto' : 'none'}
+            zIndex={10}
+          >
+            <Button
+              variant="solid"
+              colorPalette="primary"
+              size="sm"
+              width="100%"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleConfirm();
+              }}
+              disabled={copying}
+            >
+              {copying ? (
+                <HStack gap={2}>
+                  <Spinner size="xs" />
+                  <Text>Adding...</Text>
+                </HStack>
+              ) : (
+                `Add to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
+              )}
+            </Button>
+          </Box>
         </Menu.Content>
       </Menu.Positioner>
     </Menu.Root>
