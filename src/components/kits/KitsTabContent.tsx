@@ -42,7 +42,7 @@ export default function KitsTabContent({
   projectsCount,
   onViewKit,
 }: KitsTabContentProps) {
-  const { isSelected: isSelectedInContext, toggleItem, getItemsByType } = useSelection();
+  const { isSelected: isSelectedInContext, toggleItem } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -58,11 +58,6 @@ export default function KitsTabContent({
       path: kit.path,
     });
   };
-
-  const selectedKits = useMemo(() => {
-    const selectedKitItems = getItemsByType('Kit');
-    return kits.filter(kit => selectedKitItems.some(item => item.id === kit.path));
-  }, [kits, getItemsByType]);
 
   // Get all unique tags from kits
   const allTags = useMemo(() => {

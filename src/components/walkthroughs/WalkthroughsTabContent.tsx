@@ -42,7 +42,7 @@ export default function WalkthroughsTabContent({
   projectsCount,
   onViewKit,
 }: WalkthroughsTabContentProps) {
-  const { isSelected: isSelectedInContext, toggleItem, getItemsByType } = useSelection();
+  const { isSelected: isSelectedInContext, toggleItem } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -64,11 +64,6 @@ export default function WalkthroughsTabContent({
     kits.filter(kit => kit.frontMatter?.type === 'walkthrough'),
     [kits]
   );
-
-  const selectedWalkthroughs = useMemo(() => {
-    const selectedWalkthroughItems = getItemsByType('Walkthrough');
-    return walkthroughs.filter(wt => selectedWalkthroughItems.some(item => item.id === wt.path));
-  }, [walkthroughs, getItemsByType]);
 
   // Get all unique tags from walkthroughs
   const allTags = useMemo(() => {
