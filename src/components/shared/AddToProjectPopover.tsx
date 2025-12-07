@@ -239,6 +239,12 @@ export default function AddToProjectPopover({
     project.path.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Helper function to truncate path from the beginning, showing the end
+  const truncatePath = (path: string, maxLength: number = 40): string => {
+    if (path.length <= maxLength) return path;
+    return `...${path.slice(-(maxLength - 3))}`;
+  };
+
   return (
     <Menu.Root 
       closeOnSelect={false}
@@ -331,23 +337,22 @@ export default function AddToProjectPopover({
                   <Menu.Item
                     key={project.id}
                     value={project.id}
-                    onSelect={(e) => {
-                      e.preventDefault();
+                    onSelect={() => {
                       toggleProject(project.id);
                     }}
                     bg={isSelected ? 'primary.50' : undefined}
                   >
-                    <HStack gap={2} justify="space-between" width="100%">
-                      <HStack gap={2} flex="1" minW={0}>
+                    <HStack gap={2} justify="space-between" width="100%" minW={0}>
+                      <HStack gap={2} flex="1" minW={0} overflow="hidden">
                         <Icon flexShrink={0}>
                           <LuFolder />
                         </Icon>
-                        <VStack align="start" gap={0} flex="1" minW={0}>
-                          <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
+                        <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
+                          <Text fontSize="sm" fontWeight="medium" lineClamp={1} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" width="100%">
                             {project.title}
                           </Text>
-                          <Text fontSize="xs" color="text.secondary" lineClamp={1}>
-                            {project.path}
+                          <Text fontSize="xs" color="text.secondary" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" width="100%" title={project.path}>
+                            {truncatePath(project.path, 35)}
                           </Text>
                         </VStack>
                       </HStack>

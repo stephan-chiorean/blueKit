@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
+import { Button, HStack, Text, ActionBar, Portal, Box, VStack, Icon } from "@chakra-ui/react";
 import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { ArtifactFile, ProjectEntry, invokeCopyWalkthroughToProject } from "../../ipc";
@@ -148,49 +148,66 @@ export default function WalkthroughsActionBar({
       <Portal>
         <ActionBar.Positioner>
           <ActionBar.Content>
-            <Button
-              variant="surface"
-              colorPalette="red"
-              size="sm"
-              onClick={handleDelete}
-              disabled={loading}
-            >
+            <VStack align="stretch" gap={0}>
+              <Box pb={1} mt={-0.5}>
+                <HStack gap={1} justify="center">
+                  <Text fontSize="xs" color="text.secondary">
+                    {selectedWalkthroughs.length}
+                  </Text>
+                  <Icon fontSize="xs" color="text.secondary">
+                    <LuBookOpen />
+                  </Icon>
+                  <Text fontSize="xs" color="text.secondary">
+                    selected
+                  </Text>
+                </HStack>
+              </Box>
               <HStack gap={2}>
-                <LuTrash2 />
-                <Text>Delete</Text>
-              </HStack>
-            </Button>
-            <ActionBar.Separator />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePublishToLibrary}
-              disabled={loading}
-            >
-              <HStack gap={2}>
-                <LuBookOpen />
-                <Text>Publish to Library</Text>
-              </HStack>
-            </Button>
-            <AddToProjectPopover
-              onConfirm={handleConfirmAddToProject}
-              itemType="walkthrough"
-              itemCount={selectedWalkthroughs.length}
-              disabled={loading}
-              sourceFiles={selectedWalkthroughs.map(walkthrough => ({ path: walkthrough.path, name: walkthrough.name }))}
-              trigger={
                 <Button
-                  variant="outline"
+                  variant="surface"
+                  colorPalette="red"
                   size="sm"
+                  onClick={handleDelete}
                   disabled={loading}
                 >
                   <HStack gap={2}>
-                    <LuFolderPlus />
-                    <Text>Add to Project</Text>
+                    <LuTrash2 />
+                    <Text>Delete</Text>
                   </HStack>
                 </Button>
-              }
-            />
+                <ActionBar.Separator />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePublishToLibrary}
+                  disabled={loading}
+                >
+                  <HStack gap={2}>
+                    <LuBookOpen />
+                    <Text>Publish to Library</Text>
+                  </HStack>
+                </Button>
+                <AddToProjectPopover
+                  onConfirm={handleConfirmAddToProject}
+                  itemType="walkthrough"
+                  itemCount={selectedWalkthroughs.length}
+                  disabled={loading}
+                  sourceFiles={selectedWalkthroughs.map(walkthrough => ({ path: walkthrough.path, name: walkthrough.name }))}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={loading}
+                    >
+                      <HStack gap={2}>
+                        <LuFolderPlus />
+                        <Text>Add to Project</Text>
+                      </HStack>
+                    </Button>
+                  }
+                />
+              </HStack>
+            </VStack>
           </ActionBar.Content>
         </ActionBar.Positioner>
       </Portal>
