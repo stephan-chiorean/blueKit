@@ -12,10 +12,10 @@ import {
   Link,
   List,
 } from '@chakra-ui/react';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 
 interface KitMarkdownViewerProps {
-  kit: KitFile;
+  kit: ArtifactFile;
   content: string;
 }
 

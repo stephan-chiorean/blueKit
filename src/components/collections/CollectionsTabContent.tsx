@@ -23,13 +23,13 @@ import {
 import { LuLibrary, LuPlus } from 'react-icons/lu';
 import { Collection } from './AddCollectionDialog';
 import CollectionItemsSelector from './CollectionItemsSelector';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 
 interface CollectionsTabContentProps {
   collections: Collection[];
   onAddCollection: (collection: Collection, selectedItemIds: string[]) => void;
   onUpdateCollection: (collection: Collection, selectedItemIds: string[]) => void;
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
 }
 

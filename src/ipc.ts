@@ -40,14 +40,18 @@ export interface AppInfo {
 }
 
 /**
- * Type definition for a kit file returned by `get_project_kits`.
- * 
- * This interface must match the `KitFile` struct in `src-tauri/src/commands.rs`.
+ * Type definition for an artifact file returned by `get_project_artifacts`.
+ *
+ * Artifacts represent any file in the .bluekit directory: kits, walkthroughs,
+ * agents, diagrams, tasks, etc. This generic type allows us to load all
+ * .bluekit resources at once and filter by type on the frontend.
+ *
+ * This interface must match the `ArtifactFile` struct in `src-tauri/src/commands.rs`.
  */
-export interface KitFile {
-  /** Name of the kit file (without .md extension) */
+export interface ArtifactFile {
+  /** Name of the artifact file (without extension) */
   name: string;
-  /** Full path to the kit file */
+  /** Full path to the artifact file */
   path: string;
   /** Parsed YAML front matter */
   frontMatter?: KitFrontMatter;
@@ -324,25 +328,29 @@ export async function invokeExampleError(shouldFail: boolean): Promise<string> {
 }
 
 /**
- * Gets the list of kit files (.md files) from a project's .bluekit directory.
- * 
- * This command reads the .bluekit directory in the specified project path
- * and returns a list of all .md files found there. Each .md file represents a kit.
- * 
+ * Gets all artifact files from a project's .bluekit directory.
+ *
+ * This command loads ALL resources from .bluekit/ in one shot: kits, walkthroughs,
+ * agents, diagrams, tasks, etc. Frontend filters by `frontMatter.type` to separate them.
+ *
+ * This "load everything, filter later" approach:
+ * - Keeps backend simple (one function, one watcher)
+ * - Powers the Scrapbook tab (which needs everything)
+ * - Avoids multiple watchers and duplicate loading logic
+ * - Frontend filtering is cheap compared to file I/O
+ *
  * @param projectPath - The path to the project root directory
- * @returns A promise that resolves to an array of KitFile objects
- * 
+ * @returns A promise that resolves to an array of ArtifactFile objects
+ *
  * @example
  * ```typescript
- * const kits = await invokeGetProjectKits('/path/to/project');
- * kits.forEach(kit => {
- *   console.log(kit.name); // "my-kit" (without .md extension)
- *   console.log(kit.path); // "/path/to/project/.bluekit/my-kit.md"
- * });
+ * const artifacts = await invokeGetProjectArtifacts('/path/to/project');
+ * const kits = artifacts.filter(a => !a.frontMatter?.type || a.frontMatter.type === 'kit');
+ * const walkthroughs = artifacts.filter(a => a.frontMatter?.type === 'walkthrough');
  * ```
  */
-export async function invokeGetProjectKits(projectPath: string): Promise<KitFile[]> {
-  return await invokeWithTimeout<KitFile[]>('get_project_kits', { projectPath });
+export async function invokeGetProjectArtifacts(projectPath: string): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_project_artifacts', { projectPath });
 }
 
 /**
@@ -367,23 +375,23 @@ export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
 }
 
 /**
- * Starts watching a project's .bluekit directory for kit file changes.
+ * Starts watching a project's .bluekit directory for artifact file changes.
  *
  * This command sets up a file watcher that monitors the .bluekit directory
- * in the specified project path. When any .md file is added, modified, or
- * removed, it emits a Tauri event that the frontend can listen to.
+ * in the specified project path. When any artifact file (.md, .mmd, etc.) is
+ * added, modified, or removed, it emits a Tauri event that the frontend can listen to.
  *
  * @param projectPath - The path to the project root directory
  * @returns A promise that resolves when the watcher is set up
  *
  * @example
  * ```typescript
- * await invokeWatchProjectKits('/path/to/project');
- * // Then listen for 'project-kits-changed' events
+ * await invokeWatchProjectArtifacts('/path/to/project');
+ * // Then listen for 'project-artifacts-changed-{sanitized-path}' events
  * ```
  */
-export async function invokeWatchProjectKits(projectPath: string): Promise<void> {
-  return await invokeWithTimeout<void>('watch_project_kits', { projectPath }, 5000); // Shorter timeout for watcher setup
+export async function invokeWatchProjectArtifacts(projectPath: string): Promise<void> {
+  return await invokeWithTimeout<void>('watch_project_artifacts', { projectPath }, 5000); // Shorter timeout for watcher setup
 }
 
 /**
@@ -447,6 +455,64 @@ export async function invokeCopyKitToProject(
 }
 
 /**
+ * Copies a walkthrough file to a project's .bluekit directory.
+ * 
+ * This command reads the source walkthrough file and writes it to the target project's
+ * .bluekit/walkthroughs directory. It creates the directory structure if it doesn't exist.
+ * 
+ * @param sourceFilePath - The absolute path to the source walkthrough file
+ * @param targetProjectPath - The absolute path to the target project root directory
+ * @returns A promise that resolves to the path of the copied file
+ * 
+ * @example
+ * ```typescript
+ * const result = await invokeCopyWalkthroughToProject(
+ *   '/path/to/source/walkthrough.md',
+ *   '/path/to/target/project'
+ * );
+ * console.log(result); // "/path/to/target/project/.bluekit/walkthroughs/walkthrough.md"
+ * ```
+ */
+export async function invokeCopyWalkthroughToProject(
+  sourceFilePath: string,
+  targetProjectPath: string,
+): Promise<string> {
+  return await invokeWithTimeout<string>('copy_walkthrough_to_project', {
+    sourceFilePath,
+    targetProjectPath,
+  });
+}
+
+/**
+ * Copies a diagram file to a project's .bluekit directory.
+ * 
+ * This command reads the source diagram file (.mmd or .mermaid) and writes it to the target project's
+ * .bluekit/diagrams directory. It creates the directory structure if it doesn't exist.
+ * 
+ * @param sourceFilePath - The absolute path to the source diagram file
+ * @param targetProjectPath - The absolute path to the target project root directory
+ * @returns A promise that resolves to the path of the copied file
+ * 
+ * @example
+ * ```typescript
+ * const result = await invokeCopyDiagramToProject(
+ *   '/path/to/source/diagram.mmd',
+ *   '/path/to/target/project'
+ * );
+ * console.log(result); // "/path/to/target/project/.bluekit/diagrams/diagram.mmd"
+ * ```
+ */
+export async function invokeCopyDiagramToProject(
+  sourceFilePath: string,
+  targetProjectPath: string,
+): Promise<string> {
+  return await invokeWithTimeout<string>('copy_diagram_to_project', {
+    sourceFilePath,
+    targetProjectPath,
+  });
+}
+
+/**
  * Copies a blueprint directory to a project's .bluekit/blueprints directory.
  *
  * This command recursively copies the entire blueprint directory (including blueprint.json
@@ -504,7 +570,7 @@ export async function invokeGetScrapbookItems(projectPath: string): Promise<Scra
  * Gets markdown files from a specific folder in the .bluekit directory.
  *
  * @param folderPath - The absolute path to the folder
- * @returns A promise that resolves to an array of KitFile objects
+ * @returns A promise that resolves to an array of ArtifactFile objects
  *
  * @example
  * ```typescript
@@ -515,8 +581,8 @@ export async function invokeGetScrapbookItems(projectPath: string): Promise<Scra
  * });
  * ```
  */
-export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<KitFile[]> {
-  return await invokeWithTimeout<KitFile[]>('get_folder_markdown_files', { folderPath });
+export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_folder_markdown_files', { folderPath });
 }
 
 /**
@@ -568,7 +634,7 @@ export async function invokeGetBlueprintTaskFile(
  * Gets all diagram files (.mmd and .mermaid) from the .bluekit/diagrams directory.
  *
  * @param projectPath - The path to the project root directory
- * @returns A promise that resolves to an array of KitFile objects
+ * @returns A promise that resolves to an array of ArtifactFile objects
  *
  * @example
  * ```typescript
@@ -579,8 +645,8 @@ export async function invokeGetBlueprintTaskFile(
  * });
  * ```
  */
-export async function invokeGetProjectDiagrams(projectPath: string): Promise<KitFile[]> {
-  return await invokeWithTimeout<KitFile[]>('get_project_diagrams', { projectPath });
+export async function invokeGetProjectDiagrams(projectPath: string): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_project_diagrams', { projectPath });
 }
 
 /**
@@ -643,6 +709,48 @@ export async function invokeCreateProjectFromClone(
     projectTitle,
     registerProject,
   }, 60000); // 60 second timeout for git operations
+}
+
+/**
+ * Creates a new project directory and copies files to it.
+ *
+ * This command:
+ * 1. Creates a new project directory at the specified path
+ * 2. Creates .bluekit directory structure
+ * 3. Copies source files to appropriate subdirectories based on file type
+ * 4. Optionally registers the project in the registry
+ *
+ * @param targetPath - The absolute path where the new project should be created
+ * @param projectTitle - Title for the new project
+ * @param sourceFiles - Array of tuples containing (filePath, fileType) where fileType is "kit", "walkthrough", or "diagram"
+ * @param registerProject - Whether to automatically register the new project (default: true)
+ * @returns A promise that resolves to the project path
+ *
+ * @example
+ * ```typescript
+ * const result = await invokeCreateNewProject(
+ *   '/path/to/new/project',
+ *   'My New Project',
+ *   [
+ *     ['/path/to/kit.md', 'kit'],
+ *     ['/path/to/walkthrough.md', 'walkthrough']
+ *   ],
+ *   true
+ * );
+ * ```
+ */
+export async function invokeCreateNewProject(
+  targetPath: string,
+  projectTitle: string,
+  sourceFiles: Array<[string, string]>,
+  registerProject: boolean = true
+): Promise<string> {
+  return await invokeWithTimeout<string>('create_new_project', {
+    targetPath,
+    projectTitle,
+    sourceFiles,
+    registerProject,
+  });
 }
 
 /**

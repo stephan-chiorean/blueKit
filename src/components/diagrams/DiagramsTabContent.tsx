@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import {
   Box,
   Card,
@@ -15,32 +14,32 @@ import {
   Flex,
 } from '@chakra-ui/react';
 import { LuNetwork } from 'react-icons/lu';
-import {
-  KitFile,
-  invokeGetProjectDiagrams,
-  invokeReadFile,
-  TimeoutError,
-} from '../../ipc';
-import { parseFrontMatter } from '../../utils/parseFrontMatter';
+import { ArtifactFile } from '../../ipc';
 import DiagramsActionBar from './DiagramsActionBar';
 
 interface DiagramsTabContentProps {
-  projectPath: string;
-  onViewDiagram: (diagram: KitFile) => void;
+  diagrams: ArtifactFile[];
+  diagramsLoading: boolean;
+  error: string | null;
+  onViewDiagram: (diagram: ArtifactFile) => void;
 }
 
 export default function DiagramsTabContent({
-  projectPath,
+  diagrams,
+  diagramsLoading,
+  error,
   onViewDiagram,
 }: DiagramsTabContentProps) {
-  const [diagrams, setDiagrams] = useState<KitFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedDiagramPaths, setSelectedDiagramPaths] = useState<Set<string>>(new Set());
+
+  // Clear selection when component mounts (happens when switching tabs due to key prop)
+  useEffect(() => {
+    setSelectedDiagramPaths(new Set());
+  }, []);
 
   const isSelected = (path: string) => selectedDiagramPaths.has(path);
 
-  const handleDiagramToggle = (diagram: KitFile) => {
+  const handleDiagramToggle = (diagram: ArtifactFile) => {
     setSelectedDiagramPaths(prev => {
       const next = new Set(prev);
       if (next.has(diagram.path)) {
@@ -66,98 +65,12 @@ export default function DiagramsTabContent({
     clearSelection();
   };
 
-  // Load diagrams
-  const loadDiagrams = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const diagramFiles = await invokeGetProjectDiagrams(projectPath);
-      
-      // Read file contents and parse front matter for each diagram
-      const diagramsWithFrontMatter = await Promise.all(
-        diagramFiles.map(async (diagram) => {
-          try {
-            const content = await invokeReadFile(diagram.path);
-            const frontMatter = parseFrontMatter(content);
-            return {
-              ...diagram,
-              frontMatter,
-            };
-          } catch (err) {
-            console.error(`Error reading diagram file ${diagram.path}:`, err);
-            return diagram; // Return diagram without front matter if read fails
-          }
-        })
-      );
-      
-      setDiagrams(diagramsWithFrontMatter);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load diagrams');
-      console.error('Error loading diagrams:', err);
-    } finally {
-      setLoading(false);
-    }
+  // Handle clicking on a diagram - diagrams already have front matter from parent
+  const handleDiagramClick = (diagram: ArtifactFile) => {
+    onViewDiagram(diagram);
   };
 
-  // Handle clicking on a diagram
-  const handleDiagramClick = async (diagram: KitFile) => {
-    try {
-      const content = await invokeReadFile(diagram.path);
-      const frontMatter = parseFrontMatter(content);
-      const diagramFile: KitFile = {
-        ...diagram,
-        frontMatter,
-      };
-      onViewDiagram(diagramFile);
-    } catch (err) {
-      console.error('Error loading diagram:', err);
-    }
-  };
-
-  // Load diagrams on mount and set up file watcher
-  useEffect(() => {
-    loadDiagrams();
-
-    let isMounted = true;
-    let unlisten: (() => void) | null = null;
-
-    // Set up file watcher for this project
-    const setupWatcher = async () => {
-      try {
-        // Generate the event name (must match the Rust code)
-        const sanitizedPath = projectPath
-          .replace(/\//g, '_')
-          .replace(/\\/g, '_')
-          .replace(/:/g, '_')
-          .replace(/\./g, '_')
-          .replace(/ /g, '_');
-        const eventName = `project-kits-changed-${sanitizedPath}`;
-
-        // Listen for file change events
-        unlisten = await listen(eventName, () => {
-          if (isMounted) {
-            console.log(`Diagrams directory changed for ${projectPath}, reloading...`);
-            loadDiagrams();
-          }
-        });
-      } catch (error) {
-        console.error(`Failed to set up file watcher for ${projectPath}:`, error);
-        if (error instanceof TimeoutError) {
-          console.warn('File watcher setup timed out - watchers may not work');
-        }
-      }
-    };
-
-    setupWatcher();
-
-    // Synchronous cleanup
-    return () => {
-      isMounted = false;
-      if (unlisten) unlisten();
-    };
-  }, [projectPath]);
-
-  if (loading) {
+  if (diagramsLoading) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
         Loading diagrams...
@@ -196,6 +109,7 @@ export default function DiagramsTabContent({
   return (
     <Box position="relative">
       <DiagramsActionBar
+        key="diagrams-action-bar"
         selectedDiagrams={selectedDiagrams}
         hasSelection={hasSelection}
         clearSelection={clearSelection}

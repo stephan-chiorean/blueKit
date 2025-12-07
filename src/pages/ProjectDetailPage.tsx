@@ -25,7 +25,7 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeWatchProjectArtifacts, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { ResourceFile, ResourceType } from '../types/resource';
 
@@ -36,8 +36,8 @@ interface ProjectDetailPageProps {
 }
 
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
-  const [kits, setKits] = useState<KitFile[]>([]);
-  const [kitsLoading, setKitsLoading] = useState(true);
+  const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
+  const [artifactsLoading, setArtifactsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
   const [currentTab, setCurrentTab] = useState<string>("kits");
@@ -62,44 +62,46 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     loadProjects();
   }, []);
 
-  // Load kits from this project only
-  const loadProjectKits = async () => {
+  // Load all artifacts from this project
+  // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
+  // Frontend filters by type later - see kitsOnly, walkthroughs, agents, blueprints memos below
+  const loadProjectArtifacts = async () => {
     try {
-      setKitsLoading(true);
+      setArtifactsLoading(true);
       setError(null);
-      
-      console.log(`Loading kits from project: ${project.path}`);
-      const projectKits = await invokeGetProjectKits(project.path);
-      
-      // Read file contents and parse front matter for each kit
-      const kitsWithFrontMatter = await Promise.all(
-        projectKits.map(async (kit) => {
+
+      console.log(`Loading artifacts from project: ${project.path}`);
+      const projectArtifacts = await invokeGetProjectArtifacts(project.path);
+
+      // Read file contents and parse front matter for each artifact
+      const artifactsWithFrontMatter = await Promise.all(
+        projectArtifacts.map(async (artifact) => {
           try {
-            const content = await invokeReadFile(kit.path);
+            const content = await invokeReadFile(artifact.path);
             const frontMatter = parseFrontMatter(content);
             return {
-              ...kit,
+              ...artifact,
               frontMatter,
             };
           } catch (err) {
-            console.error(`Error reading kit file ${kit.path}:`, err);
-            return kit; // Return kit without front matter if read fails
+            console.error(`Error reading artifact file ${artifact.path}:`, err);
+            return artifact; // Return artifact without front matter if read fails
           }
         })
       );
-      
-      setKits(kitsWithFrontMatter);
+
+      setArtifacts(artifactsWithFrontMatter);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load kits');
-      console.error('Error loading kits:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load artifacts');
+      console.error('Error loading artifacts:', err);
     } finally {
-      setKitsLoading(false);
+      setArtifactsLoading(false);
     }
   };
 
   useEffect(() => {
-    // Load kits on mount
-    loadProjectKits();
+    // Load artifacts on mount
+    loadProjectArtifacts();
 
     let isMounted = true;
     let unlisten: (() => void) | null = null;
@@ -107,7 +109,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
-        await invokeWatchProjectKits(project.path);
+        await invokeWatchProjectArtifacts(project.path);
 
         // Generate the event name (must match the Rust code)
         const sanitizedPath = project.path
@@ -116,13 +118,13 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           .replace(/:/g, '_')
           .replace(/\./g, '_')
           .replace(/ /g, '_');
-        const eventName = `project-kits-changed-${sanitizedPath}`;
+        const eventName = `project-artifacts-changed-${sanitizedPath}`;
 
         // Listen for file change events
         unlisten = await listen(eventName, () => {
           if (isMounted) {
-            console.log(`Kits directory changed for ${project.path}, reloading...`);
-            loadProjectKits();
+            console.log(`Artifacts directory changed for ${project.path}, reloading...`);
+            loadProjectArtifacts();
           }
         });
       } catch (error) {
@@ -142,25 +144,35 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     };
   }, [project.path]);
 
-  // Filter kits by type
+  // Filter artifacts by type
+  // This is where we separate the "load everything" approach into type-specific lists
   const kitsOnly = useMemo(() => {
-    return kits.filter(kit => {
-      const type = kit.frontMatter?.type;
-      return !type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task');
+    return artifacts.filter(artifact => {
+      const type = artifact.frontMatter?.type;
+      // Only include .md files that aren't other types
+      return artifact.path.endsWith('.md') &&
+             (!type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task'));
     });
-  }, [kits]);
+  }, [artifacts]);
 
   const walkthroughs = useMemo(() => {
-    return kits.filter(kit => kit.frontMatter?.type === 'walkthrough');
-  }, [kits]);
+    return artifacts.filter(artifact => artifact.frontMatter?.type === 'walkthrough');
+  }, [artifacts]);
 
   const blueprints = useMemo(() => {
-    return kits.filter(kit => kit.frontMatter?.type === 'blueprint');
-  }, [kits]);
+    return artifacts.filter(artifact => artifact.frontMatter?.type === 'blueprint');
+  }, [artifacts]);
 
   const agents = useMemo(() => {
-    return kits.filter(kit => kit.frontMatter?.type === 'agent');
-  }, [kits]);
+    return artifacts.filter(artifact => artifact.frontMatter?.type === 'agent');
+  }, [artifacts]);
+
+  const diagrams = useMemo(() => {
+    // Filter for diagram files (.mmd or .mermaid extensions)
+    return artifacts.filter(artifact =>
+      artifact.path.endsWith('.mmd') || artifact.path.endsWith('.mermaid')
+    );
+  }, [artifacts]);
 
   // Generic handler to view any resource type
   const handleViewResource = async (resource: ResourceFile, type: ResourceType) => {
@@ -175,11 +187,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   };
 
   // Convenience handlers for different resource types (backwards compatibility)
-  const handleViewKit = async (kit: KitFile) => {
-    await handleViewResource(kit, (kit.frontMatter?.type as ResourceType) || 'kit');
+  const handleViewKit = async (artifact: ArtifactFile) => {
+    await handleViewResource(artifact, (artifact.frontMatter?.type as ResourceType) || 'kit');
   };
 
-  const handleViewDiagram = async (diagram: KitFile) => {
+  const handleViewDiagram = async (diagram: ArtifactFile) => {
     await handleViewResource(diagram, 'diagram');
   };
 
@@ -412,10 +424,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               )}
             </Flex>
 
-            <Tabs.Content value="kits">
+            <Tabs.Content value="kits" key="kits">
               <KitsTabContent
                 kits={kitsOnly}
-                kitsLoading={kitsLoading}
+                kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
                 onViewKit={handleViewKit}
@@ -428,19 +440,19 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 onViewTask={handleViewTask}
               />
             </Tabs.Content>
-            <Tabs.Content value="walkthroughs">
+            <Tabs.Content value="walkthroughs" key="walkthroughs">
               <WalkthroughsTabContent
                 kits={walkthroughs}
-                kitsLoading={kitsLoading}
+                kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
                 onViewKit={handleViewKit}
               />
             </Tabs.Content>
-            <Tabs.Content value="agents">
+            <Tabs.Content value="agents" key="agents">
               <AgentsTabContent
                 kits={agents}
-                kitsLoading={kitsLoading}
+                kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
                 onViewKit={handleViewKit}
@@ -452,9 +464,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 onViewKit={handleViewKit}
               />
             </Tabs.Content>
-            <Tabs.Content value="diagrams">
+            <Tabs.Content value="diagrams" key="diagrams">
               <DiagramsTabContent
-                projectPath={project.path}
+                diagrams={diagrams}
+                diagramsLoading={artifactsLoading}
+                error={error}
                 onViewDiagram={handleViewDiagram}
               />
             </Tabs.Content>

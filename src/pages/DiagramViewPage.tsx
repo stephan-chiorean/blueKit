@@ -9,10 +9,10 @@ import {
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
 import MermaidDiagramViewer from '../components/workstation/MermaidDiagramViewer';
-import { KitFile } from '../ipc';
+import { ArtifactFile } from '../ipc';
 
 interface DiagramViewPageProps {
-  diagram: KitFile;
+  diagram: ArtifactFile;
   diagramContent: string;
   onBack: () => void;
 }

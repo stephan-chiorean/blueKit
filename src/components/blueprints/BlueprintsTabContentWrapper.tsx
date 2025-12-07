@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import BlueprintsTabContent from './BlueprintsTabContent';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 
 interface Blueprint {
   id: string;
@@ -13,7 +13,7 @@ interface BlueprintsTabContentWrapperProps {
   onCreateBlueprint: (name: string, description: string) => void;
   isCreateMode: boolean;
   onSetCreateMode: (mode: boolean) => void;
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
 }
 

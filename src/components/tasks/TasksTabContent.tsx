@@ -21,16 +21,15 @@ import {
   InputGroup,
   Field,
   IconButton,
-  Menu,
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
-import { Task } from '../../types/task';
+import { Task, TaskPriority } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
-import { getPriorityLabel, shouldShowPriorityBadge, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette } from '../../utils/taskUtils';
+import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project

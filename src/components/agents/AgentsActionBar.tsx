@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
 import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
-import { KitFile } from "../../ipc";
+import { ArtifactFile } from "../../ipc";
 
 interface AgentsActionBarProps {
-  selectedAgents: KitFile[];
+  selectedAgents: ArtifactFile[];
   hasSelection: boolean;
   clearSelection: () => void;
   onAgentsUpdated: () => void;
@@ -18,8 +18,19 @@ export default function AgentsActionBar({
   onAgentsUpdated,
 }: AgentsActionBarProps) {
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  if (!hasSelection) {
+  // Sync isOpen with hasSelection and force close when hasSelection becomes false
+  useEffect(() => {
+    if (hasSelection) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [hasSelection]);
+
+  // Don't render anything if there's no selection
+  if (!hasSelection && !isOpen) {
     return null;
   }
 
@@ -114,7 +125,7 @@ export default function AgentsActionBar({
   };
 
   return (
-    <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
+    <ActionBar.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} closeOnInteractOutside={false}>
       <Portal>
         <ActionBar.Positioner>
           <ActionBar.Content>

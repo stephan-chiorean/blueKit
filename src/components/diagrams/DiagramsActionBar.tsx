@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
 import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
-import { KitFile } from "../../ipc";
+import { ArtifactFile, ProjectEntry, invokeCopyDiagramToProject } from "../../ipc";
+import AddToProjectPopover from "../shared/AddToProjectPopover";
 
 interface DiagramsActionBarProps {
-  selectedDiagrams: KitFile[];
+  selectedDiagrams: ArtifactFile[];
   hasSelection: boolean;
   clearSelection: () => void;
   onDiagramsUpdated: () => void;
@@ -18,8 +19,19 @@ export default function DiagramsActionBar({
   onDiagramsUpdated,
 }: DiagramsActionBarProps) {
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  if (!hasSelection) {
+  // Sync isOpen with hasSelection and force close when hasSelection becomes false
+  useEffect(() => {
+    if (hasSelection) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [hasSelection]);
+
+  // Don't render anything if there's no selection
+  if (!hasSelection && !isOpen) {
     return null;
   }
 
@@ -83,18 +95,35 @@ export default function DiagramsActionBar({
     }
   };
 
-  const handleAddToProject = async () => {
+  const handleConfirmAddToProject = async (selectedProjects: ProjectEntry[]) => {
     try {
       setLoading(true);
-      // TODO: Implement add to project functionality
-      // await Promise.all(selectedDiagrams.map(diagram => invokeAddDiagramToProject(diagram.path)));
+      
+      // Copy each diagram to each selected project
+      const copyPromises: Promise<void>[] = [];
+      for (const diagram of selectedDiagrams) {
+        for (const project of selectedProjects) {
+          copyPromises.push(
+            invokeCopyDiagramToProject(diagram.path, project.path)
+              .then(() => {
+                // Convert Promise<string> to Promise<void>
+              })
+              .catch((error) => {
+                console.error(`[DiagramsActionBar] Error copying ${diagram.name} to ${project.title}:`, error);
+                throw error;
+              })
+          );
+        }
+      }
+
+      await Promise.all(copyPromises);
 
       toaster.create({
         type: "success",
         title: "Diagrams added",
         description: `Added ${selectedDiagrams.length} diagram${
           selectedDiagrams.length !== 1 ? "s" : ""
-        } to project`,
+        } to ${selectedProjects.length} project${selectedProjects.length !== 1 ? "s" : ""}`,
       });
 
       clearSelection();
@@ -108,13 +137,14 @@ export default function DiagramsActionBar({
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
+      throw error; // Re-throw so popover can handle it
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
+    <ActionBar.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} closeOnInteractOutside={false}>
       <Portal>
         <ActionBar.Positioner>
           <ActionBar.Content>
@@ -142,17 +172,25 @@ export default function DiagramsActionBar({
                 <Text>Publish to Library</Text>
               </HStack>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddToProject}
+            <AddToProjectPopover
+              onConfirm={handleConfirmAddToProject}
+              itemType="diagram"
+              itemCount={selectedDiagrams.length}
               disabled={loading}
-            >
-              <HStack gap={2}>
-                <LuFolderPlus />
-                <Text>Add to Project</Text>
-              </HStack>
-            </Button>
+              sourceFiles={selectedDiagrams.map(diagram => ({ path: diagram.path, name: diagram.name }))}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                >
+                  <HStack gap={2}>
+                    <LuFolderPlus />
+                    <Text>Add to Project</Text>
+                  </HStack>
+                </Button>
+              }
+            />
           </ActionBar.Content>
         </ActionBar.Positioner>
       </Portal>

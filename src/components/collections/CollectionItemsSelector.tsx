@@ -15,12 +15,12 @@ import {
   Flex,
 } from '@chakra-ui/react';
 import { LuPackage, LuLayers, LuBookOpen } from 'react-icons/lu';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 
 type Category = 'Kits' | 'Templates' | 'Walkthroughs' | null;
 
 interface CollectionItemsSelectorProps {
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
   selectedItemIds: Set<string>;
   onToggleItem: (itemId: string) => void;

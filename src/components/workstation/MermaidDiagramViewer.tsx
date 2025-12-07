@@ -9,11 +9,12 @@ import {
   Tag,
   IconButton,
 } from '@chakra-ui/react';
-import { KitFile } from '../../ipc';
-import { LuMaximize2, LuMinimize2 } from 'react-icons/lu';
+import { ArtifactFile } from '../../ipc';
+import { LuMaximize2, LuMinimize2, LuStickyNote } from 'react-icons/lu';
+import DraggableNotepad from './DraggableNotepad';
 
 interface MermaidDiagramViewerProps {
-  diagram: KitFile;
+  diagram: ArtifactFile;
   content: string;
 }
 
@@ -26,6 +27,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   const [isPanning, setIsPanning] = useState(false);
   const startPanRef = useRef({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false);
   const animationFrameRef = useRef<number | null>(null);
 
   // Extract mermaid diagram code from content
@@ -126,7 +128,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     const container = containerRef.current;
     if (!container) return;
 
-    let wheelTimeout: NodeJS.Timeout | null = null;
+    let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const handleWheel = (e: WheelEvent) => {
       // Check if this is a pinch gesture (ctrlKey is set for pinch on trackpad)
@@ -251,11 +253,29 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
           >
             {isFullscreen ? <LuMinimize2 /> : <LuMaximize2 />}
           </IconButton>
+          <IconButton
+            position="absolute"
+            top={4}
+            right={isFullscreen ? 16 : 16}
+            transform={isFullscreen ? 'translateX(-40px)' : 'translateX(-40px)'}
+            zIndex={10}
+            aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
+            onClick={() => setIsNotepadOpen(!isNotepadOpen)}
+            size="sm"
+            variant="ghost"
+          >
+            <LuStickyNote />
+          </IconButton>
           <Box
             ref={diagramRef}
             style={{
               transformOrigin: 'center',
             }}
+          />
+          {/* Draggable Notepad */}
+          <DraggableNotepad
+            isOpen={isNotepadOpen}
+            onClose={() => setIsNotepadOpen(false)}
           />
         </Box>
       </VStack>

@@ -47,12 +47,14 @@ async fn main() {
             commands::ping,              // Simple ping/pong test command
             commands::get_app_info,      // Returns app metadata
             commands::example_error,      // Demonstrates error handling
-            commands::get_project_kits,  // Get kits from .bluekit directory
+            commands::get_project_artifacts,  // Get all artifacts from .bluekit directory
             commands::get_project_registry, // Get projects from registry
-            commands::watch_project_kits, // Watch project .bluekit directory for changes
+            commands::watch_project_artifacts, // Watch project .bluekit directory for artifact changes
             commands::read_file,        // Read file contents
             commands::write_file,       // Write file contents
             commands::copy_kit_to_project, // Copy kit file to project
+            commands::copy_walkthrough_to_project, // Copy walkthrough file to project
+            commands::copy_diagram_to_project, // Copy diagram file to project
             commands::copy_blueprint_to_project, // Copy blueprint directory to project
             commands::get_scrapbook_items, // Get scrapbook folders and files
             commands::get_folder_markdown_files, // Get markdown files from a folder
@@ -61,6 +63,7 @@ async fn main() {
             commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory
             commands::get_project_clones, // Get clones from .bluekit/clones.json
             commands::create_project_from_clone, // Create project from clone
+            commands::create_new_project, // Create new project with files
             commands::get_watcher_health, // Get health status of all active file watchers
             commands::db_get_tasks, // Get all tasks (database)
             commands::db_get_project_tasks, // Get tasks for a project (database)

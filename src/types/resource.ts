@@ -4,7 +4,7 @@
  * (kits, walkthroughs, agents, blueprints, diagrams, scrapbook) in a unified way.
  */
 
-import { KitFile } from '../ipc';
+import { ArtifactFile } from '../ipc';
 
 /**
  * Resource type discriminator
@@ -13,9 +13,9 @@ export type ResourceType = 'kit' | 'walkthrough' | 'agent' | 'blueprint' | 'task
 
 /**
  * Generic resource file interface
- * This is compatible with KitFile but adds a resourceType field
+ * This is compatible with ArtifactFile but adds a resourceType field
  */
-export interface ResourceFile extends KitFile {
+export interface ResourceFile extends ArtifactFile {
   /** Type of resource - used for routing and display */
   resourceType?: ResourceType;
 }

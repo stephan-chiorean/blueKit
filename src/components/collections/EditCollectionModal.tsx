@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { Collection } from './AddCollectionDialog';
 import CollectionItemsSelector from './CollectionItemsSelector';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 
 interface EditCollectionModalProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ interface EditCollectionModalProps {
   onSave: (collection: Collection, selectedItemIds: string[]) => void;
   collection: Collection;
   selectedItemIds: string[];
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
 }
 

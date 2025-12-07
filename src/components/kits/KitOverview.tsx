@@ -14,10 +14,10 @@ import {
   IconButton,
 } from '@chakra-ui/react';
 import { LuArrowLeft, LuSave, LuCopy, LuCheck, LuTrash2 } from 'react-icons/lu';
-import { KitFile, invokeGetProjectRegistry } from '../../ipc';
+import { ArtifactFile, invokeGetProjectRegistry } from '../../ipc';
 
 interface KitOverviewProps {
-  kit: KitFile;
+  kit: ArtifactFile;
   onBack?: () => void;
 }
 

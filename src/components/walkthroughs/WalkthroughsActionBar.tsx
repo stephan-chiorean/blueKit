@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, HStack, Text, ActionBar, Portal } from "@chakra-ui/react";
 import { LuTrash2, LuFolderPlus, LuBookOpen } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
-import { KitFile } from "../../ipc";
+import { ArtifactFile, ProjectEntry, invokeCopyWalkthroughToProject } from "../../ipc";
+import AddToProjectPopover from "../shared/AddToProjectPopover";
 
 interface WalkthroughsActionBarProps {
-  selectedWalkthroughs: KitFile[];
+  selectedWalkthroughs: ArtifactFile[];
   hasSelection: boolean;
   clearSelection: () => void;
   onWalkthroughsUpdated: () => void;
@@ -18,8 +19,19 @@ export default function WalkthroughsActionBar({
   onWalkthroughsUpdated,
 }: WalkthroughsActionBarProps) {
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  if (!hasSelection) {
+  // Sync isOpen with hasSelection and force close when hasSelection becomes false
+  useEffect(() => {
+    if (hasSelection) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [hasSelection]);
+
+  // Don't render anything if there's no selection
+  if (!hasSelection && !isOpen) {
     return null;
   }
 
@@ -83,18 +95,35 @@ export default function WalkthroughsActionBar({
     }
   };
 
-  const handleAddToProject = async () => {
+  const handleConfirmAddToProject = async (selectedProjects: ProjectEntry[]) => {
     try {
       setLoading(true);
-      // TODO: Implement add to project functionality
-      // await Promise.all(selectedWalkthroughs.map(walkthrough => invokeAddWalkthroughToProject(walkthrough.path)));
+      
+      // Copy each walkthrough to each selected project
+      const copyPromises: Promise<void>[] = [];
+      for (const walkthrough of selectedWalkthroughs) {
+        for (const project of selectedProjects) {
+          copyPromises.push(
+            invokeCopyWalkthroughToProject(walkthrough.path, project.path)
+              .then(() => {
+                // Convert Promise<string> to Promise<void>
+              })
+              .catch((error) => {
+                console.error(`[WalkthroughsActionBar] Error copying ${walkthrough.name} to ${project.title}:`, error);
+                throw error;
+              })
+          );
+        }
+      }
+
+      await Promise.all(copyPromises);
 
       toaster.create({
         type: "success",
         title: "Walkthroughs added",
         description: `Added ${selectedWalkthroughs.length} walkthrough${
           selectedWalkthroughs.length !== 1 ? "s" : ""
-        } to project`,
+        } to ${selectedProjects.length} project${selectedProjects.length !== 1 ? "s" : ""}`,
       });
 
       clearSelection();
@@ -108,13 +137,14 @@ export default function WalkthroughsActionBar({
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
+      throw error; // Re-throw so popover can handle it
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
+    <ActionBar.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} closeOnInteractOutside={false}>
       <Portal>
         <ActionBar.Positioner>
           <ActionBar.Content>
@@ -142,17 +172,25 @@ export default function WalkthroughsActionBar({
                 <Text>Publish to Library</Text>
               </HStack>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddToProject}
+            <AddToProjectPopover
+              onConfirm={handleConfirmAddToProject}
+              itemType="walkthrough"
+              itemCount={selectedWalkthroughs.length}
               disabled={loading}
-            >
-              <HStack gap={2}>
-                <LuFolderPlus />
-                <Text>Add to Project</Text>
-              </HStack>
-            </Button>
+              sourceFiles={selectedWalkthroughs.map(walkthrough => ({ path: walkthrough.path, name: walkthrough.name }))}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                >
+                  <HStack gap={2}>
+                    <LuFolderPlus />
+                    <Text>Add to Project</Text>
+                  </HStack>
+                </Button>
+              }
+            />
           </ActionBar.Content>
         </ActionBar.Positioner>
       </Portal>

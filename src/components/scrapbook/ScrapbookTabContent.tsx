@@ -15,7 +15,7 @@ import {
 import { LuFolder, LuFileText, LuArrowLeft } from 'react-icons/lu';
 import {
   ScrapbookItem,
-  KitFile,
+  ArtifactFile,
   invokeGetScrapbookItems,
   invokeGetFolderMarkdownFiles,
   invokeReadFile,
@@ -24,7 +24,7 @@ import { parseFrontMatter } from '../../utils/parseFrontMatter';
 
 interface ScrapbookTabContentProps {
   projectPath: string;
-  onViewKit: (kit: KitFile) => void;
+  onViewKit: (kit: ArtifactFile) => void;
 }
 
 export default function ScrapbookTabContent({
@@ -33,7 +33,7 @@ export default function ScrapbookTabContent({
 }: ScrapbookTabContentProps) {
   const [scrapbookItems, setScrapbookItems] = useState<ScrapbookItem[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<ScrapbookItem | null>(null);
-  const [folderFiles, setFolderFiles] = useState<KitFile[]>([]);
+  const [folderFiles, setFolderFiles] = useState<ArtifactFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +72,7 @@ export default function ScrapbookTabContent({
       try {
         const content = await invokeReadFile(item.path);
         const frontMatter = parseFrontMatter(content);
-        const kitFile: KitFile = {
+        const kitFile: ArtifactFile = {
           name: item.name,
           path: item.path,
           frontMatter,
@@ -85,11 +85,11 @@ export default function ScrapbookTabContent({
   };
 
   // Handle clicking on a file within a folder
-  const handleFileClick = async (file: KitFile) => {
+  const handleFileClick = async (file: ArtifactFile) => {
     try {
       const content = await invokeReadFile(file.path);
       const frontMatter = parseFrontMatter(content);
-      const kitFile: KitFile = {
+      const kitFile: ArtifactFile = {
         ...file,
         frontMatter,
       };

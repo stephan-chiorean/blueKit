@@ -8,10 +8,10 @@ import Header from '../components/Header';
 import KitOverview from '../components/kits/KitOverview';
 import Workstation from '../components/workstation/Workstation';
 import { useWorkstation } from '../contexts/WorkstationContext';
-import { KitFile } from '../ipc';
+import { ArtifactFile } from '../ipc';
 
 interface KitViewPageProps {
-  kit: KitFile;
+  kit: ArtifactFile;
   kitContent: string;
   onBack: () => void;
 }

@@ -1,0 +1,146 @@
+---
+alias: Artifact Flow Architecture
+description: Shows how artifacts are loaded from backend and distributed to frontend components
+tags: [architecture, artifacts, data-flow]
+---
+```mermaid
+graph TB
+    subgraph Backend["🦀 BACKEND LAYER (Rust)"]
+        BackendEntry[get_project_artifacts command]
+        BluekitDir[".bluekit/ directory scan"]
+        RecursiveScan["Recursive scan:<br/>- kits/ (.md files)<br/>- walkthroughs/ (.md files)<br/>- agents/ (.md files)<br/>- tasks/ (.md files)<br/>- diagrams/ (.mmd, .mermaid files)"]
+        ArtifactStruct["Vec&lt;ArtifactFile&gt;<br/>{name, path}"]
+
+        BackendEntry --> BluekitDir
+        BluekitDir --> RecursiveScan
+        RecursiveScan --> ArtifactStruct
+
+        BackendNote["Returns file paths ONLY<br/>No content reading<br/>No front matter parsing<br/>Includes .md, .mmd, .mermaid"]
+        ArtifactStruct -.-> BackendNote
+    end
+
+    subgraph IPC["🔌 IPC LAYER (TypeScript)"]
+        IPCWrapper["invokeGetProjectArtifacts<br/>(projectPath)"]
+        IPCReturn["Promise&lt;ArtifactFile[]&gt;"]
+
+        IPCWrapper --> IPCReturn
+
+        IPCNote["Type-safe wrapper<br/>with timeout handling"]
+        IPCWrapper -.-> IPCNote
+    end
+
+    subgraph Watcher["👁️ FILE WATCHER"]
+        WatchSetup["watch_project_artifacts<br/>(project.path)"]
+        WatchDir["Monitors .bluekit/<br/>and all subdirectories"]
+        WatchEvent["Event: project-artifacts-changed-<br/>{sanitized-path}"]
+        Debounce["300ms debounce<br/>Auto-recovery on errors"]
+
+        WatchSetup --> WatchDir
+        WatchDir --> Debounce
+        Debounce --> WatchEvent
+
+        WatchNote["ONE watcher for everything<br/>Monitors .md, .mmd, .mermaid<br/>Bounded channel (100 buffer)"]
+        WatchDir -.-> WatchNote
+    end
+
+    subgraph PageComponent["📄 ProjectDetailPage Component"]
+        LoadFunc["loadProjectArtifacts()<br/>(called on mount)"]
+        ReadContent["Promise.all:<br/>invokeReadFile for each artifact"]
+        ParseFront["parseFrontMatter<br/>for each file content"]
+        ArtifactsState["artifacts state<br/>(ArtifactFile[] + frontMatter)"]
+        Reload["Reload on watcher event"]
+
+        LoadFunc --> ReadContent
+        ReadContent --> ParseFront
+        ParseFront --> ArtifactsState
+        WatchEvent --> Reload
+        Reload --> LoadFunc
+
+        StateNote["Single source of truth<br/>All artifacts in one array<br/>Includes frontMatter field"]
+        ArtifactsState -.-> StateNote
+    end
+
+    subgraph Filtering["🔍 FRONTEND FILTERING (useMemo)"]
+        FilterLogic["Filter by frontMatter.type<br/>AND file extension"]
+
+        KitsFilter["kitsOnly:<br/>path.endsWith('.md') AND<br/>(type === undefined OR<br/>type NOT IN (walkthrough,<br/>blueprint, agent, task))"]
+        WalkthroughsFilter["walkthroughs:<br/>type === 'walkthrough'"]
+        AgentsFilter["agents:<br/>type === 'agent'"]
+        BlueprintsFilter["blueprints:<br/>type === 'blueprint'"]
+        DiagramsFilter["diagrams:<br/>path.endsWith('.mmd') OR<br/>path.endsWith('.mermaid')"]
+
+        ArtifactsState --> FilterLogic
+        FilterLogic --> KitsFilter
+        FilterLogic --> WalkthroughsFilter
+        FilterLogic --> AgentsFilter
+        FilterLogic --> BlueprintsFilter
+        FilterLogic --> DiagramsFilter
+
+        FilterNote["Client-side filtering<br/>No additional backend calls<br/>Reactive to artifacts changes"]
+        FilterLogic -.-> FilterNote
+    end
+
+    subgraph TabComponents["🎨 TAB COMPONENTS (Consumers)"]
+        KitsTab["KitsTabContent<br/>(receives kitsOnly)"]
+        WalkthroughsTab["WalkthroughsTabContent<br/>(receives walkthroughs)"]
+        AgentsTab["AgentsTabContent<br/>(receives agents)"]
+        BlueprintsTab["BlueprintsTabContent<br/>(receives blueprints)"]
+        DiagramsTab["DiagramsTabContent<br/>(receives diagrams)"]
+        ScrapbookTab["ScrapbookTabContent<br/>(separate loading for<br/>custom folders)"]
+
+        KitsFilter --> KitsTab
+        WalkthroughsFilter --> WalkthroughsTab
+        AgentsFilter --> AgentsTab
+        BlueprintsFilter --> BlueprintsTab
+        DiagramsFilter --> DiagramsTab
+
+        TabNote["Each tab receives<br/>pre-filtered data<br/>No duplicate API calls<br/>Diagrams now included!"]
+        KitsTab -.-> TabNote
+    end
+
+    subgraph Rationale["💡 DESIGN RATIONALE"]
+        Principle1["ONE backend call loads everything"]
+        Principle2["ONE watcher monitors all changes"]
+        Principle3["Frontend does the filtering"]
+        Principle4["Simplicity over performance"]
+
+        Why["Why 'load everything, filter later'?<br/>- Simpler architecture<br/>- Single source of truth<br/>- Easier debugging<br/>- Real-time updates work seamlessly<br/>- No complex cache invalidation<br/>- Diagrams treated like any other artifact"]
+
+        Principle1 -.-> Why
+        Principle2 -.-> Why
+        Principle3 -.-> Why
+        Principle4 -.-> Why
+    end
+
+    subgraph ScrapbookNote["📓 SCRAPBOOK EXCEPTION"]
+        ScrapbookLogic["ScrapbookTabContent uses<br/>SEPARATE loading via<br/>invokeGetScrapbookItems()"]
+        ScrapbookReason["Why separate?<br/>- Shows custom folders<br/>- Shows loose .md files in .bluekit/ root<br/>- Powers extensibility/customization<br/>- Different data structure (ScrapbookItem)"]
+
+        ScrapbookTab -.-> ScrapbookLogic
+        ScrapbookLogic -.-> ScrapbookReason
+    end
+
+    BackendEntry -->|IPC call| IPCWrapper
+    IPCReturn -->|Returns to| LoadFunc
+    WatchSetup -.->|Parallel setup| LoadFunc
+
+    classDef backend fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    classDef ipc fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px
+    classDef watcher fill:#c5e1a5,stroke:#558b2f,stroke-width:2px
+    classDef component fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+    classDef filter fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
+    classDef tab fill:#d1c4e9,stroke:#512da8,stroke-width:2px
+    classDef rationale fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef note fill:#e0e0e0,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+    classDef scrapbook fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
+
+    class BackendEntry,BluekitDir,RecursiveScan,ArtifactStruct backend
+    class IPCWrapper,IPCReturn ipc
+    class WatchSetup,WatchDir,WatchEvent,Debounce watcher
+    class LoadFunc,ReadContent,ParseFront,ArtifactsState,Reload component
+    class FilterLogic,KitsFilter,WalkthroughsFilter,AgentsFilter,BlueprintsFilter,DiagramsFilter filter
+    class KitsTab,WalkthroughsTab,AgentsTab,BlueprintsTab,DiagramsTab,ScrapbookTab tab
+    class Principle1,Principle2,Principle3,Principle4,Why rationale
+    class BackendNote,IPCNote,WatchNote,StateNote,FilterNote,TabNote note
+    class ScrapbookLogic,ScrapbookReason scrapbook
+```

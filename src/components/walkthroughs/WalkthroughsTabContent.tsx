@@ -22,15 +22,15 @@ import {
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 import WalkthroughsActionBar from './WalkthroughsActionBar';
 
 interface WalkthroughsTabContentProps {
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
   error: string | null;
   projectsCount: number;
-  onViewKit: (kit: KitFile) => void;
+  onViewKit: (kit: ArtifactFile) => void;
 }
 
 type ViewMode = 'card' | 'table';
@@ -48,9 +48,14 @@ export default function WalkthroughsTabContent({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Clear selection when component mounts (happens when switching tabs due to key prop)
+  useEffect(() => {
+    setSelectedWalkthroughPaths(new Set());
+  }, []);
+
   const isSelected = (path: string) => selectedWalkthroughPaths.has(path);
 
-  const handleWalkthroughToggle = (walkthrough: KitFile) => {
+  const handleWalkthroughToggle = (walkthrough: ArtifactFile) => {
     setSelectedWalkthroughPaths(prev => {
       const next = new Set(prev);
       if (next.has(walkthrough.path)) {
@@ -121,7 +126,7 @@ export default function WalkthroughsTabContent({
     });
   };
 
-  const handleViewWalkthrough = (walkthrough: KitFile) => {
+  const handleViewWalkthrough = (walkthrough: ArtifactFile) => {
     onViewKit(walkthrough);
   };
 
@@ -366,6 +371,7 @@ export default function WalkthroughsTabContent({
   return (
     <Box position="relative">
       <WalkthroughsActionBar
+        key="walkthroughs-action-bar"
         selectedWalkthroughs={selectedWalkthroughs}
         hasSelection={hasSelection}
         clearSelection={clearSelection}
@@ -374,12 +380,16 @@ export default function WalkthroughsTabContent({
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">
-          {/* Filter Button */}
+          {/* Filter Button - with gray subtle background */}
           <Button
             ref={filterButtonRef}
             variant="ghost"
             size="sm"
             onClick={() => setIsFilterOpen(!isFilterOpen)}
+            bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+            borderWidth="1px"
+            borderColor="border.subtle"
+            _hover={{ bg: "bg.subtle" }}
           >
             <HStack gap={2}>
               <Icon>

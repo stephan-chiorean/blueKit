@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { KitFile } from '../ipc';
+import { ArtifactFile } from '../ipc';
 
 interface WorkstationContextType {
-  selectedKit: KitFile | null;
+  selectedKit: ArtifactFile | null;
   kitContent: string | null;
-  setSelectedKit: (kit: KitFile | null, content: string | null) => void;
+  setSelectedKit: (kit: ArtifactFile | null, content: string | null) => void;
   clearSelectedKit: () => void;
 }
 
@@ -15,10 +15,10 @@ interface WorkstationProviderProps {
 }
 
 export function WorkstationProvider({ children }: WorkstationProviderProps) {
-  const [selectedKit, setSelectedKitState] = useState<KitFile | null>(null);
+  const [selectedKit, setSelectedKitState] = useState<ArtifactFile | null>(null);
   const [kitContent, setKitContent] = useState<string | null>(null);
 
-  const setSelectedKit = (kit: KitFile | null, content: string | null) => {
+  const setSelectedKit = (kit: ArtifactFile | null, content: string | null) => {
     setSelectedKitState(kit);
     setKitContent(content);
   };

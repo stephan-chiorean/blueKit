@@ -1,0 +1,94 @@
+---
+alias: Project Detail Data Loading Architecture
+description: Current eager-loading antipattern vs improved lazy-loading architecture for ProjectDetailPage, showing data flow from user interaction through tab components to backend IPC calls
+tags:
+  - architecture
+  - data-loading
+  - performance
+  - frontend
+  - refactoring
+---
+```mermaid
+graph TB
+    subgraph Current["🔴 CURRENT ARCHITECTURE (Antipattern)"]
+        User1[User Opens Project]
+        PDetail1[ProjectDetailPage]
+        LoadAll1[loadProjectKits<br/>Loads ALL kits immediately]
+        IPC1[invokeGetProjectKits<br/>Returns ALL file paths]
+        ReadAll1[Promise.all<br/>Read ALL file contents]
+        ParseAll1[Parse front matter<br/>for ALL files]
+        Filter1[useMemo filters<br/>kitsOnly, walkthroughs,<br/>agents, blueprints]
+        Tabs1[Tabs Components<br/>Receive pre-filtered data]
+        
+        User1 --> PDetail1
+        PDetail1 -->|On Mount| LoadAll1
+        LoadAll1 --> IPC1
+        IPC1 --> ReadAll1
+        ReadAll1 --> ParseAll1
+        ParseAll1 --> Filter1
+        Filter1 --> Tabs1
+        
+        Problems[❌ Problems:<br/>- Loads everything upfront<br/>- Reads all file contents<br/>- Parses all front matter<br/>- No lazy loading<br/>- Wasted I/O for unused tabs<br/>- Slow initial load]
+        
+        Tabs1 -.-> Problems
+    end
+    
+    subgraph Improved["✅ IMPROVED ARCHITECTURE"]
+        User2[User Opens Project]
+        PDetail2[ProjectDetailPage]
+        MetadataCache[Metadata Cache<br/>Store file paths only]
+        TabSwitch[Tab Switch Event]
+        
+        subgraph TabComponents["Tab Components (Lazy Load)"]
+            KitsTab[KitsTabContent<br/>Loads on activation]
+            WalkTab[WalkthroughsTabContent<br/>Loads on activation]
+            AgentsTab[AgentsTabContent<br/>Loads on activation]
+            DiagramsTab[DiagramsTabContent<br/>Loads on activation]
+        end
+        
+        subgraph BackendCalls["Backend IPC (On Demand)"]
+            GetPaths[invokeGetProjectKits<br/>Returns paths only]
+            GetByType[invokeGetKitsByType<br/>Filtered by type]
+            ReadOnDemand[invokeReadFile<br/>Only when viewing]
+            ParseCache[Front Matter Cache<br/>Parse once, reuse]
+        end
+        
+        SelectionCtx[SelectionContext<br/>Unified selection state]
+        
+        User2 --> PDetail2
+        PDetail2 -->|Initial Load| MetadataCache
+        MetadataCache -->|File paths only| GetPaths
+        PDetail2 --> TabSwitch
+        TabSwitch -->|Activates| KitsTab
+        TabSwitch -->|Activates| WalkTab
+        TabSwitch -->|Activates| AgentsTab
+        TabSwitch -->|Activates| DiagramsTab
+        
+        KitsTab -->|On Demand| GetByType
+        WalkTab -->|On Demand| GetByType
+        AgentsTab -->|On Demand| GetByType
+        DiagramsTab -->|On Demand| GetByType
+        
+        GetByType --> ReadOnDemand
+        ReadOnDemand --> ParseCache
+        
+        KitsTab --> SelectionCtx
+        WalkTab --> SelectionCtx
+        AgentsTab --> SelectionCtx
+        DiagramsTab --> SelectionCtx
+        
+        Benefits[✅ Benefits:<br/>- Load only active tab<br/>- Metadata-first approach<br/>- Cache parsed front matter<br/>- Faster initial load<br/>- Reduced I/O operations<br/>- Unified selection state]
+        
+        TabComponents -.-> Benefits
+    end
+    
+    classDef current fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef improved fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef problem fill:#fff3e0,stroke:#ef6c00
+    classDef benefit fill:#e3f2fd,stroke:#1565c0
+    
+    class User1,PDetail1,LoadAll1,IPC1,ReadAll1,ParseAll1,Filter1,Tabs1 current
+    class User2,PDetail2,MetadataCache,TabSwitch,KitsTab,WalkTab,AgentsTab,DiagramsTab,GetPaths,GetByType,ReadOnDemand,ParseCache,SelectionCtx improved
+    class Problems problem
+    class Benefits benefit
+```

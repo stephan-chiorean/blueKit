@@ -136,12 +136,16 @@ pub async fn example_error(should_fail: bool) -> Result<String, String> {
     }
 }
 
-/// Kit file information structure.
+/// Artifact file information structure.
+///
+/// Represents any file in the .bluekit directory: kits, walkthroughs, agents,
+/// diagrams, tasks, etc. This generic structure allows the backend to return
+/// all resources at once while the frontend filters by type.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct KitFile {
-    /// Name of the kit file (without .md extension)
+pub struct ArtifactFile {
+    /// Name of the artifact file (without extension)
     pub name: String,
-    /// Full path to the kit file
+    /// Full path to the artifact file
     pub path: String,
 }
 
@@ -199,19 +203,28 @@ pub struct BlueprintTask {
     pub description: String,
 }
 
-/// Reads the .bluekit directory and returns a list of .md files (kits).
-/// 
+/// Reads the .bluekit directory and returns all artifact files.
+///
+/// This function loads ALL markdown files from .bluekit/ in one shot, including:
+/// kits, walkthroughs, agents, diagrams, tasks, and any other .md files.
+///
+/// Design rationale for "load everything, filter later" approach:
+/// - Simpler backend (one function vs many type-specific functions)
+/// - Single file watcher monitors all changes
+/// - Powers the Scrapbook tab (needs everything)
+/// - Frontend filtering by frontMatter.type is cheap compared to file I/O
+///
 /// # Arguments
-/// 
+///
 /// * `project_path` - The path to the project root directory
 ///
 /// # Returns
 ///
-/// A `Result<Vec<KitFile>, String>` containing either:
-/// - `Ok(Vec<KitFile>)` - Success case with list of kit files
+/// A `Result<Vec<ArtifactFile>, String>` containing either:
+/// - `Ok(Vec<ArtifactFile>)` - Success case with list of all artifact files
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
-pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, String> {
+pub async fn get_project_artifacts(project_path: String) -> Result<Vec<ArtifactFile>, String> {
     // Construct the path to .bluekit directory
     let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
 
@@ -220,10 +233,11 @@ pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, Stri
         return Ok(Vec::new()); // Return empty vector if directory doesn't exist
     }
 
-    let mut kits = Vec::new();
+    let mut artifacts = Vec::new();
 
-    // Helper function to read markdown files from a directory recursively
-    fn read_md_files_from_dir(dir_path: &PathBuf, kits: &mut Vec<KitFile>) -> Result<(), String> {
+    // Helper function to read artifact files from a directory recursively
+    // Scans for: .md (markdown), .mmd (mermaid), .mermaid (mermaid)
+    fn read_artifact_files_from_dir(dir_path: &PathBuf, artifacts: &mut Vec<ArtifactFile>) -> Result<(), String> {
         use std::fs;
 
         if !dir_path.exists() {
@@ -232,28 +246,30 @@ pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, Stri
 
         let entries = fs::read_dir(dir_path)
             .map_err(|e| format!("Failed to read directory: {}", e))?;
-        
+
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
             let path = entry.path();
-            
+
             if path.is_file() {
                 if let Some(extension) = path.extension() {
-                    if extension == "md" {
+                    let ext_str = extension.to_str().unwrap_or("");
+                    // Include markdown files (.md) and diagram files (.mmd, .mermaid)
+                    if ext_str == "md" || ext_str == "mmd" || ext_str == "mermaid" {
                         // Get the file name without extension
                         let name = path
                             .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or("")
                             .to_string();
-                        
+
                         // Get the full path as a string
                         let path_str = path
                             .to_str()
                             .ok_or_else(|| "Invalid path encoding".to_string())?
                             .to_string();
-                        
-                        kits.push(KitFile {
+
+                        artifacts.push(ArtifactFile {
                             name,
                             path: path_str,
                         });
@@ -261,27 +277,30 @@ pub async fn get_project_kits(project_path: String) -> Result<Vec<KitFile>, Stri
                 }
             } else if path.is_dir() {
                 // Recursively read subdirectories
-                read_md_files_from_dir(&path, kits)?;
+                read_artifact_files_from_dir(&path, artifacts)?;
             }
         }
-        
+
         Ok(())
     }
-    
-    // Read from subdirectories: kits, walkthroughs, agents, and tasks
+
+    // Read from subdirectories: kits, walkthroughs, agents, tasks, and diagrams
     let kits_dir = bluekit_path.join("kits");
-    read_md_files_from_dir(&kits_dir, &mut kits)?;
+    read_artifact_files_from_dir(&kits_dir, &mut artifacts)?;
 
     let walkthroughs_dir = bluekit_path.join("walkthroughs");
-    read_md_files_from_dir(&walkthroughs_dir, &mut kits)?;
+    read_artifact_files_from_dir(&walkthroughs_dir, &mut artifacts)?;
 
     let agents_dir = bluekit_path.join("agents");
-    read_md_files_from_dir(&agents_dir, &mut kits)?;
+    read_artifact_files_from_dir(&agents_dir, &mut artifacts)?;
 
     let tasks_dir = bluekit_path.join("tasks");
-    read_md_files_from_dir(&tasks_dir, &mut kits)?;
+    read_artifact_files_from_dir(&tasks_dir, &mut artifacts)?;
 
-    Ok(kits)
+    let diagrams_dir = bluekit_path.join("diagrams");
+    read_artifact_files_from_dir(&diagrams_dir, &mut artifacts)?;
+
+    Ok(artifacts)
 }
 
 /// Project registry entry structure.
@@ -401,38 +420,38 @@ pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
     Ok(projects)
 }
 
-/// Starts watching a project's .bluekit directory for kit file changes.
-/// 
+/// Starts watching a project's .bluekit directory for artifact file changes.
+///
 /// This command sets up a file watcher that monitors the .bluekit directory
-/// in the specified project path. When any .md file is added, modified, or
-/// removed, it emits a Tauri event that the frontend can listen to.
-/// 
+/// in the specified project path. When any artifact file (.md, .mmd, etc.) is
+/// added, modified, or removed, it emits a Tauri event that the frontend can listen to.
+///
 /// # Arguments
-/// 
+///
 /// * `app_handle` - Tauri application handle (automatically provided)
 /// * `project_path` - The path to the project root directory
-/// 
+///
 /// # Returns
-/// 
+///
 /// A `Result<(), String>` containing either:
 /// - `Ok(())` - Success case
 /// - `Err(String)` - Error case with an error message
-/// 
+///
 /// # Example Usage (from frontend)
-/// 
+///
 /// ```typescript
-/// await invoke('watch_project_kits', { projectPath: '/path/to/project' });
+/// await invoke('watch_project_artifacts', { projectPath: '/path/to/project' });
 /// ```
 #[tauri::command]
-pub async fn watch_project_kits(
+pub async fn watch_project_artifacts(
     app_handle: AppHandle,
     project_path: String,
 ) -> Result<(), String> {
     use crate::watcher;
-    
+
     // Construct the path to .bluekit directory
     let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
-    
+
     // Generate a unique event name based on the project path
     // Sanitize the path to create a valid event name
     // Replace path separators and special characters with underscores
@@ -443,7 +462,7 @@ pub async fn watch_project_kits(
             _ => c,
         })
         .collect();
-    let event_name = format!("project-kits-changed-{}", sanitized_path);
+    let event_name = format!("project-artifacts-changed-{}", sanitized_path);
     
     // Start watching the directory
     watcher::watch_directory(
@@ -575,16 +594,176 @@ pub async fn copy_kit_to_project(
         .ok_or_else(|| "Invalid source file name".to_string())?
         .to_string();
     
-    // Construct target path: target_project/.bluekit/kits/filename
+    // Determine target directory: if .bluekit exists, use structured path, otherwise copy directly
     let bluekit_dir = target_project.join(".bluekit");
-    let kits_dir = bluekit_dir.join("kits");
+    let target_file_path = if bluekit_dir.exists() && bluekit_dir.is_dir() {
+        // Use structured path: target_project/.bluekit/kits/filename
+        let kits_dir = bluekit_dir.join("kits");
+        fs::create_dir_all(&kits_dir)
+            .map_err(|e| format!("Failed to create .bluekit/kits directory: {}", e))?;
+        kits_dir.join(&file_name)
+    } else {
+        // Copy directly to target directory
+        target_project.join(&file_name)
+    };
     
-    // Create directories if they don't exist
-    fs::create_dir_all(&kits_dir)
-        .map_err(|e| format!("Failed to create .bluekit/kits directory: {}", e))?;
+    // Read source file contents
+    let contents = fs::read_to_string(&source_path)
+        .map_err(|e| format!("Failed to read source file: {}", e))?;
     
-    // Construct the full target file path
-    let target_file_path = kits_dir.join(&file_name);
+    // Write to target file
+    fs::write(&target_file_path, contents)
+        .map_err(|e| format!("Failed to write target file: {}", e))?;
+    
+    // Return the target file path as a string
+    target_file_path
+        .to_str()
+        .ok_or_else(|| "Invalid target file path encoding".to_string())
+        .map(|s| s.to_string())
+}
+
+/// Copies a walkthrough file to a project's .bluekit directory.
+/// 
+/// This command reads the source walkthrough file and writes it to the target project's
+/// .bluekit/walkthroughs directory. It creates the directory structure if it doesn't exist.
+/// 
+/// # Arguments
+/// 
+/// * `source_file_path` - The absolute path to the source walkthrough file
+/// * `target_project_path` - The absolute path to the target project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with the path to the copied file
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// const result = await invoke<string>('copy_walkthrough_to_project', {
+///   sourceFilePath: '/path/to/source/walkthrough.md',
+///   targetProjectPath: '/path/to/target/project'
+/// });
+/// ```
+#[tauri::command]
+pub async fn copy_walkthrough_to_project(
+    source_file_path: String,
+    target_project_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let source_path = PathBuf::from(&source_file_path);
+    let target_project = PathBuf::from(&target_project_path);
+    
+    // Check if source file exists
+    if !source_path.exists() {
+        return Err(format!("Source file does not exist: {}", source_file_path));
+    }
+    
+    // Check if target project directory exists
+    if !target_project.exists() {
+        return Err(format!("Target project directory does not exist: {}", target_project_path));
+    }
+    
+    // Get the source file name
+    let file_name = source_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid source file name".to_string())?
+        .to_string();
+    
+    // Determine target directory: if .bluekit exists, use structured path, otherwise copy directly
+    let bluekit_dir = target_project.join(".bluekit");
+    let target_file_path = if bluekit_dir.exists() && bluekit_dir.is_dir() {
+        // Use structured path: target_project/.bluekit/walkthroughs/filename
+        let walkthroughs_dir = bluekit_dir.join("walkthroughs");
+        fs::create_dir_all(&walkthroughs_dir)
+            .map_err(|e| format!("Failed to create .bluekit/walkthroughs directory: {}", e))?;
+        walkthroughs_dir.join(&file_name)
+    } else {
+        // Copy directly to target directory
+        target_project.join(&file_name)
+    };
+    
+    // Read source file contents
+    let contents = fs::read_to_string(&source_path)
+        .map_err(|e| format!("Failed to read source file: {}", e))?;
+    
+    // Write to target file
+    fs::write(&target_file_path, contents)
+        .map_err(|e| format!("Failed to write target file: {}", e))?;
+    
+    // Return the target file path as a string
+    target_file_path
+        .to_str()
+        .ok_or_else(|| "Invalid target file path encoding".to_string())
+        .map(|s| s.to_string())
+}
+
+/// Copies a diagram file to a project's .bluekit directory.
+/// 
+/// This command reads the source diagram file (.mmd or .mermaid) and writes it to the target project's
+/// .bluekit/diagrams directory. It creates the directory structure if it doesn't exist.
+/// 
+/// # Arguments
+/// 
+/// * `source_file_path` - The absolute path to the source diagram file
+/// * `target_project_path` - The absolute path to the target project root directory
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with the path to the copied file
+/// - `Err(String)` - Error case with an error message
+/// 
+/// # Example Usage (from frontend)
+/// 
+/// ```typescript
+/// const result = await invoke<string>('copy_diagram_to_project', {
+///   sourceFilePath: '/path/to/source/diagram.mmd',
+///   targetProjectPath: '/path/to/target/project'
+/// });
+/// ```
+#[tauri::command]
+pub async fn copy_diagram_to_project(
+    source_file_path: String,
+    target_project_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let source_path = PathBuf::from(&source_file_path);
+    let target_project = PathBuf::from(&target_project_path);
+    
+    // Check if source file exists
+    if !source_path.exists() {
+        return Err(format!("Source file does not exist: {}", source_file_path));
+    }
+    
+    // Check if target project directory exists
+    if !target_project.exists() {
+        return Err(format!("Target project directory does not exist: {}", target_project_path));
+    }
+    
+    // Get the source file name
+    let file_name = source_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid source file name".to_string())?
+        .to_string();
+    
+    // Determine target directory: if .bluekit exists, use structured path, otherwise copy directly
+    let bluekit_dir = target_project.join(".bluekit");
+    let target_file_path = if bluekit_dir.exists() && bluekit_dir.is_dir() {
+        // Use structured path: target_project/.bluekit/diagrams/filename
+        let diagrams_dir = bluekit_dir.join("diagrams");
+        fs::create_dir_all(&diagrams_dir)
+            .map_err(|e| format!("Failed to create .bluekit/diagrams directory: {}", e))?;
+        diagrams_dir.join(&file_name)
+    } else {
+        // Copy directly to target directory
+        target_project.join(&file_name)
+    };
     
     // Read source file contents
     let contents = fs::read_to_string(&source_path)
@@ -818,11 +997,11 @@ pub async fn get_scrapbook_items(project_path: String) -> Result<Vec<ScrapbookIt
 ///
 /// # Returns
 ///
-/// A `Result<Vec<KitFile>, String>` containing either:
-/// - `Ok(Vec<KitFile>)` - Success case with list of markdown files
+/// A `Result<Vec<ArtifactFile>, String>` containing either:
+/// - `Ok(Vec<ArtifactFile>)` - Success case with list of markdown files
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
-pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<KitFile>, String> {
+pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<ArtifactFile>, String> {
     use std::fs;
 
     let path = PathBuf::from(&folder_path);
@@ -856,7 +1035,7 @@ pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<KitFil
                         .ok_or_else(|| "Invalid path encoding".to_string())?
                         .to_string();
 
-                    files.push(KitFile {
+                    files.push(ArtifactFile {
                         name,
                         path: path_str,
                     });
@@ -993,11 +1172,11 @@ pub async fn get_blueprint_task_file(
 ///
 /// # Returns
 ///
-/// A `Result<Vec<KitFile>, String>` containing either:
-/// - `Ok(Vec<KitFile>)` - Success case with list of diagram files
+/// A `Result<Vec<ArtifactFile>, String>` containing either:
+/// - `Ok(Vec<ArtifactFile>)` - Success case with list of diagram files
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
-pub async fn get_project_diagrams(project_path: String) -> Result<Vec<KitFile>, String> {
+pub async fn get_project_diagrams(project_path: String) -> Result<Vec<ArtifactFile>, String> {
     use std::fs;
 
     // Construct the path to .bluekit/diagrams directory
@@ -1011,7 +1190,7 @@ pub async fn get_project_diagrams(project_path: String) -> Result<Vec<KitFile>, 
     let mut diagrams = Vec::new();
 
     // Helper function to read mermaid files from a directory recursively
-    fn read_mermaid_files_from_dir(dir_path: &PathBuf, diagrams: &mut Vec<KitFile>) -> Result<(), String> {
+    fn read_mermaid_files_from_dir(dir_path: &PathBuf, diagrams: &mut Vec<ArtifactFile>) -> Result<(), String> {
         if !dir_path.exists() {
             return Ok(()); // Directory doesn't exist, skip it
         }
@@ -1040,7 +1219,7 @@ pub async fn get_project_diagrams(project_path: String) -> Result<Vec<KitFile>, 
                             .ok_or_else(|| "Invalid path encoding".to_string())?
                             .to_string();
                         
-                        diagrams.push(KitFile {
+                        diagrams.push(ArtifactFile {
                             name,
                             path: path_str,
                         });
@@ -1413,6 +1592,158 @@ pub async fn create_project_from_clone(
     }
 
     Ok(format!("Project created successfully at: {}", target_path))
+}
+
+/// Creates a new project directory and copies files to it.
+/// 
+/// This command:
+/// 1. Creates a new project directory at the specified path
+/// 2. Creates .bluekit directory structure
+/// 3. Copies source files to appropriate subdirectories based on file type
+/// 4. Optionally registers the project in the registry
+/// 
+/// # Arguments
+/// 
+/// * `target_path` - The absolute path where the new project should be created
+/// * `project_title` - Title for the new project
+/// * `source_files` - Array of source file paths with their types
+/// * `register_project` - Whether to automatically register the new project
+/// 
+/// # Returns
+/// 
+/// A `Result<String, String>` containing either:
+/// - `Ok(String)` - Success case with the project path
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn create_new_project(
+    target_path: String,
+    project_title: String,
+    source_files: Vec<(String, String)>, // (file_path, file_type) where file_type is "kit", "walkthrough", or "diagram"
+    register_project: bool,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let target = PathBuf::from(&target_path);
+    
+    // Check if target path already exists
+    if target.exists() {
+        return Err(format!("Target path already exists: {}", target_path));
+    }
+    
+    // Ensure target path is absolute
+    let target = if target.is_absolute() {
+        target
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?
+            .join(target)
+    };
+    
+    // Create project directory
+    fs::create_dir_all(&target)
+        .map_err(|e| format!("Failed to create project directory: {}", e))?;
+    
+    // Create .bluekit directory structure
+    let bluekit_dir = target.join(".bluekit");
+    let kits_dir = bluekit_dir.join("kits");
+    let walkthroughs_dir = bluekit_dir.join("walkthroughs");
+    let diagrams_dir = bluekit_dir.join("diagrams");
+    
+    fs::create_dir_all(&kits_dir)
+        .map_err(|e| format!("Failed to create .bluekit/kits directory: {}", e))?;
+    fs::create_dir_all(&walkthroughs_dir)
+        .map_err(|e| format!("Failed to create .bluekit/walkthroughs directory: {}", e))?;
+    fs::create_dir_all(&diagrams_dir)
+        .map_err(|e| format!("Failed to create .bluekit/diagrams directory: {}", e))?;
+    
+    // Capture file count before moving source_files
+    let file_count = source_files.len();
+    
+    // Copy files to appropriate directories
+    for (source_file_path, file_type) in source_files {
+        let source_path = PathBuf::from(&source_file_path);
+        
+        if !source_path.exists() {
+            eprintln!("Warning: Source file does not exist: {}", source_file_path);
+            continue;
+        }
+        
+        let file_name = source_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| format!("Invalid source file name: {}", source_file_path))?
+            .to_string();
+        
+        // Determine target directory based on file type
+        let target_dir = match file_type.as_str() {
+            "kit" => &kits_dir,
+            "walkthrough" => &walkthroughs_dir,
+            "diagram" => &diagrams_dir,
+            _ => {
+                eprintln!("Warning: Unknown file type '{}', copying to kits directory", file_type);
+                &kits_dir
+            }
+        };
+        
+        let target_file_path = target_dir.join(&file_name);
+        
+        // Read source file contents
+        let contents = fs::read_to_string(&source_path)
+            .map_err(|e| format!("Failed to read source file {}: {}", source_file_path, e))?;
+        
+        // Write to target file
+        fs::write(&target_file_path, contents)
+            .map_err(|e| format!("Failed to write target file {}: {}", target_file_path.display(), e))?;
+    }
+    
+    // Register project (optional)
+    if register_project {
+        let project_entry = ProjectEntry {
+            id: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                .to_string(),
+            title: project_title,
+            description: format!("Created with {} file{}", file_count, if file_count != 1 { "s" } else { "" }),
+            path: target_path.clone(),
+        };
+        
+        // Read existing registry
+        let home_dir = env::var("HOME")
+            .or_else(|_| env::var("USERPROFILE"))
+            .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
+        
+        let registry_path = PathBuf::from(&home_dir)
+            .join(".bluekit")
+            .join("projectRegistry.json");
+        
+        let mut projects = if registry_path.exists() {
+            let content = fs::read_to_string(&registry_path)
+                .map_err(|e| format!("Failed to read registry: {}", e))?;
+            serde_json::from_str::<Vec<ProjectEntry>>(&content)
+                .unwrap_or_else(|_| Vec::new())
+        } else {
+            Vec::new()
+        };
+        
+        // Add new project
+        projects.push(project_entry);
+        
+        // Ensure .bluekit directory exists
+        if let Some(parent) = registry_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
+        }
+        
+        // Write back to registry
+        let json = serde_json::to_string_pretty(&projects)
+            .map_err(|e| format!("Failed to serialize registry: {}", e))?;
+        fs::write(&registry_path, json)
+            .map_err(|e| format!("Failed to write registry: {}", e))?;
+    }
+    
+    Ok(target_path)
 }
 
 // How to add a new command:

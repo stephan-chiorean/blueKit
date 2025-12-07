@@ -18,7 +18,7 @@ import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import CollectionsTabContent from '../components/collections/CollectionsTabContent';
 import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
-import { invokeGetProjectRegistry, invokeGetProjectKits, invokeWatchProjectKits, invokeReadFile, KitFile, ProjectEntry, TimeoutError } from '../ipc';
+import { invokeGetProjectRegistry, invokeGetProjectArtifacts, invokeWatchProjectArtifacts, invokeReadFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
 import { parseFrontMatter } from '../utils/parseFrontMatter';
 import { useSelection } from '../contexts/SelectionContext';
 import { Collection } from '../components/collections/AddCollectionDialog';
@@ -31,7 +31,7 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [kits, setKits] = useState<KitFile[]>([]);
+  const [kits, setKits] = useState<ArtifactFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const { selectedItems } = useSelection();
   const [activeTab, setActiveTab] = useState('projects');
@@ -109,16 +109,16 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
 
       // Load kits from all projects in parallel
       const kitPromises = projects.map(project => 
-        invokeGetProjectKits(project.path).catch(err => {
+        invokeGetProjectArtifacts(project.path).catch(err => {
           console.error(`Error loading kits from ${project.path}:`, err);
-          return [] as KitFile[];
+          return [] as ArtifactFile[];
         })
       );
 
       const allKitsArrays = await Promise.all(kitPromises);
       
       // Flatten and deduplicate kits by path
-      const kitsMap = new Map<string, KitFile>();
+      const kitsMap = new Map<string, ArtifactFile>();
       allKitsArrays.flat().forEach(kit => {
         kitsMap.set(kit.path, kit);
       });
@@ -190,7 +190,7 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
         if (!isMounted) break; // Early exit if unmounted
 
         try {
-          await invokeWatchProjectKits(project.path);
+          await invokeWatchProjectArtifacts(project.path);
 
           // Generate the event name (must match the Rust code)
           const sanitizedPath = project.path

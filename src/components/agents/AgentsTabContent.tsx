@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -16,15 +16,15 @@ import {
   Flex,
 } from '@chakra-ui/react';
 import { LuBot } from 'react-icons/lu';
-import { KitFile } from '../../ipc';
+import { ArtifactFile } from '../../ipc';
 import AgentsActionBar from './AgentsActionBar';
 
 interface AgentsTabContentProps {
-  kits: KitFile[];
+  kits: ArtifactFile[];
   kitsLoading: boolean;
   error: string | null;
   projectsCount: number;
-  onViewKit: (kit: KitFile) => void;
+  onViewKit: (kit: ArtifactFile) => void;
 }
 
 export default function AgentsTabContent({
@@ -36,6 +36,11 @@ export default function AgentsTabContent({
 }: AgentsTabContentProps) {
   const [selectedAgentPaths, setSelectedAgentPaths] = useState<Set<string>>(new Set());
 
+  // Clear selection when component mounts (happens when switching tabs due to key prop)
+  useEffect(() => {
+    setSelectedAgentPaths(new Set());
+  }, []);
+
   // Filter kits to only show those with type: agent in front matter
   const agents = useMemo(() => 
     kits.filter(kit => kit.frontMatter?.type === 'agent'),
@@ -44,7 +49,7 @@ export default function AgentsTabContent({
 
   const isSelected = (path: string) => selectedAgentPaths.has(path);
 
-  const handleAgentToggle = (agent: KitFile) => {
+  const handleAgentToggle = (agent: ArtifactFile) => {
     setSelectedAgentPaths(prev => {
       const next = new Set(prev);
       if (next.has(agent.path)) {
@@ -115,6 +120,7 @@ export default function AgentsTabContent({
   return (
     <Box position="relative">
       <AgentsActionBar
+        key="agents-action-bar"
         selectedAgents={selectedAgents}
         hasSelection={hasSelection}
         clearSelection={clearSelection}

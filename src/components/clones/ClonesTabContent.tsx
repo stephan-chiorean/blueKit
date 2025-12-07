@@ -24,7 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { toaster } from '../ui/toaster';
 import { LuGitBranch, LuTag, LuCalendar, LuFilter, LuX, LuLayoutGrid, LuTable, LuFolderPlus } from 'react-icons/lu';
-import { CloneMetadata, invokeGetProjectClones, invokeWatchProjectKits, invokeCreateProjectFromClone } from '../../ipc';
+import { CloneMetadata, invokeGetProjectClones, invokeWatchProjectArtifacts, invokeCreateProjectFromClone } from '../../ipc';
 
 interface ClonesTabContentProps {
   projectPath: string;
@@ -65,7 +65,7 @@ export default function ClonesTabContent({
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
-        await invokeWatchProjectKits(projectPath);
+        await invokeWatchProjectArtifacts(projectPath);
 
         // Generate the event name (must match the Rust code)
         const sanitizedPath = projectPath
