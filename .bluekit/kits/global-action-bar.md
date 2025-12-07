@@ -3,306 +3,344 @@ id: global-action-bar
 alias: Global Action Bar
 type: kit
 is_base: false
-version: 1
-tags: []
-description: ''
+version: 2
+tags: [ui-component, selection, bulk-actions]
+description: 'Context-aware floating action bar for bulk operations on selected artifacts (kits, walkthroughs, agents, diagrams)'
 ---
 
 # Global Action Bar Component
 
 ## Overview
 
-A context-aware action bar component that appears when items are selected, providing bulk operations like delete, add to collection, add to template, and add to project. The component uses Chakra UI's ActionBar component with Portal rendering for global positioning.
+A context-aware floating action bar that appears when artifacts are selected, providing bulk operations like delete, publish to library, and add to project. The component features:
+
+- **Selection Summary**: Visual breakdown of selected items by type with icons
+- **Type-Aware Operations**: Handles kits, walkthroughs, agents, and diagrams uniformly
+- **Priority Handling**: Hides automatically when tasks are selected (TasksActionBar takes priority)
+- **Portal Rendering**: Renders globally above all content using Chakra UI's Portal
+- **Async Operations**: Handles IPC calls with loading states and toast notifications
 
 ## Prerequisites
 
-### 1. Selection Context
+### 1. Enhanced Selection Context
 
-You need a selection context that manages selected items across your application:
+The component uses an enhanced selection context (`SelectionContext.tsx`) that provides:
 
+- `selectedItems`: Array of selected items with id, name, type, and path
+- `hasArtifactSelection`: Boolean indicating if any artifacts are selected
+- `hasTaskSelection`: Boolean indicating if any tasks are selected
+- `clearSelection()`: Clears all selections
+- `getItemsByType(type)`: Filters items by type ('Kit', 'Walkthrough', 'Agent', 'Diagram')
+
+**Selection Types:**
 ```typescript
-// SelectionContext.tsx
-import { createContext, useContext, useState, ReactNode } from 'react';
-
-export type SelectionType = 'Kit' | 'Template' | 'Collection' | 'Project';
-
-export interface SelectedItem {
-  id: string;
-  name: string;
-  type: SelectionType;
-  path?: string;
-}
-
-interface SelectionContextType {
-  selectedItems: SelectedItem[];
-  addItem: (item: SelectedItem) => void;
-  removeItem: (id: string) => void;
-  toggleItem: (item: SelectedItem) => void;
-  clearSelection: () => void;
-  isSelected: (id: string) => boolean;
-  hasSelection: boolean;
-}
-
-const SelectionContext = createContext<SelectionContextType | undefined>(undefined);
-
-export function SelectionProvider({ children }: { children: ReactNode }) {
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
-
-  const addItem = (item: SelectedItem) => {
-    setSelectedItems((prev) => {
-      if (prev.some((i) => i.id === item.id)) {
-        return prev;
-      }
-      return [...prev, item];
-    });
-  };
-
-  const removeItem = (id: string) => {
-    setSelectedItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const toggleItem = (item: SelectedItem) => {
-    setSelectedItems((prev) => {
-      const exists = prev.some((i) => i.id === item.id);
-      return exists
-        ? prev.filter((i) => i.id !== item.id)
-        : [...prev, item];
-    });
-  };
-
-  const clearSelection = () => {
-    setSelectedItems([]);
-  };
-
-  const isSelected = (id: string) => {
-    return selectedItems.some((item) => item.id === id);
-  };
-
-  const hasSelection = selectedItems.length > 0;
-
-  return (
-    <SelectionContext.Provider
-      value={{
-        selectedItems,
-        addItem,
-        removeItem,
-        toggleItem,
-        clearSelection,
-        isSelected,
-        hasSelection,
-      }}
-    >
-      {children}
-    </SelectionContext.Provider>
-  );
-}
-
-export function useSelection() {
-  const context = useContext(SelectionContext);
-  if (context === undefined) {
-    throw new Error('useSelection must be used within a SelectionProvider');
-  }
-  return context;
-}
+export type SelectionType =
+  | 'Kit'
+  | 'Walkthrough'
+  | 'Agent'
+  | 'Diagram'
+  | 'Task'
+  | 'Template'
+  | 'Collection'
+  | 'Project';
 ```
 
-### 2. UI Library Setup
+### 2. IPC Commands
 
-Ensure you have Chakra UI v3 installed and configured with ActionBar component support.
+The component requires backend IPC commands for artifact operations:
 
-### 3. Icon Library
+- `invokeCopyKitToProject(kitPath, projectPath)`
+- `invokeCopyWalkthroughToProject(walkthroughPath, projectPath)`
+- `invokeCopyDiagramToProject(diagramPath, projectPath)`
+- Future: `invokeCopyAgentToProject`, delete commands
 
-Install `react-icons` for icon support:
+### 3. UI Dependencies
+
+**Chakra UI v3:**
+- ActionBar component for floating bar
+- Portal for global rendering
+- Toast/Toaster for notifications
+- Button, HStack, VStack, Box, Text, Icon
+
+**Icons (react-icons):**
 ```bash
 npm install react-icons
 ```
 
+Icons used: `LuTrash2`, `LuFolderPlus`, `LuBookOpen`, `LuPackage`, `LuBot`, `LuNetwork`
+
 ## Implementation Steps
 
-### Step 1: Create the Component File
-
-Create `GlobalActionBar.tsx` in your components directory.
-
-### Step 2: Import Dependencies
+### Step 1: Import Dependencies
 
 ```typescript
-import {
-  Button,
-  HStack,
-  Text,
-  ActionBar,
-  Portal,
-} from '@chakra-ui/react';
-import { LuTrash2, LuFolderPlus, LuFileText, LuLayers } from 'react-icons/lu';
-import { useSelection } from '../contexts/SelectionContext';
+import { useState, useEffect } from "react";
+import { Button, HStack, Text, ActionBar, Portal, Box, VStack, Icon } from "@chakra-ui/react";
+import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork } from "react-icons/lu";
+import { toaster } from "../ui/toaster";
+import { useSelection } from "../../contexts/SelectionContext";
+import { ProjectEntry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from "../../ipc";
+import AddToProjectPopover from "./AddToProjectPopover";
 ```
 
-**Key Imports:**
-- `ActionBar` components from Chakra UI for the floating action bar
-- `Portal` for rendering outside the normal DOM hierarchy
-- `HStack` for horizontal button layouts
-- Icons from `react-icons/lu` (Lucide icons)
-- `useSelection` hook from your selection context
+**Key Dependencies:**
+- **React hooks**: `useState` for loading state, `useEffect` for syncing visibility
+- **Chakra UI**: ActionBar, Portal, layout components (HStack, VStack, Box)
+- **Icons**: Type-specific icons (LuPackage for kits, LuBookOpen for walkthroughs, etc.)
+- **IPC**: Backend command wrappers for copying artifacts
+- **AddToProjectPopover**: Reusable project selection popover component
 
-### Step 3: Component Structure
+### Step 2: Component State and Selection Logic
 
 ```typescript
 export default function GlobalActionBar() {
-  const { selectedItems, hasSelection, removeItem } = useSelection();
+  const { selectedItems, hasArtifactSelection, hasTaskSelection, clearSelection, getItemsByType } = useSelection();
+  const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const handleDelete = () => {
-    selectedItems.forEach((item) => removeItem(item.id));
-  };
+  // Sync visibility with selection state
+  // Hide when tasks are selected (TasksActionBar takes priority)
+  useEffect(() => {
+    if (hasArtifactSelection && !hasTaskSelection) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [hasArtifactSelection, hasTaskSelection]);
 
-  if (!hasSelection) {
+  // Don't render if no artifacts selected or tasks are selected
+  if (!hasArtifactSelection || hasTaskSelection || !isOpen) {
     return null;
   }
 
-  return (
-    <ActionBar.Root 
-      open={hasSelection} 
-      closeOnInteractOutside={false}
-      onOpenChange={(e) => {
-        // Handle open/close state if needed
-      }}
-    >
-      <Portal>
-        <ActionBar.Positioner>
-          <ActionBar.Content>
-            {/* Action buttons here */}
-          </ActionBar.Content>
-        </ActionBar.Positioner>
-      </Portal>
-    </ActionBar.Root>
-  );
-}
+  // Group selected items by type
+  const kits = getItemsByType('Kit');
+  const walkthroughs = getItemsByType('Walkthrough');
+  const agents = getItemsByType('Agent');
+  const diagrams = getItemsByType('Diagram');
+  const totalCount = selectedItems.length;
 ```
 
-### Step 4: Implement Delete Action
+**Key State Management:**
+- **loading**: Tracks async operation state (disables buttons during operations)
+- **isOpen**: Controls ActionBar visibility (synced with selection state)
+- **Priority system**: Hides when tasks are selected (allows TasksActionBar to take over)
+- **Type filtering**: Groups items by type for type-specific operations
+
+### Step 3: Build Selection Summary
+
+Create a visual breakdown showing counts per artifact type with icons:
 
 ```typescript
-const handleDelete = () => {
-  selectedItems.forEach((item) => removeItem(item.id));
+const getSelectionSummary = () => {
+  const parts: { count: number; label: string; icon: React.ReactNode }[] = [];
+
+  if (kits.length > 0) {
+    parts.push({
+      count: kits.length,
+      label: kits.length === 1 ? 'kit' : 'kits',
+      icon: <LuPackage />
+    });
+  }
+  if (walkthroughs.length > 0) {
+    parts.push({
+      count: walkthroughs.length,
+      label: walkthroughs.length === 1 ? 'walkthrough' : 'walkthroughs',
+      icon: <LuBookOpen />
+    });
+  }
+  if (agents.length > 0) {
+    parts.push({
+      count: agents.length,
+      label: agents.length === 1 ? 'agent' : 'agents',
+      icon: <LuBot />
+    });
+  }
+  if (diagrams.length > 0) {
+    parts.push({
+      count: diagrams.length,
+      label: diagrams.length === 1 ? 'diagram' : 'diagrams',
+      icon: <LuNetwork />
+    });
+  }
+
+  return parts;
+};
+
+const selectionSummary = getSelectionSummary();
+```
+
+**Display Format**: "3 📦 • 2 📖 • 1 🤖 selected"
+
+### Step 4: Implement Action Handlers
+
+#### Delete Handler (Placeholder)
+```typescript
+const handleDelete = async () => {
+  try {
+    setLoading(true);
+    // TODO: Implement actual delete IPC calls
+    // await Promise.all([
+    //   ...kits.map(kit => invokeDeleteKit(kit.path)),
+    //   ...walkthroughs.map(wt => invokeDeleteWalkthrough(wt.path)),
+    //   ...agents.map(agent => invokeDeleteAgent(agent.path)),
+    //   ...diagrams.map(diagram => invokeDeleteDiagram(diagram.path)),
+    // ]);
+
+    toaster.create({
+      type: "success",
+      title: "Artifacts deleted",
+      description: `${totalCount} artifact${totalCount !== 1 ? "s" : ""} deleted`,
+    });
+
+    clearSelection();
+  } catch (error) {
+    toaster.create({
+      type: "error",
+      title: "Error",
+      description: `Failed to delete: ${error instanceof Error ? error.message : "Unknown error"}`,
+    });
+  } finally {
+    setLoading(false);
+  }
 };
 ```
 
-Add the delete button:
-
+#### Add to Project Handler
 ```typescript
-<Button 
-  variant="surface" 
-  colorPalette="red" 
-  size="sm" 
-  onClick={handleDelete}
->
-  <HStack gap={2}>
-    <LuTrash2 />
-    <Text>Delete</Text>
-  </HStack>
-</Button>
-```
+const handleConfirmAddToProject = async (selectedProjects: ProjectEntry[]) => {
+  try {
+    setLoading(true);
+    const copyPromises: Promise<void>[] = [];
 
-### Step 5: Add Action Separator
+    // Copy each artifact type to each selected project
+    for (const kit of kits) {
+      for (const project of selectedProjects) {
+        if (kit.path) {
+          copyPromises.push(invokeCopyKitToProject(kit.path, project.path));
+        }
+      }
+    }
 
-```typescript
-<ActionBar.Separator />
-```
+    for (const walkthrough of walkthroughs) {
+      for (const project of selectedProjects) {
+        if (walkthrough.path) {
+          copyPromises.push(invokeCopyWalkthroughToProject(walkthrough.path, project.path));
+        }
+      }
+    }
 
-### Step 6: Add Additional Actions
+    for (const diagram of diagrams) {
+      for (const project of selectedProjects) {
+        if (diagram.path) {
+          copyPromises.push(invokeCopyDiagramToProject(diagram.path, project.path));
+        }
+      }
+    }
 
-Implement additional action buttons with consistent styling:
+    await Promise.all(copyPromises);
 
-```typescript
-<Button variant="outline" size="sm">
-  <HStack gap={2}>
-    <LuLayers />
-    <Text>Add to Collection</Text>
-  </HStack>
-</Button>
+    toaster.create({
+      type: "success",
+      title: "Artifacts added",
+      description: `Added ${totalCount} artifact${totalCount !== 1 ? "s" : ""} to ${selectedProjects.length} project${selectedProjects.length !== 1 ? "s" : ""}`,
+    });
 
-<Button variant="outline" size="sm">
-  <HStack gap={2}>
-    <LuFileText />
-    <Text>Add to Template</Text>
-  </HStack>
-</Button>
-
-<Button variant="outline" size="sm">
-  <HStack gap={2}>
-    <LuFolderPlus />
-    <Text>Add to Project</Text>
-  </HStack>
-</Button>
-```
-
-### Step 7: Complete Implementation
-
-```typescript
-import {
-  Button,
-  HStack,
-  Text,
-  ActionBar,
-  Portal,
-} from '@chakra-ui/react';
-import { LuTrash2, LuFolderPlus, LuFileText, LuLayers } from 'react-icons/lu';
-import { useSelection } from '../contexts/SelectionContext';
-
-export default function GlobalActionBar() {
-  const { selectedItems, hasSelection, removeItem } = useSelection();
-
-  const handleDelete = () => {
-    selectedItems.forEach((item) => removeItem(item.id));
-  };
-
-  if (!hasSelection) {
-    return null;
+    clearSelection();
+  } catch (error) {
+    toaster.create({
+      type: "error",
+      title: "Error",
+      description: `Failed to add: ${error instanceof Error ? error.message : "Unknown error"}`,
+    });
+    throw error;
+  } finally {
+    setLoading(false);
   }
-
-  return (
-    <ActionBar.Root 
-      open={hasSelection} 
-      closeOnInteractOutside={false}
-      onOpenChange={(e) => {
-        // Only clear selection if explicitly closed (not from clicking outside)
-        // We'll handle clearing via explicit actions instead
-      }}
-    >
-      <Portal>
-        <ActionBar.Positioner>
-          <ActionBar.Content>
-            <Button variant="surface" colorPalette="red" size="sm" onClick={handleDelete}>
-              <HStack gap={2}>
-                <LuTrash2 />
-                <Text>Delete</Text>
-              </HStack>
-            </Button>
-            <ActionBar.Separator />
-            <Button variant="outline" size="sm">
-              <HStack gap={2}>
-                <LuLayers />
-                <Text>Add to Collection</Text>
-              </HStack>
-            </Button>
-            <Button variant="outline" size="sm">
-              <HStack gap={2}>
-                <LuFileText />
-                <Text>Add to Template</Text>
-              </HStack>
-            </Button>
-            <Button variant="outline" size="sm">
-              <HStack gap={2}>
-                <LuFolderPlus />
-                <Text>Add to Project</Text>
-              </HStack>
-            </Button>
-          </ActionBar.Content>
-        </ActionBar.Positioner>
-      </Portal>
-    </ActionBar.Root>
-  );
-}
+};
 ```
+
+### Step 5: Render the UI
+
+```typescript
+return (
+  <ActionBar.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} closeOnInteractOutside={false}>
+    <Portal>
+      <ActionBar.Positioner>
+        <ActionBar.Content>
+          <VStack align="stretch" gap={0}>
+            {/* Selection Summary Header */}
+            <Box pb={1} mt={-0.5}>
+              <HStack gap={1.5} justify="center" wrap="wrap">
+                {selectionSummary.map((part, index) => (
+                  <HStack key={index} gap={1}>
+                    {index > 0 && (
+                      <Text fontSize="xs" color="text.secondary">•</Text>
+                    )}
+                    <Text fontSize="xs" color="text.secondary">{part.count}</Text>
+                    <Icon fontSize="xs" color="text.secondary">{part.icon}</Icon>
+                  </HStack>
+                ))}
+                <Text fontSize="xs" color="text.secondary">selected</Text>
+              </HStack>
+            </Box>
+
+            {/* Action Buttons */}
+            <HStack gap={2}>
+              <Button
+                variant="surface"
+                colorPalette="red"
+                size="sm"
+                onClick={handleDelete}
+                disabled={loading}
+              >
+                <HStack gap={2}>
+                  <LuTrash2 />
+                  <Text>Delete</Text>
+                </HStack>
+              </Button>
+
+              <ActionBar.Separator />
+
+              <Button variant="outline" size="sm" onClick={handlePublishToLibrary} disabled={loading}>
+                <HStack gap={2}>
+                  <LuBookOpen />
+                  <Text>Publish to Library</Text>
+                </HStack>
+              </Button>
+
+              <AddToProjectPopover
+                onConfirm={handleConfirmAddToProject}
+                itemCount={totalCount}
+                sourceFiles={selectedItems.map(item => ({
+                  path: item.path || '',
+                  name: item.name,
+                  type: item.type.toLowerCase() as 'kit' | 'walkthrough' | 'diagram' | 'agent'
+                }))}
+                trigger={
+                  <Button variant="outline" size="sm" disabled={loading}>
+                    <HStack gap={2}>
+                      <LuFolderPlus />
+                      <Text>Add to Project</Text>
+                    </HStack>
+                  </Button>
+                }
+              />
+            </HStack>
+          </VStack>
+        </ActionBar.Content>
+      </ActionBar.Positioner>
+    </Portal>
+  </ActionBar.Root>
+);
+```
+
+**UI Structure:**
+- **VStack wrapper**: Vertically stacks summary header and action buttons
+- **Selection summary**: Shows counts with type icons (e.g., "3 📦 • 2 📖 selected")
+- **Delete button**: Red surface variant for destructive action
+- **Publish button**: Outline variant (feature not yet implemented)
+- **Add to Project**: Uses `AddToProjectPopover` component with trigger button
 
 ## Integration
 
@@ -324,87 +362,158 @@ function App() {
 }
 ```
 
-## Key Concepts
+## Key Architectural Patterns
 
-### 1. Conditional Rendering
+### 1. Priority-Based Rendering
 
-The component returns `null` when there's no selection, preventing unnecessary DOM elements:
+The component conditionally renders based on selection state hierarchy:
 
 ```typescript
-if (!hasSelection) {
+// Priority: TasksActionBar > GlobalActionBar
+if (!hasArtifactSelection || hasTaskSelection || !isOpen) {
   return null;
 }
 ```
 
-### 2. Portal Rendering
+**Why**: Prevents UI conflicts when multiple action bars could appear simultaneously.
 
-Using `Portal` ensures the action bar renders outside the normal DOM hierarchy, allowing it to appear above other content and be positioned globally.
+### 2. Type-Aware Bulk Operations
 
-### 3. ActionBar Component Structure
-
-- `ActionBar.Root`: Main container with open/close state
-- `ActionBar.Positioner`: Handles positioning logic
-- `ActionBar.Content`: The actual content container
-- `ActionBar.Separator`: Visual separator between button groups
-
-### 4. Selection Management
-
-The component reads from the selection context but doesn't manage it directly. Selection is managed by the context provider, allowing multiple components to interact with the same selection state.
-
-### 5. Bulk Operations
-
-The delete handler iterates over all selected items, performing the operation on each:
+Operations are grouped by artifact type for type-specific IPC calls:
 
 ```typescript
-selectedItems.forEach((item) => removeItem(item.id));
+const kits = getItemsByType('Kit');
+const walkthroughs = getItemsByType('Walkthrough');
+
+// Then process each type separately
+for (const kit of kits) {
+  copyPromises.push(invokeCopyKitToProject(kit.path, project.path));
+}
 ```
 
-## Customization Options
+**Why**: Different artifact types require different backend commands.
 
-### Custom Actions
+### 3. Async Operation Handling
 
-Add custom action handlers by creating handler functions and connecting them to buttons:
+Standard pattern for all async operations:
 
 ```typescript
-const handleAddToCollection = () => {
-  // Your logic here
-  selectedItems.forEach((item) => {
-    // Process each selected item
-  });
+const handleAction = async () => {
+  try {
+    setLoading(true);
+    // Perform operation
+    await Promise.all(promises);
+
+    // Success feedback
+    toaster.create({ type: "success", ... });
+    clearSelection();
+  } catch (error) {
+    // Error feedback
+    toaster.create({ type: "error", ... });
+  } finally {
+    setLoading(false);
+  }
 };
 ```
 
-### Styling
+**Features:**
+- Loading state disables buttons during operation
+- Toast notifications for user feedback
+- Clears selection on success
+- Error handling with user-friendly messages
 
-Modify button variants, sizes, and color palettes:
-- `variant`: "surface", "outline", "solid", etc.
-- `colorPalette`: "red", "blue", "gray", etc.
-- `size`: "sm", "md", "lg"
+### 4. Portal Rendering
 
-### Icons
+```typescript
+<Portal>
+  <ActionBar.Positioner>
+    <ActionBar.Content>
+      {/* Content */}
+    </ActionBar.Content>
+  </ActionBar.Positioner>
+</Portal>
+```
 
-Replace icons by importing different icons from `react-icons`:
-- `react-icons/lu` - Lucide icons
-- `react-icons/fa` - Font Awesome
-- `react-icons/md` - Material Design
+**Why**: Renders outside normal DOM hierarchy for proper z-index layering and global positioning.
+
+### 5. Selection Summary Pattern
+
+Dynamically builds type-specific breakdown with icons:
+
+```typescript
+const parts = [];
+if (kits.length > 0) {
+  parts.push({ count: kits.length, label: 'kit', icon: <LuPackage /> });
+}
+// Renders as: "3 📦 • 2 📖 selected"
+```
+
+**Why**: Provides at-a-glance understanding of what's selected without opening details.
+
+## Current Limitations & Future Work
+
+### Incomplete Features
+
+1. **Delete Functionality**:
+   - Backend IPC commands not yet implemented (`invokeDeleteKit`, etc.)
+   - Currently shows success toast but doesn't actually delete files
+   - See planning doc: `.bluekit/plan/resource-edit-delete.md`
+
+2. **Agent Copying**:
+   - `invokeCopyAgentToProject` not yet implemented
+   - Agents are skipped during "Add to Project" operations
+
+3. **Publish to Library**:
+   - Placeholder handler with no implementation
+   - Intended for sharing artifacts globally
+
+### Known Issues
+
+- **Loading state**: Buttons disabled during operations, but no visual loading indicator
+- **Error recovery**: Failed operations don't provide retry mechanism
+- **Partial failures**: If some copies succeed and others fail, no rollback mechanism
+
+## Extension Points
+
+### Adding New Actions
+
+1. Create async handler following the standard pattern
+2. Add button to the `<HStack gap={2}>` section
+3. Use appropriate icon and variant
+
+```typescript
+const handleCustomAction = async () => {
+  try {
+    setLoading(true);
+    // Implementation
+    toaster.create({ type: "success", ... });
+    clearSelection();
+  } catch (error) {
+    toaster.create({ type: "error", ... });
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+### Supporting New Artifact Types
+
+1. Add type to `SelectionType` in `SelectionContext`
+2. Add to `getSelectionSummary()` with appropriate icon
+3. Implement type-specific IPC commands
+4. Add to bulk operation handlers
 
 ## Best Practices
 
-1. **Keep actions focused**: Only include actions that make sense for bulk operations
-2. **Provide visual feedback**: Use appropriate button variants (e.g., red for destructive actions)
-3. **Handle edge cases**: Check for empty selections before rendering
-4. **Use Portal for global UI**: Ensures the action bar appears above all content
-5. **Maintain separation of concerns**: Let the context manage state, component handles presentation
-
-## Testing Considerations
-
-- Test that the component doesn't render when `hasSelection` is false
-- Verify delete action removes all selected items
-- Ensure the action bar appears when items are selected
-- Test that clicking outside doesn't interfere with selection (due to `closeOnInteractOutside={false}`)
+1. **Always clear selection on success**: Prevents confusion after operations complete
+2. **Use loading state**: Prevents duplicate operations from rapid clicking
+3. **Provide specific error messages**: Include operation type and item count in messages
+4. **Type-specific icons**: Makes selection summary immediately scannable
+5. **Batch IPC calls**: Use `Promise.all()` for parallel operations on multiple items
 
 ## Related Components
 
-- SelectionContext: Manages the selection state
-- Items that can be selected (Kits, Templates, Collections, Projects)
-- Other components that use `useSelection` hook
+- **SelectionContext** (`src/contexts/SelectionContext.tsx`): State management for selections
+- **TasksActionBar** (`src/components/tasks/TasksActionBar.tsx`): Priority action bar for task selections
+- **AddToProjectPopover** (`src/components/shared/AddToProjectPopover.tsx`): Project selection dialog
+- Tab content components: Kits, Walkthroughs, Agents, Diagrams (handle item selection)

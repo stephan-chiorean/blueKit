@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import {
   Box,
   Card,
@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { LuBot } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
-import AgentsActionBar from './AgentsActionBar';
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface AgentsTabContentProps {
   kits: ArtifactFile[];
@@ -34,45 +34,23 @@ export default function AgentsTabContent({
   projectsCount,
   onViewKit,
 }: AgentsTabContentProps) {
-  const [selectedAgentPaths, setSelectedAgentPaths] = useState<Set<string>>(new Set());
-
-  // Clear selection when component mounts (happens when switching tabs due to key prop)
-  useEffect(() => {
-    setSelectedAgentPaths(new Set());
-  }, []);
+  const { isSelected: isSelectedInContext, toggleItem } = useSelection();
 
   // Filter kits to only show those with type: agent in front matter
-  const agents = useMemo(() => 
+  const agents = useMemo(() =>
     kits.filter(kit => kit.frontMatter?.type === 'agent'),
     [kits]
   );
 
-  const isSelected = (path: string) => selectedAgentPaths.has(path);
+  const isSelected = (agentId: string) => isSelectedInContext(agentId);
 
   const handleAgentToggle = (agent: ArtifactFile) => {
-    setSelectedAgentPaths(prev => {
-      const next = new Set(prev);
-      if (next.has(agent.path)) {
-        next.delete(agent.path);
-      } else {
-        next.add(agent.path);
-      }
-      return next;
+    toggleItem({
+      id: agent.path,
+      name: agent.frontMatter?.alias || agent.name,
+      type: 'Agent',
+      path: agent.path,
     });
-  };
-
-  const clearSelection = () => {
-    setSelectedAgentPaths(new Set());
-  };
-
-  const selectedAgents = useMemo(() => {
-    return agents.filter(agent => selectedAgentPaths.has(agent.path));
-  }, [agents, selectedAgentPaths]);
-
-  const hasSelection = selectedAgentPaths.size > 0;
-
-  const handleAgentsUpdated = () => {
-    clearSelection();
   };
 
   if (kitsLoading) {
@@ -119,13 +97,6 @@ export default function AgentsTabContent({
 
   return (
     <Box position="relative">
-      <AgentsActionBar
-        key="agents-action-bar"
-        selectedAgents={selectedAgents}
-        hasSelection={hasSelection}
-        clearSelection={clearSelection}
-        onAgentsUpdated={handleAgentsUpdated}
-      />
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
         {agents.map((agent) => {
           const agentSelected = isSelected(agent.path);

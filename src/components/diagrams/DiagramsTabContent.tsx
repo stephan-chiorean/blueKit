@@ -1,4 +1,3 @@
-import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -15,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { LuNetwork } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
-import DiagramsActionBar from './DiagramsActionBar';
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface DiagramsTabContentProps {
   diagrams: ArtifactFile[];
@@ -30,39 +29,17 @@ export default function DiagramsTabContent({
   error,
   onViewDiagram,
 }: DiagramsTabContentProps) {
-  const [selectedDiagramPaths, setSelectedDiagramPaths] = useState<Set<string>>(new Set());
+  const { isSelected: isSelectedInContext, toggleItem } = useSelection();
 
-  // Clear selection when component mounts (happens when switching tabs due to key prop)
-  useEffect(() => {
-    setSelectedDiagramPaths(new Set());
-  }, []);
-
-  const isSelected = (path: string) => selectedDiagramPaths.has(path);
+  const isSelected = (diagramId: string) => isSelectedInContext(diagramId);
 
   const handleDiagramToggle = (diagram: ArtifactFile) => {
-    setSelectedDiagramPaths(prev => {
-      const next = new Set(prev);
-      if (next.has(diagram.path)) {
-        next.delete(diagram.path);
-      } else {
-        next.add(diagram.path);
-      }
-      return next;
+    toggleItem({
+      id: diagram.path,
+      name: diagram.frontMatter?.alias || diagram.name,
+      type: 'Diagram',
+      path: diagram.path,
     });
-  };
-
-  const clearSelection = () => {
-    setSelectedDiagramPaths(new Set());
-  };
-
-  const selectedDiagrams = useMemo(() => {
-    return diagrams.filter(diagram => selectedDiagramPaths.has(diagram.path));
-  }, [diagrams, selectedDiagramPaths]);
-
-  const hasSelection = selectedDiagramPaths.size > 0;
-
-  const handleDiagramsUpdated = () => {
-    clearSelection();
   };
 
   // Handle clicking on a diagram - diagrams already have front matter from parent
@@ -108,13 +85,6 @@ export default function DiagramsTabContent({
 
   return (
     <Box position="relative">
-      <DiagramsActionBar
-        key="diagrams-action-bar"
-        selectedDiagrams={selectedDiagrams}
-        hasSelection={hasSelection}
-        clearSelection={clearSelection}
-        onDiagramsUpdated={handleDiagramsUpdated}
-      />
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
         {diagrams.map((diagram) => {
           const diagramSelected = isSelected(diagram.path);

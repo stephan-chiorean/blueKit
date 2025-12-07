@@ -7,6 +7,7 @@ import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ResourceProvider } from './contexts/ResourceContext';
 import { ProjectEntry } from './ipc';
+import GlobalActionBar from './components/shared/GlobalActionBar';
 
 type View = 'welcome' | 'home' | 'project-detail';
 
@@ -44,6 +45,7 @@ function App() {
             ) : (
               <HomePage onProjectSelect={handleProjectSelect} />
             )}
+            <GlobalActionBar />
           </SelectionProvider>
         </ResourceProvider>
       </FeatureFlagsProvider>

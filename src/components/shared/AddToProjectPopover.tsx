@@ -17,17 +17,17 @@ import { open } from '@tauri-apps/api/dialog';
 import { ProjectEntry, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, invokeCreateNewProject } from '../../ipc';
 import { toaster } from '../ui/toaster';
 
+export type ArtifactType = 'kit' | 'walkthrough' | 'diagram' | 'agent';
+
 interface AddToProjectPopoverProps {
   onConfirm: (selectedProjects: ProjectEntry[]) => Promise<void>;
-  itemType: 'kit' | 'walkthrough' | 'diagram';
   itemCount: number;
   trigger: React.ReactNode;
-  sourceFiles: Array<{ path: string; name: string }>;
+  sourceFiles: Array<{ path: string; name: string; type: ArtifactType }>;
 }
 
 export default function AddToProjectPopover({
   onConfirm,
-  itemType,
   itemCount,
   trigger,
   sourceFiles,
@@ -112,12 +112,12 @@ export default function AddToProjectPopover({
   const handleBrowse = async () => {
     try {
       setCopying(true);
-      
+
       // Open directory picker
       const selectedPath = await open({
         directory: true,
         multiple: false,
-        title: `Select directory to add ${itemCount} ${itemType}${itemCount !== 1 ? 's' : ''}`,
+        title: `Select directory to add ${itemCount} artifact${itemCount !== 1 ? 's' : ''}`,
       });
 
       if (!selectedPath || typeof selectedPath !== 'string') {
@@ -126,17 +126,21 @@ export default function AddToProjectPopover({
         return;
       }
 
-      // Copy each file to the selected directory
+      // Copy each file to the selected directory based on its type
       const copyPromises: Promise<void>[] = [];
       for (const file of sourceFiles) {
         let copyPromise: Promise<string>;
-        
-        if (itemType === 'kit') {
+
+        if (file.type === 'kit') {
           copyPromise = invokeCopyKitToProject(file.path, selectedPath);
-        } else if (itemType === 'walkthrough') {
+        } else if (file.type === 'walkthrough') {
           copyPromise = invokeCopyWalkthroughToProject(file.path, selectedPath);
-        } else {
+        } else if (file.type === 'diagram') {
           copyPromise = invokeCopyDiagramToProject(file.path, selectedPath);
+        } else {
+          // agent type - TODO: implement invokeCopyAgentToProject
+          console.warn(`[AddToProjectPopover] Skipping agent ${file.name} - not yet implemented`);
+          continue;
         }
 
         copyPromises.push(
@@ -156,7 +160,7 @@ export default function AddToProjectPopover({
       toaster.create({
         type: 'success',
         title: 'Items added',
-        description: `Added ${itemCount} ${itemType}${itemCount !== 1 ? 's' : ''} to ${selectedPath}`,
+        description: `Added ${itemCount} artifact${itemCount !== 1 ? 's' : ''} to ${selectedPath}`,
       });
 
       setIsOpen(false);
@@ -177,7 +181,7 @@ export default function AddToProjectPopover({
   const handleNewProject = async () => {
     try {
       setCopying(true);
-      
+
       // First, open directory picker to select parent directory
       const parentPath = await open({
         directory: true,
@@ -199,7 +203,7 @@ export default function AddToProjectPopover({
       // Prepare source files with their types
       const filesWithTypes: Array<[string, string]> = sourceFiles.map(file => [
         file.path,
-        itemType
+        file.type
       ]);
 
       // Create new project
@@ -213,7 +217,7 @@ export default function AddToProjectPopover({
       toaster.create({
         type: 'success',
         title: 'Project created',
-        description: `Created new project "${projectName}" with ${itemCount} ${itemType}${itemCount !== 1 ? 's' : ''} at ${createdPath}`,
+        description: `Created new project "${projectName}" with ${itemCount} artifact${itemCount !== 1 ? 's' : ''} at ${createdPath}`,
       });
 
       setIsOpen(false);

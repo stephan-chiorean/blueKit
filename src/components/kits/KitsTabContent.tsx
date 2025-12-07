@@ -23,7 +23,7 @@ import {
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
-import KitsActionBar from './KitsActionBar';
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface KitsTabContentProps {
   kits: ArtifactFile[];
@@ -42,45 +42,27 @@ export default function KitsTabContent({
   projectsCount,
   onViewKit,
 }: KitsTabContentProps) {
-  const [selectedKitPaths, setSelectedKitPaths] = useState<Set<string>>(new Set());
+  const { isSelected: isSelectedInContext, toggleItem, getItemsByType } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Clear selection when component mounts (happens when switching tabs due to key prop)
-  useEffect(() => {
-    setSelectedKitPaths(new Set());
-  }, []);
-
-  const isSelected = (path: string) => selectedKitPaths.has(path);
+  const isSelected = (kitId: string) => isSelectedInContext(kitId);
 
   const handleKitToggle = (kit: ArtifactFile) => {
-    setSelectedKitPaths(prev => {
-      const next = new Set(prev);
-      if (next.has(kit.path)) {
-        next.delete(kit.path);
-      } else {
-        next.add(kit.path);
-      }
-      return next;
+    toggleItem({
+      id: kit.path,
+      name: kit.frontMatter?.alias || kit.name,
+      type: 'Kit',
+      path: kit.path,
     });
   };
 
-  const clearSelection = () => {
-    setSelectedKitPaths(new Set());
-  };
-
   const selectedKits = useMemo(() => {
-    return kits.filter(kit => selectedKitPaths.has(kit.path));
-  }, [kits, selectedKitPaths]);
-
-  const hasSelection = selectedKitPaths.size > 0;
-
-  const handleKitsUpdated = () => {
-    // Reload kits if needed - for now just clear selection
-    clearSelection();
-  };
+    const selectedKitItems = getItemsByType('Kit');
+    return kits.filter(kit => selectedKitItems.some(item => item.id === kit.path));
+  }, [kits, getItemsByType]);
 
   // Get all unique tags from kits
   const allTags = useMemo(() => {
@@ -366,13 +348,6 @@ export default function KitsTabContent({
 
   return (
     <Box position="relative">
-      <KitsActionBar
-        key="kits-action-bar"
-        selectedKits={selectedKits}
-        hasSelection={hasSelection}
-        clearSelection={clearSelection}
-        onKitsUpdated={handleKitsUpdated}
-      />
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">

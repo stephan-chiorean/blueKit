@@ -23,7 +23,7 @@ import {
 import { ImTree } from 'react-icons/im';
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
-import WalkthroughsActionBar from './WalkthroughsActionBar';
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface WalkthroughsTabContentProps {
   kits: ArtifactFile[];
@@ -42,51 +42,33 @@ export default function WalkthroughsTabContent({
   projectsCount,
   onViewKit,
 }: WalkthroughsTabContentProps) {
-  const [selectedWalkthroughPaths, setSelectedWalkthroughPaths] = useState<Set<string>>(new Set());
+  const { isSelected: isSelectedInContext, toggleItem, getItemsByType } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Clear selection when component mounts (happens when switching tabs due to key prop)
-  useEffect(() => {
-    setSelectedWalkthroughPaths(new Set());
-  }, []);
-
-  const isSelected = (path: string) => selectedWalkthroughPaths.has(path);
+  const isSelected = (walkthroughId: string) => isSelectedInContext(walkthroughId);
 
   const handleWalkthroughToggle = (walkthrough: ArtifactFile) => {
-    setSelectedWalkthroughPaths(prev => {
-      const next = new Set(prev);
-      if (next.has(walkthrough.path)) {
-        next.delete(walkthrough.path);
-      } else {
-        next.add(walkthrough.path);
-      }
-      return next;
+    toggleItem({
+      id: walkthrough.path,
+      name: walkthrough.frontMatter?.alias || walkthrough.name,
+      type: 'Walkthrough',
+      path: walkthrough.path,
     });
   };
 
-  const clearSelection = () => {
-    setSelectedWalkthroughPaths(new Set());
-  };
-
   // Filter kits to only show those with type: walkthrough in front matter
-  const walkthroughs = useMemo(() => 
+  const walkthroughs = useMemo(() =>
     kits.filter(kit => kit.frontMatter?.type === 'walkthrough'),
     [kits]
   );
 
   const selectedWalkthroughs = useMemo(() => {
-    return walkthroughs.filter(walkthrough => selectedWalkthroughPaths.has(walkthrough.path));
-  }, [walkthroughs, selectedWalkthroughPaths]);
-
-  const hasSelection = selectedWalkthroughPaths.size > 0;
-
-  const handleWalkthroughsUpdated = () => {
-    // Reload walkthroughs if needed - for now just clear selection
-    clearSelection();
-  };
+    const selectedWalkthroughItems = getItemsByType('Walkthrough');
+    return walkthroughs.filter(wt => selectedWalkthroughItems.some(item => item.id === wt.path));
+  }, [walkthroughs, getItemsByType]);
 
   // Get all unique tags from walkthroughs
   const allTags = useMemo(() => {
@@ -233,7 +215,7 @@ export default function WalkthroughsTabContent({
                   cursor="pointer"
                 >
                   <Checkbox.HiddenInput />
-                  <Checkbox.Control>
+                  <Checkbox.Control cursor="pointer">
                     <Checkbox.Indicator />
                   </Checkbox.Control>
                 </Checkbox.Root>
@@ -315,9 +297,10 @@ export default function WalkthroughsTabContent({
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
+                  cursor="pointer"
                 >
                   <Checkbox.HiddenInput />
-                  <Checkbox.Control>
+                  <Checkbox.Control cursor="pointer">
                     <Checkbox.Indicator />
                   </Checkbox.Control>
                 </Checkbox.Root>
@@ -370,13 +353,6 @@ export default function WalkthroughsTabContent({
 
   return (
     <Box position="relative">
-      <WalkthroughsActionBar
-        key="walkthroughs-action-bar"
-        selectedWalkthroughs={selectedWalkthroughs}
-        hasSelection={hasSelection}
-        clearSelection={clearSelection}
-        onWalkthroughsUpdated={handleWalkthroughsUpdated}
-      />
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">

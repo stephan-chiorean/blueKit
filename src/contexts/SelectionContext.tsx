@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type SelectionType = 'Kit' | 'Template' | 'Collection' | 'Project' | 'Task';
+export type SelectionType = 'Kit' | 'Walkthrough' | 'Agent' | 'Diagram' | 'Task';
 
 export interface SelectedItem {
   id: string;
@@ -17,6 +17,12 @@ interface SelectionContextType {
   clearSelection: () => void;
   isSelected: (id: string) => boolean;
   hasSelection: boolean;
+  // Helper methods to get selections by type
+  getItemsByType: (type: SelectionType) => SelectedItem[];
+  hasSelectionOfType: (type: SelectionType) => boolean;
+  // Helper to check if there are any artifact selections (excluding tasks)
+  hasArtifactSelection: boolean;
+  hasTaskSelection: boolean;
 }
 
 const SelectionContext = createContext<SelectionContextType | undefined>(undefined);
@@ -62,7 +68,25 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     return selectedItems.some((item) => item.id === id);
   };
 
+  const getItemsByType = (type: SelectionType) => {
+    return selectedItems.filter((item) => item.type === type);
+  };
+
+  const hasSelectionOfType = (type: SelectionType) => {
+    return selectedItems.some((item) => item.type === type);
+  };
+
   const hasSelection = selectedItems.length > 0;
+
+  // Check if there are any artifact selections (excluding tasks)
+  const hasArtifactSelection = selectedItems.some((item) =>
+    item.type === 'Kit' ||
+    item.type === 'Walkthrough' ||
+    item.type === 'Agent' ||
+    item.type === 'Diagram'
+  );
+
+  const hasTaskSelection = selectedItems.some((item) => item.type === 'Task');
 
   return (
     <SelectionContext.Provider
@@ -74,6 +98,10 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         clearSelection,
         isSelected,
         hasSelection,
+        getItemsByType,
+        hasSelectionOfType,
+        hasArtifactSelection,
+        hasTaskSelection,
       }}
     >
       {children}
