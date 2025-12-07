@@ -586,6 +586,25 @@ export async function invokeGetFolderMarkdownFiles(folderPath: string): Promise<
 }
 
 /**
+ * Gets all plan files from Claude or Cursor plans directory.
+ *
+ * This command reads markdown files from either `~/.claude/plans` or `~/.cursor/plans`
+ * based on the source parameter.
+ *
+ * @param source - Either "claude" or "cursor" to specify which plans directory to read
+ * @returns A promise that resolves to an array of ArtifactFile objects
+ *
+ * @example
+ * ```typescript
+ * const claudePlans = await invokeGetPlansFiles('claude');
+ * const cursorPlans = await invokeGetPlansFiles('cursor');
+ * ```
+ */
+export async function invokeGetPlansFiles(source: 'claude' | 'cursor'): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_plans_files', { source });
+}
+
+/**
  * Gets all blueprints from the .bluekit/blueprints directory.
  *
  * @param projectPath - The path to the project root directory

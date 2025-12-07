@@ -58,6 +58,7 @@ async fn main() {
             commands::copy_blueprint_to_project, // Copy blueprint directory to project
             commands::get_scrapbook_items, // Get scrapbook folders and files
             commands::get_folder_markdown_files, // Get markdown files from a folder
+            commands::get_plans_files, // Get plan files from ~/.claude/plans or ~/.cursor/plans
             commands::get_blueprints, // Get blueprints from .bluekit/blueprints directory
             commands::get_blueprint_task_file, // Get task file content from blueprint
             commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory

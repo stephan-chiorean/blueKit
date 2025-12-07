@@ -25,9 +25,10 @@ import { Collection } from '../components/collections/AddCollectionDialog';
 
 interface HomePageProps {
   onProjectSelect: (project: ProjectEntry) => void;
+  onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
-export default function HomePage({ onProjectSelect }: HomePageProps) {
+export default function HomePage({ onProjectSelect, onNavigateToPlans }: HomePageProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -254,7 +255,7 @@ export default function HomePage({ onProjectSelect }: HomePageProps) {
             }}
           >
             <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
-              <NavigationMenu>
+              <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
                 {({ onOpen }) => (
                   <IconButton
                     variant="ghost"

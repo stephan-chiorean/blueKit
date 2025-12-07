@@ -1050,6 +1050,88 @@ pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<Artifa
     Ok(files)
 }
 
+/// Gets all plan files from Claude or Cursor plans directory.
+///
+/// This command reads markdown files from either `~/.claude/plans` or `~/.cursor/plans`
+/// based on the source parameter.
+///
+/// # Arguments
+///
+/// * `source` - Either "claude" or "cursor" to specify which plans directory to read
+///
+/// # Returns
+///
+/// A `Result<Vec<ArtifactFile>, String>` containing either:
+/// - `Ok(Vec<ArtifactFile>)` - Success case with list of plan files
+/// - `Err(String)` - Error case with an error message
+///
+/// # Example Usage (from frontend)
+///
+/// ```typescript
+/// const plans = await invoke<ArtifactFile[]>('get_plans_files', { source: 'claude' });
+/// ```
+#[tauri::command]
+pub async fn get_plans_files(source: String) -> Result<Vec<ArtifactFile>, String> {
+    use std::fs;
+
+    // Validate source
+    if source != "claude" && source != "cursor" {
+        return Err(format!("Invalid source: {}. Must be 'claude' or 'cursor'", source));
+    }
+
+    // Get home directory
+    let home_dir = env::var("HOME")
+        .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
+
+    // Construct path to plans directory
+    let plans_path = PathBuf::from(&home_dir)
+        .join(if source == "claude" { ".claude" } else { ".cursor" })
+        .join("plans");
+
+    // Check if folder exists
+    if !plans_path.exists() || !plans_path.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+
+    // Read entries in the folder
+    let entries = fs::read_dir(&plans_path)
+        .map_err(|e| format!("Failed to read plans folder: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let entry_path = entry.path();
+
+        if entry_path.is_file() {
+            if let Some(extension) = entry_path.extension() {
+                if extension == "md" {
+                    let name = entry_path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let path_str = entry_path
+                        .to_str()
+                        .ok_or_else(|| "Invalid path encoding".to_string())?
+                        .to_string();
+
+                    files.push(ArtifactFile {
+                        name,
+                        path: path_str,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort alphabetically
+    files.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(files)
+}
+
 /// Gets all blueprints from the .bluekit/blueprints directory.
 ///
 /// # Arguments

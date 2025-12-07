@@ -9,19 +9,24 @@ import {
   Avatar,
   Heading,
   Text,
+  Switch,
+  Icon,
 } from '@chakra-ui/react';
 import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
+import { FaMoon, FaSun } from "react-icons/fa";
 import { Task } from '../types/task';
 import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
 import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 export default function Header() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const { colorMode, toggleColorMode } = useColorMode();
 
   // Load projects on mount
   useEffect(() => {
@@ -85,6 +90,28 @@ export default function Header() {
 
         {/* Right side icons */}
         <HStack gap={2} flex="1" justify="flex-end">
+          {/* Dark Mode Toggle */}
+          <Switch.Root
+            colorPalette="blue"
+            size="lg"
+            checked={colorMode === 'dark'}
+            onCheckedChange={(e) => {
+              if (e.checked && colorMode === 'light') {
+                toggleColorMode();
+              } else if (!e.checked && colorMode === 'dark') {
+                toggleColorMode();
+              }
+            }}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control>
+              <Switch.Thumb />
+              <Switch.Indicator fallback={<Icon as={FaSun} color="yellow.400" />}>
+                <Icon as={FaMoon} color="gray.400" />
+              </Switch.Indicator>
+            </Switch.Control>
+          </Switch.Root>
+
           <TaskManagerPopover
             onOpenTaskDialog={handleOpenTaskDialog}
             onOpenCreateDialog={handleOpenCreateDialog}

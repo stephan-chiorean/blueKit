@@ -14,7 +14,6 @@ import {
   Icon,
   Flex,
   NativeSelect,
-  Switch,
 } from '@chakra-ui/react';
 import { 
   LuMenu, 
@@ -28,16 +27,15 @@ import {
   LuPlug,
   LuBriefcase,
   LuSettings,
-  LuMoon,
-  LuSun,
   LuArchive,
+  LuCode,
 } from 'react-icons/lu';
 import {FaBucket} from "react-icons/fa6";
-import { FaMoon, FaSun } from "react-icons/fa";
-import { useColorMode } from '../contexts/ColorModeContext';
+import { RiClaudeFill } from "react-icons/ri";
 
 interface NavigationMenuProps {
   children?: (props: { isOpen: boolean; onOpen: () => void }) => ReactNode;
+  onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
 interface MenuItem {
@@ -66,6 +64,10 @@ const menuItems: MenuItem[] = [
       { id: 'bucket', label: 'Bucket', icon: FaBucket },
       { id: 'notebook', label: 'Notebook', icon: LuNotebook },
       { id: 'mcp', label: 'MCP', icon: LuPlug },
+      { id: 'plans', label: 'Plans', icon: LuFileText, children: [
+        { id: 'claude', label: 'Claude', icon: RiClaudeFill },
+        { id: 'cursor', label: 'Cursor', icon: LuCode },
+      ]},
     ],
   },
   {
@@ -83,10 +85,9 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-export default function NavigationMenu({ children }: NavigationMenuProps) {
+export default function NavigationMenu({ children, onNavigateToPlans }: NavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const { colorMode, toggleColorMode } = useColorMode();
   const [selectedWorkspace, setSelectedWorkspace] = useState('workspace-1');
 
   const handleMenuItemClick = (item: MenuItem) => {
@@ -96,6 +97,16 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
     } else {
       // Handle navigation
       console.log('Navigate to:', item.id);
+      setIsOpen(false);
+    }
+  };
+
+  const handleChildClick = (child: MenuItem) => {
+    if (child.id === 'claude' || child.id === 'cursor') {
+      onNavigateToPlans?.(child.id as 'claude' | 'cursor');
+      setIsOpen(false);
+    } else {
+      console.log('Navigate to:', child.id);
       setIsOpen(false);
     }
   };
@@ -138,38 +149,6 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
                     </NativeSelect.Root>
                   </Box>
 
-                  <Separator mb={2} />
-
-                  {/* Color Mode Toggle */}
-                  <Box mb={2}>
-                    <HStack justify="space-between" w="100%">
-                      <Text fontSize="sm">
-                        {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
-                      </Text>
-                      <Switch.Root
-                        colorPalette="blue"
-                        size="lg"
-                        checked={colorMode === 'dark'}
-                        onCheckedChange={(e) => {
-                          if (e.checked && colorMode === 'light') {
-                            toggleColorMode();
-                          } else if (!e.checked && colorMode === 'dark') {
-                            toggleColorMode();
-                          }
-                        }}
-                      >
-                        <Switch.HiddenInput />
-                        <Switch.Control>
-                          <Switch.Thumb />
-                          <Switch.Indicator fallback={<Icon as={FaSun} color="yellow.400" />}>
-                            <Icon as={FaMoon} color="gray.400" />
-                          </Switch.Indicator>
-                        </Switch.Control>
-                      </Switch.Root>
-                    </HStack>
-                  </Box>
-
-                  <Separator mb={2} />
 
                   {/* Menu Items */}
                   {menuItems.map((item) => (
@@ -217,26 +196,91 @@ export default function NavigationMenu({ children }: NavigationMenuProps) {
                         {item.children && (
                           <Collapsible.Content>
                             <VStack align="stretch" gap={0} pl={8} mt={1}>
-                              {item.children.map((child) => (
-                                <Button
-                                  key={child.id}
-                                  variant="ghost"
-                                  size="sm"
-                                  w="100%"
-                                  justifyContent="flex-start"
-                                  onClick={() => {
-                                    console.log('Navigate to:', child.id);
-                                    setIsOpen(false);
-                                  }}
-                                >
-                                  <HStack gap={3}>
-                                    <Icon size="sm">
-                                      <child.icon />
-                                    </Icon>
-                                    <Text>{child.label}</Text>
-                                  </HStack>
-                                </Button>
-                              ))}
+                              {item.children.map((child) => {
+                                // Check if this child has children (nested menu)
+                                if (child.children) {
+                                  return (
+                                    <Collapsible.Root
+                                      key={child.id}
+                                      open={expandedItems.has(child.id)}
+                                      onOpenChange={(e) => {
+                                        if (e.open) {
+                                          setExpandedItems((prev) => new Set(prev).add(child.id));
+                                        } else {
+                                          setExpandedItems((prev) => {
+                                            const next = new Set(prev);
+                                            next.delete(child.id);
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <Collapsible.Trigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          w="100%"
+                                          justifyContent="flex-start"
+                                        >
+                                          <HStack gap={3} flex="1">
+                                            <Icon size="sm">
+                                              <child.icon />
+                                            </Icon>
+                                            <Text flex="1" textAlign="left">{child.label}</Text>
+                                            <Collapsible.Indicator
+                                              transition="transform 0.2s"
+                                              _open={{ transform: 'rotate(90deg)' }}
+                                            >
+                                              <LuChevronRight />
+                                            </Collapsible.Indicator>
+                                          </HStack>
+                                        </Button>
+                                      </Collapsible.Trigger>
+                                      {child.children && (
+                                        <Collapsible.Content>
+                                          <VStack align="stretch" gap={0} pl={8} mt={1}>
+                                            {child.children.map((grandchild) => (
+                                              <Button
+                                                key={grandchild.id}
+                                                variant="ghost"
+                                                size="sm"
+                                                w="100%"
+                                                justifyContent="flex-start"
+                                                onClick={() => handleChildClick(grandchild)}
+                                              >
+                                                <HStack gap={3}>
+                                                  <Icon size="sm">
+                                                    <grandchild.icon />
+                                                  </Icon>
+                                                  <Text>{grandchild.label}</Text>
+                                                </HStack>
+                                              </Button>
+                                            ))}
+                                          </VStack>
+                                        </Collapsible.Content>
+                                      )}
+                                    </Collapsible.Root>
+                                  );
+                                }
+                                // Regular child item
+                                return (
+                                  <Button
+                                    key={child.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    w="100%"
+                                    justifyContent="flex-start"
+                                    onClick={() => handleChildClick(child)}
+                                  >
+                                    <HStack gap={3}>
+                                      <Icon size="sm">
+                                        <child.icon />
+                                      </Icon>
+                                      <Text>{child.label}</Text>
+                                    </HStack>
+                                  </Button>
+                                );
+                              })}
                             </VStack>
                           </Collapsible.Content>
                         )}
