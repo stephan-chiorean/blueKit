@@ -191,7 +191,6 @@ export default function KitsActionBar({
                   onConfirm={handleConfirmAddToProject}
                   itemType="kit"
                   itemCount={selectedKits.length}
-                  disabled={loading}
                   sourceFiles={selectedKits.map(kit => ({ path: kit.path, name: kit.name }))}
                   trigger={
                     <Button

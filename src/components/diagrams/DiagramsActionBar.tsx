@@ -191,7 +191,6 @@ export default function DiagramsActionBar({
                   onConfirm={handleConfirmAddToProject}
                   itemType="diagram"
                   itemCount={selectedDiagrams.length}
-                  disabled={loading}
                   sourceFiles={selectedDiagrams.map(diagram => ({ path: diagram.path, name: diagram.name }))}
                   trigger={
                     <Button

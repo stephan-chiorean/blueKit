@@ -191,7 +191,6 @@ export default function WalkthroughsActionBar({
                   onConfirm={handleConfirmAddToProject}
                   itemType="walkthrough"
                   itemCount={selectedWalkthroughs.length}
-                  disabled={loading}
                   sourceFiles={selectedWalkthroughs.map(walkthrough => ({ path: walkthrough.path, name: walkthrough.name }))}
                   trigger={
                     <Button
