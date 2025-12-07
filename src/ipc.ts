@@ -886,3 +886,68 @@ export async function invokeDbDeleteTask(taskId: string): Promise<void> {
   return await invokeWithTimeout<void>('db_delete_task', { taskId }, 10000);
 }
 
+/**
+ * Delete resource files from the filesystem.
+ *
+ * This command deletes one or more resource files (kits, walkthroughs, agents, diagrams).
+ * All paths are validated to be within `.bluekit` directories for safety.
+ *
+ * @param filePaths - Array of absolute file paths to delete
+ * @returns Promise that resolves when all files are deleted
+ * @throws Error if any deletions fail
+ *
+ * @example
+ * ```typescript
+ * await deleteResources([
+ *   '/path/to/project/.bluekit/kits/my-kit.md',
+ *   '/path/to/project/.bluekit/walkthroughs/my-walkthrough.md'
+ * ]);
+ * ```
+ */
+export async function deleteResources(filePaths: string[]): Promise<void> {
+  return await invokeWithTimeout<void>('delete_resources', { filePaths }, 10000);
+}
+
+/**
+ * Update metadata in a resource file's YAML front matter.
+ *
+ * This command updates the YAML front matter of a resource file (kit, walkthrough,
+ * agent, or diagram) while preserving the markdown body content.
+ *
+ * @param filePath - Absolute path to the resource file
+ * @param metadata - Object containing fields to update (alias, description, tags)
+ * @returns Promise that resolves when metadata is updated
+ * @throws Error if the update fails
+ *
+ * @example
+ * ```typescript
+ * await updateResourceMetadata(
+ *   '/path/to/project/.bluekit/kits/my-kit.md',
+ *   {
+ *     alias: 'Updated Kit Name',
+ *     description: 'Updated description',
+ *     tags: ['tag1', 'tag2']
+ *   }
+ * );
+ * ```
+ */
+export async function updateResourceMetadata(
+  filePath: string,
+  metadata: {
+    alias?: string;
+    description?: string;
+    tags?: string[];
+  }
+): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'update_resource_metadata',
+    {
+      filePath,
+      alias: metadata.alias,
+      description: metadata.description,
+      tags: metadata.tags,
+    },
+    10000
+  );
+}
+

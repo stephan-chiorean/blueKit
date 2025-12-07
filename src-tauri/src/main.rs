@@ -71,6 +71,8 @@ async fn main() {
             commands::db_create_task, // Create a new task (database)
             commands::db_update_task, // Update a task (database)
             commands::db_delete_task, // Delete a task (database)
+            commands::delete_resources, // Delete resource files
+            commands::update_resource_metadata, // Update resource metadata
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands

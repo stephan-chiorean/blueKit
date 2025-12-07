@@ -4,9 +4,13 @@ alias: Base Tab Content
 type: kit
 is_base: false
 version: 1
-tags: [ui, tab, pattern]
-description: "Conditional tab content with empty state pattern"
+tags:
+- ui
+- tab
+- pattern
+description: This will be the base tab content
 ---
+
 
 # Conditional Tab Content with Empty State Pattern
 

@@ -4,9 +4,81 @@
 
 Walkthroughs in BlueKit currently use a **one-size-fits-all** markdown approach. While this keeps things simple, we're missing opportunities to provide specialized UX for different **use cases** that walkthroughs serve.
 
-The solution: **Format types** that adapt the UI/UX based on the `format` field in YAML front matter, while keeping the underlying storage agnostic (still just markdown).
+**Core Vision:** BlueKit follows the principle of **"agnostic container, opinionated workflow"** - the storage (markdown files) should be flexible and agnostic, but the tooling should be smart about how it presents and works with that content. This rewards users who add structure while keeping simple workflows easy.
 
-**Key Principle:** Folders give users organizational freedom, but **format types** unlock specialized, purpose-built UX.
+## Analysis: Explicit Format Types vs. Structure Detection
+
+### The Question
+
+Should we require users to explicitly set a `format` field in YAML front matter, or should we auto-detect structure from content and provide progressive enhancement?
+
+### Assessment
+
+**"Monumental UX" Features (High Value):**
+1. **Review checklists with progress tracking** - Truly useful if you do code reviews regularly
+2. **Guide step navigation with progress saving** - Valuable for multi-step tutorials
+3. **Reference search/filter** - Helpful for large reference docs
+
+**Nice-to-Have (Lower Priority):**
+- Format badges/indicators (visual polish)
+- Auto-format suggestions (convenience)
+- Architecture split-view (can be auto-detected from mermaid presence)
+
+### The Problem with Explicit Format Types
+
+Requiring explicit format types adds complexity:
+- Users must learn about format types
+- Users must remember to set the format field
+- Creates friction for simple use cases
+- Requires format-specific components and logic
+- Adds maintenance burden
+
+### Better Approach: Structure Detection + Progressive Enhancement
+
+Instead of requiring explicit format types, **auto-detect structure from content** and provide progressive enhancement:
+
+**Benefits:**
+- ✅ **Agnostic container:** No format field required - plain markdown works
+- ✅ **Opinionated workflow:** UI adapts automatically based on detected structure
+- ✅ **Simple by default:** Users don't need to learn format types
+- ✅ **Rewards structure:** Adding checkboxes/steps/mermaid automatically unlocks features
+- ✅ **No friction:** Works immediately without configuration
+
+**Implementation:**
+```typescript
+// Auto-detect structure from content, don't require format field
+const detectStructure = (content: string) => {
+  const hasMermaid = /```mermaid/.test(content);
+  const hasCheckboxes = /- \[ \]/.test(content);
+  const hasSteps = /##\s+(Step \d+|Install|Setup)/.test(content);
+  const codeBlockCount = (content.match(/```/g) || []).length / 2;
+  
+  // Progressive enhancement based on what's detected
+  return {
+    hasCheckboxes,      // → Enable checklist UI
+    hasSteps,           // → Enable stepper navigation
+    hasMermaid,         // → Enable diagram focus mode
+    isReference: codeBlockCount > 5, // → Enable search/filter
+  };
+};
+```
+
+### Recommendation
+
+1. **Keep folders for organization** (user-controlled, agnostic)
+2. **Auto-detect structure** (no format field required)
+3. **Progressive enhancement:**
+   - Checkboxes detected → show checklist UI
+   - Step patterns detected → show stepper navigation
+   - Mermaid detected → enable diagram focus
+   - Many code blocks → enable search/filter
+4. **Optional format field:** If present, use it; otherwise auto-detect
+
+This aligns with the vision: the container (markdown) stays agnostic, and the workflow (UI) adapts based on detected structure. Users get enhanced UX when structure is present, without needing to declare format types.
+
+---
+
+## Revised Approach: Structure-Based Progressive Enhancement
 
 ---
 
@@ -21,15 +93,19 @@ complexity: simple | moderate | comprehensive
 
 **Currently:** These fields exist but don't affect the UI. All walkthroughs render the same way.
 
-**Opportunity:** Each format type has unique UX needs that we're not addressing.
+**Opportunity:** Detect structure from content and provide specialized UX without requiring explicit format declaration.
 
 ---
 
-## Format Type Variations
+## Structure Detection & UX Enhancements
 
-### 1. `reference` - Quick Lookup
+The following enhancements are **auto-detected** from content structure, not requiring explicit format types:
+
+### 1. Reference Mode - Quick Lookup (Auto-detected)
 
 **Use Case:** API cheatsheets, command references, keyboard shortcuts, common patterns
+
+**Detection:** 5+ code blocks with minimal surrounding text
 
 **Current Pain:** Users have to scroll through markdown to find specific snippets
 
@@ -68,9 +144,11 @@ complexity: simple | moderate | comprehensive
 
 ---
 
-### 2. `review` - Code Review Checklist
+### 2. Review Mode - Code Review Checklist (Auto-detected)
 
 **Use Case:** PR reviews, audit checklists, QA walkthroughs, security reviews
+
+**Detection:** Presence of markdown checkboxes (`- [ ]` or `- [x]`)
 
 **Current Pain:** No way to track which items you've reviewed
 
@@ -124,9 +202,11 @@ complexity: simple | moderate | comprehensive
 
 ---
 
-### 3. `guide` - Step-by-Step Tutorial
+### 3. Guide Mode - Step-by-Step Tutorial (Auto-detected)
 
 **Use Case:** Implementation guides, setup instructions, migration guides
+
+**Detection:** Sequential headings with imperative verbs ("Step 1", "Install", "Setup", "Configure")
 
 **Current Pain:** No way to track where you are in multi-step process
 
@@ -167,9 +247,11 @@ complexity: simple | moderate | comprehensive
 
 ---
 
-### 4. `architecture` - System Diagrams
+### 4. Architecture Mode - System Diagrams (Auto-detected)
 
 **Use Case:** System design docs, component relationships, data flow diagrams
+
+**Detection:** Presence of mermaid diagram code blocks (```` ```mermaid ````)
 
 **Current Pain:** No specialized rendering for diagrams or relationships
 
@@ -208,9 +290,11 @@ complexity: simple | moderate | comprehensive
 
 ---
 
-### 5. `documentation` - Traditional Docs
+### 5. Documentation Mode - Traditional Docs (Default)
 
 **Use Case:** General understanding, how-to guides, concept explanations
+
+**Detection:** Default mode when no specific structure is detected
 
 **Current Pain:** This is what we have now, it's fine but could be better
 
@@ -251,32 +335,55 @@ complexity: simple | moderate | comprehensive
 
 ## Implementation Strategy
 
-### Phase 1: Format Detection & Basic Variants (Week 1-2)
+### Phase 1: Structure Detection & Basic Enhancements (Week 1-2)
 
-**Goal:** Parse `format` field and render different UI for each type
+**Goal:** Auto-detect structure from content and render appropriate UI enhancements
 
 #### Tasks
-1. **Parse front matter format field**
-   - Update `ArtifactFile` type to include `format` and `complexity`
-   - Read in `WalkthroughsTabContent` component
-
-2. **Create format-specific overview components**
-   - `ReferenceOverview.tsx` - Search + quick jump
-   - `ReviewOverview.tsx` - Checklist system
-   - `GuideOverview.tsx` - Stepper UI
-   - `ArchitectureOverview.tsx` - Diagram focus
-   - `DocumentationOverview.tsx` - Enhanced current view
-
-3. **Route to correct component based on format**
+1. **Create structure detection utility**
    ```typescript
-   const renderOverview = () => {
-     switch (walkthrough.frontMatter?.format) {
-       case 'reference': return <ReferenceOverview {...props} />;
-       case 'review': return <ReviewOverview {...props} />;
-       case 'guide': return <GuideOverview {...props} />;
-       case 'architecture': return <ArchitectureOverview {...props} />;
-       default: return <DocumentationOverview {...props} />;
-     }
+   interface DetectedStructure {
+     hasCheckboxes: boolean;
+     hasSteps: boolean;
+     hasMermaid: boolean;
+     isReference: boolean; // 5+ code blocks
+   }
+   
+   const detectStructure = (content: string): DetectedStructure => {
+     const hasMermaid = /```mermaid/.test(content);
+     const hasCheckboxes = /- \[ \]/.test(content);
+     const hasSteps = /##\s+(Step \d+|Install|Setup|Configure)/.test(content);
+     const codeBlockCount = (content.match(/```/g) || []).length / 2;
+     
+     return {
+       hasCheckboxes,
+       hasSteps,
+       hasMermaid,
+       isReference: codeBlockCount > 5,
+     };
+   };
+   ```
+
+2. **Create enhancement components (progressive disclosure)**
+   - `ChecklistOverlay.tsx` - Appears when checkboxes detected
+   - `StepperNavigation.tsx` - Appears when steps detected
+   - `DiagramFocusMode.tsx` - Appears when mermaid detected
+   - `ReferenceSearch.tsx` - Appears when many code blocks detected
+   - Base markdown renderer remains unchanged
+
+3. **Apply enhancements conditionally**
+   ```typescript
+   const renderWalkthrough = (content: string) => {
+     const structure = detectStructure(content);
+     
+     return (
+       <WalkthroughViewer content={content}>
+         {structure.hasCheckboxes && <ChecklistOverlay />}
+         {structure.hasSteps && <StepperNavigation />}
+         {structure.hasMermaid && <DiagramFocusMode />}
+         {structure.isReference && <ReferenceSearch />}
+       </WalkthroughViewer>
+     );
    };
    ```
 
@@ -286,32 +393,32 @@ complexity: simple | moderate | comprehensive
 
 ### Phase 2: Interactive Features (Week 3-4)
 
-**Goal:** Add format-specific interactive features
+**Goal:** Add interactive features for detected structures
 
-#### `reference` Type
+#### Reference Mode (when many code blocks detected)
 - Implement search/filter across code blocks
 - Add copy-to-clipboard for all snippets
-- Build "Recently copied" tracking
+- Build "Recently copied" tracking (localStorage)
 
-#### `review` Type
+#### Review Mode (when checkboxes detected)
 - Checkbox state management (localStorage)
 - Progress calculation
 - Notes system per item
 - Export checklist to markdown
 
-#### `guide` Type
+#### Guide Mode (when steps detected)
 - Step navigation (prev/next)
-- Progress saving
+- Progress saving (localStorage)
 - Time estimate parsing
 - Jump-to-step controls
 
-#### `architecture` Type
+#### Architecture Mode (when mermaid detected)
 - Interactive mermaid diagrams (click to highlight)
-- Split view layout
+- Split view layout (diagram + explanation)
 - Zoom/pan for large diagrams
 - Component index sidebar
 
-#### `documentation` Type
+#### Documentation Mode (default)
 - Persistent TOC sidebar
 - Related walkthroughs detection
 - "Edit in editor" integration
@@ -321,20 +428,26 @@ complexity: simple | moderate | comprehensive
 
 ---
 
-### Phase 3: Advanced Parsing (Week 5-6)
+### Phase 3: Enhanced Parsing & Optional Format Override (Week 5-6)
 
-**Goal:** Auto-extract structure from markdown content
+**Goal:** Improve structure detection accuracy and support optional format field
 
-#### Parsing Pipeline
+#### Enhanced Parsing Pipeline
 ```typescript
 interface ParsedWalkthrough {
   frontMatter: {
-    format: 'reference' | 'guide' | 'review' | 'architecture' | 'documentation';
-    complexity: 'simple' | 'moderate' | 'comprehensive';
+    format?: 'reference' | 'guide' | 'review' | 'architecture' | 'documentation'; // Optional override
+    complexity?: 'simple' | 'moderate' | 'comprehensive';
     tags: string[];
     description: string;
   };
-  structure: {
+  detectedStructure: {
+    hasCheckboxes: boolean;
+    hasSteps: boolean;
+    hasMermaid: boolean;
+    isReference: boolean;
+  };
+  parsed: {
     headings: Heading[];
     codeBlocks: CodeBlock[];
     diagrams: MermaidDiagram[];
@@ -346,12 +459,17 @@ interface ParsedWalkthrough {
 }
 ```
 
-#### Auto-Detection Logic
-- **Reference:** Lots of code blocks with minimal text
-- **Review:** Numbered lists, checkbox patterns
-- **Guide:** Sequential headings with imperative verbs ("Install", "Configure")
-- **Architecture:** Presence of mermaid diagrams
-- **Documentation:** Mixed content, multiple sections
+#### Detection Logic (Refined)
+- **Reference:** 5+ code blocks with minimal surrounding text (< 3 lines per code block)
+- **Review:** Presence of markdown checkboxes (`- [ ]` or `- [x]`)
+- **Guide:** Sequential headings (H2/H3) with imperative verbs ("Step 1", "Install", "Setup", "Configure")
+- **Architecture:** Presence of mermaid diagram code blocks
+- **Documentation:** Default when no specific structure detected
+
+#### Format Override Support
+- If `format` field exists in front matter, use it (user override)
+- Otherwise, use auto-detected structure
+- UI shows detected mode with option to override if needed
 
 **Estimated Effort:** 1 week
 
@@ -391,19 +509,19 @@ The `complexity` field affects **depth of detail**, not structure:
 
 ## Folder Integration
 
-**Key Insight:** Folders are agnostic organization, formats are specialized UX.
+**Key Insight:** Folders are agnostic organization, structure detection provides specialized UX.
 
 Users can organize walkthroughs into folders like:
-- `/reviews/` - Might contain `review` format walkthroughs
-- `/guides/` - Might contain `guide` format walkthroughs
-- `/architecture/` - Might contain `architecture` format walkthroughs
+- `/reviews/` - Might contain walkthroughs with checkboxes
+- `/guides/` - Might contain step-by-step walkthroughs
+- `/architecture/` - Might contain mermaid diagrams
 
-**But:** Folders don't enforce format. A user could put a `guide` in `/reviews/` and it still renders with guide UX.
+**But:** Folders don't enforce structure. A user could put a step-by-step guide in `/reviews/` and it still detects steps and shows stepper navigation.
 
 **This gives:**
-- **Flexibility:** Users organize how they want
-- **Consistency:** Same format = same UX, regardless of folder
-- **Discovery:** "Show me all reviews" filters by format, not folder
+- **Flexibility:** Users organize how they want (agnostic container)
+- **Smart UX:** Structure is auto-detected regardless of folder (opinionated workflow)
+- **Discovery:** "Show me all reviews" filters by detected structure, not folder
 
 ---
 
@@ -448,60 +566,53 @@ Users can organize walkthroughs into folders like:
 
 ---
 
-## Format Type Suggestions (AI-Powered)
+## Optional Format Override
 
-When user creates a walkthrough **without** specifying format, suggest based on content:
+While structure is auto-detected, users can optionally set a `format` field in front matter to override detection:
 
-```typescript
-const suggestFormat = (content: string): Format => {
-  const codeBlockCount = (content.match(/```/g) || []).length / 2;
-  const hasMermaid = /```mermaid/.test(content);
-  const hasCheckboxes = /- \[ \]/.test(content);
-  const hasSteps = /##\s+(Step \d+|Install|Setup|Configure)/.test(content);
-
-  if (hasMermaid) return 'architecture';
-  if (hasCheckboxes) return 'review';
-  if (hasSteps) return 'guide';
-  if (codeBlockCount > 5) return 'reference';
-  return 'documentation';
-};
+```yaml
+---
+format: review  # Optional: overrides auto-detection
+description: "Security review checklist"
+---
 ```
 
-**UI Prompt:**
-```
-┌─ Format Suggestion ──────────────────────┐
-│ Based on your content, this looks like   │
-│ a "guide" walkthrough.                   │
-│                                          │
-│ [Use Guide Format] [Choose Different]    │
-└──────────────────────────────────────────┘
-```
+**Use Cases for Override:**
+- Content doesn't match expected patterns but user wants specific UX
+- User wants to force a particular mode
+- Edge cases where detection might be ambiguous
+
+**Default Behavior:**
+- No format field → auto-detect from content
+- Format field present → use specified format (user override)
 
 ---
 
 ## Migration Path
 
-**All existing walkthroughs (no format field):**
-- Default to `format: documentation`
-- Render with current UI (no breaking changes)
-- Users can add `format` field later to unlock enhanced UX
+**All existing walkthroughs:**
+- Auto-detect structure from content
+- Enhanced UX activates automatically when structure is detected
+- No format field required
+- No breaking changes - plain markdown still works perfectly
 
-**Opt-in enhancement:**
-1. User creates walkthrough (default: documentation)
-2. BlueKit suggests format based on content
-3. User accepts or chooses different format
-4. Enhanced UX activates immediately
+**Progressive Enhancement:**
+1. User creates walkthrough (plain markdown)
+2. BlueKit auto-detects structure (checkboxes, steps, mermaid, etc.)
+3. Enhanced UX activates automatically
+4. User can optionally add `format` field to override detection
 
-**No forced migration, no breaking changes.**
+**No forced migration, no breaking changes, no configuration required.**
 
 ---
 
 ## Success Metrics
 
 ### Phase 1
-- ✓ All 5 format types render correctly
-- ✓ Format detection works 100% of the time
+- ✓ Structure detection works accurately
+- ✓ Enhancements appear when structure is detected
 - ✓ UI adapts within 100ms of loading walkthrough
+- ✓ No breaking changes for existing walkthroughs
 
 ### Phase 2
 - ✓ Review checklists save progress reliably (localStorage)
@@ -509,9 +620,10 @@ const suggestFormat = (content: string): Format => {
 - ✓ Reference search returns results <50ms
 
 ### Phase 3
-- ✓ Auto-format suggestions are accurate 70%+ of time
-- ✓ Users discover format types organically (analytics)
-- ✓ Format-specific features used regularly (track interactions)
+- ✓ Structure detection is accurate 90%+ of time
+- ✓ Users discover enhancements organically (analytics)
+- ✓ Enhancement features used regularly (track interactions)
+- ✓ Optional format override works when needed
 
 ---
 
@@ -616,19 +728,19 @@ const suggestFormat = (content: string): Format => {
 
 ### 1. Should format be auto-detected or manually set?
 **Options:**
-- Auto-detect on creation, user can override
+- Auto-detect from content (no user action required)
 - User chooses format explicitly every time
 - Auto-detect, show suggestion, require confirmation
 
-**Recommendation:** Auto-detect with suggestion prompt (non-blocking)
+**Recommendation:** Auto-detect from content by default, optional `format` field for override
 
-### 2. Can users change format after creation?
+### 2. Can users override format after creation?
 **Options:**
-- Format is immutable (locked at creation)
-- Format can be changed anytime (edit front matter)
+- No override (always auto-detect)
+- Format can be set/removed anytime (edit front matter)
 - Format change triggers UI re-render
 
-**Recommendation:** Allow changes (just edit YAML), UI re-renders automatically
+**Recommendation:** Allow optional `format` field override, but default to auto-detection
 
 ### 3. Should complexity affect UX or just display?
 **Options:**
@@ -657,20 +769,18 @@ components/
 ├── walkthroughs/
 │   ├── WalkthroughsTabContent.tsx       # Main tab (already exists)
 │   ├── WalkthroughViewer.tsx            # Base viewer (shared)
-│   ├── formats/
-│   │   ├── ReferenceOverview.tsx        # Quick lookup UI
-│   │   ├── ReviewOverview.tsx           # Checklist system
-│   │   ├── GuideOverview.tsx            # Stepper navigation
-│   │   ├── ArchitectureOverview.tsx     # Diagram focus
-│   │   └── DocumentationOverview.tsx    # Enhanced docs
+│   ├── enhancements/
+│   │   ├── ChecklistOverlay.tsx        # Appears when checkboxes detected
+│   │   ├── StepperNavigation.tsx        # Appears when steps detected
+│   │   ├── DiagramFocusMode.tsx         # Appears when mermaid detected
+│   │   └── ReferenceSearch.tsx         # Appears when many code blocks
 │   ├── shared/
 │   │   ├── MarkdownRenderer.tsx         # Shared markdown rendering
 │   │   ├── CodeBlock.tsx                # Code block with copy
-│   │   ├── TableOfContents.tsx          # Shared TOC
-│   │   └── FormatBadge.tsx              # Format type indicator
+│   │   └── TableOfContents.tsx          # Shared TOC
 │   └── utils/
 │       ├── parseWalkthrough.ts          # Parse markdown structure
-│       ├── detectFormat.ts              # Auto-detect format type
+│       ├── detectStructure.ts           # Auto-detect structure from content
 │       └── walkthroughStorage.ts        # localStorage helpers
 ```
 
@@ -678,6 +788,8 @@ components/
 
 ```typescript
 // Add to types/resource.ts
+
+// Optional format override (for user preference)
 export type WalkthroughFormat =
   | 'reference'   // Quick lookup, search-focused
   | 'guide'       // Step-by-step, progress tracking
@@ -690,13 +802,22 @@ export type WalkthroughComplexity =
   | 'moderate'      // Standard detail
   | 'comprehensive'; // Deep dive, expanded
 
+// Detected structure from content (auto-detected)
+export interface DetectedStructure {
+  hasCheckboxes: boolean;  // Markdown checkboxes detected
+  hasSteps: boolean;       // Step patterns detected
+  hasMermaid: boolean;     // Mermaid diagrams detected
+  isReference: boolean;    // Many code blocks detected
+}
+
 export interface WalkthroughFrontMatter extends ResourceFrontMatter {
   type: 'walkthrough';
-  format?: WalkthroughFormat;
+  format?: WalkthroughFormat;  // Optional override
   complexity?: WalkthroughComplexity;
 }
 
 export interface ParsedWalkthroughStructure {
+  detected: DetectedStructure;  // Auto-detected structure
   headings: { level: number; text: string; id: string }[];
   codeBlocks: { language: string; code: string; lineNumber: number }[];
   diagrams: { type: 'mermaid'; code: string; lineNumber: number }[];
@@ -768,13 +889,13 @@ interface ReferenceHistory {
 
 **The Pitch:**
 
-> "Other tools just store markdown. BlueKit **understands** your walkthroughs and gives you specialized UX for each type:
+> "Other tools just store markdown. BlueKit **understands** your walkthroughs and automatically provides specialized UX:
 >
-> - **References** become searchable snippet libraries
-> - **Reviews** track your progress with checklists
-> - **Guides** navigate step-by-step with auto-save
-> - **Architecture docs** highlight diagrams with interactive controls
+> - Add checkboxes → Get progress tracking automatically
+> - Add step headings → Get stepper navigation automatically
+> - Add mermaid diagrams → Get diagram focus mode automatically
+> - Add many code blocks → Get search/filter automatically
 >
-> Same markdown files. Way better UX."
+> Same markdown files. No configuration. Way better UX."
 
-This differentiation makes BlueKit **immediately valuable** compared to just storing markdown in folders or using generic note-taking apps.
+This differentiation makes BlueKit **immediately valuable** compared to just storing markdown in folders or using generic note-taking apps. The "agnostic container, opinionated workflow" principle means users get smart UX without learning format types or setting configuration.

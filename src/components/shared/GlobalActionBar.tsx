@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import { Button, HStack, Text, ActionBar, Portal, Box, VStack, Icon } from "@chakra-ui/react";
-import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork } from "react-icons/lu";
+import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork, LuPencil } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { useSelection } from "../../contexts/SelectionContext";
-import { ProjectEntry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from "../../ipc";
+import { ProjectEntry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, deleteResources } from "../../ipc";
 import AddToProjectPopover from "./AddToProjectPopover";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
+import EditResourceMetadataModal from "./EditResourceMetadataModal";
 
 export default function GlobalActionBar() {
   const { selectedItems, hasArtifactSelection, hasTaskSelection, clearSelection, getItemsByType } = useSelection();
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Sync isOpen with hasArtifactSelection and force close when hasArtifactSelection becomes false
   // Hide when tasks are selected (TasksActionBar takes priority)
@@ -55,23 +59,36 @@ export default function GlobalActionBar() {
 
   const selectionSummary = getSelectionSummary();
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     try {
       setLoading(true);
-      // TODO: Implement delete functionality for all artifact types
-      // await Promise.all([
-      //   ...kits.map(kit => invokeDeleteKit(kit.path)),
-      //   ...walkthroughs.map(wt => invokeDeleteWalkthrough(wt.path)),
-      //   ...agents.map(agent => invokeDeleteAgent(agent.path)),
-      //   ...diagrams.map(diagram => invokeDeleteDiagram(diagram.path)),
-      // ]);
+      
+      // Extract file paths from selected items
+      const filePaths = selectedItems
+        .map(item => item.path)
+        .filter((path): path is string => path !== undefined);
+
+      if (filePaths.length === 0) {
+        toaster.create({
+          type: "error",
+          title: "Error",
+          description: "No valid file paths found for deletion",
+        });
+        return;
+      }
+
+      await deleteResources(filePaths);
 
       toaster.create({
-        type: "error",
-        title: "Artifacts deleted",
-        description: `${totalCount} artifact${
+        type: "success",
+        title: "Resources deleted",
+        description: `${totalCount} resource${
           totalCount !== 1 ? "s" : ""
-        } deleted`,
+        } deleted successfully`,
       });
 
       clearSelection();
@@ -80,13 +97,24 @@ export default function GlobalActionBar() {
       toaster.create({
         type: "error",
         title: "Error",
-        description: `Failed to delete artifacts: ${
+        description: `Failed to delete resources: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClick = () => {
+    if (selectedItems.length === 1) {
+      setEditModalOpen(true);
+    }
+  };
+
+  const handleEditUpdated = () => {
+    // File watcher will automatically update the UI
+    // No need to manually refresh
   };
 
   const handlePublishToLibrary = async () => {
@@ -235,7 +263,7 @@ export default function GlobalActionBar() {
                   variant="surface"
                   colorPalette="red"
                   size="sm"
-                  onClick={handleDelete}
+                  onClick={handleDeleteClick}
                   disabled={loading}
                 >
                   <HStack gap={2}>
@@ -243,6 +271,22 @@ export default function GlobalActionBar() {
                     <Text>Delete</Text>
                   </HStack>
                 </Button>
+                {selectedItems.length === 1 && (
+                  <>
+                    <ActionBar.Separator />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleEditClick}
+                      disabled={loading}
+                    >
+                      <HStack gap={2}>
+                        <LuPencil />
+                        <Text>Edit</Text>
+                      </HStack>
+                    </Button>
+                  </>
+                )}
                 <ActionBar.Separator />
                 <Button
                   variant="outline"
@@ -281,6 +325,20 @@ export default function GlobalActionBar() {
           </ActionBar.Content>
         </ActionBar.Positioner>
       </Portal>
+
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        items={selectedItems}
+      />
+
+      <EditResourceMetadataModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        item={selectedItems.length === 1 ? selectedItems[0] : null}
+        onUpdated={handleEditUpdated}
+      />
     </ActionBar.Root>
   );
 }

@@ -1889,3 +1889,197 @@ pub async fn db_delete_task(
         .map_err(|e| format!("Failed to delete task: {}", e))
 }
 
+/// Delete resource files from the filesystem.
+///
+/// This command deletes one or more resource files (kits, walkthroughs, agents, diagrams).
+/// It validates that all paths are within `.bluekit` directories for safety.
+///
+/// # Arguments
+///
+/// * `file_paths` - Vector of absolute file paths to delete
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case (all files deleted)
+/// - `Err(String)` - Error case with an error message
+///
+/// # Safety
+///
+/// This function validates that all file paths are within `.bluekit` directories
+/// to prevent accidental deletion of files outside the project structure.
+#[tauri::command]
+pub async fn delete_resources(file_paths: Vec<String>) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let mut errors = Vec::new();
+
+    for file_path in file_paths {
+        let path = Path::new(&file_path);
+
+        // Validate path is within a .bluekit directory for safety
+        if !path.to_string_lossy().contains(".bluekit") {
+            errors.push(format!(
+                "Path is not within a .bluekit directory: {}",
+                file_path
+            ));
+            continue;
+        }
+
+        // Check if file exists
+        if !path.exists() {
+            // File already deleted, skip silently or log warning
+            continue;
+        }
+
+        // Attempt to delete the file
+        match fs::remove_file(path) {
+            Ok(_) => {
+                // File deleted successfully
+            }
+            Err(e) => {
+                errors.push(format!(
+                    "Failed to delete file {}: {}",
+                    file_path,
+                    e
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Some deletions failed: {}", errors.join("; ")))
+    }
+}
+
+/// Update metadata in a resource file's YAML front matter.
+///
+/// This command updates the YAML front matter of a resource file (kit, walkthrough,
+/// agent, or diagram) while preserving the markdown body content.
+///
+/// # Arguments
+///
+/// * `file_path` - Absolute path to the resource file
+/// * `alias` - Optional new alias/title value
+/// * `description` - Optional new description value
+/// * `tags` - Optional new tags array
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case (metadata updated)
+/// - `Err(String)` - Error case with an error message
+///
+/// # Behavior
+///
+/// - If front matter doesn't exist, creates a new front matter block
+/// - Updates only the specified fields, preserving all others
+/// - Preserves the markdown body content unchanged
+/// - Works with both `.md` and `.mmd`/`.mermaid` files
+#[tauri::command]
+pub async fn update_resource_metadata(
+    file_path: String,
+    alias: Option<String>,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+    use serde_yaml::{Mapping, Value};
+
+    let path = Path::new(&file_path);
+
+    // Validate path is within a .bluekit directory for safety
+    if !path.to_string_lossy().contains(".bluekit") {
+        return Err(format!(
+            "Path is not within a .bluekit directory: {}",
+            file_path
+        ));
+    }
+
+    // Read existing file content
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
+
+    // Parse front matter and body
+    // Front matter is between --- delimiters at the start of the file
+    let (mut front_matter, body) = if content.trim_start().starts_with("---") {
+        // Skip leading whitespace and first "---"
+        let start_pos = content.find("---").unwrap();
+        let after_first_delim = start_pos + 3;
+        
+        // Find the closing "---" (must be on its own line)
+        if let Some(end_pos) = content[after_first_delim..].find("\n---") {
+            let front_matter_end = after_first_delim + end_pos + 4; // +4 for "\n---"
+            let front_matter_str = content[after_first_delim..after_first_delim + end_pos].trim();
+            let body = content[front_matter_end..].to_string();
+
+            // Parse existing front matter
+            let fm: Mapping = if front_matter_str.is_empty() {
+                Mapping::new()
+            } else {
+                serde_yaml::from_str(front_matter_str)
+                    .map_err(|e| format!("Failed to parse YAML front matter: {}", e))?
+            };
+
+            (fm, body)
+        } else {
+            // Malformed front matter (no closing ---), treat as no front matter
+            (Mapping::new(), content)
+        }
+    } else {
+        // No front matter exists, create new
+        (Mapping::new(), content)
+    };
+
+    // Update specified fields
+    if let Some(alias_value) = alias {
+        front_matter.insert(
+            Value::String("alias".to_string()),
+            Value::String(alias_value),
+        );
+    }
+
+    if let Some(desc_value) = description {
+        front_matter.insert(
+            Value::String("description".to_string()),
+            Value::String(desc_value),
+        );
+    }
+
+    if let Some(tags_value) = tags {
+        let tags_array: Vec<Value> = tags_value
+            .into_iter()
+            .map(|tag| Value::String(tag))
+            .collect();
+        front_matter.insert(
+            Value::String("tags".to_string()),
+            Value::Sequence(tags_array),
+        );
+    }
+
+    // Serialize updated front matter
+    let updated_front_matter = serde_yaml::to_string(&front_matter)
+        .map_err(|e| format!("Failed to serialize YAML front matter: {}", e))?;
+
+    // Reconstruct file content with updated front matter
+    let new_content = if front_matter.is_empty() {
+        // No front matter to write, just return body
+        body
+    } else {
+        // Write front matter with proper delimiters
+        // Ensure there's a newline before the closing --- delimiter
+        let trimmed_fm = updated_front_matter.trim_end();
+        format!("---\n{}\n---\n{}", trimmed_fm, body)
+    };
+
+    // Write back to file
+    fs::write(path, new_content)
+        .map_err(|e| format!("Failed to write file {}: {}", file_path, e))?;
+
+    Ok(())
+}
+
