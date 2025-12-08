@@ -581,7 +581,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             borderColor="border.subtle"
             borderRadius="md"
             p={4}
-            bg="white"
+            bg="bg.surface"
             boxShadow="lg"
           >
             <VStack align="stretch" gap={4}>
