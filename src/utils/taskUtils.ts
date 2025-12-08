@@ -50,20 +50,21 @@ export function getPriorityIcon(priority: TaskPriority): { icon: React.Component
 
 /**
  * Gets hover colors (border and background) based on priority
- * Background matches tag subtle variant background (100 shade) for seamless blending
+ * Uses semantic tokens that adapt to color mode
+ * Background uses rgba with low opacity for subtle effect in dark mode
  */
 export function getPriorityHoverColors(priority: TaskPriority): { borderColor: string; bg: string } {
   switch (priority) {
     case 'pinned':
-      return { borderColor: 'blue.400', bg: 'blue.100' };
+      return { borderColor: 'blue.400', bg: 'blue.subtle' };
     case 'high':
-      return { borderColor: 'red.400', bg: 'red.100' };
+      return { borderColor: 'red.400', bg: 'red.subtle' };
     case 'long term':
-      return { borderColor: 'purple.400', bg: 'purple.100' };
+      return { borderColor: 'purple.400', bg: 'purple.subtle' };
     case 'nit':
-      return { borderColor: 'yellow.400', bg: 'yellow.100' };
+      return { borderColor: 'yellow.400', bg: 'yellow.subtle' };
     case 'standard':
-      return { borderColor: 'orange.400', bg: 'orange.100' };
+      return { borderColor: 'orange.400', bg: 'orange.subtle' };
     default:
       return { borderColor: 'border.subtle', bg: 'bg.subtle' };
   }

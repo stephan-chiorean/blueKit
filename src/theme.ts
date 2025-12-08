@@ -39,6 +39,12 @@ export const system = createSystem(defaultConfig, {
         },
         // Hover/selected background for cards and interactive elements
         'primary.hover.bg': { value: { _light: '{colors.primary.50}', _dark: 'rgba(66, 135, 245, 0.1)' } },
+        // Priority-based subtle backgrounds for task cards
+        'blue.subtle': { value: { _light: '{colors.blue.100}', _dark: 'rgba(59, 130, 246, 0.15)' } },
+        'red.subtle': { value: { _light: '{colors.red.100}', _dark: 'rgba(239, 68, 68, 0.15)' } },
+        'purple.subtle': { value: { _light: '{colors.purple.100}', _dark: 'rgba(168, 85, 247, 0.15)' } },
+        'yellow.subtle': { value: { _light: '{colors.yellow.100}', _dark: 'rgba(234, 179, 8, 0.15)' } },
+        'orange.subtle': { value: { _light: '{colors.orange.100}', _dark: 'rgba(249, 115, 22, 0.15)' } },
         // Subtle background for cards, tabs, header - consistent across the app
         // Using Chakra UI's default subtle background (gray.100 in light, gray.800 in dark)
         'bg.subtle': { value: { _light: '{colors.gray.100}', _dark: '{colors.gray.950}' } },
