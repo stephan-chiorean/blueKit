@@ -149,10 +149,26 @@ pub struct ArtifactFile {
     pub path: String,
 }
 
-/// Folder metadata from config.json.
+/// Folder group structure for organizing resources within a folder.
 ///
-/// Each folder in the artifact directories can contain a config.json file
-/// with metadata about the folder. This struct represents that configuration.
+/// Similar to blueprint layers, groups allow organizing artifacts into named categories.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FolderGroup {
+    /// Unique identifier for the group
+    pub id: String,
+    /// Display order (lower numbers appear first)
+    pub order: i32,
+    /// Display name for the group
+    pub name: String,
+    /// Array of artifact file paths belonging to this group
+    #[serde(rename = "resourcePaths")]
+    pub resource_paths: Vec<String>,
+}
+
+/// Folder configuration from config.json.
+///
+/// Each folder in artifact directories can contain a config.json file
+/// with metadata about the folder, including optional groups for organizing resources.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FolderConfig {
     /// Unique identifier (slugified-name-timestamp)
@@ -171,6 +187,9 @@ pub struct FolderConfig {
     /// Optional icon identifier (Lucide icon name)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Optional groups for organizing resources within the folder
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups: Option<Vec<FolderGroup>>,
     /// Extensible custom metadata (future-proof for Postgres migration)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,

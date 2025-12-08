@@ -13,9 +13,12 @@ import {
   Icon,
   Box,
   Separator,
+  Badge,
+  Checkbox,
+  IconButton,
 } from '@chakra-ui/react';
-import { LuPackage, LuBookOpen, LuNetwork, LuX } from 'react-icons/lu';
-import { ArtifactFolder, ArtifactFile, FolderConfig, invokeUpdateFolderConfig, invokeMoveArtifactToFolder } from '../../ipc';
+import { LuPackage, LuBookOpen, LuNetwork, LuX, LuPlus, LuTrash2, LuArrowUp, LuArrowDown } from 'react-icons/lu';
+import { ArtifactFolder, ArtifactFile, FolderConfig, FolderGroup, invokeUpdateFolderConfig, invokeMoveArtifactToFolder } from '../../ipc';
 import { toaster } from '../ui/toaster';
 
 interface EditFolderDialogProps {
@@ -53,6 +56,9 @@ export default function EditFolderDialog({
   const [tags, setTags] = useState('');
   const [loading, setLoading] = useState(false);
   const [removingArtifacts, setRemovingArtifacts] = useState<Set<string>>(new Set());
+  const [groups, setGroups] = useState<FolderGroup[]>([]);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState('');
 
   // Get the icon for the artifact type
   const getArtifactIcon = () => {
@@ -76,12 +82,16 @@ export default function EditFolderDialog({
       setAlias(folder.config?.name || folder.name);
       setDescription(folder.config?.description || '');
       setTags(folder.config?.tags?.join(', ') || '');
+      setGroups(folder.config?.groups ? [...folder.config.groups] : []);
     } else {
       // Reset form when dialog closes
       setAlias('');
       setDescription('');
       setTags('');
       setRemovingArtifacts(new Set());
+      setGroups([]);
+      setEditingGroupId(null);
+      setNewGroupName('');
     }
   }, [isOpen, folder]);
 
@@ -104,6 +114,7 @@ export default function EditFolderDialog({
         tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t.length > 0) : [],
         color: folder.config?.color,
         icon: folder.config?.icon,
+        groups: groups.length > 0 ? groups : undefined,
         createdAt: folder.config?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -167,6 +178,85 @@ export default function EditFolderDialog({
     });
   };
 
+  // Group management functions
+  const handleAddGroup = () => {
+    if (!newGroupName.trim()) return;
+    
+    const maxOrder = groups.length > 0 ? Math.max(...groups.map(g => g.order)) : 0;
+    const newGroup: FolderGroup = {
+      id: `group-${Date.now()}`,
+      order: maxOrder + 1,
+      name: newGroupName.trim(),
+      resourcePaths: [],
+    };
+    
+    setGroups([...groups, newGroup]);
+    setNewGroupName('');
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    setGroups(groups.filter(g => g.id !== groupId));
+    if (editingGroupId === groupId) {
+      setEditingGroupId(null);
+    }
+  };
+
+  const handleUpdateGroupName = (groupId: string, newName: string) => {
+    setGroups(groups.map(g => 
+      g.id === groupId ? { ...g, name: newName.trim() } : g
+    ));
+  };
+
+  const handleToggleResourceInGroup = (groupId: string, resourcePath: string) => {
+    setGroups(groups.map(group => {
+      if (group.id !== groupId) return group;
+      
+      const hasResource = group.resourcePaths.includes(resourcePath);
+      return {
+        ...group,
+        resourcePaths: hasResource
+          ? group.resourcePaths.filter(p => p !== resourcePath)
+          : [...group.resourcePaths, resourcePath],
+      };
+    }));
+  };
+
+  const handleMoveGroupUp = (index: number) => {
+    if (index === 0) return;
+    const newGroups = [...groups];
+    [newGroups[index - 1], newGroups[index]] = [newGroups[index], newGroups[index - 1]];
+    // Update orders
+    newGroups.forEach((g, i) => {
+      g.order = i + 1;
+    });
+    setGroups(newGroups);
+  };
+
+  const handleMoveGroupDown = (index: number) => {
+    if (index === groups.length - 1) return;
+    const newGroups = [...groups];
+    [newGroups[index], newGroups[index + 1]] = [newGroups[index + 1], newGroups[index]];
+    // Update orders
+    newGroups.forEach((g, i) => {
+      g.order = i + 1;
+    });
+    setGroups(newGroups);
+  };
+
+  // Get resources that are in any group
+  const groupedResourcePaths = useMemo(() => {
+    const paths = new Set<string>();
+    groups.forEach(group => {
+      group.resourcePaths.forEach(path => paths.add(path));
+    });
+    return paths;
+  }, [groups]);
+
+  // Get ungrouped artifacts
+  const ungroupedArtifacts = useMemo(() => {
+    return folderArtifacts.filter(artifact => !groupedResourcePaths.has(artifact.path));
+  }, [folderArtifacts, groupedResourcePaths]);
+
   if (!folder) return null;
 
   return (
@@ -220,6 +310,200 @@ export default function EditFolderDialog({
                     Optional tags for categorization
                   </Field.HelperText>
                 </Field.Root>
+
+                <Separator />
+
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium" mb={2}>
+                    Groups
+                  </Text>
+                  <Text fontSize="xs" color="text.secondary" mb={3}>
+                    Organize resources into groups (similar to blueprint layers)
+                  </Text>
+
+                  {/* Add new group */}
+                  <HStack gap={2} mb={4}>
+                    <Input
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Group name (e.g., Core Systems)"
+                      disabled={loading}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddGroup();
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleAddGroup}
+                      disabled={!newGroupName.trim() || loading}
+                    >
+                      <Icon>
+                        <LuPlus />
+                      </Icon>
+                      Add Group
+                    </Button>
+                  </HStack>
+
+                  {/* List of groups */}
+                  {groups.length > 0 && (
+                    <VStack align="stretch" gap={3}>
+                      {groups
+                        .sort((a, b) => a.order - b.order)
+                        .map((group, index) => {
+                          const isEditing = editingGroupId === group.id;
+                          const groupResources = folderArtifacts.filter(a => 
+                            group.resourcePaths.includes(a.path)
+                          );
+                          
+                          return (
+                            <Box
+                              key={group.id}
+                              p={3}
+                              borderWidth="1px"
+                              borderColor="border.subtle"
+                              borderRadius="md"
+                              bg="bg.subtle"
+                            >
+                              <VStack align="stretch" gap={3}>
+                                {/* Group header */}
+                                <HStack justify="space-between">
+                                  <HStack gap={1} flex={1}>
+                                    <IconButton
+                                      size="xs"
+                                      variant="ghost"
+                                      aria-label="Move up"
+                                      onClick={() => handleMoveGroupUp(index)}
+                                      disabled={index === 0 || loading}
+                                    >
+                                      <Icon>
+                                        <LuArrowUp />
+                                      </Icon>
+                                    </IconButton>
+                                    <IconButton
+                                      size="xs"
+                                      variant="ghost"
+                                      aria-label="Move down"
+                                      onClick={() => handleMoveGroupDown(index)}
+                                      disabled={index === groups.length - 1 || loading}
+                                    >
+                                      <Icon>
+                                        <LuArrowDown />
+                                      </Icon>
+                                    </IconButton>
+                                    {isEditing ? (
+                                      <Input
+                                        size="sm"
+                                        value={group.name}
+                                        onChange={(e) => handleUpdateGroupName(group.id, e.target.value)}
+                                        onBlur={() => setEditingGroupId(null)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            setEditingGroupId(null);
+                                          }
+                                        }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <Badge
+                                        size="sm"
+                                        colorPalette="primary"
+                                        cursor="pointer"
+                                        onClick={() => setEditingGroupId(group.id)}
+                                      >
+                                        {group.name}
+                                      </Badge>
+                                    )}
+                                  </HStack>
+                                  <HStack gap={2}>
+                                    <Text fontSize="xs" color="text.secondary">
+                                      {groupResources.length} resource{groupResources.length !== 1 ? 's' : ''}
+                                    </Text>
+                                    <IconButton
+                                      size="xs"
+                                      variant="ghost"
+                                      colorPalette="red"
+                                      aria-label="Delete group"
+                                      onClick={() => handleDeleteGroup(group.id)}
+                                      disabled={loading}
+                                    >
+                                      <Icon>
+                                        <LuTrash2 />
+                                      </Icon>
+                                    </IconButton>
+                                  </HStack>
+                                </HStack>
+
+                                {/* Resources in this group */}
+                                {folderArtifacts.length > 0 && (
+                                  <Box pl={4} borderLeft="2px solid" borderColor="primary.200">
+                                    <Text fontSize="xs" fontWeight="medium" color="text.tertiary" mb={2}>
+                                      Resources:
+                                    </Text>
+                                    <VStack align="stretch" gap={2} maxH="200px" overflowY="auto">
+                                      {folderArtifacts.map((artifact) => {
+                                        const isInGroup = group.resourcePaths.includes(artifact.path);
+                                        return (
+                                          <Checkbox.Root
+                                            key={artifact.path}
+                                            checked={isInGroup}
+                                            onCheckedChange={(changes) => {
+                                              if (changes.checked !== isInGroup) {
+                                                handleToggleResourceInGroup(group.id, artifact.path);
+                                              }
+                                            }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                            }}
+                                            cursor="pointer"
+                                          >
+                                            <Checkbox.HiddenInput />
+                                            <Checkbox.Control cursor="pointer">
+                                              <Checkbox.Indicator />
+                                            </Checkbox.Control>
+                                            <Checkbox.Label cursor="pointer">
+                                              <HStack gap={2}>
+                                                <Icon boxSize={3} color="text.secondary">
+                                                  <ArtifactIcon />
+                                                </Icon>
+                                                <Text fontSize="xs">
+                                                  {artifact.frontMatter?.alias || artifact.name}
+                                                </Text>
+                                              </HStack>
+                                            </Checkbox.Label>
+                                          </Checkbox.Root>
+                                        );
+                                      })}
+                                    </VStack>
+                                  </Box>
+                                )}
+                              </VStack>
+                            </Box>
+                          );
+                        })}
+                    </VStack>
+                  )}
+
+                  {/* Show ungrouped resources if groups exist */}
+                  {groups.length > 0 && ungroupedArtifacts.length > 0 && (
+                    <Box mt={4} p={3} borderWidth="1px" borderColor="border.subtle" borderRadius="md" bg="bg.subtle">
+                      <VStack align="stretch" gap={1}>
+                        {ungroupedArtifacts.map((artifact) => (
+                          <HStack key={artifact.path} gap={2}>
+                            <Icon boxSize={3} color="text.secondary">
+                              <ArtifactIcon />
+                            </Icon>
+                            <Text fontSize="xs" color="text.secondary">
+                              {artifact.frontMatter?.alias || artifact.name}
+                            </Text>
+                          </HStack>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </Box>
 
                 {folderArtifacts.length > 0 && (
                   <>

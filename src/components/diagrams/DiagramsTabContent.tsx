@@ -11,16 +11,18 @@ import {
   EmptyState,
   Checkbox,
   VStack,
+  Button,
+  Table,
+  Tag,
 } from '@chakra-ui/react';
-import { LuNetwork } from 'react-icons/lu';
-import { useState, useEffect, useRef } from 'react';
+import { LuNetwork, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
+import { useState, useEffect, useMemo } from 'react';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
-import { ArtifactActionBar } from '../shared/ArtifactActionBar';
 import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
@@ -51,9 +53,7 @@ export default function DiagramsTabContent({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
-
-  // Ref for filter button (used by ArtifactActionBar)
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const isSelected = (diagramId: string) => isSelectedInContext(diagramId);
 
@@ -202,6 +202,11 @@ export default function DiagramsTabContent({
     }
   };
 
+  // Get root-level diagrams (not in folders) - must be before early returns
+  const rootDiagrams = useMemo(() => {
+    return getRootArtifacts(diagrams, folders, 'diagrams', projectPath);
+  }, [diagrams, folders, projectPath]);
+
   if (diagramsLoading) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
@@ -240,88 +245,323 @@ export default function DiagramsTabContent({
 
   return (
     <Box position="relative">
-        <VStack align="stretch" gap={4}>
-          <ArtifactActionBar
-            onNewFolder={() => setIsCreateFolderOpen(true)}
-            onToggleFilter={() => {}}
-            isFilterOpen={false}
-            viewMode="card"
-            onViewModeChange={() => {}}
-            showViewModeSwitcher={false}
-            filterButtonRef={filterButtonRef}
-          />
-
-          <MasonryLayout columnCount={3}>
-            {/* Folders first */}
-            {folderTree.map((node) => (
-              <MasonryItem key={node.folder.path}>
-                <FolderCard
-                  node={node}
-                  artifactType="diagrams"
-                  onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                  onViewArtifact={handleDiagramClick}
-                  onAddToFolder={handleAddToFolder}
-                  onEdit={handleEditFolder}
-                  onDelete={handleDeleteFolder}
-                  hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
-                  renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                />
-              </MasonryItem>
-            ))}
-
-            {/* Root-level diagrams */}
-            {getRootArtifacts(diagrams, folders, 'diagrams', projectPath).map((diagram) => {
-            const diagramSelected = isSelected(diagram.path);
-            const displayName = diagram.frontMatter?.alias || diagram.name;
-            const description = diagram.frontMatter?.description || diagram.path;
-            return (
-              <MasonryItem key={diagram.path}>
-                <Card.Root
+      <VStack align="stretch" gap={6}>
+        {/* Folders Section - only show if folders exist */}
+        {folderTree.length > 0 && (
+          <Box position="relative">
+            <Flex align="center" justify="space-between" gap={2} mb={4}>
+              <Flex align="center" gap={2}>
+                <Heading size="md">Folders</Heading>
+                <Text fontSize="sm" color="text.muted">
+                  {folderTree.length}
+                </Text>
+                {/* New Folder Button - subtle blue style */}
+                <Button
+                  size="sm"
+                  onClick={() => setIsCreateFolderOpen(true)}
+                  colorPalette="blue"
                   variant="subtle"
-                  borderWidth={diagramSelected ? "2px" : "1px"}
-                  borderColor={diagramSelected ? "primary.500" : "border.subtle"}
-                  bg={diagramSelected ? "primary.50" : undefined}
-                  cursor="pointer"
-                  onClick={() => handleDiagramClick(diagram)}
-                  _hover={{ borderColor: "primary.400", bg: "primary.50" }}
-                  transition="all 0.2s"
                 >
-                  <CardHeader>
-                    <Flex align="center" justify="space-between" gap={4}>
-                      <HStack gap={2} align="center" flex="1">
-                        <Icon boxSize={5} color="primary.500">
-                          <LuNetwork />
-                        </Icon>
-                        <Heading size="md">{displayName}</Heading>
-                      </HStack>
-                      <Checkbox.Root
-                        checked={diagramSelected}
-                        colorPalette="blue"
-                        onCheckedChange={() => handleDiagramToggle(diagram)}
-                        onClick={(e) => e.stopPropagation()}
-                        cursor="pointer"
-                      >
-                        <Checkbox.HiddenInput />
-                        <Checkbox.Control cursor="pointer">
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                      </Checkbox.Root>
-                    </Flex>
-                  </CardHeader>
-                  <CardBody display="flex" flexDirection="column" flex="1">
-                    <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                      {description}
-                    </Text>
-                    <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
-                      {diagram.path}
-                    </Text>
-                  </CardBody>
-                </Card.Root>
-              </MasonryItem>
-            );
-          })}
-        </MasonryLayout>
-        </VStack>
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuFolderPlus />
+                    </Icon>
+                    <Text>New Folder</Text>
+                  </HStack>
+                </Button>
+              </Flex>
+              {/* View Mode Switcher */}
+              <HStack gap={0} borderWidth="1px" borderColor="border" borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="md">
+                <Button
+                  onClick={() => setViewMode('card')}
+                  variant="ghost"
+                  borderRadius={0}
+                  borderRightWidth="1px"
+                  borderRightColor="border.subtle"
+                  bg={viewMode === 'card' ? 'white' : 'transparent'}
+                  color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
+                  _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+                  size="sm"
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuLayoutGrid />
+                    </Icon>
+                    <Text>Cards</Text>
+                  </HStack>
+                </Button>
+                <Button
+                  onClick={() => setViewMode('table')}
+                  variant="ghost"
+                  borderRadius={0}
+                  bg={viewMode === 'table' ? 'white' : 'transparent'}
+                  color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
+                  _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+                  size="sm"
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuTable />
+                    </Icon>
+                    <Text>Table</Text>
+                  </HStack>
+                </Button>
+              </HStack>
+            </Flex>
+
+            {viewMode === 'card' ? (
+              <MasonryLayout columnCount={3}>
+                {folderTree.map((node) => (
+                  <MasonryItem key={node.folder.path}>
+                    <FolderCard
+                      node={node}
+                      artifactType="diagrams"
+                      onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                      onViewArtifact={handleDiagramClick}
+                      onAddToFolder={handleAddToFolder}
+                      onEdit={handleEditFolder}
+                      onDelete={handleDeleteFolder}
+                      hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
+                      renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                    />
+                  </MasonryItem>
+                ))}
+              </MasonryLayout>
+            ) : (
+              <Table.Root size="sm" variant="outline">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Description</Table.ColumnHeader>
+                    <Table.ColumnHeader>Tags</Table.ColumnHeader>
+                    <Table.ColumnHeader>Resources</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {folderTree.map((node) => {
+                    const folderName = node.folder.config?.name || node.folder.name;
+                    const folderDescription = node.folder.config?.description || '';
+                    const totalResources = node.artifacts.length;
+                    const isExpanded = expandedFolders.has(node.folder.path);
+                    
+                    return (
+                      <>
+                        <Table.Row
+                          key={node.folder.path}
+                          cursor="pointer"
+                          onClick={() => toggleFolderExpanded(node.folder.path)}
+                          _hover={{ bg: "bg.subtle" }}
+                        >
+                          <Table.Cell>
+                            <Icon
+                              transform={isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}
+                              transition='transform 0.2s'
+                            >
+                              <LuChevronRight />
+                            </Icon>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <HStack gap={2}>
+                              <Icon boxSize={4} color="blue.500">
+                                <LuFolder />
+                              </Icon>
+                              <Text fontWeight="medium">{folderName}</Text>
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text fontSize="sm" color="text.secondary" lineClamp={1}>
+                              {folderDescription || '—'}
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {node.folder.config?.tags && node.folder.config.tags.length > 0 ? (
+                              <HStack gap={1} flexWrap="wrap">
+                                {node.folder.config.tags.map((tag) => (
+                                  <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                                    <Tag.Label>{tag}</Tag.Label>
+                                  </Tag.Root>
+                                ))}
+                              </HStack>
+                            ) : (
+                              <Text fontSize="sm" color="text.tertiary">—</Text>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text fontSize="sm" color="text.secondary">
+                              {totalResources} resource{totalResources !== 1 ? 's' : ''}
+                            </Text>
+                          </Table.Cell>
+                        </Table.Row>
+                        {isExpanded && node.artifacts.map((artifact) => {
+                          const artifactSelected = isSelected(artifact.path);
+                          const displayName = artifact.frontMatter?.alias || artifact.name;
+                          return (
+                            <Table.Row
+                              key={artifact.path}
+                              cursor="pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDiagramClick(artifact);
+                              }}
+                              _hover={{ bg: "bg.subtle" }}
+                              bg="bg.subtle"
+                              data-selected={artifactSelected ? "" : undefined}
+                            >
+                              <Table.Cell>
+                                <Checkbox.Root
+                                  size="sm"
+                                  colorPalette="blue"
+                                  checked={artifactSelected}
+                                  onCheckedChange={() => {
+                                    handleDiagramToggle(artifact);
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  cursor="pointer"
+                                >
+                                  <Checkbox.HiddenInput />
+                                  <Checkbox.Control cursor="pointer">
+                                    <Checkbox.Indicator />
+                                  </Checkbox.Control>
+                                </Checkbox.Root>
+                              </Table.Cell>
+                              <Table.Cell pl={8}>
+                                <HStack gap={2}>
+                                  <Icon boxSize={4} color="primary.500">
+                                    <LuNetwork />
+                                  </Icon>
+                                  <Text>{displayName}</Text>
+                                </HStack>
+                              </Table.Cell>
+                              <Table.Cell>
+                                <Text fontSize="sm" color="text.secondary" lineClamp={1}>
+                                  {artifact.frontMatter?.description || '—'}
+                                </Text>
+                              </Table.Cell>
+                              <Table.Cell>
+                                {artifact.frontMatter?.tags && artifact.frontMatter.tags.length > 0 ? (
+                                  <HStack gap={1} flexWrap="wrap">
+                                    {artifact.frontMatter.tags.map((tag) => (
+                                      <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                                        <Tag.Label>{tag}</Tag.Label>
+                                      </Tag.Root>
+                                    ))}
+                                  </HStack>
+                                ) : (
+                                  <Text fontSize="sm" color="text.tertiary">—</Text>
+                                )}
+                              </Table.Cell>
+                              <Table.Cell>
+                                <Text fontSize="sm" color="text.tertiary">—</Text>
+                              </Table.Cell>
+                            </Table.Row>
+                          );
+                        })}
+                      </>
+                    );
+                  })}
+                </Table.Body>
+              </Table.Root>
+            )}
+          </Box>
+        )}
+
+        {/* Diagrams Section */}
+        <Box mb={8} position="relative">
+          <Flex align="center" gap={2} mb={4}>
+            <Heading size="md">Diagrams</Heading>
+            <Text fontSize="sm" color="text.muted">
+              {rootDiagrams.length}
+            </Text>
+            {/* Show New Folder button if no folders exist */}
+            {folderTree.length === 0 && (
+              <Button
+                size="sm"
+                onClick={() => setIsCreateFolderOpen(true)}
+                colorPalette="blue"
+                variant="subtle"
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFolderPlus />
+                  </Icon>
+                  <Text>New Folder</Text>
+                </HStack>
+              </Button>
+            )}
+          </Flex>
+
+          {rootDiagrams.length === 0 ? (
+            <Box
+              p={6}
+              bg="bg.subtle"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <Text color="text.muted" fontSize="sm">
+                No diagrams at root level. All diagrams are organized in folders.
+              </Text>
+            </Box>
+          ) : viewMode === 'card' ? (
+            <MasonryLayout columnCount={3}>
+              {rootDiagrams.map((diagram) => {
+                const diagramSelected = isSelected(diagram.path);
+                const displayName = diagram.frontMatter?.alias || diagram.name;
+                const description = diagram.frontMatter?.description || diagram.path;
+                return (
+                  <MasonryItem key={diagram.path}>
+                    <Card.Root
+                      variant="subtle"
+                      borderWidth={diagramSelected ? "2px" : "1px"}
+                      borderColor={diagramSelected ? "primary.500" : "border.subtle"}
+                      bg={diagramSelected ? "primary.50" : undefined}
+                      cursor="pointer"
+                      onClick={() => handleDiagramClick(diagram)}
+                      _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+                      transition="all 0.2s"
+                    >
+                      <CardHeader>
+                        <Flex align="center" justify="space-between" gap={4}>
+                          <HStack gap={2} align="center" flex="1">
+                            <Icon boxSize={5} color="primary.500">
+                              <LuNetwork />
+                            </Icon>
+                            <Heading size="md">{displayName}</Heading>
+                          </HStack>
+                          <Checkbox.Root
+                            checked={diagramSelected}
+                            colorPalette="blue"
+                            onCheckedChange={() => handleDiagramToggle(diagram)}
+                            onClick={(e) => e.stopPropagation()}
+                            cursor="pointer"
+                          >
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control cursor="pointer">
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                          </Checkbox.Root>
+                        </Flex>
+                      </CardHeader>
+                      <CardBody display="flex" flexDirection="column" flex="1">
+                        <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                          {description}
+                        </Text>
+                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                          {diagram.path}
+                        </Text>
+                      </CardBody>
+                    </Card.Root>
+                  </MasonryItem>
+                );
+              })}
+            </MasonryLayout>
+          ) : null}
+        </Box>
+      </VStack>
 
       <CreateFolderDialog
         isOpen={isCreateFolderOpen}

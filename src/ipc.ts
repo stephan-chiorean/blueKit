@@ -90,10 +90,27 @@ export interface KitFrontMatter {
 }
 
 /**
+ * Folder group structure for organizing resources within a folder.
+ *
+ * Similar to blueprint layers, groups allow organizing artifacts into named categories.
+ * This interface must match the `FolderGroup` struct in `src-tauri/src/commands.rs`.
+ */
+export interface FolderGroup {
+  /** Unique identifier for the group */
+  id: string;
+  /** Display order (lower numbers appear first) */
+  order: number;
+  /** Display name for the group */
+  name: string;
+  /** Array of artifact file paths belonging to this group */
+  resourcePaths: string[];
+}
+
+/**
  * Folder configuration from config.json.
  *
  * Each folder in artifact directories can contain a config.json file
- * with metadata about the folder.
+ * with metadata about the folder, including optional groups for organizing resources.
  *
  * This interface must match the `FolderConfig` struct in `src-tauri/src/commands.rs`.
  */
@@ -110,6 +127,8 @@ export interface FolderConfig {
   color?: string;
   /** Optional icon identifier (Lucide icon name) */
   icon?: string;
+  /** Optional groups for organizing resources within the folder */
+  groups?: FolderGroup[];
   /** Extensible custom metadata (future-proof for Postgres migration) */
   metadata?: Record<string, any>;
   /** Creation timestamp (ISO 8601) */

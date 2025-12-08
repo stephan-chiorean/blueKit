@@ -1,7 +1,8 @@
-import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Button, Flex, Menu, IconButton } from '@chakra-ui/react';
+import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Button, Flex, Menu, IconButton, Badge, Checkbox, Portal } from '@chakra-ui/react';
 import { LuFolder, LuChevronRight, LuFolderInput, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
-import { FolderTreeNode, ArtifactFile, ArtifactFolder } from '../../ipc';
+import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '../../ipc';
+import { useSelection } from '../../contexts/SelectionContext';
 
 interface FolderCardProps {
   node: FolderTreeNode;
@@ -12,7 +13,7 @@ interface FolderCardProps {
   onEdit: (folder: ArtifactFolder) => void;
   onDelete: (folder: ArtifactFolder) => void;
   hasCompatibleSelection: boolean;
-  renderArtifactCard: (artifact: ArtifactFile) => React.ReactNode;
+  renderArtifactCard: (artifact: ArtifactFile) => React.ReactNode; // Currently unused, kept for API compatibility
 }
 
 /**
@@ -33,13 +34,38 @@ export function FolderCard({
   onEdit,
   onDelete,
   hasCompatibleSelection,
-  renderArtifactCard,
+  renderArtifactCard, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: FolderCardProps) {
   const { folder, children, artifacts, isExpanded } = node;
+  const { isSelected, toggleItem } = useSelection();
 
   const displayName = folder.config?.name || folder.name;
   const description = folder.config?.description;
   const color = folder.config?.color;
+  const groups = folder.config?.groups;
+
+  // Map artifact type to selection type
+  const getSelectionType = (): 'Kit' | 'Walkthrough' | 'Diagram' => {
+    switch (artifactType) {
+      case 'kits':
+        return 'Kit';
+      case 'walkthroughs':
+        return 'Walkthrough';
+      case 'diagrams':
+        return 'Diagram';
+    }
+  };
+
+  const selectionType = getSelectionType();
+
+  const handleArtifactToggle = (artifact: ArtifactFile) => {
+    toggleItem({
+      id: artifact.path,
+      name: artifact.frontMatter?.alias || artifact.name,
+      type: selectionType,
+      path: artifact.path,
+    });
+  };
 
   // Get the icon for the artifact type (matching tab icons)
   const getArtifactIcon = () => {
@@ -57,6 +83,56 @@ export function FolderCard({
 
   const ArtifactIcon = getArtifactIcon();
 
+  // Organize artifacts by groups if groups exist
+  const organizeArtifactsByGroups = () => {
+    if (!groups || groups.length === 0) {
+      return null;
+    }
+
+    // Create a map of resource paths to artifacts
+    const artifactMap = new Map<string, ArtifactFile>();
+    artifacts.forEach(artifact => {
+      artifactMap.set(artifact.path, artifact);
+    });
+
+    // Create a set of all grouped resource paths
+    const groupedPaths = new Set<string>();
+    groups.forEach(group => {
+      group.resourcePaths.forEach(path => groupedPaths.add(path));
+    });
+
+    // Organize artifacts by group
+    const groupedArtifacts: Array<{ group: FolderGroup; artifacts: ArtifactFile[] }> = [];
+    const ungroupedArtifacts: ArtifactFile[] = [];
+
+    // Process each group
+    groups
+      .sort((a, b) => a.order - b.order)
+      .forEach(group => {
+        const groupArtifacts: ArtifactFile[] = [];
+        group.resourcePaths.forEach(path => {
+          const artifact = artifactMap.get(path);
+          if (artifact) {
+            groupArtifacts.push(artifact);
+          }
+        });
+        if (groupArtifacts.length > 0) {
+          groupedArtifacts.push({ group, artifacts: groupArtifacts });
+        }
+      });
+
+    // Find ungrouped artifacts
+    artifacts.forEach(artifact => {
+      if (!groupedPaths.has(artifact.path)) {
+        ungroupedArtifacts.push(artifact);
+      }
+    });
+
+    return { groupedArtifacts, ungroupedArtifacts };
+  };
+
+  const groupedData = organizeArtifactsByGroups();
+
   return (
     <Card.Root
       variant='subtle'
@@ -67,6 +143,7 @@ export function FolderCard({
       onClick={onToggleExpand}
       _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
       position='relative'
+      overflow='visible'
     >
       <CardHeader>
         <Flex align='center' justify='space-between' gap={4}>
@@ -82,44 +159,48 @@ export function FolderCard({
             </Icon>
             <Heading size='md'>{displayName}</Heading>
           </HStack>
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <IconButton
-                variant='ghost'
-                size='sm'
-                aria-label='Folder options'
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Icon>
-                  <IoIosMore />
-                </Icon>
-              </IconButton>
-            </Menu.Trigger>
-            <Menu.Positioner>
-              <Menu.Content>
-                <Menu.Item value='edit' onSelect={() => {
-                  onEdit(folder);
-                }}>
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuPencil />
-                    </Icon>
-                    <Text>Edit</Text>
-                  </HStack>
-                </Menu.Item>
-                <Menu.Item value='delete' onSelect={() => {
-                  onDelete(folder);
-                }}>
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuTrash2 />
-                    </Icon>
-                    <Text>Delete</Text>
-                  </HStack>
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Positioner>
-          </Menu.Root>
+          <Box flexShrink={0}>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <IconButton
+                  variant='ghost'
+                  size='sm'
+                  aria-label='Folder options'
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Icon>
+                    <IoIosMore />
+                  </Icon>
+                </IconButton>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <Menu.Content>
+                    <Menu.Item value='edit' onSelect={() => {
+                      onEdit(folder);
+                    }}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuPencil />
+                        </Icon>
+                        <Text>Edit</Text>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item value='delete' onSelect={() => {
+                      onDelete(folder);
+                    }}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuTrash2 />
+                        </Icon>
+                        <Text>Delete</Text>
+                      </HStack>
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </Box>
         </Flex>
       </CardHeader>
       <CardBody display='flex' flexDirection='column' flex='1'>
@@ -157,12 +238,121 @@ export function FolderCard({
               CONTENTS:
             </Text>
             <VStack align='stretch' gap={2}>
+              {/* Child folders */}
               {children.map((childNode) => (
                 <Box key={childNode.folder.path} fontSize='sm' color='text.secondary'>
                   📁 {childNode.folder.config?.name || childNode.folder.name}
                 </Box>
               ))}
-              {artifacts.map((artifact) => (
+
+              {/* Grouped artifacts (if groups exist) */}
+              {groupedData && (
+                <VStack align='stretch' gap={4} mt={2}>
+                  {groupedData.groupedArtifacts.map(({ group, artifacts: groupArtifacts }) => (
+                    <Box key={group.id} pl={4} borderLeft='2px solid' borderColor='primary.200'>
+                      <VStack align='stretch' gap={2}>
+                              <HStack justify='space-between'>
+                                <Badge size='sm' colorPalette='primary'>
+                                  {group.name}
+                                </Badge>
+                                <Text fontSize='xs' color='text.secondary'>
+                                  {groupArtifacts.length} resource{groupArtifacts.length !== 1 ? 's' : ''}
+                                </Text>
+                              </HStack>
+                        <VStack align='stretch' gap={2} pl={4}>
+                          {groupArtifacts.map((artifact) => (
+                            <HStack
+                              key={artifact.path}
+                              fontSize='sm'
+                              color='text.secondary'
+                              cursor='pointer'
+                              _hover={{ color: 'blue.500' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onViewArtifact(artifact);
+                              }}
+                              gap={2}
+                              justify='space-between'
+                            >
+                              <HStack gap={2} flex={1}>
+                                <Icon boxSize={4}>
+                                  <ArtifactIcon />
+                                </Icon>
+                                <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                              </HStack>
+                              <Checkbox.Root
+                                checked={isSelected(artifact.path)}
+                                colorPalette='blue'
+                                onCheckedChange={() => {
+                                  handleArtifactToggle(artifact);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                cursor='pointer'
+                              >
+                                <Checkbox.HiddenInput />
+                                <Checkbox.Control cursor='pointer'>
+                                  <Checkbox.Indicator />
+                                </Checkbox.Control>
+                              </Checkbox.Root>
+                            </HStack>
+                          ))}
+                        </VStack>
+                      </VStack>
+                    </Box>
+                  ))}
+
+                  {/* Ungrouped artifacts */}
+                  {groupedData.ungroupedArtifacts.length > 0 && (
+                    <Box pl={4} borderLeft='2px solid' borderColor='border.subtle'>
+                      <VStack align='stretch' gap={2} pl={4}>
+                        {groupedData.ungroupedArtifacts.map((artifact) => (
+                          <HStack
+                            key={artifact.path}
+                            fontSize='sm'
+                            color='text.secondary'
+                            cursor='pointer'
+                            _hover={{ color: 'blue.500' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewArtifact(artifact);
+                            }}
+                            gap={2}
+                            justify='space-between'
+                          >
+                            <HStack gap={2} flex={1}>
+                              <Icon boxSize={4}>
+                                <ArtifactIcon />
+                              </Icon>
+                              <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                            </HStack>
+                            <Checkbox.Root
+                              checked={isSelected(artifact.path)}
+                              colorPalette='blue'
+                              onCheckedChange={() => {
+                                handleArtifactToggle(artifact);
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              cursor='pointer'
+                            >
+                              <Checkbox.HiddenInput />
+                              <Checkbox.Control cursor='pointer'>
+                                <Checkbox.Indicator />
+                              </Checkbox.Control>
+                            </Checkbox.Root>
+                          </HStack>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </VStack>
+              )}
+
+              {/* Flat list of artifacts (if no groups) */}
+              {!groupedData && artifacts.map((artifact) => (
                 <HStack
                   key={artifact.path}
                   fontSize='sm'
@@ -174,11 +364,30 @@ export function FolderCard({
                     onViewArtifact(artifact);
                   }}
                   gap={2}
+                  justify='space-between'
                 >
-                  <Icon boxSize={4}>
-                    <ArtifactIcon />
-                  </Icon>
-                  <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                  <HStack gap={2} flex={1}>
+                    <Icon boxSize={4}>
+                      <ArtifactIcon />
+                    </Icon>
+                    <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                  </HStack>
+                  <Checkbox.Root
+                    checked={isSelected(artifact.path)}
+                    colorPalette='blue'
+                    onCheckedChange={() => {
+                      handleArtifactToggle(artifact);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    cursor='pointer'
+                  >
+                    <Checkbox.HiddenInput />
+                    <Checkbox.Control cursor='pointer'>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                  </Checkbox.Root>
                 </HStack>
               ))}
             </VStack>
