@@ -430,7 +430,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
+                projectPath={project.path}
                 onViewKit={handleViewKit}
+                onReload={loadProjectArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="blueprints">
@@ -446,7 +448,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
+                projectPath={project.path}
                 onViewKit={handleViewKit}
+                onReload={loadProjectArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="agents" key="agents">
@@ -469,7 +473,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 diagrams={diagrams}
                 diagramsLoading={artifactsLoading}
                 error={error}
+                projectPath={project.path}
                 onViewDiagram={handleViewDiagram}
+                onReload={loadProjectArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="clones">

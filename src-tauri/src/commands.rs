@@ -149,7 +149,60 @@ pub struct ArtifactFile {
     pub path: String,
 }
 
+/// Folder metadata from config.json.
+///
+/// Each folder in the artifact directories can contain a config.json file
+/// with metadata about the folder. This struct represents that configuration.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FolderConfig {
+    /// Unique identifier (slugified-name-timestamp)
+    pub id: String,
+    /// Display name for the folder
+    pub name: String,
+    /// Optional description of the folder's purpose
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Tags for categorization
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Optional hex color for visual grouping (#3B82F6)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Optional icon identifier (Lucide icon name)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Extensible custom metadata (future-proof for Postgres migration)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+    /// Creation timestamp (ISO 8601)
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    /// Last updated timestamp (ISO 8601)
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
 
+/// Folder information for artifact organization.
+///
+/// Represents a folder within an artifact type directory (kits, walkthroughs, diagrams).
+/// Folders can contain artifacts and other folders (nested).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArtifactFolder {
+    /// Folder name (directory name)
+    pub name: String,
+    /// Full path to the folder
+    pub path: String,
+    /// Parent folder path (if nested), None if root level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_path: Option<String>,
+    /// Parsed config.json if exists
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<FolderConfig>,
+    /// Number of direct child artifacts
+    pub artifact_count: usize,
+    /// Number of direct child folders
+    pub folder_count: usize,
+}
 
 /// Scrapbook item structure - can be either a folder or a file.
 #[derive(Debug, Serialize, Deserialize)]
@@ -2163,5 +2216,339 @@ pub async fn update_resource_metadata(
         .map_err(|e| format!("Failed to write file {}: {}", file_path, e))?;
 
     Ok(())
+}
+
+/// Gets all folders in a specific artifact type directory with their metadata.
+///
+/// This command scans a specific subdirectory (kits, walkthroughs, diagrams) and
+/// returns all folders found, including their config.json if present.
+///
+/// # Arguments
+///
+/// * `project_path` - Path to project root
+/// * `artifact_type` - Type directory to scan ("kits", "walkthroughs", "diagrams")
+///
+/// # Returns
+///
+/// A `Result<Vec<ArtifactFolder>, String>` with all folders found
+#[tauri::command]
+pub async fn get_artifact_folders(
+    project_path: String,
+    artifact_type: String,
+) -> Result<Vec<ArtifactFolder>, String> {
+    use std::fs;
+
+    let artifact_dir = PathBuf::from(&project_path)
+        .join(".bluekit")
+        .join(&artifact_type);
+
+    if !artifact_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut folders = Vec::new();
+
+    // Recursive helper to scan folder tree
+    fn scan_folders(
+        dir: &PathBuf,
+        base_path: &PathBuf,
+        parent_path: Option<String>,
+        folders: &mut Vec<ArtifactFolder>,
+    ) -> Result<(), String> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                let folder_name = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Skip hidden directories
+                if folder_name.starts_with('.') {
+                    continue;
+                }
+
+                // Read config.json if exists
+                let config_path = path.join("config.json");
+                let config = if config_path.exists() {
+                    match fs::read_to_string(&config_path) {
+                        Ok(content) => serde_json::from_str::<FolderConfig>(&content).ok(),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                };
+
+                // Count direct children
+                let (artifact_count, folder_count) = count_children(&path)?;
+
+                folders.push(ArtifactFolder {
+                    name: folder_name,
+                    path: path.to_str().unwrap_or("").to_string(),
+                    parent_path: parent_path.clone(),
+                    config,
+                    artifact_count,
+                    folder_count,
+                });
+
+                // Recursively scan subdirectories
+                scan_folders(
+                    &path,
+                    base_path,
+                    Some(path.to_str().unwrap_or("").to_string()),
+                    folders,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn count_children(dir: &PathBuf) -> Result<(usize, usize), String> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+        let mut artifact_count = 0;
+        let mut folder_count = 0;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+
+            if path.is_dir() && !path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .starts_with('.')
+            {
+                folder_count += 1;
+            } else if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if matches!(ext, "md" | "mmd" | "mermaid") {
+                        artifact_count += 1;
+                    }
+                }
+            }
+        }
+
+        Ok((artifact_count, folder_count))
+    }
+
+    scan_folders(&artifact_dir, &artifact_dir, None, &mut folders)?;
+
+    Ok(folders)
+}
+
+/// Creates a new folder with config.json in an artifact directory.
+///
+/// # Arguments
+///
+/// * `project_path` - Path to project root
+/// * `artifact_type` - Type directory ("kits", "walkthroughs", "diagrams")
+/// * `parent_path` - Optional parent folder path (None for root)
+/// * `folder_name` - Name of the new folder
+/// * `config` - Initial folder configuration
+///
+/// # Returns
+///
+/// Path to the created folder
+#[tauri::command]
+pub async fn create_artifact_folder(
+    project_path: String,
+    artifact_type: String,
+    parent_path: Option<String>,
+    folder_name: String,
+    config: FolderConfig,
+) -> Result<String, String> {
+    use std::fs;
+
+    let base_dir = if let Some(parent) = parent_path {
+        PathBuf::from(parent)
+    } else {
+        PathBuf::from(&project_path)
+            .join(".bluekit")
+            .join(&artifact_type)
+    };
+
+    let folder_path = base_dir.join(&folder_name);
+
+    if folder_path.exists() {
+        return Err(format!("Folder already exists: {}", folder_name));
+    }
+
+    // Create folder
+    fs::create_dir_all(&folder_path)
+        .map_err(|e| format!("Failed to create folder: {}", e))?;
+
+    // Write config.json
+    let config_path = folder_path.join("config.json");
+    let config_json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    fs::write(&config_path, config_json)
+        .map_err(|e| format!("Failed to write config.json: {}", e))?;
+
+    Ok(folder_path.to_str().unwrap_or("").to_string())
+}
+
+/// Updates a folder's config.json file.
+///
+/// # Arguments
+///
+/// * `folder_path` - Full path to the folder
+/// * `config` - Updated folder configuration
+///
+/// # Returns
+///
+/// Success or error
+#[tauri::command]
+pub async fn update_folder_config(
+    folder_path: String,
+    config: FolderConfig,
+) -> Result<(), String> {
+    use std::fs;
+
+    let config_path = PathBuf::from(&folder_path).join("config.json");
+
+    // Update timestamp
+    let mut updated_config = config;
+    updated_config.updated_at = chrono::Utc::now().to_rfc3339();
+
+    let config_json = serde_json::to_string_pretty(&updated_config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    fs::write(&config_path, config_json)
+        .map_err(|e| format!("Failed to write config.json: {}", e))?;
+
+    Ok(())
+}
+
+/// Deletes a folder and all its contents.
+///
+/// WARNING: This permanently deletes the folder and all files/subfolders inside.
+///
+/// # Arguments
+///
+/// * `folder_path` - Full path to the folder to delete
+///
+/// # Safety
+///
+/// - Validates path is within .bluekit directory
+/// - Returns error if path is invalid or outside .bluekit
+#[tauri::command]
+pub async fn delete_artifact_folder(
+    folder_path: String,
+) -> Result<(), String> {
+    use std::fs;
+
+    let path = PathBuf::from(&folder_path);
+
+    // Validate path is within .bluekit
+    if !path.to_string_lossy().contains(".bluekit") {
+        return Err("Path must be within .bluekit directory".to_string());
+    }
+
+    if !path.exists() {
+        return Err("Folder does not exist".to_string());
+    }
+
+    // Remove directory and all contents
+    fs::remove_dir_all(&path)
+        .map_err(|e| format!("Failed to delete folder: {}", e))?;
+
+    Ok(())
+}
+
+/// Moves an artifact file into a folder.
+///
+/// # Arguments
+///
+/// * `artifact_path` - Full path to the artifact file
+/// * `target_folder_path` - Full path to the target folder
+///
+/// # Returns
+///
+/// New path of the moved artifact
+#[tauri::command]
+pub async fn move_artifact_to_folder(
+    artifact_path: String,
+    target_folder_path: String,
+) -> Result<String, String> {
+    use std::fs;
+
+    let source = PathBuf::from(&artifact_path);
+    let target_folder = PathBuf::from(&target_folder_path);
+
+    if !source.exists() {
+        return Err("Source artifact does not exist".to_string());
+    }
+
+    if !target_folder.exists() || !target_folder.is_dir() {
+        return Err("Target folder does not exist".to_string());
+    }
+
+    let file_name = source.file_name()
+        .ok_or_else(|| "Invalid source file name".to_string())?;
+    let destination = target_folder.join(file_name);
+
+    if destination.exists() {
+        return Err(format!("File already exists in target folder: {:?}", file_name));
+    }
+
+    // Move file
+    fs::rename(&source, &destination)
+        .map_err(|e| format!("Failed to move file: {}", e))?;
+
+    Ok(destination.to_str().unwrap_or("").to_string())
+}
+
+/// Moves a folder into another folder (creating nesting).
+///
+/// # Arguments
+///
+/// * `source_folder_path` - Full path to folder being moved
+/// * `target_folder_path` - Full path to destination folder
+///
+/// # Returns
+///
+/// New path of the moved folder
+#[tauri::command]
+pub async fn move_folder_to_folder(
+    source_folder_path: String,
+    target_folder_path: String,
+) -> Result<String, String> {
+    use std::fs;
+
+    let source = PathBuf::from(&source_folder_path);
+    let target_folder = PathBuf::from(&target_folder_path);
+
+    // Prevent moving folder into itself or its descendants
+    if target_folder.starts_with(&source) {
+        return Err("Cannot move folder into itself or its subdirectories".to_string());
+    }
+
+    if !source.exists() || !source.is_dir() {
+        return Err("Source folder does not exist".to_string());
+    }
+
+    if !target_folder.exists() || !target_folder.is_dir() {
+        return Err("Target folder does not exist".to_string());
+    }
+
+    let folder_name = source.file_name()
+        .ok_or_else(|| "Invalid source folder name".to_string())?;
+    let destination = target_folder.join(folder_name);
+
+    if destination.exists() {
+        return Err(format!("Folder already exists in target: {:?}", folder_name));
+    }
+
+    // Move entire folder tree
+    fs::rename(&source, &destination)
+        .map_err(|e| format!("Failed to move folder: {}", e))?;
+
+    Ok(destination.to_str().unwrap_or("").to_string())
 }
 

@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type SelectionType = 'Kit' | 'Walkthrough' | 'Agent' | 'Diagram' | 'Task';
+export type SelectionType = 'Kit' | 'Walkthrough' | 'Agent' | 'Diagram' | 'Task' | 'Folder';
 
 export interface SelectedItem {
   id: string;
   name: string;
   type: SelectionType;
   path?: string;
+  artifactType?: 'kits' | 'walkthroughs' | 'diagrams'; // For folders: which artifact type directory
 }
 
 interface SelectionContextType {

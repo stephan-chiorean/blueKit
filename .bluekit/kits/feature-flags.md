@@ -4,9 +4,14 @@ alias: Feature Flags
 type: kit
 is_base: false
 version: 1
-tags: [frontend, feature-flags, context, react]
-description: "Pattern for adding feature flags to control frontend functionality"
+tags:
+- frontend
+- feature-flags
+- context
+- react
+description: Pattern for adding feature flags to control frontend functionality. this is the best description we’ve ever had because it’s gonna be by far the biggest. this is gonna be such a big description because we really want to show how important this is. very very very very very big. the biggest. and it’s still going a little big
 ---
+
 
 # Feature Flags Pattern
 

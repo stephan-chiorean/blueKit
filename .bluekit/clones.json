@@ -56,5 +56,19 @@
       "bluekit"
     ],
     "createdAt": "2025-12-04T23:57:09.899Z"
+  },
+  {
+    "id": "bluekit-foundation-20251208",
+    "name": "BlueKit Foundation",
+    "description": "The main BlueKit application repository - a Tauri-based desktop app for managing development artifacts (kits, walkthroughs, blueprints, agents) with folder organization, drag-and-drop, and file-based storage.",
+    "gitUrl": "https://github.com/stephan-chiorean/blueKit.git",
+    "gitCommit": "a55e0cae969c791444f7f84b9333bddac9a28891",
+    "gitBranch": "main",
+    "tags": [
+      "foundation",
+      "tauri",
+      "desktop-app"
+    ],
+    "createdAt": "2025-12-08T00:12:58.160Z"
   }
 ]

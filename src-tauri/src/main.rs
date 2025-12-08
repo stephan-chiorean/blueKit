@@ -74,6 +74,12 @@ async fn main() {
             commands::db_delete_task, // Delete a task (database)
             commands::delete_resources, // Delete resource files
             commands::update_resource_metadata, // Update resource metadata
+            commands::get_artifact_folders, // Get folders in artifact directory
+            commands::create_artifact_folder, // Create new folder with config.json
+            commands::update_folder_config, // Update folder config.json
+            commands::delete_artifact_folder, // Delete folder and contents
+            commands::move_artifact_to_folder, // Move artifact into folder
+            commands::move_folder_to_folder, // Move folder into folder (nesting)
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands
