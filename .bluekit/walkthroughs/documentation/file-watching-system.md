@@ -1,13 +1,13 @@
 ---
-id: watcher-reliability-fix
-alias: Production-Grade File Watcher Fix
+id: file-watching-system
+alias: File Watching System
 type: walkthrough
 is_base: false
 version: 1
 tags: ['rust', 'file-watching', 'reliability']
-description: A comprehensive guide to fixing silent crashes in file watchers using bounded channels, debouncing, auto-recovery, and proper error handling
+description: Production-grade file watching system with bounded channels, debouncing, auto-recovery, and proper error handling
 complexity: comprehensive
-format: guide
+format: documentation
 ---
 
 # Production-Grade File Watcher Fix: From Silent Crashes to Reliable Operation

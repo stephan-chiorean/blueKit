@@ -1,6 +1,6 @@
 ---
-id: task-management-system-v2
-alias: Task Management System Architecture v2
+id: task-management-architecture
+alias: Task Management Architecture
 type: walkthrough
 is_base: false
 version: 2
@@ -10,7 +10,7 @@ tags:
   - react-tauri
 description: Complete architecture and data flow for the database-backed task management system with status tracking, priority management, and real-time UI updates
 complexity: comprehensive
-format: architecture
+format: documentation
 ---
 # Task Management System Architecture v2
 

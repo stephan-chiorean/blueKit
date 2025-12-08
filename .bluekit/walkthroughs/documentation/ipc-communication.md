@@ -1,45 +1,46 @@
 ---
-id: ipc-walkthrough
-alias: IPC Communication Walkthrough
+id: ipc-communication
+alias: IPC Communication
 type: walkthrough
 is_base: false
-version: 1
+version: 2
 tags: [ipc, tauri, typescript, rust, communication, frontend, backend]
-description: "Comprehensive walkthrough explaining how Inter-Process Communication (IPC) works in this Tauri application, covering the frontend TypeScript layer, Rust backend handlers, type safety, error handling, and how to add new commands"
+description: "Comprehensive technical reference for IPC communication in BlueKit, covering frontend TypeScript layer, Rust backend handlers, type safety, error handling, and how to add new commands"
+complexity: comprehensive
+format: documentation
 ---
 
-# IPC Communication Walkthrough
+# IPC Communication in BlueKit
 
-This walkthrough provides a comprehensive understanding of how Inter-Process Communication (IPC) works in this Tauri application. You'll learn how the React frontend communicates with the Rust backend, how type safety is maintained across the boundary, and how to extend the system with new commands.
+This walkthrough provides a comprehensive technical reference for how Inter-Process Communication (IPC) works in this Tauri application. For a beginner-friendly guide with Express.js metaphors, see the [Understanding Tauri IPC guide](../guide/understanding-tauri-ipc.md).
 
 ## Table of Contents
 
-1. [Introduction to IPC in Tauri](#introduction)
-2. [The Frontend Layer: TypeScript IPC Wrappers](#frontend-layer)
-3. [The Backend Layer: Rust Command Handlers](#backend-layer)
-4. [The Connection: Command Registration](#command-registration)
-5. [Type Safety and Serialization](#type-safety)
-6. [Error Handling Patterns](#error-handling)
+1. [Introduction to IPC in Tauri](#introduction-to-ipc-in-tauri)
+2. [The Frontend Layer: TypeScript IPC Wrappers](#the-frontend-layer-typescript-ipc-wrappers)
+3. [The Backend Layer: Rust Command Handlers](#the-backend-layer-rust-command-handlers)
+4. [The Connection: Command Registration](#the-connection-command-registration)
+5. [Type Safety and Serialization](#type-safety-and-serialization)
+6. [Error Handling Patterns](#error-handling-patterns)
 7. [Real-World Examples](#real-world-examples)
-8. [Adding New IPC Commands](#adding-commands)
+8. [Adding New IPC Commands](#adding-new-ipc-commands)
 9. [Best Practices](#best-practices)
 
----
 
-## Introduction
+### Introduction to IPC in Tauri
 
-### What is IPC?
+#### What is IPC?
 
 Inter-Process Communication (IPC) is the mechanism that allows the frontend (React/TypeScript) and backend (Rust) to communicate in a Tauri application. Unlike traditional web apps where everything runs in the browser, Tauri apps have a native backend that can access system resources, file systems, and perform operations that JavaScript cannot.
 
-### Why IPC is Needed
+#### Why IPC is Needed
 
 - **Security**: The frontend runs in a sandboxed webview and cannot directly access the file system or system APIs
 - **Performance**: Rust can perform heavy operations more efficiently than JavaScript
 - **Native Integration**: Access to OS features like file watching, system notifications, etc.
 - **Type Safety**: TypeScript and Rust types work together to catch errors at compile time
 
-### The IPC Flow
+#### The IPC Flow
 
 ```
 ┌─────────────────┐
@@ -78,15 +79,13 @@ Inter-Process Communication (IPC) is the mechanism that allows the frontend (Rea
 └─────────────────┘
 ```
 
----
+### The Frontend Layer: TypeScript IPC Wrappers
 
-## The Frontend Layer: TypeScript IPC Wrappers
-
-### Location: `src/ipc.ts`
+#### Location: `src/ipc.ts`
 
 The frontend IPC layer serves as a type-safe bridge between React components and Tauri's `invoke` API. Instead of calling `invoke` directly with string command names, we create typed wrapper functions.
 
-### Why Use Wrapper Functions?
+#### Why Use Wrapper Functions?
 
 1. **Type Safety**: TypeScript knows the exact return type
 2. **IDE Autocomplete**: Better developer experience
@@ -94,7 +93,7 @@ The frontend IPC layer serves as a type-safe bridge between React components and
 4. **Documentation**: JSDoc comments explain usage
 5. **Refactoring Safety**: Renaming commands updates all call sites
 
-### Basic Structure
+#### Basic Structure
 
 ```typescript
 import { invoke } from '@tauri-apps/api/tauri';
@@ -110,7 +109,7 @@ export async function invokePing(): Promise<string> {
 - `'ping'` is the command name (must match the Rust function name)
 - The second argument (optional) contains parameters: `{ param: value }`
 
-### Type Definitions
+#### Type Definitions
 
 TypeScript interfaces must match Rust structs exactly:
 
@@ -124,7 +123,7 @@ export interface AppInfo {
 
 This interface corresponds to the `AppInfo` struct in Rust. The types must match because Tauri serializes Rust structs to JSON, which TypeScript then deserializes.
 
-### Example: Simple Command (No Parameters)
+#### Example: Simple Command (No Parameters)
 
 ```typescript
 /**
@@ -145,7 +144,7 @@ const result = await invokePing();
 console.log(result); // "pong"
 ```
 
-### Example: Command with Parameters
+#### Example: Command with Parameters
 
 ```typescript
 /**
@@ -177,7 +176,7 @@ kits.forEach(kit => {
 });
 ```
 
-### Example: Complex Return Types
+#### Example: Complex Return Types
 
 ```typescript
 export interface KitFile {
@@ -195,22 +194,20 @@ export async function invokeGetProjectKits(
 
 The return type `Promise<KitFile[]>` tells TypeScript that this function returns an array of `KitFile` objects, providing full type checking and autocomplete.
 
----
+### The Backend Layer: Rust Command Handlers
 
-## The Backend Layer: Rust Command Handlers
-
-### Location: `src-tauri/src/commands.rs`
+#### Location: `src-tauri/src/commands.rs`
 
 The backend layer contains all the Rust functions that handle IPC requests. Each function is marked with `#[tauri::command]` and follows a specific pattern.
 
-### Command Function Requirements
+#### Command Function Requirements
 
 1. **Attribute**: Must have `#[tauri::command]` attribute
 2. **Async**: Must be `async fn` (Tauri uses async/await)
 3. **Return Type**: Must return `Result<T, E>` for error handling
 4. **Serialization**: Parameters and return values must be serializable
 
-### Basic Command Structure
+#### Basic Command Structure
 
 ```rust
 #[tauri::command]
@@ -225,7 +222,7 @@ pub async fn ping() -> Result<String, String> {
 - `-> Result<String, String>` - Returns either success (`Ok`) or error (`Err`)
 - `Ok("pong".to_string())` - Wraps the success value
 
-### The Result Type
+#### The Result Type
 
 Rust's `Result<T, E>` is the standard way to handle operations that can fail:
 
@@ -236,7 +233,7 @@ Tauri automatically converts:
 - `Ok(value)` → Promise resolves with the value
 - `Err(message)` → Promise rejects with the error
 
-### Example: Command with Parameters
+#### Example: Command with Parameters
 
 ```rust
 #[tauri::command]
@@ -258,7 +255,7 @@ pub async fn get_project_kits(
 - TypeScript uses camelCase, but Tauri handles the conversion
 - The parameter type must be serializable (String, numbers, structs, etc.)
 
-### Struct Definitions
+#### Struct Definitions
 
 Structs that are sent to/from the frontend must derive `Serialize` and `Deserialize`:
 
@@ -277,7 +274,7 @@ pub struct AppInfo {
 - `Debug` - Allows printing for debugging
 - All fields must be `pub` (public) to be serialized
 
-### Example: Complex Command with File Operations
+#### Example: Complex Command with File Operations
 
 ```rust
 #[tauri::command]
@@ -304,7 +301,7 @@ pub async fn read_file(file_path: String) -> Result<String, String> {
 - The `?` operator propagates errors (short for `return Err(...)`)
 - Early return with `Err()` for validation failures
 
-### Example: Command with AppHandle
+#### Example: Command with AppHandle
 
 Some commands need access to the Tauri application handle (for events, state, etc.):
 
@@ -321,15 +318,13 @@ pub async fn watch_project_kits(
 
 Tauri automatically injects `AppHandle` when it's in the function signature.
 
----
+### The Connection: Command Registration
 
-## The Connection: Command Registration
-
-### Location: `src-tauri/src/main.rs`
+#### Location: `src-tauri/src/main.rs`
 
 Commands must be registered in the main application setup for the frontend to call them.
 
-### Registration Process
+#### Registration Process
 
 ```rust
 #[tokio::main]
@@ -353,7 +348,7 @@ async fn main() {
 - The macro automatically creates the routing logic
 - Commands not listed here cannot be called from the frontend
 
-### The Complete Flow
+#### The Complete Flow
 
 1. **Frontend calls**: `invokePing()` in `src/ipc.ts`
 2. **IPC wrapper calls**: `invoke<string>('ping')`
@@ -362,11 +357,9 @@ async fn main() {
 5. **Result serialized**: Rust `Result` → JSON
 6. **Frontend receives**: Promise resolves/rejects with the result
 
----
+### Type Safety and Serialization
 
-## Type Safety and Serialization
-
-### How Types Flow Across the Boundary
+#### How Types Flow Across the Boundary
 
 ```
 TypeScript Interface          Rust Struct
@@ -387,7 +380,7 @@ interface AppInfo {    ←→    struct AppInfo {
             }
 ```
 
-### Type Matching Rules
+#### Type Matching Rules
 
 1. **Field names**: Must match exactly (case-sensitive)
 2. **Field types**: Must be compatible
@@ -398,7 +391,7 @@ interface AppInfo {    ←→    struct AppInfo {
    - `array` ↔ `Vec<T>`
    - `null` ↔ `Option<T>`
 
-### Optional Fields
+#### Optional Fields
 
 TypeScript optional fields map to Rust `Option`:
 
@@ -419,18 +412,16 @@ pub struct KitFile {
 }
 ```
 
-### Serialization Process
+#### Serialization Process
 
 1. **Rust → JSON**: `serde` serializes the struct to JSON
 2. **JSON → TypeScript**: Tauri sends JSON over IPC
 3. **TypeScript deserializes**: JSON becomes a TypeScript object
 4. **Type checking**: TypeScript validates against the interface
 
----
+### Error Handling Patterns
 
-## Error Handling Patterns
-
-### Frontend Error Handling
+#### Frontend Error Handling
 
 IPC calls return Promises that can reject:
 
@@ -444,7 +435,7 @@ try {
 }
 ```
 
-### Backend Error Handling
+#### Backend Error Handling
 
 Rust commands return `Result<T, E>`:
 
@@ -466,7 +457,7 @@ pub async fn read_file(file_path: String) -> Result<String, String> {
 }
 ```
 
-### Error Propagation
+#### Error Propagation
 
 The `?` operator in Rust is shorthand for error propagation:
 
@@ -482,18 +473,16 @@ let contents = match fs::read_to_string(&path) {
 };
 ```
 
-### Error Message Best Practices
+#### Error Message Best Practices
 
 - **Be descriptive**: Include context about what failed
 - **Include parameters**: Mention which file/path/input caused the error
 - **User-friendly**: Avoid raw Rust error messages
 - **Actionable**: Tell the user what they can do
 
----
+### Real-World Examples
 
-## Real-World Examples
-
-### Example 1: Reading Project Registry
+#### Example 1: Reading Project Registry
 
 **Frontend (`src/pages/HomePage.tsx`):**
 ```typescript
@@ -542,7 +531,7 @@ pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
 - Missing file returns empty array (not an error) - design decision
 - JSON parsing errors are converted to user-friendly strings
 
-### Example 2: File Watching with Events
+#### Example 2: File Watching with Events
 
 **Frontend:**
 ```typescript
@@ -585,7 +574,7 @@ pub async fn watch_project_kits(
 - Frontend uses Tauri's `listen` API to receive events
 - This enables real-time updates without polling
 
-### Example 3: Reading File Contents
+#### Example 3: Reading File Contents
 
 **Frontend (`src/components/walkthroughs/WalkthroughsTabContent.tsx`):**
 ```typescript
@@ -616,13 +605,11 @@ pub async fn read_file(file_path: String) -> Result<String, String> {
 }
 ```
 
----
+### Adding New IPC Commands
 
-## Adding New IPC Commands
+#### Step-by-Step Guide
 
-### Step-by-Step Guide
-
-#### Step 1: Create the Rust Command Handler
+##### Step 1: Create the Rust Command Handler
 
 In `src-tauri/src/commands.rs`:
 
@@ -637,7 +624,7 @@ pub async fn my_new_command(
 }
 ```
 
-#### Step 2: Register the Command
+##### Step 2: Register the Command
 
 In `src-tauri/src/main.rs`, add to the handler list:
 
@@ -649,7 +636,7 @@ In `src-tauri/src/main.rs`, add to the handler list:
 ])
 ```
 
-#### Step 3: Create TypeScript Wrapper
+##### Step 3: Create TypeScript Wrapper
 
 In `src/ipc.ts`:
 
@@ -669,7 +656,7 @@ export async function invokeMyNewCommand(
 }
 ```
 
-#### Step 4: Use in React Components
+##### Step 4: Use in React Components
 
 ```typescript
 import { invokeMyNewCommand } from './ipc';
@@ -684,7 +671,7 @@ const handleClick = async () => {
 };
 ```
 
-### Checklist
+#### Checklist
 
 - [ ] Rust function has `#[tauri::command]` attribute
 - [ ] Rust function returns `Result<T, E>`
@@ -695,11 +682,9 @@ const handleClick = async () => {
 - [ ] JSDoc comments added
 - [ ] Tested in the application
 
----
+### Best Practices
 
-## Best Practices
-
-### Frontend Best Practices
+#### Frontend Best Practices
 
 1. **Always use wrapper functions**: Never call `invoke` directly
 2. **Handle errors**: Always wrap IPC calls in try/catch
@@ -707,7 +692,7 @@ const handleClick = async () => {
 4. **Document functions**: Add JSDoc comments explaining usage
 5. **Loading states**: Show loading indicators during async IPC calls
 
-### Backend Best Practices
+#### Backend Best Practices
 
 1. **Descriptive errors**: Return user-friendly error messages
 2. **Validate input**: Check parameters before processing
@@ -715,14 +700,14 @@ const handleClick = async () => {
 4. **Document commands**: Add rustdoc comments explaining behavior
 5. **Handle edge cases**: Consider missing files, empty directories, etc.
 
-### Type Safety Best Practices
+#### Type Safety Best Practices
 
 1. **Match types exactly**: TypeScript interfaces must match Rust structs
 2. **Use Option for nullable**: Use `Option<T>` in Rust, `T?` in TypeScript
 3. **Test serialization**: Verify complex types serialize correctly
 4. **Version types**: Consider versioning if types change over time
 
-### Performance Best Practices
+#### Performance Best Practices
 
 1. **Batch operations**: Combine multiple operations when possible
 2. **Async operations**: Use async/await for I/O operations
@@ -743,4 +728,3 @@ The IPC system in this Tauri application provides a type-safe, well-structured w
 6. **Adding commands** follows a clear 4-step process
 
 This architecture ensures type safety, good developer experience, and maintainable code as the application grows.
-
