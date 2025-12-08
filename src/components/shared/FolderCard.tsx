@@ -1,5 +1,5 @@
-import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Button, Flex, Menu, IconButton, Badge, Checkbox, Portal } from '@chakra-ui/react';
-import { LuFolder, LuChevronRight, LuFolderInput, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Flex, Menu, IconButton, Badge, Checkbox, Portal } from '@chakra-ui/react';
+import { LuFolder, LuChevronRight, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2, LuPlus } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
@@ -34,7 +34,6 @@ export function FolderCard({
   onEdit,
   onDelete,
   hasCompatibleSelection,
-  renderArtifactCard, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: FolderCardProps) {
   const { folder, children, artifacts, isExpanded } = node;
   const { isSelected, toggleItem } = useSelection();
@@ -137,8 +136,7 @@ export function FolderCard({
     <Card.Root
       variant='subtle'
       borderWidth='1px'
-      borderColor={hasCompatibleSelection ? 'blue.400' : 'border.subtle'}
-      bg={hasCompatibleSelection ? 'blue.25' : undefined}
+      borderColor='border.subtle'
       cursor='pointer'
       onClick={onToggleExpand}
       _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
@@ -154,93 +152,90 @@ export function FolderCard({
             >
               <LuChevronRight />
             </Icon>
-            <Icon boxSize={5} color={color || 'blue.500'}>
+            <Icon boxSize={6} color={color || 'blue.500'}>
               <LuFolder />
             </Icon>
-            <Heading size='md'>{displayName}</Heading>
+            <Heading size='lg'>{displayName}</Heading>
           </HStack>
           <Box flexShrink={0}>
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <IconButton
-                  variant='ghost'
-                  size='sm'
-                  aria-label='Folder options'
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Icon>
-                    <IoIosMore />
-                  </Icon>
-                </IconButton>
-              </Menu.Trigger>
-              <Portal>
-                <Menu.Positioner>
-                  <Menu.Content>
-                    <Menu.Item value='edit' onSelect={() => {
-                      onEdit(folder);
-                    }}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuPencil />
-                        </Icon>
-                        <Text>Edit</Text>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item value='delete' onSelect={() => {
-                      onDelete(folder);
-                    }}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuTrash2 />
-                        </Icon>
-                        <Text>Delete</Text>
-                      </HStack>
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Positioner>
-              </Portal>
-            </Menu.Root>
+            {hasCompatibleSelection ? (
+              <IconButton
+                variant='ghost'
+                size='sm'
+                aria-label='Add selected items to folder'
+                colorPalette='blue'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToFolder(folder);
+                }}
+              >
+                <Icon>
+                  <LuPlus />
+                </Icon>
+              </IconButton>
+            ) : (
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <IconButton
+                    variant='ghost'
+                    size='sm'
+                    aria-label='Folder options'
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Icon>
+                      <IoIosMore />
+                    </Icon>
+                  </IconButton>
+                </Menu.Trigger>
+                <Portal>
+                  <Menu.Positioner>
+                    <Menu.Content>
+                      <Menu.Item value='edit' onSelect={() => {
+                        onEdit(folder);
+                      }}>
+                        <HStack gap={2}>
+                          <Icon>
+                            <LuPencil />
+                          </Icon>
+                          <Text fontSize='md'>Edit</Text>
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item value='delete' onSelect={() => {
+                        onDelete(folder);
+                      }}>
+                        <HStack gap={2}>
+                          <Icon>
+                            <LuTrash2 />
+                          </Icon>
+                          <Text fontSize='md'>Delete</Text>
+                        </HStack>
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Positioner>
+                </Portal>
+              </Menu.Root>
+            )}
           </Box>
         </Flex>
       </CardHeader>
       <CardBody display='flex' flexDirection='column' flex='1'>
         <VStack align='stretch' gap={2}>
           {description && (
-            <Text fontSize='sm' color='text.secondary'>
+            <Text fontSize='md' color='text.secondary'>
               {description}
             </Text>
-          )}
-
-          {hasCompatibleSelection && (
-            <Button
-              size='sm'
-              variant='solid'
-              colorPalette='blue'
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToFolder(folder);
-              }}
-              mt={2}
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuFolderInput />
-                </Icon>
-                <Text>Add items here</Text>
-              </HStack>
-            </Button>
           )}
         </VStack>
 
         {isExpanded && (artifacts.length > 0 || children.length > 0) && (
           <Box mt={4} pt={4} borderTopWidth='1px' borderColor='border.subtle'>
-            <Text fontSize='xs' fontWeight='bold' color='text.tertiary' mb={2}>
+            <Text fontSize='sm' fontWeight='bold' color='text.tertiary' mb={2}>
               CONTENTS:
             </Text>
             <VStack align='stretch' gap={2}>
               {/* Child folders */}
               {children.map((childNode) => (
-                <Box key={childNode.folder.path} fontSize='sm' color='text.secondary'>
+                <Box key={childNode.folder.path} fontSize='md' color='text.secondary'>
                   📁 {childNode.folder.config?.name || childNode.folder.name}
                 </Box>
               ))}
@@ -252,10 +247,10 @@ export function FolderCard({
                     <Box key={group.id} pl={4} borderLeft='2px solid' borderColor='primary.200'>
                       <VStack align='stretch' gap={2}>
                               <HStack justify='space-between'>
-                                <Badge size='sm' colorPalette='primary'>
+                                <Badge size='md' colorPalette='primary'>
                                   {group.name}
                                 </Badge>
-                                <Text fontSize='xs' color='text.secondary'>
+                                <Text fontSize='sm' color='text.secondary'>
                                   {groupArtifacts.length} resource{groupArtifacts.length !== 1 ? 's' : ''}
                                 </Text>
                               </HStack>
@@ -263,7 +258,7 @@ export function FolderCard({
                           {groupArtifacts.map((artifact) => (
                             <HStack
                               key={artifact.path}
-                              fontSize='sm'
+                              fontSize='md'
                               color='text.secondary'
                               cursor='pointer'
                               _hover={{ color: 'blue.500' }}
@@ -275,10 +270,10 @@ export function FolderCard({
                               justify='space-between'
                             >
                               <HStack gap={2} flex={1}>
-                                <Icon boxSize={4}>
+                                <Icon boxSize={5}>
                                   <ArtifactIcon />
                                 </Icon>
-                                <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                                <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
                               </HStack>
                               <Checkbox.Root
                                 checked={isSelected(artifact.path)}
@@ -310,7 +305,7 @@ export function FolderCard({
                         {groupedData.ungroupedArtifacts.map((artifact) => (
                           <HStack
                             key={artifact.path}
-                            fontSize='sm'
+                            fontSize='md'
                             color='text.secondary'
                             cursor='pointer'
                             _hover={{ color: 'blue.500' }}
@@ -322,10 +317,10 @@ export function FolderCard({
                             justify='space-between'
                           >
                             <HStack gap={2} flex={1}>
-                              <Icon boxSize={4}>
+                              <Icon boxSize={5}>
                                 <ArtifactIcon />
                               </Icon>
-                              <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                              <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
                             </HStack>
                             <Checkbox.Root
                               checked={isSelected(artifact.path)}
@@ -355,7 +350,7 @@ export function FolderCard({
               {!groupedData && artifacts.map((artifact) => (
                 <HStack
                   key={artifact.path}
-                  fontSize='sm'
+                  fontSize='md'
                   color='text.secondary'
                   cursor='pointer'
                   _hover={{ color: 'blue.500' }}
@@ -367,10 +362,10 @@ export function FolderCard({
                   justify='space-between'
                 >
                   <HStack gap={2} flex={1}>
-                    <Icon boxSize={4}>
+                    <Icon boxSize={5}>
                       <ArtifactIcon />
                     </Icon>
-                    <Text>{artifact.frontMatter?.alias || artifact.name}</Text>
+                    <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
                   </HStack>
                   <Checkbox.Root
                     checked={isSelected(artifact.path)}
