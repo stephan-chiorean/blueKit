@@ -80,6 +80,7 @@ async fn main() {
             commands::delete_artifact_folder, // Delete folder and contents
             commands::move_artifact_to_folder, // Move artifact into folder
             commands::move_folder_to_folder, // Move folder into folder (nesting)
+            commands::open_project_in_editor, // Open project in Cursor or VSCode
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands

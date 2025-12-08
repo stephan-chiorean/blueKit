@@ -2571,3 +2571,86 @@ pub async fn move_folder_to_folder(
     Ok(destination.to_str().unwrap_or("").to_string())
 }
 
+/// Opens a project in the specified editor.
+///
+/// This command opens a project directory in either Cursor or VSCode.
+/// It uses the system's default command for each editor.
+///
+/// # Arguments
+///
+/// * `project_path` - The absolute path to the project directory
+/// * `editor` - The editor to use: "cursor" or "vscode"
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case
+/// - `Err(String)` - Error case with an error message
+///
+/// # Example Usage (from frontend)
+///
+/// ```typescript
+/// await invoke('open_project_in_editor', { 
+///   projectPath: '/path/to/project', 
+///   editor: 'cursor' 
+/// });
+/// ```
+#[tauri::command]
+pub async fn open_project_in_editor(
+    project_path: String,
+    editor: String,
+) -> Result<(), String> {
+    use std::process::Command;
+
+    let path = PathBuf::from(&project_path);
+
+    // Verify the project path exists
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    if !path.is_dir() {
+        return Err(format!("Project path is not a directory: {}", project_path));
+    }
+
+    // Determine the command based on the editor
+    let (cmd, args) = match editor.as_str() {
+        "cursor" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Cursor", &project_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("cursor", vec![&project_path])
+            }
+        }
+        "vscode" | "code" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Visual Studio Code", &project_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("code", vec![&project_path])
+            }
+        }
+        _ => {
+            return Err(format!("Unknown editor: {}. Supported editors: 'cursor', 'vscode'", editor));
+        }
+    };
+
+    // Execute the command
+    let output = Command::new(cmd)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to open project in {}: {}", editor, stderr));
+    }
+
+    Ok(())
+}
+

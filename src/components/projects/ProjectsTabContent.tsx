@@ -10,9 +10,15 @@ import {
   HStack,
   EmptyState,
   Icon,
+  Menu,
+  IconButton,
+  Portal,
+  Flex,
 } from '@chakra-ui/react';
-import { ProjectEntry } from '../../ipc';
+import { ProjectEntry, invokeOpenProjectInEditor } from '../../ipc';
 import { LuFolder } from 'react-icons/lu';
+import { IoIosMore } from 'react-icons/io';
+import { LuChevronRight } from 'react-icons/lu';
 
 interface ProjectsTabContentProps {
   projects: ProjectEntry[];
@@ -66,6 +72,18 @@ export default function ProjectsTabContent({
     );
   }
 
+  const handleOpenInEditor = async (
+    project: ProjectEntry,
+    editor: 'cursor' | 'vscode'
+  ) => {
+    try {
+      await invokeOpenProjectInEditor(project.path, editor);
+    } catch (error) {
+      console.error(`Failed to open project in ${editor}:`, error);
+      // You could show a toast notification here if needed
+    }
+  };
+
   return (
     <VStack align="stretch" gap={4}>
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
@@ -79,16 +97,70 @@ export default function ProjectsTabContent({
             _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
             transition="all 0.2s"
             onClick={() => onProjectSelect(project)}
+            position="relative"
+            overflow="visible"
           >
             <CardHeader>
-              <VStack align="start" gap={2}>
-                <HStack gap={2} align="center">
-                  <Icon boxSize={5} color="primary.500">
-                    <LuFolder />
-                  </Icon>
-                  <Heading size="md">{project.title}</Heading>
-                </HStack>
-              </VStack>
+              <Flex align="center" justify="space-between" gap={4}>
+                <VStack align="start" gap={2} flex={1}>
+                  <HStack gap={2} align="center">
+                    <Icon boxSize={5} color="primary.500">
+                      <LuFolder />
+                    </Icon>
+                    <Heading size="md">{project.title}</Heading>
+                  </HStack>
+                </VStack>
+                <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Project options"
+                        onClick={(e) => e.stopPropagation()}
+                        bg="transparent"
+                        _hover={{ bg: "transparent" }}
+                        _active={{ bg: "transparent" }}
+                        _focus={{ bg: "transparent" }}
+                        _focusVisible={{ bg: "transparent" }}
+                      >
+                        <Icon>
+                          <IoIosMore />
+                        </Icon>
+                      </IconButton>
+                    </Menu.Trigger>
+                    <Portal>
+                      <Menu.Positioner>
+                        <Menu.Content>
+                          <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                            <Menu.TriggerItem>
+                              Open <LuChevronRight />
+                            </Menu.TriggerItem>
+                            <Portal>
+                              <Menu.Positioner>
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="cursor"
+                                    onSelect={() => handleOpenInEditor(project, 'cursor')}
+                                  >
+                                    Cursor
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="vscode"
+                                    onSelect={() => handleOpenInEditor(project, 'vscode')}
+                                  >
+                                    VSCode
+                                  </Menu.Item>
+                                </Menu.Content>
+                              </Menu.Positioner>
+                            </Portal>
+                          </Menu.Root>
+                        </Menu.Content>
+                      </Menu.Positioner>
+                    </Portal>
+                  </Menu.Root>
+                </Box>
+              </Flex>
             </CardHeader>
             <CardBody>
               <Text fontSize="sm" color="text.secondary" mb={2}>

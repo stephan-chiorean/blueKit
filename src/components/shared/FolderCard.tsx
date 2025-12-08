@@ -181,6 +181,11 @@ export function FolderCard({
                     size='sm'
                     aria-label='Folder options'
                     onClick={(e) => e.stopPropagation()}
+                    bg="transparent"
+                    _hover={{ bg: "transparent" }}
+                    _active={{ bg: "transparent" }}
+                    _focus={{ bg: "transparent" }}
+                    _focusVisible={{ bg: "transparent" }}
                   >
                     <Icon>
                       <IoIosMore />

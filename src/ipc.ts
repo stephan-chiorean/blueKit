@@ -1246,3 +1246,30 @@ export async function invokeMoveFolderToFolder(
   );
 }
 
+/**
+ * Opens a project in the specified editor (Cursor or VSCode).
+ *
+ * @param projectPath - Absolute path to the project directory
+ * @param editor - The editor to use: 'cursor' or 'vscode'
+ * @returns Promise that resolves when the editor is opened
+ *
+ * @example
+ * ```typescript
+ * await invokeOpenProjectInEditor('/path/to/project', 'cursor');
+ * await invokeOpenProjectInEditor('/path/to/project', 'vscode');
+ * ```
+ */
+export async function invokeOpenProjectInEditor(
+  projectPath: string,
+  editor: 'cursor' | 'vscode'
+): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'open_project_in_editor',
+    {
+      projectPath,
+      editor,
+    },
+    10000 // 10 second timeout for opening editor
+  );
+}
+
