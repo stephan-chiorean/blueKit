@@ -139,7 +139,7 @@ export function FolderCard({
       borderColor='border.subtle'
       cursor='pointer'
       onClick={onToggleExpand}
-      _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
+      _hover={{ borderColor: 'blue.400', bg: 'primary.hover.bg' }}
       position='relative'
       overflow='visible'
     >

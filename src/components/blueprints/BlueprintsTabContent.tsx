@@ -171,7 +171,7 @@ export default function BlueprintsTabContent({
               variant="subtle"
               borderWidth={blueprintSelected ? "2px" : "1px"}
               borderColor={blueprintSelected ? "primary.500" : "border.subtle"}
-              bg={blueprintSelected ? "primary.50" : undefined}
+              bg={blueprintSelected ? "primary.hover.bg" : undefined}
             >
               <CardHeader>
                 <VStack align="stretch" gap={3}>
@@ -254,7 +254,7 @@ export default function BlueprintsTabContent({
                                     size="sm"
                                     bg="bg.subtle"
                                     cursor="pointer"
-                                    _hover={{ bg: 'primary.50', borderColor: 'primary.300' }}
+                                    _hover={{ bg: 'primary.hover.bg', borderColor: 'primary.300' }}
                                     onClick={() => handleTaskClick(blueprint, task)}
                                   >
                                     <CardBody py={2}>

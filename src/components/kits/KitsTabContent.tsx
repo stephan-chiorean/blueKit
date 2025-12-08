@@ -459,9 +459,9 @@ export default function KitsTabContent({
                   borderRadius={0}
                   borderRightWidth="1px"
                   borderRightColor="border.subtle"
-                  bg={viewMode === 'card' ? 'white' : 'transparent'}
+                  bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
                   color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+                  _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
                   size="sm"
                 >
                   <HStack gap={2}>
@@ -475,9 +475,9 @@ export default function KitsTabContent({
                   onClick={() => setViewMode('table')}
                   variant="ghost"
                   borderRadius={0}
-                  bg={viewMode === 'table' ? 'white' : 'transparent'}
+                  bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
                   color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+                  _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
                   size="sm"
                 >
                   <HStack gap={2}>
@@ -741,11 +741,11 @@ export default function KitsTabContent({
                     variant="subtle"
                     borderWidth={isSelected(kit.path) ? "2px" : "1px"}
                     borderColor={isSelected(kit.path) ? "primary.500" : "border.subtle"}
-                    bg={isSelected(kit.path) ? "primary.50" : undefined}
+                    bg={isSelected(kit.path) ? "primary.hover.bg" : undefined}
                     position="relative"
                     cursor="pointer"
                     onClick={() => handleViewKit(kit)}
-                    _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+                    _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
                   >
                     <CardHeader>
                       <Flex align="center" justify="space-between" gap={4}>

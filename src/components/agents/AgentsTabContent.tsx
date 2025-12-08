@@ -121,10 +121,10 @@ export default function AgentsTabContent({
               variant="subtle" 
               borderWidth={agentSelected ? "2px" : "1px"}
               borderColor={agentSelected ? "primary.500" : "border.subtle"}
-              bg={agentSelected ? "primary.50" : undefined}
+              bg={agentSelected ? "primary.hover.bg" : undefined}
               cursor="pointer" 
               onClick={() => onViewKit(agent)} 
-              _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+              _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
             >
               <CardHeader>
                 <Flex align="center" justify="space-between" gap={4}>

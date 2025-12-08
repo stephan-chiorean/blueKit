@@ -11,7 +11,7 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
       alignItems="center"
       justifyContent="center"
       minH="100vh"
-      bg="gray.50"
+      bg="main.bg"
     >
       <VStack spacing={6}>
         <Heading size="2xl">

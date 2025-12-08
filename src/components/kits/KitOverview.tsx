@@ -243,7 +243,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   <Text fontSize="xs" color="text.tertiary" mb={1}>
                     Name
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text">
+                  <Text fontSize="sm" fontFamily="mono" color="text.primary">
                     {kit.name}
                   </Text>
                 </Box>
@@ -251,7 +251,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   <Text fontSize="xs" color="text.tertiary" mb={1}>
                     Path
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text" wordBreak="break-all">
+                  <Text fontSize="sm" fontFamily="mono" color="text.primary" wordBreak="break-all">
                     {kit.path}
                   </Text>
                 </Box>
@@ -259,7 +259,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   <Text fontSize="xs" color="text.tertiary" mb={1}>
                     Project
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text" wordBreak="break-all">
+                  <Text fontSize="sm" fontFamily="mono" color="text.primary" wordBreak="break-all">
                     {projectPath}
                   </Text>
                 </Box>
@@ -379,7 +379,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                           </Icon>
                         </IconButton>
                       </HStack>
-                      <Text fontSize="sm" color="text" pr={16}>
+                      <Text fontSize="sm" color="text.primary" pr={16}>
                         {note.content}
                       </Text>
                       <Text fontSize="xs" color="text.tertiary" mt={2}>

@@ -75,9 +75,9 @@ export function ArtifactActionBar({
             borderRadius={0}
             borderRightWidth="1px"
             borderRightColor="border.subtle"
-            bg={viewMode === 'card' ? 'white' : 'transparent'}
+            bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
             color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+            _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
           >
             <HStack gap={2}>
               <Icon>
@@ -90,9 +90,9 @@ export function ArtifactActionBar({
             onClick={() => onViewModeChange('table')}
             variant="ghost"
             borderRadius={0}
-            bg={viewMode === 'table' ? 'white' : 'transparent'}
+            bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
             color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+            _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
           >
             <HStack gap={2}>
               <Icon>

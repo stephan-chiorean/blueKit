@@ -69,7 +69,7 @@ export default function CollectionItemsSelector({
                 transition="all 0.2s"
                 _hover={{
                   transform: 'scale(1.02)',
-                  bg: 'primary.50',
+                  bg: 'primary.hover.bg',
                 }}
                 onClick={() => setSelectedCategory(category.name as Category)}
                 flex="1"
@@ -125,7 +125,7 @@ export default function CollectionItemsSelector({
                   variant="subtle"
                   borderWidth={kitSelected ? "2px" : "1px"}
                   borderColor={kitSelected ? "primary.500" : "border.subtle"}
-                  bg={kitSelected ? "primary.50" : undefined}
+                  bg={kitSelected ? "primary.hover.bg" : undefined}
                 >
                   <CardHeader>
                     <Heading size="md">{kit.name}</Heading>

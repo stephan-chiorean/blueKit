@@ -99,7 +99,7 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
             // Paragraphs
             '& p': {
               lineHeight: '1.75',
-              color: 'text',
+              color: 'text.primary',
             },
             // Lists
             '& ul, & ol': {
@@ -132,7 +132,6 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               pl: 4,
               py: 2,
               my: 4,
-              bg: 'bg.subtle',
               fontStyle: 'italic',
             },
             // Tables
@@ -148,7 +147,6 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               py: 2,
             },
             '& th': {
-              bg: 'bg.subtle',
               fontWeight: 'semibold',
             },
           }}
@@ -162,7 +160,7 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               h4: ({ children }) => <Heading as="h4" size="md" mt={3} mb={2}>{children}</Heading>,
               h5: ({ children }) => <Heading as="h5" size="sm" mt={3} mb={2}>{children}</Heading>,
               h6: ({ children }) => <Heading as="h6" size="xs" mt={3} mb={2}>{children}</Heading>,
-              p: ({ children }) => <Text mb={4} lineHeight="1.75">{children}</Text>,
+              p: ({ children }) => <Text mb={4} lineHeight="1.75" color="text.primary">{children}</Text>,
               ul: ({ children }) => (
                 <List.Root mb={4} pl={4}>
                   {children}
@@ -186,7 +184,6 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                     <Code
                       px={1.5}
                       py={0.5}
-                      bg="bg.subtle"
                       borderRadius="sm"
                       fontSize="0.9em"
                       {...props}
@@ -242,7 +239,6 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                   pl={4}
                   py={2}
                   my={4}
-                  bg="bg.subtle"
                   fontStyle="italic"
                 >
                   {children}
@@ -257,7 +253,7 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               tbody: ({ children }) => <Box as="tbody">{children}</Box>,
               tr: ({ children }) => <Box as="tr">{children}</Box>,
               th: ({ children }) => (
-                <Box as="th" border="1px solid" borderColor="border.subtle" px={3} py={2} bg="bg.subtle" fontWeight="semibold">
+                <Box as="th" border="1px solid" borderColor="border.subtle" px={3} py={2} fontWeight="semibold">
                   {children}
                 </Box>
               ),

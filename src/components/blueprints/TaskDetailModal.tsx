@@ -138,7 +138,7 @@ export default function TaskDetailModal({
                       },
                       '& p': {
                         lineHeight: '1.75',
-                        color: 'text',
+                        color: 'text.primary',
                       },
                       '& ul, & ol': {
                         pl: 4,

@@ -97,7 +97,7 @@ export default function KitMarkdownViewer({ kit, content }: KitMarkdownViewerPro
             // Paragraphs
             '& p': {
               lineHeight: '1.75',
-              color: 'text',
+              color: 'text.primary',
             },
             // Lists
             '& ul, & ol': {
@@ -160,7 +160,7 @@ export default function KitMarkdownViewer({ kit, content }: KitMarkdownViewerPro
               h4: ({ children }) => <Heading as="h4" size="md" mt={3} mb={2}>{children}</Heading>,
               h5: ({ children }) => <Heading as="h5" size="sm" mt={3} mb={2}>{children}</Heading>,
               h6: ({ children }) => <Heading as="h6" size="xs" mt={3} mb={2}>{children}</Heading>,
-              p: ({ children }) => <Text mb={4} lineHeight="1.75">{children}</Text>,
+              p: ({ children }) => <Text mb={4} lineHeight="1.75" color="text.primary">{children}</Text>,
               ul: ({ children }) => (
                 <List.Root mb={4} pl={4}>
                   {children}

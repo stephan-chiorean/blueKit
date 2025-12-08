@@ -241,7 +241,7 @@ export default function ClonesTabContent({
           variant="subtle"
           borderWidth="1px"
           borderColor="border.subtle"
-          _hover={{ borderColor: "primary.400", bg: "primary.50" }}
+          _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
           transition="all 0.2s"
         >
           <CardHeader>
@@ -428,9 +428,9 @@ export default function ClonesTabContent({
               borderRadius={0}
               borderRightWidth="1px"
               borderRightColor="border.subtle"
-              bg={viewMode === 'card' ? 'white' : 'transparent'}
+              bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
               color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-              _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+              _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
               size="sm"
             >
               <HStack gap={2}>
@@ -444,9 +444,9 @@ export default function ClonesTabContent({
               onClick={() => setViewMode('table')}
               variant="ghost"
               borderRadius={0}
-              bg={viewMode === 'table' ? 'white' : 'transparent'}
+              bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
               color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-              _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+              _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
               size="sm"
             >
               <HStack gap={2}>

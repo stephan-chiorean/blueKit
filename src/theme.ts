@@ -32,14 +32,18 @@ export const system = createSystem(defaultConfig, {
           contrast: { value: '{colors.primary.50}' },
           fg: { value: { _light: '{colors.primary.700}', _dark: '{colors.primary.200}' } },
           muted: { value: '{colors.primary.100}' },
-          subtle: { value: '{colors.primary.200}' },
+          subtle: { value: { _light: '{colors.primary.200}', _dark: '{colors.primary.800}' } },
           emphasized: { value: '{colors.primary.300}' },
           focusRing: { value: '{colors.primary.500}' },
           border: { value: '{colors.primary.200}' },
         },
+        // Hover/selected background for cards and interactive elements
+        'primary.hover.bg': { value: { _light: '{colors.primary.50}', _dark: 'rgba(66, 135, 245, 0.1)' } },
         // Subtle background for cards, tabs, header - consistent across the app
         // Using Chakra UI's default subtle background (gray.100 in light, gray.800 in dark)
         'bg.subtle': { value: { _light: '{colors.gray.100}', _dark: '{colors.gray.950}' } },
+        // Surface background for selected states (e.g., view mode switcher)
+        'bg.surface': { value: { _light: 'white', _dark: '{colors.gray.900}' } },
         // Header background - same as subtle background (cards/tabs)
         'header.bg': { value: { _light: '{colors.gray.100}', _dark: '{colors.gray.950}' } },
         // Main content background - darker than header/tabs/cards in dark mode (neutral dark gray/black)

@@ -56,7 +56,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
               <Icon>
                 <LuArrowLeft />
               </Icon>
-              <Text>Back</Text>
+              <Text color="text.primary">Back</Text>
             </HStack>
           </Button>
         </Box>
