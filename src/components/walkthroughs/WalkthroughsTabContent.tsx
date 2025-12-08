@@ -5,29 +5,25 @@ import {
   CardBody,
   CardHeader,
   Heading,
-  SimpleGrid,
   Flex,
   Text,
   Icon,
   HStack,
   Checkbox,
   Tag,
-  IconButton,
-  Button,
   Table,
   VStack,
-  Input,
-  InputGroup,
-  Field,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
-import { LuLayoutGrid, LuTable, LuX, LuFilter, LuFolderPlus } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
+import { ArtifactActionBar } from '../shared/ArtifactActionBar';
+import { FilterPanel } from '../shared/FilterPanel';
+import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
@@ -256,32 +252,8 @@ export default function WalkthroughsTabContent({
     }
   };
 
-  // Refs for filter panel and button to detect outside clicks
-  const filterPanelRef = useRef<HTMLDivElement>(null);
+  // Ref for filter button (used by FilterPanel for click-outside detection)
   const filterButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Close filter panel when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isFilterOpen &&
-        filterPanelRef.current &&
-        filterButtonRef.current &&
-        !filterPanelRef.current.contains(event.target as Node) &&
-        !filterButtonRef.current.contains(event.target as Node)
-      ) {
-        setIsFilterOpen(false);
-      }
-    };
-
-    if (isFilterOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isFilterOpen]);
 
   if (kitsLoading) {
     return (
@@ -429,148 +401,26 @@ export default function WalkthroughsTabContent({
     <Box position="relative">
         {/* Main Content */}
         <VStack align="stretch" gap={4}>
-          <Flex justify="space-between" align="center">
-            {/* New Folder Button */}
-            <Button
-              size="sm"
-              onClick={() => setIsCreateFolderOpen(true)}
-              colorPalette="blue"
-              variant="subtle"
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuFolderPlus />
-                </Icon>
-                <Text>New Folder</Text>
-              </HStack>
-            </Button>
+          <ArtifactActionBar
+            onNewFolder={() => setIsCreateFolderOpen(true)}
+            onToggleFilter={() => setIsFilterOpen(!isFilterOpen)}
+            isFilterOpen={isFilterOpen}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            showViewModeSwitcher={true}
+            filterButtonRef={filterButtonRef}
+          />
 
-            <HStack gap={2}>
-              {/* Filter Button */}
-              <Button
-                ref={filterButtonRef}
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-                borderWidth="1px"
-                borderColor="border.subtle"
-                _hover={{ bg: "bg.subtle" }}
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                </HStack>
-              </Button>
-
-              {/* View Mode Switcher */}
-              <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
-                <Button
-                  onClick={() => setViewMode('card')}
-                  variant="ghost"
-                  borderRadius={0}
-                  borderRightWidth="1px"
-                  borderRightColor="border.subtle"
-                  bg={viewMode === 'card' ? 'white' : 'transparent'}
-                  color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuLayoutGrid />
-                    </Icon>
-                    <Text>Cards</Text>
-                  </HStack>
-                </Button>
-                <Button
-                  onClick={() => setViewMode('table')}
-                  variant="ghost"
-                  borderRadius={0}
-                  bg={viewMode === 'table' ? 'white' : 'transparent'}
-                  color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuTable />
-                    </Icon>
-                    <Text>Table</Text>
-                  </HStack>
-                </Button>
-              </HStack>
-            </HStack>
-          </Flex>
-
-        {/* Filter Overlay */}
-        {isFilterOpen && (
-          <Box
-            ref={filterPanelRef}
-            position="absolute"
-            top="50px"
-            left={0}
-            zIndex={10}
-            w="300px"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            borderRadius="md"
-            p={4}
-            bg="white"
-            boxShadow="lg"
-          >
-            <VStack align="stretch" gap={4}>
-              <Field.Root>
-                <Field.Label>Name</Field.Label>
-                <InputGroup
-                  endElement={nameFilter ? (
-                    <IconButton
-                      size="xs"
-                      variant="ghost"
-                      aria-label="Clear name filter"
-                      onClick={() => setNameFilter('')}
-                    >
-                      <Icon>
-                        <LuX />
-                      </Icon>
-                    </IconButton>
-                  ) : undefined}
-                >
-                  <Input
-                    placeholder="Filter by name..."
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                  />
-                </InputGroup>
-              </Field.Root>
-
-              {allTags.length > 0 && (
-                <Field.Root>
-                  <Field.Label>Tags</Field.Label>
-                  <HStack gap={1} flexWrap="wrap" mt={2}>
-                    {allTags.map((tag) => {
-                      const isSelected = selectedTags.includes(tag);
-                      return (
-                        <Tag.Root
-                          key={tag}
-                          size="sm"
-                          variant={isSelected ? 'solid' : 'subtle'}
-                          colorPalette={isSelected ? 'primary' : undefined}
-                          cursor="pointer"
-                          onClick={() => toggleTag(tag)}
-                          opacity={isSelected ? 1 : 0.6}
-                          _hover={{ opacity: 1 }}
-                        >
-                          <Tag.Label>{tag}</Tag.Label>
-                        </Tag.Root>
-                      );
-                    })}
-                  </HStack>
-                </Field.Root>
-              )}
-            </VStack>
-          </Box>
-        )}
+          <FilterPanel
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+            nameFilter={nameFilter}
+            onNameFilterChange={setNameFilter}
+            allTags={allTags}
+            selectedTags={selectedTags}
+            onToggleTag={toggleTag}
+            filterButtonRef={filterButtonRef}
+          />
 
         {/* Content */}
         {filteredWalkthroughs.length === 0 ? (
@@ -578,26 +428,27 @@ export default function WalkthroughsTabContent({
             No walkthroughs match the current filters.
           </Box>
         ) : viewMode === 'card' ? (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+          <MasonryLayout columnCount={3}>
             {/* Folders first */}
             {folderTree.map((node) => (
-              <FolderCard
-                key={node.folder.path}
-                node={node}
-                artifactType="walkthroughs"
-                onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                onViewArtifact={handleViewWalkthrough}
-                onAddToFolder={handleAddToFolder}
-                onEdit={handleEditFolder}
-                onDelete={handleDeleteFolder}
-                hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
-                renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-              />
+              <MasonryItem key={node.folder.path}>
+                <FolderCard
+                  node={node}
+                  artifactType="walkthroughs"
+                  onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                  onViewArtifact={handleViewWalkthrough}
+                  onAddToFolder={handleAddToFolder}
+                  onEdit={handleEditFolder}
+                  onDelete={handleDeleteFolder}
+                  hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
+                  renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                />
+              </MasonryItem>
             ))}
 
             {/* Root-level walkthroughs */}
             {getRootArtifacts(filteredWalkthroughs, folders, 'walkthroughs', projectPath).map((walkthrough) => (
-              <Box key={walkthrough.path}>
+              <MasonryItem key={walkthrough.path}>
                 <Card.Root
                   variant="subtle"
                   borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
@@ -644,11 +495,11 @@ export default function WalkthroughsTabContent({
                       </HStack>
                     )}
                   </CardBody>
-                </Card.Root>
-              </Box>
-            ))}
-          </SimpleGrid>
-        ) : (
+                  </Card.Root>
+                </MasonryItem>
+              ))}
+            </MasonryLayout>
+          ) : (
           renderTableView()
         )}
       </VStack>

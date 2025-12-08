@@ -4,22 +4,24 @@ import {
   CardBody,
   CardHeader,
   Heading,
-  SimpleGrid,
+  Flex,
   Text,
   Icon,
   HStack,
   EmptyState,
   Checkbox,
-  Flex,
+  VStack,
 } from '@chakra-ui/react';
-import { LuNetwork, LuFolderPlus } from 'react-icons/lu';
-import { useState, useEffect } from 'react';
+import { LuNetwork } from 'react-icons/lu';
+import { useState, useEffect, useRef } from 'react';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
+import { ArtifactActionBar } from '../shared/ArtifactActionBar';
+import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
@@ -49,6 +51,9 @@ export default function DiagramsTabContent({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
+
+  // Ref for filter button (used by ArtifactActionBar)
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
 
   const isSelected = (diagramId: string) => isSelectedInContext(diagramId);
 
@@ -235,47 +240,42 @@ export default function DiagramsTabContent({
 
   return (
     <Box position="relative">
-        <Flex justify="flex-start" mb={4}>
-          <Box
-            onClick={() => setIsCreateFolderOpen(true)}
-            cursor="pointer"
-            p={2}
-            borderRadius="md"
-            _hover={{ bg: "blue.50" }}
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuFolderPlus />
-              </Icon>
-              <Text fontWeight="medium" color="blue.600">New Folder</Text>
-            </HStack>
-          </Box>
-        </Flex>
+        <VStack align="stretch" gap={4}>
+          <ArtifactActionBar
+            onNewFolder={() => setIsCreateFolderOpen(true)}
+            onToggleFilter={() => {}}
+            isFilterOpen={false}
+            viewMode="card"
+            onViewModeChange={() => {}}
+            showViewModeSwitcher={false}
+            filterButtonRef={filterButtonRef}
+          />
 
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-          {/* Folders first */}
-          {folderTree.map((node) => (
-            <FolderCard
-              key={node.folder.path}
-              node={node}
-              artifactType="diagrams"
-              onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-              onViewArtifact={handleDiagramClick}
-              onAddToFolder={handleAddToFolder}
-              onEdit={handleEditFolder}
-              onDelete={handleDeleteFolder}
-              hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
-              renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-            />
-          ))}
+          <MasonryLayout columnCount={3}>
+            {/* Folders first */}
+            {folderTree.map((node) => (
+              <MasonryItem key={node.folder.path}>
+                <FolderCard
+                  node={node}
+                  artifactType="diagrams"
+                  onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                  onViewArtifact={handleDiagramClick}
+                  onAddToFolder={handleAddToFolder}
+                  onEdit={handleEditFolder}
+                  onDelete={handleDeleteFolder}
+                  hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
+                  renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                />
+              </MasonryItem>
+            ))}
 
-          {/* Root-level diagrams */}
-          {getRootArtifacts(diagrams, folders, 'diagrams', projectPath).map((diagram) => {
+            {/* Root-level diagrams */}
+            {getRootArtifacts(diagrams, folders, 'diagrams', projectPath).map((diagram) => {
             const diagramSelected = isSelected(diagram.path);
             const displayName = diagram.frontMatter?.alias || diagram.name;
             const description = diagram.frontMatter?.description || diagram.path;
             return (
-              <Box key={diagram.path}>
+              <MasonryItem key={diagram.path}>
                 <Card.Root
                   variant="subtle"
                   borderWidth={diagramSelected ? "2px" : "1px"}
@@ -317,10 +317,11 @@ export default function DiagramsTabContent({
                     </Text>
                   </CardBody>
                 </Card.Root>
-              </Box>
+              </MasonryItem>
             );
           })}
-        </SimpleGrid>
+        </MasonryLayout>
+        </VStack>
 
       <CreateFolderDialog
         isOpen={isCreateFolderOpen}

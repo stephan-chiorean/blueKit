@@ -494,33 +494,78 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         onTasksUpdated={loadTasks}
       />
 
-      {/* Controls Bar - Filter and View Mode */}
-      <Flex justify="space-between" align="center" mb={6} position="relative">
-        {/* Filter Button - with gray subtle background */}
-        <Button
-          ref={filterButtonRef}
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsFilterOpen(!isFilterOpen)}
-          bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-          borderWidth="1px"
-          borderColor="border.subtle"
-          _hover={{ bg: "bg.subtle" }}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuFilter />
-            </Icon>
-            <Text>Filter</Text>
-            {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
-              <Badge size="sm" colorPalette="primary" variant="solid">
-                {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
-                  .filter(Boolean)
-                  .reduce((a, b) => (a || 0) + (b || 0), 0)}
-              </Badge>
-            )}
+      {/* In Progress Section */}
+      <Box mb={8} position="relative">
+        <Flex align="center" justify="space-between" gap={2} mb={4}>
+          <Flex align="center" gap={2}>
+            <Heading size="md">In Progress</Heading>
+            <Text fontSize="sm" color="text.muted">
+              {inProgressTasks.length}
+            </Text>
+            {/* Filter Button - with gray subtle background */}
+            <Button
+              ref={filterButtonRef}
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+              borderWidth="1px"
+              borderColor="border.subtle"
+              _hover={{ bg: "bg.subtle" }}
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuFilter />
+                </Icon>
+                <Text>Filter</Text>
+                {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
+                  <Badge size="sm" colorPalette="primary" variant="solid">
+                    {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
+                      .filter(Boolean)
+                      .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                  </Badge>
+                )}
+              </HStack>
+            </Button>
+          </Flex>
+          {/* View Mode Switcher */}
+          <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
+            <Button
+              onClick={() => setViewMode('card')}
+              variant="ghost"
+              borderRadius={0}
+              borderRightWidth="1px"
+              borderRightColor="border.subtle"
+              bg={viewMode === 'card' ? 'white' : 'transparent'}
+              color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
+              _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+              size="sm"
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuLayoutGrid />
+                </Icon>
+                <Text>Cards</Text>
+              </HStack>
+            </Button>
+            <Button
+              onClick={() => setViewMode('table')}
+              variant="ghost"
+              borderRadius={0}
+              bg={viewMode === 'table' ? 'white' : 'transparent'}
+              color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
+              _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+              size="sm"
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuTable />
+                </Icon>
+                <Text>Table</Text>
+              </HStack>
+            </Button>
           </HStack>
-        </Button>
+        </Flex>
 
         {/* Filter Overlay */}
         {isFilterOpen && (
@@ -645,54 +690,6 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             </VStack>
           </Box>
         )}
-
-        {/* View Mode Switcher */}
-        <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
-          <Button
-            onClick={() => setViewMode('card')}
-            variant="ghost"
-            borderRadius={0}
-            borderRightWidth="1px"
-            borderRightColor="border.subtle"
-            bg={viewMode === 'card' ? 'white' : 'transparent'}
-            color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
-            size="sm"
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuLayoutGrid />
-              </Icon>
-              <Text>Cards</Text>
-            </HStack>
-          </Button>
-          <Button
-            onClick={() => setViewMode('table')}
-            variant="ghost"
-            borderRadius={0}
-            bg={viewMode === 'table' ? 'white' : 'transparent'}
-            color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
-            size="sm"
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuTable />
-              </Icon>
-              <Text>Table</Text>
-            </HStack>
-          </Button>
-        </HStack>
-      </Flex>
-
-      {/* In Progress Section */}
-      <Box mb={8}>
-        <Flex align="center" gap={2} mb={4}>
-          <Heading size="md">In Progress</Heading>
-          <Text fontSize="sm" color="text.muted">
-            {inProgressTasks.length}
-          </Text>
-        </Flex>
 
         {inProgressTasks.length === 0 ? (
           <Box
