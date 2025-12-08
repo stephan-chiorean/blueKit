@@ -263,7 +263,13 @@ export default function HomePage({ onProjectSelect, onNavigateToPlans }: HomePag
                     aria-label="Open menu"
                     onClick={onOpen}
                     color="gray.600"
-                    _hover={{}}
+                    _hover={{ bg: 'transparent' }}
+                    css={{
+                      '&:hover': {
+                        background: 'transparent !important',
+                        backgroundColor: 'transparent !important',
+                      }
+                    }}
                   >
                     <LuMenu />
                   </IconButton>
