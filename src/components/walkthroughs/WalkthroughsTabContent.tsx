@@ -416,30 +416,42 @@ export default function WalkthroughsTabContent({
                 {folderTree.length}
               </Text>
               {/* Filter Button */}
-              <Button
-                ref={filterButtonRef}
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-                borderWidth="1px"
-                borderColor="border.subtle"
-                _hover={{ bg: "bg.subtle" }}
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                  {(nameFilter || selectedTags.length > 0) && (
-                    <Badge size="sm" colorPalette="primary" variant="solid">
-                      {[nameFilter && 1, selectedTags.length]
-                        .filter(Boolean)
-                        .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                    </Badge>
-                  )}
-                </HStack>
-              </Button>
+              <Box position="relative" overflow="visible">
+                <Button
+                  ref={filterButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  _hover={{ bg: "bg.subtle" }}
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuFilter />
+                    </Icon>
+                    <Text>Filter</Text>
+                    {(nameFilter || selectedTags.length > 0) && (
+                      <Badge size="sm" colorPalette="primary" variant="solid">
+                        {[nameFilter && 1, selectedTags.length]
+                          .filter(Boolean)
+                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                      </Badge>
+                    )}
+                  </HStack>
+                </Button>
+                <FilterPanel
+                  isOpen={isFilterOpen}
+                  onClose={() => setIsFilterOpen(false)}
+                  nameFilter={nameFilter}
+                  onNameFilterChange={setNameFilter}
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  onToggleTag={toggleTag}
+                  filterButtonRef={filterButtonRef}
+                />
+              </Box>
               {/* New Folder Button - subtle blue style */}
               <Button
                 size="sm"
@@ -493,17 +505,6 @@ export default function WalkthroughsTabContent({
               </Button>
             </HStack>
           </Flex>
-
-          <FilterPanel
-            isOpen={isFilterOpen}
-            onClose={() => setIsFilterOpen(false)}
-            nameFilter={nameFilter}
-            onNameFilterChange={setNameFilter}
-            allTags={allTags}
-            selectedTags={selectedTags}
-            onToggleTag={toggleTag}
-            filterButtonRef={filterButtonRef}
-          />
 
           {folderTree.length === 0 ? (
             <Box

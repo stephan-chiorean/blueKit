@@ -656,7 +656,7 @@ export default function KitsTabContent({
         )}
 
         {/* Kits Section */}
-        <Box mb={8} position="relative">
+        <Box mb={8} position="relative" overflow="visible">
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">Kits</Heading>
             <Text fontSize="sm" color="text.muted">
@@ -665,30 +665,42 @@ export default function KitsTabContent({
             {/* Show Filter and New Folder buttons if no folders exist */}
             {folderTree.length === 0 && (
               <>
-                <Button
-                  ref={filterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  _hover={{ bg: "bg.subtle" }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFilter />
-                    </Icon>
-                    <Text>Filter</Text>
-                    {(nameFilter || selectedTags.length > 0) && (
-                      <Badge size="sm" colorPalette="primary" variant="solid">
-                        {[nameFilter && 1, selectedTags.length]
-                          .filter(Boolean)
-                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
+                <Box position="relative" overflow="visible">
+                  <Button
+                    ref={filterButtonRef}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+                    borderWidth="1px"
+                    borderColor="border.subtle"
+                    _hover={{ bg: "bg.subtle" }}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuFilter />
+                      </Icon>
+                      <Text>Filter</Text>
+                      {(nameFilter || selectedTags.length > 0) && (
+                        <Badge size="sm" colorPalette="primary" variant="solid">
+                          {[nameFilter && 1, selectedTags.length]
+                            .filter(Boolean)
+                            .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                        </Badge>
+                      )}
+                    </HStack>
+                  </Button>
+                  <FilterPanel
+                    isOpen={isFilterOpen}
+                    onClose={() => setIsFilterOpen(false)}
+                    nameFilter={nameFilter}
+                    onNameFilterChange={setNameFilter}
+                    allTags={allTags}
+                    selectedTags={selectedTags}
+                    onToggleTag={toggleTag}
+                    filterButtonRef={filterButtonRef}
+                  />
+                </Box>
                 <Button
                   size="sm"
                   onClick={() => setIsCreateFolderOpen(true)}
@@ -705,18 +717,6 @@ export default function KitsTabContent({
               </>
             )}
           </Flex>
-          {folderTree.length === 0 && (
-            <FilterPanel
-              isOpen={isFilterOpen}
-              onClose={() => setIsFilterOpen(false)}
-              nameFilter={nameFilter}
-              onNameFilterChange={setNameFilter}
-              allTags={allTags}
-              selectedTags={selectedTags}
-              onToggleTag={toggleTag}
-              filterButtonRef={filterButtonRef}
-            />
-          )}
 
           {rootKits.length === 0 ? (
             <Box

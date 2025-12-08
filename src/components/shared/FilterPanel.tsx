@@ -9,7 +9,6 @@ import {
   IconButton,
   Icon,
   Tag,
-  Text,
 } from '@chakra-ui/react';
 import { LuX } from 'react-icons/lu';
 
@@ -74,15 +73,16 @@ export function FilterPanel({
     <Box
       ref={filterPanelRef}
       position="absolute"
-      top="50px"
+      top="100%"
       left={0}
       zIndex={10}
       w="300px"
+      mt={2}
       borderWidth="1px"
       borderColor="border.subtle"
       borderRadius="md"
       p={4}
-      bg="white"
+      bg="bg.surface"
       boxShadow="lg"
     >
       <VStack align="stretch" gap={4}>

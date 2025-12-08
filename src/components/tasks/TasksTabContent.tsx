@@ -503,30 +503,155 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
               {inProgressTasks.length}
             </Text>
             {/* Filter Button - with gray subtle background */}
-            <Button
-              ref={filterButtonRef}
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-              borderWidth="1px"
-              borderColor="border.subtle"
-              _hover={{ bg: "bg.subtle" }}
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuFilter />
-                </Icon>
-                <Text>Filter</Text>
-                {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
-                  <Badge size="sm" colorPalette="primary" variant="solid">
-                    {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
-                      .filter(Boolean)
-                      .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                  </Badge>
-                )}
-              </HStack>
-            </Button>
+            <Box position="relative" overflow="visible">
+              <Button
+                ref={filterButtonRef}
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+                borderWidth="1px"
+                borderColor="border.subtle"
+                _hover={{ bg: "bg.subtle" }}
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFilter />
+                  </Icon>
+                  <Text>Filter</Text>
+                  {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
+                    <Badge size="sm" colorPalette="primary" variant="solid">
+                      {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
+                        .filter(Boolean)
+                        .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                    </Badge>
+                  )}
+                </HStack>
+              </Button>
+              {/* Filter Overlay */}
+              {isFilterOpen && (
+                <Box
+                  ref={filterPanelRef}
+                  position="absolute"
+                  top="100%"
+                  left={0}
+                  zIndex={10}
+                  w="400px"
+                  mt={2}
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  borderRadius="md"
+                  p={4}
+                  bg="bg.surface"
+                  boxShadow="lg"
+                >
+                  <VStack align="stretch" gap={4}>
+                    <Field.Root>
+                      <Field.Label>Title</Field.Label>
+                      <InputGroup
+                        endElement={titleFilter ? (
+                          <IconButton
+                            size="xs"
+                            variant="ghost"
+                            aria-label="Clear title filter"
+                            onClick={() => setTitleFilter('')}
+                          >
+                            <Icon>
+                              <LuX />
+                            </Icon>
+                          </IconButton>
+                        ) : undefined}
+                      >
+                        <Input
+                          placeholder="Search by title or description..."
+                          value={titleFilter}
+                          onChange={(e) => setTitleFilter(e.target.value)}
+                        />
+                      </InputGroup>
+                    </Field.Root>
+
+                    {allTags.length > 0 && (
+                      <Field.Root>
+                        <Field.Label>Tags</Field.Label>
+                        <HStack gap={1} flexWrap="wrap" mt={2}>
+                          {allTags.map((tag) => {
+                            const isSelected = selectedTags.includes(tag);
+                            return (
+                              <Tag.Root
+                                key={tag}
+                                size="sm"
+                                variant={isSelected ? 'solid' : 'subtle'}
+                                colorPalette={isSelected ? 'primary' : undefined}
+                                cursor="pointer"
+                                onClick={() => toggleTag(tag)}
+                                opacity={isSelected ? 1 : 0.6}
+                                _hover={{ opacity: 1 }}
+                              >
+                                <Tag.Label>{tag}</Tag.Label>
+                              </Tag.Root>
+                            );
+                          })}
+                        </HStack>
+                      </Field.Root>
+                    )}
+
+                    <Field.Root>
+                      <Field.Label>Priority</Field.Label>
+                      <HStack gap={1} flexWrap="wrap" mt={2}>
+                        {allPriorities.map((priority) => {
+                          const isSelected = selectedPriorities.includes(priority);
+                          const priorityIcon = getPriorityIcon(priority);
+                          return (
+                            <Tag.Root
+                              key={priority}
+                              size="sm"
+                              variant={isSelected ? 'solid' : 'subtle'}
+                              colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
+                              cursor="pointer"
+                              onClick={() => togglePriority(priority)}
+                              opacity={isSelected ? 1 : 0.6}
+                              _hover={{ opacity: 1 }}
+                            >
+                              <HStack gap={1}>
+                                {priorityIcon && (
+                                  <Icon color={priorityIcon.color} boxSize={3}>
+                                    <priorityIcon.icon />
+                                  </Icon>
+                                )}
+                                <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
+                              </HStack>
+                            </Tag.Root>
+                          );
+                        })}
+                      </HStack>
+                    </Field.Root>
+
+                    <Field.Root>
+                      <Field.Label>Complexity</Field.Label>
+                      <HStack gap={1} flexWrap="wrap" mt={2}>
+                        {allComplexities.map((complexity) => {
+                          const isSelected = selectedComplexities.includes(complexity);
+                          return (
+                            <Tag.Root
+                              key={complexity}
+                              size="sm"
+                              variant={isSelected ? 'solid' : 'subtle'}
+                              colorPalette={isSelected ? 'primary' : undefined}
+                              cursor="pointer"
+                              onClick={() => toggleComplexity(complexity)}
+                              opacity={isSelected ? 1 : 0.6}
+                              _hover={{ opacity: 1 }}
+                            >
+                              <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
+                            </Tag.Root>
+                          );
+                        })}
+                      </HStack>
+                    </Field.Root>
+                  </VStack>
+                </Box>
+              )}
+            </Box>
           </Flex>
           {/* View Mode Switcher */}
           <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
@@ -566,130 +691,6 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             </Button>
           </HStack>
         </Flex>
-
-        {/* Filter Overlay */}
-        {isFilterOpen && (
-          <Box
-            ref={filterPanelRef}
-            position="absolute"
-            top="100%"
-            left={0}
-            zIndex={10}
-            w="400px"
-            mt={2}
-            borderWidth="1px"
-            borderColor="border.subtle"
-            borderRadius="md"
-            p={4}
-            bg="bg.surface"
-            boxShadow="lg"
-          >
-            <VStack align="stretch" gap={4}>
-              <Field.Root>
-                <Field.Label>Title</Field.Label>
-                <InputGroup
-                  endElement={titleFilter ? (
-                    <IconButton
-                      size="xs"
-                      variant="ghost"
-                      aria-label="Clear title filter"
-                      onClick={() => setTitleFilter('')}
-                    >
-                      <Icon>
-                        <LuX />
-                      </Icon>
-                    </IconButton>
-                  ) : undefined}
-                >
-                  <Input
-                    placeholder="Search by title or description..."
-                    value={titleFilter}
-                    onChange={(e) => setTitleFilter(e.target.value)}
-                  />
-                </InputGroup>
-              </Field.Root>
-
-              {allTags.length > 0 && (
-                <Field.Root>
-                  <Field.Label>Tags</Field.Label>
-                  <HStack gap={1} flexWrap="wrap" mt={2}>
-                    {allTags.map((tag) => {
-                      const isSelected = selectedTags.includes(tag);
-                      return (
-                        <Tag.Root
-                          key={tag}
-                          size="sm"
-                          variant={isSelected ? 'solid' : 'subtle'}
-                          colorPalette={isSelected ? 'primary' : undefined}
-                          cursor="pointer"
-                          onClick={() => toggleTag(tag)}
-                          opacity={isSelected ? 1 : 0.6}
-                          _hover={{ opacity: 1 }}
-                        >
-                          <Tag.Label>{tag}</Tag.Label>
-                        </Tag.Root>
-                      );
-                    })}
-                  </HStack>
-                </Field.Root>
-              )}
-
-              <Field.Root>
-                <Field.Label>Priority</Field.Label>
-                <HStack gap={1} flexWrap="wrap" mt={2}>
-                  {allPriorities.map((priority) => {
-                    const isSelected = selectedPriorities.includes(priority);
-                    const priorityIcon = getPriorityIcon(priority);
-                    return (
-                      <Tag.Root
-                        key={priority}
-                        size="sm"
-                        variant={isSelected ? 'solid' : 'subtle'}
-                        colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
-                        cursor="pointer"
-                        onClick={() => togglePriority(priority)}
-                        opacity={isSelected ? 1 : 0.6}
-                        _hover={{ opacity: 1 }}
-                      >
-                        <HStack gap={1}>
-                          {priorityIcon && (
-                            <Icon color={priorityIcon.color} boxSize={3}>
-                              <priorityIcon.icon />
-                            </Icon>
-                          )}
-                          <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
-                        </HStack>
-                      </Tag.Root>
-                    );
-                  })}
-                </HStack>
-              </Field.Root>
-
-              <Field.Root>
-                <Field.Label>Complexity</Field.Label>
-                <HStack gap={1} flexWrap="wrap" mt={2}>
-                  {allComplexities.map((complexity) => {
-                    const isSelected = selectedComplexities.includes(complexity);
-                    return (
-                      <Tag.Root
-                        key={complexity}
-                        size="sm"
-                        variant={isSelected ? 'solid' : 'subtle'}
-                        colorPalette={isSelected ? 'primary' : undefined}
-                        cursor="pointer"
-                        onClick={() => toggleComplexity(complexity)}
-                        opacity={isSelected ? 1 : 0.6}
-                        _hover={{ opacity: 1 }}
-                      >
-                        <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
-                      </Tag.Root>
-                    );
-                  })}
-                </HStack>
-              </Field.Root>
-            </VStack>
-          </Box>
-        )}
 
         {inProgressTasks.length === 0 ? (
           <Box
