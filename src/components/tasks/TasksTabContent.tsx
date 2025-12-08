@@ -529,7 +529,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             </Button>
           </Flex>
           {/* View Mode Switcher */}
-          <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
+          <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
             <Button
               onClick={() => setViewMode('card')}
               variant="ghost"

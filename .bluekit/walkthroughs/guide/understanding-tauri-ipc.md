@@ -337,3 +337,4 @@ TypeScript → Tauri IPC → Rust
 - All serialization is automatic
 
 The frontend and backend run in the same application, communicating through Tauri's IPC bridge instead of HTTP. Same concepts, different transport layer!
+

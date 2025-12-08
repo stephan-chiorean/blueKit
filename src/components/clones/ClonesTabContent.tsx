@@ -421,7 +421,7 @@ export default function ClonesTabContent({
           </Button>
 
           {/* View Mode Switcher */}
-          <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">
+          <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
             <Button
               onClick={() => setViewMode('card')}
               variant="ghost"
@@ -431,6 +431,7 @@ export default function ClonesTabContent({
               bg={viewMode === 'card' ? 'white' : 'transparent'}
               color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
               _hover={{ bg: viewMode === 'card' ? 'white' : 'bg.subtle' }}
+              size="sm"
             >
               <HStack gap={2}>
                 <Icon>
@@ -446,6 +447,7 @@ export default function ClonesTabContent({
               bg={viewMode === 'table' ? 'white' : 'transparent'}
               color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
               _hover={{ bg: viewMode === 'table' ? 'white' : 'bg.subtle' }}
+              size="sm"
             >
               <HStack gap={2}>
                 <Icon>

@@ -3,23 +3,23 @@ id: view-mode-switcher
 alias: View Mode Switcher
 type: kit
 is_base: false
-version: 1
+version: 2
 tags: [ui-component, switcher, view-mode, cards, table]
-description: 'Reusable cards/table view mode switcher component with shadow styling for elevated appearance'
+description: 'Reusable cards/table view mode switcher component with shadow-only styling for elevated appearance'
 ---
 
 # View Mode Switcher Component
 
 ## Overview
 
-A reusable view mode switcher component that allows users to toggle between card and table views. The component features a subtle shadow effect that makes it appear elevated and more noticeable, with a clean border and smooth transitions.
+A reusable view mode switcher component that allows users to toggle between card and table views. The component features a subtle shadow effect that makes it appear elevated and more noticeable, with smooth transitions.
 
 ## Features
 
 - **Dual View Modes**: Toggle between card and table views
 - **Visual Feedback**: Active state styling with background color change
-- **Elevated Appearance**: Medium shadow (`shadow="md"`) for depth
-- **Clean Borders**: 1px border with subtle color
+- **Elevated Appearance**: Subtle shadow (`shadow="sm"`) for depth without borders
+- **Shadow-Only Design**: Clean appearance relying solely on shadow for definition
 - **Icon Support**: Uses react-icons for visual indicators
 - **Hover States**: Interactive hover feedback
 
@@ -66,12 +66,10 @@ const [viewMode, setViewMode] = useState<ViewMode>('card');
 ```tsx
 <HStack 
   gap={0} 
-  borderWidth="1px" 
-  borderColor="border" 
   borderRadius="md" 
   overflow="hidden" 
   bg="bg.subtle" 
-  shadow="md"
+  shadow="sm"
 >
   <Button
     onClick={() => setViewMode('card')}
@@ -114,11 +112,11 @@ const [viewMode, setViewMode] = useState<ViewMode>('card');
 
 ### Container Styling
 
-- **Border**: `borderWidth="1px"` with `borderColor="border"` for subtle definition
-- **Shadow**: `shadow="md"` provides medium elevation for pop-out effect
+- **Shadow**: `shadow="sm"` provides subtle elevation for pop-out effect
 - **Background**: `bg="bg.subtle"` for subtle background
 - **Border Radius**: `borderRadius="md"` for rounded corners
 - **Overflow**: `overflow="hidden"` ensures buttons respect container radius
+- **No Border**: Clean shadow-only design for a softer appearance
 
 ### Button Styling
 
@@ -155,12 +153,10 @@ export default function MyComponent() {
       {/* View Mode Switcher */}
       <HStack 
         gap={0} 
-        borderWidth="1px" 
-        borderColor="border" 
         borderRadius="md" 
         overflow="hidden" 
         bg="bg.subtle" 
-        shadow="md"
+        shadow="sm"
       >
         <Button
           onClick={() => setViewMode('card')}
@@ -211,21 +207,21 @@ export default function MyComponent() {
 
 ## Design Decisions
 
-### Why Shadow?
+### Why Shadow-Only Design?
 
-The `shadow="md"` property creates a subtle elevation effect that:
+The `shadow="sm"` property creates a subtle elevation effect that:
 - Makes the switcher stand out from surrounding content
-- Provides visual hierarchy
+- Provides visual hierarchy without harsh borders
 - Creates a modern, polished appearance
-- Works well with the 1px border for definition
+- Gives a softer, more elegant look than bordered designs
 
-### Why 1px Border?
+### Why No Border?
 
-A 1px border provides:
-- Subtle definition without being heavy
-- Clean appearance that doesn't compete with content
-- Good balance with the shadow effect
-- Consistent with modern UI design patterns
+Removing the border:
+- Creates a cleaner, more minimal appearance
+- Lets the shadow provide all the visual definition
+- Reduces visual noise and competition with content
+- Results in a softer, more modern aesthetic
 
 ### Why White Background for Active State?
 
@@ -240,27 +236,32 @@ The white background on the active button:
 ### Different Shadow Levels
 
 ```tsx
-// Subtle shadow
+// Subtle shadow (default)
 shadow="sm"
 
-// Medium shadow (default)
+// Medium shadow
 shadow="md"
 
 // Prominent shadow
 shadow="lg"
 ```
 
-### Different Border Styles
+### Adding a Border (Optional)
+
+If you want to add a border for more definition:
 
 ```tsx
+// Thin border
+borderWidth="1px"
+borderColor="border"
+
 // Thicker border
 borderWidth="2px"
+borderColor="border"
 
 // Colored border
+borderWidth="1px"
 borderColor="primary.500"
-
-// No border (shadow only)
-borderWidth="0"
 ```
 
 ### Additional View Modes
@@ -293,3 +294,4 @@ This switcher is used in:
 3. **State Management**: Use React state to track current view mode
 4. **Accessibility**: Ensure keyboard navigation works (Chakra UI handles this)
 5. **Visual Feedback**: Always provide clear active state indication
+

@@ -728,3 +728,4 @@ The IPC system in this Tauri application provides a type-safe, well-structured w
 6. **Adding commands** follows a clear 4-step process
 
 This architecture ensures type safety, good developer experience, and maintainable code as the application grows.
+
