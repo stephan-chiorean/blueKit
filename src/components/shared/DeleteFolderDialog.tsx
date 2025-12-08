@@ -25,7 +25,7 @@ export default function DeleteFolderDialog({
   onConfirm,
 }: DeleteFolderDialogProps) {
   const displayName = folder?.config?.name || folder?.name || 'this folder';
-  const itemCount = (folder?.artifact_count || 0) + (folder?.folder_count || 0);
+  const itemCount = (folder?.artifactCount || 0) + (folder?.folderCount || 0);
 
   const handleConfirm = () => {
     onConfirm();
