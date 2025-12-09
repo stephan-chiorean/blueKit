@@ -1,0 +1,73 @@
+---
+alias: Project Detail Data Flow
+description: High-level data flow diagram showing how ProjectDetailPage loads and filters artifacts, then passes data down to child tab components, with some components loading their own data independently
+tags:
+  - data-flow
+  - frontend
+  - components
+  - architecture
+---
+```mermaid
+graph TB
+    subgraph ProjectDetailPage["ProjectDetailPage.tsx"]
+        Mount[On Mount<br/>useEffect]
+        LoadAll[loadProjectArtifacts<br/>invokeGetProjectArtifacts<br/>project.path]
+        AllArtifacts[All Artifacts State<br/>ArtifactFile array]
+        FilterKits[Filter: kitsOnly<br/>useMemo filters .md files]
+        FilterWalkthroughs[Filter: walkthroughs<br/>useMemo filters type='walkthrough']
+        FilterAgents[Filter: agents<br/>useMemo filters type='agent']
+        FilterDiagrams[Filter: diagrams<br/>useMemo filters .mmd/.mermaid]
+    end
+    
+    subgraph TabComponents["Tab Components"]
+        KitsTab[KitsTabContent<br/>Receives: kitsOnly]
+        WalkthroughsTab[WalkthroughsTabContent<br/>Receives: walkthroughs]
+        AgentsTab[AgentsTabContent<br/>Receives: agents]
+        DiagramsTab[DiagramsTabContent<br/>Receives: diagrams]
+        BlueprintsTab[BlueprintsTabContent<br/>Loads own data]
+        ClonesTab[ClonesTabContent<br/>Loads own data]
+        TasksTab[TasksTabContent<br/>Loads own data]
+        ScrapbookTab[ScrapbookTabContent<br/>Loads own data]
+    end
+    
+    subgraph BackendIPC["Backend IPC Calls"]
+        GetArtifacts[invokeGetProjectArtifacts<br/>Returns all artifacts]
+        GetBlueprints[invokeGetBlueprints<br/>Returns blueprints]
+        GetClones[invokeGetProjectClones<br/>Returns clones]
+        GetTasks[invokeDbGetProjectTasks<br/>Returns tasks]
+    end
+    
+    %% Initial Load Flow
+    Mount -->|On mount| LoadAll
+    LoadAll -->|IPC Call| GetArtifacts
+    GetArtifacts -->|All Artifacts| AllArtifacts
+    
+    %% Filtering Flow
+    AllArtifacts -->|Filter by type| FilterKits
+    AllArtifacts -->|Filter by type| FilterWalkthroughs
+    AllArtifacts -->|Filter by type| FilterAgents
+    AllArtifacts -->|Filter by type| FilterDiagrams
+    
+    %% Data Passed to Components
+    FilterKits -->|Props: kits| KitsTab
+    FilterWalkthroughs -->|Props: walkthroughs| WalkthroughsTab
+    FilterAgents -->|Props: agents| AgentsTab
+    FilterDiagrams -->|Props: diagrams| DiagramsTab
+    
+    %% Components that Load Own Data
+    BlueprintsTab -->|On mount| GetBlueprints
+    ClonesTab -->|On mount| GetClones
+    TasksTab -->|On mount| GetTasks
+    ScrapbookTab -->|On mount| GetArtifacts
+    
+    %% Styling
+    classDef page fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef filter fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef component fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef ipc fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    
+    class Mount,LoadAll,AllArtifacts page
+    class FilterKits,FilterWalkthroughs,FilterAgents,FilterDiagrams filter
+    class KitsTab,WalkthroughsTab,AgentsTab,DiagramsTab,BlueprintsTab,ClonesTab,TasksTab,ScrapbookTab component
+    class GetArtifacts,GetBlueprints,GetClones,GetTasks ipc
+```

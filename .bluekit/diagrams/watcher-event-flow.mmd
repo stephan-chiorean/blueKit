@@ -1,0 +1,72 @@
+---
+alias: Watcher Event Flow
+description: Simple flow diagram showing how filesystem changes trigger watcher events, frontend event listeners receive paths, then call back to backend to fetch artifact data, and finally update frontend state
+tags:
+  - watcher
+  - events
+  - file-system
+  - ipc
+  - incremental-updates
+---
+```mermaid
+graph LR
+    subgraph FileSystem["File System"]
+        FSChange[File Change<br/>Create/Modify/Delete]
+    end
+    
+    subgraph Watcher["Backend: Watcher (watcher.rs)"]
+        NotifyCrate[notify crate<br/>Detects changes]
+        Debounce[300ms Debounce<br/>Batch events]
+        Dedupe[HashSet Deduplication<br/>Remove duplicates]
+        EmitEvent[Emit Tauri Event<br/>project-artifacts-changed-path<br/>Payload: Vec&lt;String&gt; paths]
+    end
+    
+    subgraph FrontendListener["Frontend: Event Listener"]
+        Listen[listen event<br/>project-artifacts-changed-path]
+        ReceivePaths[Receive Event<br/>event.payload = changedPaths]
+        Handler[updateArtifactsIncremental<br/>changedPaths]
+    end
+    
+    subgraph FrontendIPC["Frontend: IPC Call"]
+        InvokeCommand[invokeGetChangedArtifacts<br/>project.path, changedPaths]
+    end
+    
+    subgraph BackendCommand["Backend: Command (commands.rs)"]
+        GetChanged[get_changed_artifacts<br/>Receives changedPaths]
+        ProcessPaths[For each path:<br/>- Invalidate cache<br/>- Read file<br/>- Parse front matter]
+        ReturnArtifacts[Return Vec&lt;ArtifactFile&gt;<br/>Full artifact data]
+    end
+    
+    subgraph FrontendState["Frontend: State Update"]
+        UpdateState[Update React State<br/>Merge/Add/Remove artifacts]
+    end
+    
+    %% Flow
+    FSChange -->|File events| NotifyCrate
+    NotifyCrate -->|Raw events| Debounce
+    Debounce -->|Batched| Dedupe
+    Dedupe -->|Unique paths| EmitEvent
+    EmitEvent -->|Tauri Event<br/>Vec&lt;String&gt;| Listen
+    Listen -->|Receives| ReceivePaths
+    ReceivePaths -->|Calls| Handler
+    Handler -->|Invokes| InvokeCommand
+    InvokeCommand -->|IPC Command<br/>project.path, changedPaths| GetChanged
+    GetChanged -->|Processes| ProcessPaths
+    ProcessPaths -->|Returns| ReturnArtifacts
+    ReturnArtifacts -->|Vec&lt;ArtifactFile&gt;| InvokeCommand
+    InvokeCommand -->|Artifacts| Handler
+    Handler -->|Updates| UpdateState
+    
+    %% Styling
+    classDef filesystem fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef watcher fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef backend fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef state fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    
+    class FSChange filesystem
+    class NotifyCrate,Debounce,Dedupe,EmitEvent watcher
+    class Listen,ReceivePaths,Handler,InvokeCommand frontend
+    class GetChanged,ProcessPaths,ReturnArtifacts backend
+    class UpdateState state
+```
