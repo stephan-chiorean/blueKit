@@ -19,6 +19,50 @@ interface MermaidDiagramViewerProps {
   content: string;
 }
 
+// Color palette array - colors are assigned sequentially to classes
+// Each entry is a light/dark color pair
+const CLASS_COLOR_PALETTE: Array<{ light: string; dark: string }> = [
+  // Architecture layers
+  { light: '#e3f2fd', dark: '#0c4a6e' },
+  { light: '#fff3e0', dark: '#7c2d12' },
+  { light: '#f3e5f5', dark: '#581c87' },
+  { light: '#e8f5e9', dark: '#14532d' },
+  { light: '#fff9c4', dark: '#78350f' },
+  { light: '#fce4ec', dark: '#831843' },
+  { light: '#e0f2f1', dark: '#134e4a' },
+  { light: '#f5f5f5', dark: '#1f2937' },
+  { light: '#e1f5fe', dark: '#0c4a6e' },
+  { light: '#ffebee', dark: '#7f1d1d' },
+  
+  // Common component types
+  { light: '#dbeafe', dark: '#1e40af' },
+  { light: '#bfdbfe', dark: '#3b82f6' },
+  { light: '#e0e7ff', dark: '#4338ca' },
+  
+  // Data flow
+  { light: '#dcfce7', dark: '#166534' },
+  { light: '#fef3c7', dark: '#92400e' },
+  { light: '#e0e7ff', dark: '#4338ca' },
+  
+  // Status/State
+  { light: '#dcfce7', dark: '#166534' },
+  { light: '#f3f4f6', dark: '#374151' },
+  { light: '#fee2e2', dark: '#991b1b' },
+  { light: '#fef3c7', dark: '#92400e' },
+  { light: '#d1fae5', dark: '#065f46' },
+  
+  // Process types
+  { light: '#e0f2fe', dark: '#0c4a6e' },
+  { light: '#f3e8ff', dark: '#6b21a8' },
+  { light: '#fef3c7', dark: '#92400e' },
+  { light: '#e0f2f1', dark: '#134e4a' },
+  
+  // Generic categories
+  { light: '#eff6ff', dark: '#1e3a8a' },
+  { light: '#f3f4f6', dark: '#374151' },
+  { light: '#f9fafb', dark: '#1f2937' },
+];
+
 export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagramViewerProps) {
   const { colorMode } = useColorMode();
   const diagramRef = useRef<HTMLDivElement>(null);
@@ -56,185 +100,8 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     return cleaned.trim();
   };
 
-  useEffect(() => {
-    // Define custom BlueKit theme variables
-    // BlueKit primary blue: #4287f5
-    const bluekitPrimary = '#4287f5';
-    const bluekitPrimaryLight = '#60a5fa';
-    const bluekitPrimaryDark = '#2563eb';
-    
-    if (colorMode === 'dark') {
-      // Dark mode theme with BlueKit blue and darker backgrounds
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'loose',
-        theme: 'dark',
-        themeVariables: {
-          // Primary colors - BlueKit blue
-          primaryColor: '#1e293b',
-          primaryTextColor: '#bfdbfe',
-          primaryBorderColor: bluekitPrimary,
-          lineColor: bluekitPrimary,
-          arrowheadColor: bluekitPrimary,
-          
-          // Backgrounds - darker for better contrast
-          background: '#0f172a',
-          mainBkg: '#1e293b',
-          secondBkg: '#334155',
-          tertiaryBkg: '#475569',
-          
-          // Text colors - lighter for visibility
-          textColor: '#bfdbfe',
-          secondaryTextColor: '#93c5fd',
-          tertiaryTextColor: '#60a5fa',
-          lineTextColor: '#bfdbfe',
-          labelColor: '#bfdbfe',
-          
-          // Borders - BlueKit blue
-          border1: bluekitPrimary,
-          border2: bluekitPrimaryLight,
-          
-          // Actor/Node colors - darker blue backgrounds
-          actorBorder: bluekitPrimary,
-          actorBkg: '#1e3a8a',
-          actorTextColor: '#bfdbfe',
-          actorLineColor: bluekitPrimary,
-          
-          // Signal/Flow colors
-          signalColor: bluekitPrimary,
-          signalTextColor: '#bfdbfe',
-          
-          // Label boxes
-          labelBoxBkgColor: '#1e293b',
-          labelBoxBorderColor: bluekitPrimary,
-          labelTextColor: '#bfdbfe',
-          labelBackground: '#1e293b',
-          
-          // Notes - darker blue background
-          noteBorderColor: bluekitPrimary,
-          noteBkgColor: '#1e3a8a',
-          noteTextColor: '#bfdbfe',
-          
-          // Activation boxes - darker blue background
-          activationBorderColor: bluekitPrimary,
-          activationBkgColor: '#1e3a8a',
-          sequenceNumberColor: '#bfdbfe',
-          
-          // Sections - darker blue background
-          sectionBkgColor: '#1e3a8a',
-          altBkgColor: '#334155',
-          exclBkgColor: '#991b1b',
-          
-          // Tasks - darker blue background
-          taskBorderColor: bluekitPrimary,
-          taskBkgColor: '#1e3a8a',
-          taskTextColor: '#bfdbfe',
-          taskTextLightColor: '#bfdbfe',
-          taskTextDarkColor: '#bfdbfe',
-          taskTextOutsideColor: '#bfdbfe',
-          taskTextClickableColor: bluekitPrimaryLight,
-          activeTaskBorderColor: bluekitPrimaryLight,
-          activeTaskBkgColor: '#172554',
-          doneTaskBkgColor: '#065f46',
-          doneTaskBorderColor: '#10b981',
-          critBorderColor: '#dc2626',
-          critBkgColor: '#991b1b',
-          
-          // Other
-          gridColor: bluekitPrimary,
-          todayLineColor: '#ef4444',
-          errorBkgColor: '#7f1d1d',
-          errorTextColor: '#fca5a5',
-          loopTextColor: '#bfdbfe',
-        },
-      });
-    } else {
-      // Light mode theme with BlueKit blue
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'loose',
-        theme: 'default',
-        themeVariables: {
-          // Primary colors - BlueKit blue
-          primaryColor: '#ffffff',
-          primaryTextColor: '#1f2937',
-          primaryBorderColor: bluekitPrimary,
-          lineColor: bluekitPrimary,
-          arrowheadColor: bluekitPrimary,
-          
-          // Backgrounds
-          background: '#ffffff',
-          mainBkg: '#ffffff',
-          secondBkg: '#f3f4f6',
-          tertiaryBkg: '#e5e7eb',
-          
-          // Text colors
-          textColor: '#1f2937',
-          secondaryTextColor: '#4b5563',
-          tertiaryTextColor: '#6b7280',
-          lineTextColor: '#1f2937',
-          labelColor: '#1f2937',
-          
-          // Borders - BlueKit blue
-          border1: bluekitPrimary,
-          border2: bluekitPrimaryDark,
-          
-          // Actor/Node colors
-          actorBorder: bluekitPrimary,
-          actorBkg: '#eff6ff',
-          actorTextColor: '#1f2937',
-          actorLineColor: bluekitPrimary,
-          
-          // Signal/Flow colors
-          signalColor: bluekitPrimary,
-          signalTextColor: '#1f2937',
-          
-          // Label boxes
-          labelBoxBkgColor: '#ffffff',
-          labelBoxBorderColor: bluekitPrimary,
-          labelTextColor: '#1f2937',
-          labelBackground: '#ffffff',
-          
-          // Notes
-          noteBorderColor: bluekitPrimary,
-          noteBkgColor: '#eff6ff',
-          noteTextColor: '#1f2937',
-          
-          // Activation boxes
-          activationBorderColor: bluekitPrimary,
-          activationBkgColor: '#dbeafe',
-          sequenceNumberColor: '#ffffff',
-          
-          // Sections
-          sectionBkgColor: '#eff6ff',
-          altBkgColor: '#f3f4f6',
-          exclBkgColor: '#fee2e2',
-          
-          // Tasks
-          taskBorderColor: bluekitPrimary,
-          taskBkgColor: '#eff6ff',
-          taskTextColor: '#1f2937',
-          taskTextLightColor: '#ffffff',
-          taskTextDarkColor: '#1f2937',
-          taskTextOutsideColor: '#1f2937',
-          taskTextClickableColor: bluekitPrimaryDark,
-          activeTaskBorderColor: bluekitPrimaryDark,
-          activeTaskBkgColor: '#dbeafe',
-          doneTaskBkgColor: '#d1fae5',
-          doneTaskBorderColor: '#10b981',
-          critBorderColor: '#ef4444',
-          critBkgColor: '#fee2e2',
-          
-          // Other
-          gridColor: bluekitPrimary,
-          todayLineColor: '#ef4444',
-          errorBkgColor: '#fee2e2',
-          errorTextColor: '#dc2626',
-          loopTextColor: '#1f2937',
-        },
-      });
-    }
-  }, [colorMode]);
+  // Mermaid is now initialized globally in ColorModeContext
+  // No need to initialize here - it's already done when color mode changes
 
   useEffect(() => {
     if (!diagramRef.current || !content) {
@@ -242,167 +109,226 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
       return;
     }
 
-    // Clear previous content
-    diagramRef.current.innerHTML = '';
+    // When color mode changes, Mermaid needs to be re-initialized in ColorModeContext
+    // Add a small delay to ensure Mermaid is fully re-initialized before rendering
+    const renderTimeout = setTimeout(() => {
+      if (!diagramRef.current) return;
 
-    // Extract the mermaid code
-    const mermaidCode = extractMermaidCode(content);
-    console.log('MermaidDiagramViewer: Extracted code', {
-      contentLength: content.length,
-      mermaidCodeLength: mermaidCode.length,
-      mermaidCodePreview: mermaidCode.substring(0, 100)
-    });
+      // Clear previous content
+      diagramRef.current.innerHTML = '';
 
-    if (!mermaidCode) {
-      console.warn('MermaidDiagramViewer: No mermaid code found in content');
-      if (diagramRef.current) {
-        diagramRef.current.innerHTML = '<p style="color: red;">No mermaid diagram code found</p>';
+      // Extract the mermaid code
+      const mermaidCode = extractMermaidCode(content);
+      console.log('MermaidDiagramViewer: Extracted code', {
+        contentLength: content.length,
+        mermaidCodeLength: mermaidCode.length,
+        mermaidCodePreview: mermaidCode.substring(0, 100)
+      });
+
+      if (!mermaidCode) {
+        console.warn('MermaidDiagramViewer: No mermaid code found in content');
+        if (diagramRef.current) {
+          diagramRef.current.innerHTML = '<p style="color: red;">No mermaid diagram code found</p>';
+        }
+        return;
       }
-      return;
-    }
 
-    // Create a unique ID for this diagram
-    const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Create a unique ID for this diagram
+      const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Render the diagram
-    console.log('MermaidDiagramViewer: Attempting to render diagram', { id, codeLength: mermaidCode.length });
-    mermaid.render(id, mermaidCode).then((result) => {
-      console.log('MermaidDiagramViewer: Render successful', { svgLength: result.svg?.length });
-      if (diagramRef.current) {
-        diagramRef.current.innerHTML = result.svg;
-        
-        // Apply BlueKit blue to arrows and lines after render
-        // This ensures all diagram types use the correct colors
-        const svg = diagramRef.current.querySelector('svg');
-        if (svg) {
-          const bluekitBlue = '#4287f5';
+      // Render the diagram
+      console.log('MermaidDiagramViewer: Attempting to render diagram', { id, codeLength: mermaidCode.length });
+      mermaid.render(id, mermaidCode).then((result) => {
+        console.log('MermaidDiagramViewer: Render successful', { svgLength: result.svg?.length });
+        if (diagramRef.current) {
+          diagramRef.current.innerHTML = result.svg;
           
-          // Style arrows (marker elements)
-          const markers = svg.querySelectorAll('marker');
-          markers.forEach((marker) => {
-            const path = marker.querySelector('path');
-            if (path) {
-              path.setAttribute('fill', bluekitBlue);
-              path.setAttribute('stroke', bluekitBlue);
-            }
-          });
-          
-          // Style lines and paths (arrows, connectors)
-          const paths = svg.querySelectorAll('path[stroke]');
-          paths.forEach((path) => {
-            const stroke = path.getAttribute('stroke');
-            // Only change if it's a line/arrow color (not text or other elements)
-            if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
-              path.setAttribute('stroke', bluekitBlue);
-            }
-          });
-          
-          // Style polyline arrows
-          const polylines = svg.querySelectorAll('polyline[stroke]');
-          polylines.forEach((polyline) => {
-            const stroke = polyline.getAttribute('stroke');
-            if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
-              polyline.setAttribute('stroke', bluekitBlue);
-            }
-          });
-          
-          // Make text more visible in dark mode
-          if (colorMode === 'dark') {
-            const textElements = svg.querySelectorAll('text');
-            textElements.forEach((text) => {
-              const fill = text.getAttribute('fill');
-              // Only update if it's dark text that would be hard to see
-              if (!fill || fill === '#000' || fill === 'rgb(0,0,0)' || fill === '#333' || fill === '#1f2937') {
-                text.setAttribute('fill', '#bfdbfe');
+          // Apply BlueKit blue to arrows and lines after render
+          // This ensures all diagram types use the correct colors
+          const svg = diagramRef.current.querySelector('svg');
+          if (svg) {
+            const bluekitBlue = '#4287f5';
+            
+            // Style arrows (marker elements)
+            const markers = svg.querySelectorAll('marker');
+            markers.forEach((marker) => {
+              const path = marker.querySelector('path');
+              if (path) {
+                path.setAttribute('fill', bluekitBlue);
+                path.setAttribute('stroke', bluekitBlue);
               }
             });
             
-            // Darken background rectangles for better contrast
-            const rects = svg.querySelectorAll('rect[fill]');
-            rects.forEach((rect) => {
-              const fill = rect.getAttribute('fill');
-              if (!fill || fill === 'none') return;
-              
-              // White/very light backgrounds -> darker blue
-              if (fill === '#fff' || fill === '#ffffff' || fill === 'rgb(255,255,255)' || 
-                  fill.includes('rgb(255,255,255)') || fill === '#f9fafb' || fill === '#f3f4f6') {
-                rect.setAttribute('fill', '#1e3a8a');
-              }
-              // Light gray backgrounds -> darker gray
-              else if (fill === '#e5e7eb' || fill === '#d1d5db' || fill.includes('rgb(229')) {
-                rect.setAttribute('fill', '#334155');
-              }
-              // Light blue backgrounds (#eff6ff, #dbeafe, #bfdbfe, #93c5fd, #60a5fa, #1e40af) -> darker blue
-              else if (fill === '#eff6ff' || fill === '#dbeafe' || fill === '#bfdbfe' || 
-                       fill === '#93c5fd' || fill === '#60a5fa' || fill === '#1e40af' ||
-                       fill.includes('rgb(239,246,255)') || fill.includes('rgb(219,234,254)') ||
-                       fill.includes('rgb(191,219,254)') || fill.includes('rgb(147,197,253)') ||
-                       fill.includes('rgb(96,165,250)') || fill.includes('rgb(30,64,175)')) {
-                rect.setAttribute('fill', '#1e3a8a');
-              }
-              // Light green backgrounds -> darker green
-              else if (fill === '#d1fae5' || fill === '#a7f3d0' || fill === '#6ee7b7' ||
-                       fill === '#34d399' || fill === '#10b981' || fill === '#059669' ||
-                       fill.includes('rgb(209,250,229)') || fill.includes('rgb(167,243,208)') ||
-                       fill.includes('rgb(110,231,183)') || fill.includes('rgb(52,211,153)') ||
-                       fill.includes('rgb(16,185,129)') || fill.includes('rgb(5,150,105)')) {
-                rect.setAttribute('fill', '#065f46');
-              }
-              // Light red/pink backgrounds -> darker red
-              else if (fill === '#fee2e2' || fill === '#fecaca' || fill === '#fca5a5' ||
-                       fill === '#f87171' || fill === '#ef4444' || fill === '#dc2626' ||
-                       fill === '#7f1d1d' || fill.includes('rgb(254,226,226)') ||
-                       fill.includes('rgb(254,202,202)') || fill.includes('rgb(252,165,165)') ||
-                       fill.includes('rgb(248,113,113)') || fill.includes('rgb(239,68,68)') ||
-                       fill.includes('rgb(220,38,38)') || fill.includes('rgb(127,29,29)')) {
-                rect.setAttribute('fill', '#991b1b');
-              }
-              // Light purple backgrounds -> darker purple
-              else if (fill === '#f3e8ff' || fill === '#e9d5ff' || fill === '#ddd6fe' ||
-                       fill === '#c4b5fd' || fill === '#a78bfa' || fill === '#8b5cf6' ||
-                       fill.includes('rgb(243,232,255)') || fill.includes('rgb(233,213,255)') ||
-                       fill.includes('rgb(221,214,254)') || fill.includes('rgb(196,181,253)') ||
-                       fill.includes('rgb(167,139,250)') || fill.includes('rgb(139,92,246)')) {
-                rect.setAttribute('fill', '#6b21a8');
-              }
-              // Light yellow/orange backgrounds -> darker orange
-              else if (fill === '#fef3c7' || fill === '#fde68a' || fill === '#fcd34d' ||
-                       fill === '#fbbf24' || fill === '#f59e0b' || fill === '#d97706' ||
-                       fill.includes('rgb(254,243,199)') || fill.includes('rgb(253,230,138)') ||
-                       fill.includes('rgb(252,211,77)') || fill.includes('rgb(251,191,36)') ||
-                       fill.includes('rgb(245,158,11)') || fill.includes('rgb(217,119,6)')) {
-                rect.setAttribute('fill', '#92400e');
+            // Style lines and paths (arrows, connectors)
+            const paths = svg.querySelectorAll('path[stroke]');
+            paths.forEach((path) => {
+              const stroke = path.getAttribute('stroke');
+              // Only change if it's a line/arrow color (not text or other elements)
+              if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
+                path.setAttribute('stroke', bluekitBlue);
               }
             });
             
-            // Also darken polygons (used for some shapes)
-            const polygons = svg.querySelectorAll('polygon[fill]');
-            polygons.forEach((polygon) => {
-              const fill = polygon.getAttribute('fill');
-              if (!fill || fill === 'none') return;
-              
-              // Apply same darkening logic as rectangles
-              if (fill === '#fff' || fill === '#ffffff' || fill === 'rgb(255,255,255)') {
-                polygon.setAttribute('fill', '#1e3a8a');
-              } else if (fill === '#eff6ff' || fill === '#dbeafe' || fill === '#1e40af' ||
-                         fill.includes('rgb(239,246,255)') || fill.includes('rgb(219,234,254)') ||
-                         fill.includes('rgb(30,64,175)')) {
-                polygon.setAttribute('fill', '#1e3a8a');
-              } else if (fill === '#d1fae5' || fill.includes('rgb(209,250,229)')) {
-                polygon.setAttribute('fill', '#065f46');
-              } else if (fill === '#fee2e2' || fill === '#7f1d1d' || fill.includes('rgb(254,226,226)')) {
-                polygon.setAttribute('fill', '#991b1b');
+            // Style polyline arrows
+            const polylines = svg.querySelectorAll('polyline[stroke]');
+            polylines.forEach((polyline) => {
+              const stroke = polyline.getAttribute('stroke');
+              if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
+                polyline.setAttribute('stroke', bluekitBlue);
               }
             });
+
+            // Apply class-based colors from front matter or palette
+            const frontMatterClasses = (diagram.frontMatter as any)?.classes;
+            console.log('MermaidDiagramViewer: Checking for class colors', {
+              hasFrontMatter: !!diagram.frontMatter,
+              frontMatterKeys: diagram.frontMatter ? Object.keys(diagram.frontMatter) : [],
+              rawClasses: frontMatterClasses,
+              isArray: Array.isArray(frontMatterClasses),
+            });
+            
+            // Build class color map: assign colors sequentially from palette based on array order
+            const classColorMap: Record<string, { light: string; dark: string }> = {};
+            
+            if (frontMatterClasses && Array.isArray(frontMatterClasses)) {
+              frontMatterClasses.forEach((className: string, index: number) => {
+                const colorIndex = index % CLASS_COLOR_PALETTE.length;
+                classColorMap[className] = CLASS_COLOR_PALETTE[colorIndex];
+              });
+            }
+            
+            console.log('MermaidDiagramViewer: Built classColorMap', { classColorMap, colorMode });
+            
+            if (Object.keys(classColorMap).length > 0) {
+              console.log('MermaidDiagramViewer: Processing class colors', Object.keys(classColorMap));
+              
+              Object.entries(classColorMap).forEach(([className, colors]) => {
+                const color = colorMode === 'dark' ? colors.dark : colors.light;
+                console.log(`MermaidDiagramViewer: Processing class "${className}"`, { color, colors, colorMode });
+                
+                if (color) {
+                  // Find all elements with this class
+                  // Mermaid applies classes to g elements and their children
+                  const classElements = svg.querySelectorAll(`.${className}`);
+                  console.log(`MermaidDiagramViewer: Found ${classElements.length} elements with class "${className}"`);
+                  
+                  if (classElements.length === 0) {
+                    // Try alternative selectors - Mermaid might use different class naming
+                    const allClasses = Array.from(svg.querySelectorAll('[class]')).map(el => el.getAttribute('class'));
+                    console.log(`MermaidDiagramViewer: All classes found in SVG:`, allClasses);
+                    
+                    // Try with different class name formats
+                    const altSelectors = [
+                      `.node-${className}`,
+                      `[class*="${className}"]`,
+                      `[class~="${className}"]`,
+                    ];
+                    
+                    altSelectors.forEach(selector => {
+                      const altElements = svg.querySelectorAll(selector);
+                      if (altElements.length > 0) {
+                        console.log(`MermaidDiagramViewer: Found ${altElements.length} elements with selector "${selector}"`);
+                      }
+                    });
+                  }
+                  
+                  classElements.forEach((element, index) => {
+                    console.log(`MermaidDiagramViewer: Processing element ${index} for class "${className}"`, {
+                      tagName: element.tagName,
+                      className: element.getAttribute('class'),
+                      currentFill: element.getAttribute('fill'),
+                    });
+                    
+                    if (element instanceof SVGElement) {
+                      // Apply fill to the element itself if it's a shape
+                      if (element.tagName === 'rect' || element.tagName === 'circle' || 
+                          element.tagName === 'ellipse' || element.tagName === 'polygon' || 
+                          element.tagName === 'path') {
+                        const existingFill = element.getAttribute('fill');
+                        // Only apply if it's not explicitly set to none/transparent
+                        if (existingFill !== 'none' && existingFill !== 'transparent') {
+                          console.log(`MermaidDiagramViewer: Applying fill "${color}" to ${element.tagName}`);
+                          element.setAttribute('fill', color);
+                        }
+                      }
+                      
+                      // Also apply to child rect, circle, ellipse, polygon, path elements
+                      const shapes = element.querySelectorAll('rect, circle, ellipse, polygon, path');
+                      console.log(`MermaidDiagramViewer: Found ${shapes.length} child shapes in element ${index}`);
+                      
+                      shapes.forEach((shape, shapeIndex) => {
+                        const fill = shape.getAttribute('fill');
+                        const stroke = shape.getAttribute('stroke');
+                        const width = shape.getAttribute('width');
+                        const height = shape.getAttribute('height');
+                        
+                        // Get computed style to see what's actually being applied
+                        const computedStyle = window.getComputedStyle(shape as Element);
+                        const computedFill = computedStyle.fill;
+                        
+                        console.log(`MermaidDiagramViewer: Child shape ${shapeIndex}`, {
+                          tagName: shape.tagName,
+                          currentFill: fill,
+                          computedFill: computedFill,
+                          stroke: stroke,
+                          width: width,
+                          height: height,
+                          currentStyle: shape.getAttribute('style'),
+                        });
+                        
+                        // For rects, apply to background rects (ones without stroke, or the larger one)
+                        if (shape.tagName === 'rect') {
+                          // Skip border rects that have stroke
+                          if (stroke && stroke !== 'none' && stroke !== 'transparent') {
+                            console.log(`MermaidDiagramViewer: Skipping border rect ${shapeIndex} (has stroke: ${stroke})`);
+                            return;
+                          }
+                        }
+                        
+                        // Apply fill color - apply to all shapes that aren't explicitly transparent
+                        // Even if fill is null, we should apply it (it's using CSS/default)
+                        if (fill !== 'none' && fill !== 'transparent') {
+                          console.log(`MermaidDiagramViewer: Applying fill "${color}" to child ${shape.tagName} (was: ${fill || 'null/default'}, computed: ${computedFill})`);
+                          // Set both fill attribute and style attribute for maximum specificity
+                          shape.setAttribute('fill', color);
+                          // Get existing style and append/override fill
+                          const existingStyle = shape.getAttribute('style') || '';
+                          // Remove any existing fill from style
+                          const styleWithoutFill = existingStyle.replace(/fill:\s*[^;]+;?/gi, '').trim();
+                          const newStyle = styleWithoutFill ? `${styleWithoutFill}; fill: ${color};` : `fill: ${color};`;
+                          shape.setAttribute('style', newStyle);
+                          
+                          // Verify it was applied
+                          const afterFill = shape.getAttribute('fill');
+                          const afterStyle = shape.getAttribute('style');
+                          const afterComputed = window.getComputedStyle(shape as Element).fill;
+                          console.log(`MermaidDiagramViewer: After applying - fill: ${afterFill}, style: ${afterStyle}, computed: ${afterComputed}`);
+                        } else {
+                          console.log(`MermaidDiagramViewer: Skipping child ${shape.tagName} - fill is ${fill}`);
+                        }
+                      });
+                    }
+                  });
+                } else {
+                  console.log(`MermaidDiagramViewer: No color found for class "${className}" in ${colorMode} mode`);
+                }
+              });
+            } else {
+              console.log('MermaidDiagramViewer: No classColors found in front matter');
+            }
           }
         }
-      }
-    }).catch((error) => {
-      console.error('MermaidDiagramViewer: Error rendering mermaid diagram:', error);
-      if (diagramRef.current) {
-        diagramRef.current.innerHTML = `<p style="color: red;">Error rendering diagram: ${error.message}</p>`;
-      }
-    });
+      }).catch((error) => {
+        console.error('MermaidDiagramViewer: Error rendering mermaid diagram:', error);
+        if (diagramRef.current) {
+          diagramRef.current.innerHTML = `<p style="color: red;">Error rendering diagram: ${error.message}</p>`;
+        }
+      });
+    }, 100); // Small delay to ensure Mermaid is re-initialized when color mode changes
+
+    return () => {
+      clearTimeout(renderTimeout);
+    };
   }, [content, diagram.path, colorMode]);
 
   // Smooth transform update using requestAnimationFrame
@@ -581,4 +507,3 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     </Box>
   );
 }
-

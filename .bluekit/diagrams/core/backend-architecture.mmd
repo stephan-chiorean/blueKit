@@ -7,6 +7,15 @@ tags:
   - tauri
   - rust
   - ipc
+classes:
+  - frontend
+  - tauri
+  - main
+  - module
+  - command
+  - filesystem
+  - watcher
+  - dependency
 ---
 ```mermaid
 graph TB
@@ -125,16 +134,6 @@ graph TB
     Commands -.->|Uses| Tokio
     Watcher -.->|Uses| NotifyCrate
     Main_Module -.->|Uses| Tokio
-
-    %% Styling
-    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef tauri fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef main fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef module fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef command fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    classDef filesystem fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef watcher fill:#e0f2f1,stroke:#00796b,stroke-width:2px
-    classDef dependency fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
 
     class UI,IPC_Wrapper frontend
     class IPC_Bridge,Event_System tauri

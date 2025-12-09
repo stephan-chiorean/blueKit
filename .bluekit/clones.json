@@ -70,5 +70,21 @@
       "desktop-app"
     ],
     "createdAt": "2025-12-08T00:12:58.160Z"
+  },
+  {
+    "id": "bluekit-foundation-20251209",
+    "name": "BlueKit Foundation",
+    "description": "The BlueKit application itself - a desktop app for managing development artifacts (kits, walkthroughs, blueprints, agents, diagrams) built with React, TypeScript, Chakra UI, and Tauri",
+    "gitUrl": "https://github.com/stephan-chiorean/blueKit.git",
+    "gitCommit": "5798d266ab4eeab7efca88b583f885299240e8fb",
+    "gitBranch": "main",
+    "tags": [
+      "foundation",
+      "bluekit",
+      "react",
+      "tauri",
+      "typescript"
+    ],
+    "createdAt": "2025-12-09T16:40:22.787Z"
   }
 ]

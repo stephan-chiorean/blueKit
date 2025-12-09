@@ -7,6 +7,12 @@ tags:
   - rendering
   - performance
   - debugging
+classes:
+  - problem
+  - backend
+  - frontend
+  - state
+  - render
 ---
 ```mermaid
 sequenceDiagram
@@ -190,12 +196,6 @@ graph TB
         C5 --> Render4
         C6 --> Render4
     end
-    
-    classDef problem fill:#ffcccc,stroke:#cc0000,stroke-width:3px
-    classDef backend fill:#cce5ff,stroke:#0066cc
-    classDef frontend fill:#e5ffcc,stroke:#00cc00
-    classDef state fill:#ffe5cc,stroke:#cc6600
-    classDef render fill:#ffccff,stroke:#cc00cc,stroke-width:2px
     
     class Events,Debounce,FDebounce problem
     class RW,Emit backend

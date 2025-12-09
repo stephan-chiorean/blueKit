@@ -7,6 +7,17 @@ tags:
   - react
   - typescript
   - chakra-ui
+classes:
+  - entry
+  - app
+  - context
+  - page
+  - feature
+  - ui
+  - ipc
+  - util
+  - theme
+  - backend
 ---
 ```mermaid
 graph TB
@@ -169,18 +180,7 @@ graph TB
     Pages -->|Uses| ChakraComponents
     ThemeConfig --> ChakraComponents
 
-    %% Styling
-    classDef entry fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef app fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef context fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef page fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef feature fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    classDef ui fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef ipc fill:#e0f2f1,stroke:#00796b,stroke-width:2px
-    classDef util fill:#f5f5f5,stroke:#616161,stroke-width:1px
-    classDef theme fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    classDef backend fill:#ffebee,stroke:#c62828,stroke-width:2px
-
+    %% Class assignments
     class Main,ChakraProvider,Toaster entry
     class App,WelcomeScreen,HomePage,ProjectDetailPage app
     class ColorModeProvider,FeatureFlagsProvider,WorkstationProvider,SelectionProvider context

@@ -7,6 +7,13 @@ tags:
   - incremental-updates
   - cache
   - ipc
+classes:
+  - frontend
+  - ipc
+  - watcher
+  - commands
+  - cache
+  - filesystem
 ---
 ```mermaid
 graph TB
@@ -102,14 +109,6 @@ graph TB
     IncrementalUpdate -->|Detects Moves| State
     IncrementalUpdate -->|Removes Old Path| State
     IncrementalUpdate -->|Adds New Path| State
-    
-    %% Styling
-    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef ipc fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef watcher fill:#e0f2f1,stroke:#00796b,stroke-width:2px
-    classDef commands fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef cache fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef filesystem fill:#fce4ec,stroke:#c2185b,stroke-width:2px
     
     class ProjectPage,Mount,WatchSetup,EventListener,IncrementalUpdate,State frontend
     class InvokeGetChanged,EventEmit,EventListen ipc
