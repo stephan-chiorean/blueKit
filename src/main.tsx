@@ -12,10 +12,8 @@ if (!rootElement) {
 }
 
 ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <ChakraProvider value={system}>
-      <App />
-      <Toaster />
-    </ChakraProvider>
-  </React.StrictMode>
+  <ChakraProvider value={system}>
+    <App />
+    <Toaster />
+  </ChakraProvider>
 );

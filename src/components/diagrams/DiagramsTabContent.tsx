@@ -16,7 +16,7 @@ import {
   Tag,
 } from '@chakra-ui/react';
 import { LuNetwork, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
@@ -34,21 +34,26 @@ interface DiagramsTabContentProps {
   projectPath: string;
   onViewDiagram: (diagram: ArtifactFile) => void;
   onReload?: () => void;
+  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
+  onConfirmMove?: (oldPath: string, newPath: string) => void;
+  movingArtifacts?: Set<string>;
 }
 
-export default function DiagramsTabContent({
+function DiagramsTabContent({
   diagrams,
   diagramsLoading,
   error,
   projectPath,
   onViewDiagram,
   onReload,
+  onOptimisticMove,
+  onConfirmMove,
+  movingArtifacts = new Set(),
 }: DiagramsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
-  const [folderTree, setFolderTree] = useState<FolderTreeNode[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
@@ -82,16 +87,21 @@ export default function DiagramsTabContent({
       }
     };
 
-    loadFolders();
-  }, [projectPath]);
+    // Debounce folder loading to avoid excessive calls when artifacts update rapidly
+    const timeoutId = setTimeout(() => {
+      loadFolders();
+    }, 100); // 100ms debounce
 
-  // Build folder tree when folders or diagrams change
-  useEffect(() => {
+    return () => clearTimeout(timeoutId);
+  }, [projectPath, diagrams]); // Reload when diagrams change (from file watcher)
+
+  // Build folder tree when folders or diagrams change (memoized for performance)
+  const folderTree = useMemo(() => {
     const tree = buildFolderTree(folders, diagrams, 'diagrams', projectPath);
-    setFolderTree(tree.map(node => ({
+    return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),
-    })));
+    }));
   }, [folders, diagrams, projectPath, expandedFolders]);
 
   // Handle adding selected items to folder
@@ -100,21 +110,52 @@ export default function DiagramsTabContent({
 
     if (selectedDiagrams.length === 0) return;
 
+    const rollbacks: (() => void)[] = [];
+
     try {
-      // Move all selected diagrams to the folder
+      // Optimistically update UI immediately for each item
       for (const item of selectedDiagrams) {
-        if (item.path) {
-          await invokeMoveArtifactToFolder(item.path, folder.path);
+        if (item.path && onOptimisticMove) {
+          const rollback = onOptimisticMove(item.path, folder.path);
+          rollbacks.push(rollback);
         }
       }
 
-      // Clear selection and reload
-      clearSelection();
-      if (onReload) {
-        onReload();
+      // Expand folder so user can see the item being added
+      if (!expandedFolders.has(folder.path)) {
+        setExpandedFolders(prev => new Set(prev).add(folder.path));
       }
+
+      // Move all selected diagrams to the folder (backend operation)
+      for (const item of selectedDiagrams) {
+        if (item.path) {
+          try {
+            const newPath = await invokeMoveArtifactToFolder(item.path, folder.path);
+            // Confirm the move with actual path from backend
+            if (onConfirmMove) {
+              onConfirmMove(item.path, newPath);
+            }
+          } catch (err) {
+            console.error(`Failed to move ${item.path}:`, err);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => selectedDiagrams[idx].path === item.path);
+            if (rollback) rollback();
+            throw err;
+          }
+        }
+      }
+
+      // Don't reload folders here - it causes state mismatch with useDeferredValue
+      // The file watcher will update both artifacts and folders via incremental updates
+      // Optimistic updates already show the correct UI state immediately
+
+      // Clear selection
+      clearSelection();
     } catch (err) {
       console.error('Failed to move artifacts to folder:', err);
+      // Rollback all optimistic updates on error
+      rollbacks.forEach(rollback => rollback());
+      throw err;
     }
   };
 
@@ -173,13 +214,9 @@ export default function DiagramsTabContent({
         description: `Deleted ${deletingFolder.config?.name || deletingFolder.name}`,
       });
 
-      // Reload folders
-      const newFolders = await invokeGetArtifactFolders(projectPath, 'diagrams');
-      setFolders(newFolders);
-
-      if (onReload) {
-        onReload();
-      }
+      // Don't reload folders here - file watcher will update artifacts first,
+      // then the folder reload effect (with diagrams dependency) will sync folders
+      // Reloading now causes state mismatch with useDeferredValue
     } catch (error) {
       console.error('Failed to delete folder:', error);
       toaster.create({
@@ -193,13 +230,9 @@ export default function DiagramsTabContent({
 
   // Handle folder updated (after edit)
   const handleFolderUpdated = async () => {
-    // Reload folders
-    const newFolders = await invokeGetArtifactFolders(projectPath, 'diagrams');
-    setFolders(newFolders);
-
-    if (onReload) {
-      onReload();
-    }
+    // Don't reload folders here - if artifacts moved, file watcher will update them first,
+    // then the folder reload effect (with diagrams dependency) will sync folders
+    // For metadata-only changes (name, color), folders will reload from effect anyway
   };
 
   // Get root-level diagrams (not in folders) - must be before early returns
@@ -323,6 +356,7 @@ export default function DiagramsTabContent({
                       onDelete={handleDeleteFolder}
                       hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
                       renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                      movingArtifacts={movingArtifacts}
                     />
                   </MasonryItem>
                 ))}
@@ -577,6 +611,8 @@ export default function DiagramsTabContent({
         artifactType="diagrams"
         projectPath={projectPath}
         onUpdated={handleFolderUpdated}
+        onOptimisticMove={onOptimisticMove}
+        onConfirmMove={onConfirmMove}
       />
 
       <DeleteFolderDialog
@@ -588,4 +624,17 @@ export default function DiagramsTabContent({
     </Box>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when props actually change
+export default memo(DiagramsTabContent, (prevProps, nextProps) => {
+  return (
+    prevProps.diagrams === nextProps.diagrams &&
+    prevProps.diagramsLoading === nextProps.diagramsLoading &&
+    prevProps.error === nextProps.error &&
+    prevProps.projectPath === nextProps.projectPath &&
+    prevProps.onViewDiagram === nextProps.onViewDiagram &&
+    prevProps.onReload === nextProps.onReload
+  );
+});
 

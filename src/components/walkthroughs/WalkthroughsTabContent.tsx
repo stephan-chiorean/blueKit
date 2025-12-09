@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import {
   Box,
   Card,
@@ -37,11 +37,14 @@ interface WalkthroughsTabContentProps {
   projectPath: string;
   onViewKit: (kit: ArtifactFile) => void;
   onReload?: () => void;
+  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
+  onConfirmMove?: (oldPath: string, newPath: string) => void;
+  movingArtifacts?: Set<string>;
 }
 
 type ViewMode = 'card' | 'table';
 
-export default function WalkthroughsTabContent({
+function WalkthroughsTabContent({
   kits,
   kitsLoading,
   error,
@@ -49,6 +52,9 @@ export default function WalkthroughsTabContent({
   projectPath,
   onViewKit,
   onReload,
+  onOptimisticMove,
+  onConfirmMove,
+  movingArtifacts = new Set(),
 }: WalkthroughsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
@@ -58,7 +64,6 @@ export default function WalkthroughsTabContent({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
-  const [folderTree, setFolderTree] = useState<FolderTreeNode[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
@@ -121,25 +126,42 @@ export default function WalkthroughsTabContent({
 
   // Load folders from backend
   useEffect(() => {
+    console.log('[WalkthroughFolders] 🎯 Effect triggered - walkthroughs count:', walkthroughs.length);
+    console.log('[WalkthroughFolders] 📝 Walkthrough paths:', walkthroughs.map(w => w.path));
+
     const loadFolders = async () => {
       try {
+        console.log('[WalkthroughFolders] 🔍 Fetching folders from backend...');
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
+        console.log('[WalkthroughFolders] ✅ Received', loadedFolders.length, 'folders');
+        console.log('[WalkthroughFolders] 📁 Folder paths:', loadedFolders.map(f => f.path));
         setFolders(loadedFolders);
+        console.log('[WalkthroughFolders] 💾 Folders state updated');
       } catch (err) {
-        console.error('Failed to load folders:', err);
+        console.error('[WalkthroughFolders] ❌ Failed to load folders:', err);
       }
     };
 
-    loadFolders();
-  }, [projectPath]);
+    // Debounce folder loading to avoid excessive calls when artifacts update rapidly
+    console.log('[WalkthroughFolders] ⏱️ Starting 100ms debounce timer...');
+    const timeoutId = setTimeout(() => {
+      console.log('[WalkthroughFolders] ⏰ Debounce complete, loading folders now');
+      loadFolders();
+    }, 100); // 100ms debounce
 
-  // Build folder tree when folders or walkthroughs change
-  useEffect(() => {
+    return () => {
+      console.log('[WalkthroughFolders] 🧹 Cleanup - canceling debounce timer');
+      clearTimeout(timeoutId);
+    };
+  }, [projectPath, walkthroughs]); // Reload when walkthroughs change (from file watcher)
+
+  // Build folder tree when folders or walkthroughs change (memoized for performance)
+  const folderTree = useMemo(() => {
     const tree = buildFolderTree(folders, filteredWalkthroughs, 'walkthroughs', projectPath);
-    setFolderTree(tree.map(node => ({
+    return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),
-    })));
+    }));
   }, [folders, filteredWalkthroughs, projectPath, expandedFolders]);
 
   const handleViewWalkthrough = (walkthrough: ArtifactFile) => {
@@ -152,21 +174,52 @@ export default function WalkthroughsTabContent({
 
     if (selectedWalkthroughs.length === 0) return;
 
+    const rollbacks: (() => void)[] = [];
+
     try {
-      // Move all selected walkthroughs to the folder
+      // Optimistically update UI immediately for each item
       for (const item of selectedWalkthroughs) {
-        if (item.path) {
-          await invokeMoveArtifactToFolder(item.path, folder.path);
+        if (item.path && onOptimisticMove) {
+          const rollback = onOptimisticMove(item.path, folder.path);
+          rollbacks.push(rollback);
         }
       }
 
-      // Clear selection and reload
-      clearSelection();
-      if (onReload) {
-        onReload();
+      // Expand folder so user can see the item being added
+      if (!expandedFolders.has(folder.path)) {
+        setExpandedFolders(prev => new Set(prev).add(folder.path));
       }
+
+      // Move all selected walkthroughs to the folder (backend operation)
+      for (const item of selectedWalkthroughs) {
+        if (item.path) {
+          try {
+            const newPath = await invokeMoveArtifactToFolder(item.path, folder.path);
+            // Confirm the move with actual path from backend
+            if (onConfirmMove) {
+              onConfirmMove(item.path, newPath);
+            }
+          } catch (err) {
+            console.error(`Failed to move ${item.path}:`, err);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => selectedWalkthroughs[idx].path === item.path);
+            if (rollback) rollback();
+            throw err;
+          }
+        }
+      }
+
+      // Don't reload folders here - it causes state mismatch with useDeferredValue
+      // The file watcher will update both artifacts and folders via incremental updates
+      // Optimistic updates already show the correct UI state immediately
+
+      // Clear selection
+      clearSelection();
     } catch (err) {
       console.error('Failed to move artifacts to folder:', err);
+      // Rollback all optimistic updates on error
+      rollbacks.forEach(rollback => rollback());
+      throw err;
     }
   };
 
@@ -225,13 +278,9 @@ export default function WalkthroughsTabContent({
         description: `Deleted ${deletingFolder.config?.name || deletingFolder.name}`,
       });
 
-      // Reload folders
-      const newFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
-      setFolders(newFolders);
-
-      if (onReload) {
-        onReload();
-      }
+      // Don't reload folders here - file watcher will update artifacts first,
+      // then the folder reload effect (with walkthroughs dependency) will sync folders
+      // Reloading now causes state mismatch with useDeferredValue
     } catch (error) {
       console.error('Failed to delete folder:', error);
       toaster.create({
@@ -245,13 +294,9 @@ export default function WalkthroughsTabContent({
 
   // Handle folder updated (after edit)
   const handleFolderUpdated = async () => {
-    // Reload folders
-    const newFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
-    setFolders(newFolders);
-
-    if (onReload) {
-      onReload();
-    }
+    // Don't reload folders here - if artifacts moved, file watcher will update them first,
+    // then the folder reload effect (with walkthroughs dependency) will sync folders
+    // For metadata-only changes (name, color), folders will reload from effect anyway
   };
 
   // Ref for filter button (used by FilterPanel for click-outside detection)
@@ -523,17 +568,18 @@ export default function WalkthroughsTabContent({
             <MasonryLayout columnCount={3}>
               {folderTree.map((node) => (
                 <MasonryItem key={node.folder.path}>
-                  <FolderCard
-                    node={node}
-                    artifactType="walkthroughs"
-                    onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                    onViewArtifact={handleViewWalkthrough}
-                    onAddToFolder={handleAddToFolder}
-                    onEdit={handleEditFolder}
-                    onDelete={handleDeleteFolder}
-                    hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
-                    renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                  />
+                    <FolderCard
+                      node={node}
+                      artifactType="walkthroughs"
+                      onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                      onViewArtifact={handleViewWalkthrough}
+                      onAddToFolder={handleAddToFolder}
+                      onEdit={handleEditFolder}
+                      onDelete={handleDeleteFolder}
+                      hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
+                      renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                      movingArtifacts={movingArtifacts}
+                    />
                 </MasonryItem>
               ))}
             </MasonryLayout>
@@ -770,6 +816,8 @@ export default function WalkthroughsTabContent({
         artifactType="walkthroughs"
         projectPath={projectPath}
         onUpdated={handleFolderUpdated}
+        onOptimisticMove={onOptimisticMove}
+        onConfirmMove={onConfirmMove}
       />
 
       <DeleteFolderDialog
@@ -781,6 +829,20 @@ export default function WalkthroughsTabContent({
     </Box>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when props actually change
+export default memo(WalkthroughsTabContent, (prevProps, nextProps) => {
+  return (
+    prevProps.kits === nextProps.kits &&
+    prevProps.kitsLoading === nextProps.kitsLoading &&
+    prevProps.error === nextProps.error &&
+    prevProps.projectsCount === nextProps.projectsCount &&
+    prevProps.projectPath === nextProps.projectPath &&
+    prevProps.onViewKit === nextProps.onViewKit &&
+    prevProps.onReload === nextProps.onReload
+  );
+});
 
 
 

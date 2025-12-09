@@ -30,13 +30,12 @@ import TasksTabContent, {
 import {
   invokeGetProjectRegistry,
   invokeGetProjectArtifacts,
+  invokeGetChangedArtifacts,
   invokeWatchProjectArtifacts,
-  invokeReadFile,
   ArtifactFile,
   ProjectEntry,
   TimeoutError,
 } from "../ipc";
-import { parseFrontMatter } from "../utils/parseFrontMatter";
 import { useSelection } from "../contexts/SelectionContext";
 import { Collection } from "../components/collections/AddCollectionDialog";
 
@@ -164,22 +163,12 @@ export default function HomePage({
         kitsMap.set(kit.path, kit);
       });
 
-      // Read file contents and parse front matter for each kit
-      const kitsWithFrontMatter = await Promise.all(
-        Array.from(kitsMap.values()).map(async (kit) => {
-          try {
-            const content = await invokeReadFile(kit.path);
-            const frontMatter = parseFrontMatter(content);
-            return {
-              ...kit,
-              frontMatter,
-            };
-          } catch (err) {
-            console.error(`Error reading kit file ${kit.path}:`, err);
-            return kit; // Return kit without front matter if read fails
-          }
-        })
-      );
+      // Artifacts already have content and frontMatter from backend
+      // Map front_matter to frontMatter for TypeScript compatibility
+      const kitsWithFrontMatter = Array.from(kitsMap.values()).map(kit => ({
+        ...kit,
+        frontMatter: kit.frontMatter, // Already parsed by backend
+      }));
 
       setKits(kitsWithFrontMatter);
     } catch (err) {
@@ -219,6 +208,45 @@ export default function HomePage({
     loadAllKits();
   }, [projects]);
 
+  // Incremental update for HomePage - handles multiple projects
+  const updateKitsIncremental = async (changedPaths: string[], projectPath: string) => {
+    if (changedPaths.length === 0) {
+      return;
+    }
+
+    try {
+      const changedArtifacts = await invokeGetChangedArtifacts(projectPath, changedPaths);
+
+      // Map front_matter to frontMatter for TypeScript compatibility
+      const artifactsWithFrontMatter = changedArtifacts.map((artifact: ArtifactFile) => ({
+        ...artifact,
+        frontMatter: artifact.frontMatter, // Already parsed by backend
+      }));
+
+      // Update kits - merge changed artifacts
+      setKits(prev => {
+        const updated = new Map(prev.map((kit: ArtifactFile) => [kit.path, kit]));
+        
+        artifactsWithFrontMatter.forEach((artifact: ArtifactFile) => {
+          updated.set(artifact.path, artifact);
+        });
+
+        // Remove artifacts that were deleted
+        changedPaths.forEach((path: string) => {
+          if (!artifactsWithFrontMatter.some((a: ArtifactFile) => a.path === path)) {
+            updated.delete(path);
+          }
+        });
+
+        return Array.from(updated.values());
+      });
+    } catch (err) {
+      console.error('Error updating kits incrementally:', err);
+      // Fallback to full reload on error
+      loadAllKits();
+    }
+  };
+
   // Set up file watchers for all projects
   useEffect(() => {
     if (projects.length === 0) return;
@@ -240,15 +268,21 @@ export default function HomePage({
             .replace(/:/g, "_")
             .replace(/\./g, "_")
             .replace(/ /g, "_");
-          const eventName = `project-kits-changed-${sanitizedPath}`;
+          const eventName = `project-artifacts-changed-${sanitizedPath}`;
 
-          // Listen for file change events
-          const unlisten = await listen(eventName, () => {
+          // Listen for file change events - receive changed file paths
+          const unlisten = await listen<string[]>(eventName, (event) => {
             if (isMounted) {
+              const changedPaths = event.payload;
               console.log(
-                `Kits directory changed for ${project.path}, reloading...`
+                `Kits directory changed for ${project.path}, ${changedPaths.length} files changed`
               );
-              loadAllKits();
+              if (changedPaths.length > 0) {
+                updateKitsIncremental(changedPaths, project.path);
+              } else {
+                // If no paths provided, fallback to full reload
+                loadAllKits();
+              }
             }
           });
 

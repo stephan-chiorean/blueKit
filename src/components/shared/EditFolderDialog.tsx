@@ -29,6 +29,8 @@ interface EditFolderDialogProps {
   artifactType: 'kits' | 'walkthroughs' | 'diagrams';
   projectPath: string;
   onUpdated?: () => void;
+  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
+  onConfirmMove?: (oldPath: string, newPath: string) => void;
 }
 
 /**
@@ -50,6 +52,8 @@ export default function EditFolderDialog({
   artifactType,
   projectPath,
   onUpdated,
+  onOptimisticMove,
+  onConfirmMove,
 }: EditFolderDialogProps) {
   const [alias, setAlias] = useState('');
   const [description, setDescription] = useState('');
@@ -125,13 +129,29 @@ export default function EditFolderDialog({
       if (removingArtifacts.size > 0) {
         // Move artifacts back to the artifact type root directory
         const artifactTypeRoot = `${projectPath}/.bluekit/${artifactType}`;
+        const rollbacks: (() => void)[] = [];
 
+        // Optimistically update UI immediately for each removed artifact
+        for (const artifactPath of removingArtifacts) {
+          if (onOptimisticMove) {
+            const rollback = onOptimisticMove(artifactPath, artifactTypeRoot);
+            rollbacks.push(rollback);
+          }
+        }
+
+        // Move artifacts back to artifact type root directory
         for (const artifactPath of removingArtifacts) {
           try {
-            // Move artifact back to artifact type root directory
-            await invokeMoveArtifactToFolder(artifactPath, artifactTypeRoot);
+            const newPath = await invokeMoveArtifactToFolder(artifactPath, artifactTypeRoot);
+            // Confirm the move with actual path from backend
+            if (onConfirmMove) {
+              onConfirmMove(artifactPath, newPath);
+            }
           } catch (error) {
             console.error(`Failed to remove artifact ${artifactPath}:`, error);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => Array.from(removingArtifacts)[idx] === artifactPath);
+            if (rollback) rollback();
             toaster.create({
               type: 'error',
               title: 'Failed to remove artifact',

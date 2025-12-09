@@ -1,0 +1,120 @@
+---
+alias: Incremental Update System Architecture
+description: Complete architecture of the incremental update system showing file watching, cache invalidation, IPC communication, and frontend state synchronization flow
+tags:
+  - architecture
+  - file-watcher
+  - incremental-updates
+  - cache
+  - ipc
+---
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (React + TypeScript)"]
+        ProjectPage[ProjectDetailPage.tsx]
+        Mount["1. Mount: loadProjectArtifacts<br/>Full scan of .bluekit/"]
+        WatchSetup["2. Setup: watch_project_artifacts<br/>Starts file watcher"]
+        EventListener["3. Event Listener<br/>listen: project-artifacts-changed"]
+        IncrementalUpdate["4. updateArtifactsIncremental<br/>Merges changes into state"]
+        State["Artifacts State<br/>Map: path to artifact"]
+        
+        ProjectPage -->|On Mount| Mount
+        ProjectPage -->|Setup Watcher| WatchSetup
+        EventListener -->|Receives Events| IncrementalUpdate
+        IncrementalUpdate -->|Updates| State
+    end
+    
+    subgraph IPC_Layer["Tauri IPC Layer"]
+        InvokeGetChanged["invokeGetChangedArtifacts<br/>Type-safe wrapper"]
+        EventEmit["emit: project-artifacts-changed<br/>Event system"]
+        EventListen["listen: project-artifacts-changed<br/>Event listener"]
+    end
+    
+    subgraph Backend["Backend (Rust)"]
+        subgraph WatcherModule["watcher.rs - File System Watcher"]
+            NotifyCrate["notify crate<br/>OS-level file watching"]
+            Debounce["300ms Debounce Window<br/>Batches rapid changes"]
+            Dedupe["HashSet Deduplication<br/>Removes duplicate paths"]
+            EmitEvent["Emit: project-artifacts-changed<br/>Vec of String paths"]
+        end
+        
+        subgraph CommandsModule["commands.rs - IPC Handlers"]
+            GetChanged["get_changed_artifacts<br/>path, changed_paths"]
+            InvalidateCache["Force Cache Invalidation<br/>cache.invalidate path"]
+            ReadFile["Re-read File Content<br/>cache.get_or_read"]
+            ParseFrontMatter["Parse YAML Front Matter<br/>Extract metadata"]
+            ReturnArtifacts["Return ArtifactFile array<br/>With new path"]
+        end
+        
+        subgraph CacheModule["cache.rs - ArtifactCache"]
+            CacheStore["Cache Storage<br/>path to content, mod_time"]
+            Invalidate["invalidate path<br/>Removes cache entry"]
+            GetOrRead["get_or_read path<br/>Reads if missing/changed"]
+            GetIfUnchanged["get_if_unchanged path<br/>Check mod time"]
+        end
+    end
+    
+    subgraph FileSystem["File System"]
+        BluekitDir[".bluekit/ Directory"]
+        FileMove["File Move Operation<br/>old_path to new_path"]
+        FileDelete["File Delete<br/>old_path removed"]
+        FileCreate["File Create<br/>new_path created"]
+        ConfigUpdate["config.json Update<br/>Folder metadata"]
+    end
+    
+    %% Frontend to IPC
+    WatchSetup -->|invoke| InvokeGetChanged
+    EventListen -->|Receives| EventEmit
+    
+    %% IPC to Backend
+    InvokeGetChanged -->|Calls| GetChanged
+    EventEmit -->|Emits| EmitEvent
+    
+    %% Watcher Flow
+    FileSystem -->|File Changes| NotifyCrate
+    NotifyCrate -->|Raw Events| Debounce
+    Debounce -->|Batched Events| Dedupe
+    Dedupe -->|Unique Paths| EmitEvent
+    EmitEvent -->|Event| EventEmit
+    
+    %% Commands Flow
+    GetChanged -->|For Each Path| InvalidateCache
+    InvalidateCache -->|Calls| Invalidate
+    Invalidate -->|Removes| CacheStore
+    GetChanged -->|After Invalidate| ReadFile
+    ReadFile -->|Calls| GetOrRead
+    GetOrRead -->|Reads| BluekitDir
+    GetOrRead -->|Returns| ParseFrontMatter
+    ParseFrontMatter -->|Creates| ReturnArtifacts
+    ReturnArtifacts -->|Returns| InvokeGetChanged
+    
+    %% File System Operations
+    FileMove --> FileDelete
+    FileMove --> FileCreate
+    FileMove --> ConfigUpdate
+    FileDelete --> BluekitDir
+    FileCreate --> BluekitDir
+    ConfigUpdate --> BluekitDir
+    
+    %% Frontend State Update Flow
+    IncrementalUpdate -->|Calls| InvokeGetChanged
+    InvokeGetChanged -->|Receives| ReturnArtifacts
+    IncrementalUpdate -->|Detects Moves| State
+    IncrementalUpdate -->|Removes Old Path| State
+    IncrementalUpdate -->|Adds New Path| State
+    
+    %% Styling
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef ipc fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef watcher fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef commands fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef cache fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef filesystem fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    
+    class ProjectPage,Mount,WatchSetup,EventListener,IncrementalUpdate,State frontend
+    class InvokeGetChanged,EventEmit,EventListen ipc
+    class NotifyCrate,Debounce,Dedupe,EmitEvent watcher
+    class GetChanged,InvalidateCache,ReadFile,ParseFrontMatter,ReturnArtifacts commands
+    class CacheStore,Invalidate,GetOrRead,GetIfUnchanged cache
+    class BluekitDir,FileMove,FileDelete,FileCreate,ConfigUpdate filesystem
+```

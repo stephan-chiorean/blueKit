@@ -53,6 +53,8 @@ export interface ArtifactFile {
   name: string;
   /** Full path to the artifact file */
   path: string;
+  /** File content (optional - populated when using cache) */
+  content?: string;
   /** Parsed YAML front matter */
   frontMatter?: KitFrontMatter;
 }
@@ -439,6 +441,35 @@ export async function invokeExampleError(shouldFail: boolean): Promise<string> {
  */
 export async function invokeGetProjectArtifacts(projectPath: string): Promise<ArtifactFile[]> {
   return await invokeWithTimeout<ArtifactFile[]>('get_project_artifacts', { projectPath });
+}
+
+/**
+ * Gets only changed artifacts based on file paths (incremental updates).
+ *
+ * This command is used when the file watcher detects changes - it returns
+ * only those artifacts that have actually changed, with content and frontMatter
+ * already populated from the backend cache.
+ *
+ * @param projectPath - The path to the project root directory
+ * @param changedPaths - Array of file paths that were detected as changed
+ * @returns A promise that resolves to an array of changed ArtifactFile objects
+ *
+ * @example
+ * ```typescript
+ * const changedArtifacts = await invokeGetChangedArtifacts(
+ *   '/path/to/project',
+ *   ['/path/to/project/.bluekit/kits/new-kit.md']
+ * );
+ * ```
+ */
+export async function invokeGetChangedArtifacts(
+  projectPath: string,
+  changedPaths: string[]
+): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_changed_artifacts', {
+    projectPath,
+    changedPaths,
+  });
 }
 
 /**

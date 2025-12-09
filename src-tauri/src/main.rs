@@ -4,6 +4,7 @@
 
 // Module declarations: tell Rust about other modules in this crate
 // These must match the file names in the `src/` directory
+mod cache;    // File content caching
 mod commands; // IPC command handlers
 mod db;       // Database layer (SeaORM + SQLite)
 mod state;    // Application state management
@@ -29,7 +30,7 @@ use tauri::Manager;
 async fn main() {
     // Initialize structured logging
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::DEBUG) // Changed from INFO to DEBUG for file watcher debugging
         .with_target(false)
         .init();
 
@@ -48,6 +49,7 @@ async fn main() {
             commands::get_app_info,      // Returns app metadata
             commands::example_error,      // Demonstrates error handling
             commands::get_project_artifacts,  // Get all artifacts from .bluekit directory
+            commands::get_changed_artifacts, // Get only changed artifacts (incremental updates)
             commands::get_project_registry, // Get projects from registry
             commands::watch_project_artifacts, // Watch project .bluekit directory for artifact changes
             commands::read_file,        // Read file contents
@@ -98,6 +100,10 @@ async fn main() {
                 .expect("Failed to initialize database");
 
             app.manage(db);
+
+            // Initialize and register artifact cache
+            use crate::cache::ArtifactCache;
+            app.manage(ArtifactCache::new());
 
             // Set up file watcher for project registry
             let app_handle = app.handle();

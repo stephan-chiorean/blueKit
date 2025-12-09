@@ -48,7 +48,7 @@ static WATCHER_REGISTRY: once_cell::sync::Lazy<Arc<RwLock<HashMap<String, Watche
 /// Debouncer state - tracks recent file events to batch them
 struct DebouncerState {
     last_event_time: Instant,
-    pending_paths: Vec<PathBuf>,
+    pending_paths: std::collections::HashSet<PathBuf>, // Changed from Vec to HashSet for automatic deduplication
 }
 
 /// Checks if a file extension matches watched types
@@ -126,7 +126,7 @@ pub fn watch_file(
 
         let mut debounce_state = DebouncerState {
             last_event_time: Instant::now(),
-            pending_paths: Vec::new(),
+            pending_paths: std::collections::HashSet::new(), // HashSet for automatic deduplication
         };
 
         info!("File watcher started for: {}", event_name_for_task);
@@ -143,8 +143,8 @@ pub fn watch_file(
                                     .map(|n| n == file_name)
                                     .unwrap_or(false)
                             }) {
-                                // Debounce: collect events
-                                debounce_state.pending_paths.push(path.clone());
+                                // Debounce: collect events (insert deduplicates automatically)
+                                debounce_state.pending_paths.insert(path.clone());
                                 debounce_state.last_event_time = Instant::now();
                             }
                         }
@@ -253,7 +253,7 @@ fn start_directory_watcher_with_recovery(
 
         let mut debounce_state = DebouncerState {
             last_event_time: Instant::now(),
-            pending_paths: Vec::new(),
+            pending_paths: std::collections::HashSet::new(), // HashSet for automatic deduplication
         };
 
         let mut consecutive_errors = 0u32;
@@ -284,7 +284,7 @@ fn start_directory_watcher_with_recovery(
 
                             if has_relevant_change {
                                 for path in &event.paths {
-                                    debounce_state.pending_paths.push(path.clone());
+                                    debounce_state.pending_paths.insert(path.clone()); // Insert into HashSet (auto-deduplicates)
                                 }
                                 debounce_state.last_event_time = Instant::now();
                             }
@@ -317,7 +317,25 @@ fn start_directory_watcher_with_recovery(
                         debug!("Debounced {} directory changes, emitting event",
                             debounce_state.pending_paths.len());
 
-                        if let Err(e) = app_handle.emit_all(&event_name_for_task, ()) {
+                        // Filter to only watched file types and convert to strings
+                        let changed_paths: Vec<String> = debounce_state.pending_paths
+                            .iter()
+                            .filter(|p| {
+                                if is_watched_file(p) {
+                                    // For JSON files, only watch specific ones
+                                    if p.extension().and_then(|e| e.to_str()) == Some("json") {
+                                        is_watched_json(p)
+                                    } else {
+                                        true // All .md, .mmd, .mermaid files
+                                    }
+                                } else {
+                                    false
+                                }
+                            })
+                            .map(|p| p.to_string_lossy().to_string())
+                            .collect();
+
+                        if let Err(e) = app_handle.emit_all(&event_name_for_task, changed_paths) {
                             error!("Failed to emit directory change event: {}", e);
                         }
 

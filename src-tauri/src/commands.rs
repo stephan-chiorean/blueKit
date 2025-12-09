@@ -14,6 +14,34 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::env;
 use tauri::{AppHandle, State};
+use crate::cache::ArtifactCache;
+
+/// Parses YAML front matter from markdown content.
+///
+/// Extracts YAML between `---` delimiters at the start of the file.
+/// Returns `None` if no front matter is found or if parsing fails.
+fn parse_front_matter(content: &str) -> Option<serde_yaml::Value> {
+    if !content.trim_start().starts_with("---") {
+        return None;
+    }
+
+    let start_pos = content.find("---")?;
+    let after_first_delim = start_pos + 3;
+    
+    // Find the closing "---" (must be on its own line)
+    if let Some(end_pos) = content[after_first_delim..].find("\n---") {
+        let front_matter_str = content[after_first_delim..after_first_delim + end_pos].trim();
+        
+        if front_matter_str.is_empty() {
+            return None;
+        }
+
+        // Parse YAML front matter
+        serde_yaml::from_str(front_matter_str).ok()
+    } else {
+        None
+    }
+}
 
 /// Response structure for the `get_app_info` command.
 /// 
@@ -147,6 +175,12 @@ pub struct ArtifactFile {
     pub name: String,
     /// Full path to the artifact file
     pub path: String,
+    /// File content (optional - populated when using cache)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Parsed YAML front matter (optional - populated when using cache)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "frontMatter")]
+    pub front_matter: Option<serde_yaml::Value>,
 }
 
 /// Folder group structure for organizing resources within a folder.
@@ -296,7 +330,10 @@ pub struct BlueprintTask {
 /// - `Ok(Vec<ArtifactFile>)` - Success case with list of all artifact files
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
-pub async fn get_project_artifacts(project_path: String) -> Result<Vec<ArtifactFile>, String> {
+pub async fn get_project_artifacts(
+    project_path: String,
+    cache: State<'_, ArtifactCache>,
+) -> Result<Vec<ArtifactFile>, String> {
     // Construct the path to .bluekit directory
     let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
 
@@ -305,11 +342,11 @@ pub async fn get_project_artifacts(project_path: String) -> Result<Vec<ArtifactF
         return Ok(Vec::new()); // Return empty vector if directory doesn't exist
     }
 
-    let mut artifacts = Vec::new();
+    let mut artifact_paths = Vec::new();
 
     // Helper function to read artifact files from a directory recursively
     // Scans for: .md (markdown), .mmd (mermaid), .mermaid (mermaid)
-    fn read_artifact_files_from_dir(dir_path: &PathBuf, artifacts: &mut Vec<ArtifactFile>) -> Result<(), String> {
+    fn read_artifact_files_from_dir(dir_path: &PathBuf, artifact_paths: &mut Vec<PathBuf>) -> Result<(), String> {
         use std::fs;
 
         if !dir_path.exists() {
@@ -328,28 +365,12 @@ pub async fn get_project_artifacts(project_path: String) -> Result<Vec<ArtifactF
                     let ext_str = extension.to_str().unwrap_or("");
                     // Include markdown files (.md) and diagram files (.mmd, .mermaid)
                     if ext_str == "md" || ext_str == "mmd" || ext_str == "mermaid" {
-                        // Get the file name without extension
-                        let name = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("")
-                            .to_string();
-
-                        // Get the full path as a string
-                        let path_str = path
-                            .to_str()
-                            .ok_or_else(|| "Invalid path encoding".to_string())?
-                            .to_string();
-
-                        artifacts.push(ArtifactFile {
-                            name,
-                            path: path_str,
-                        });
+                        artifact_paths.push(path);
                     }
                 }
             } else if path.is_dir() {
                 // Recursively read subdirectories
-                read_artifact_files_from_dir(&path, artifacts)?;
+                read_artifact_files_from_dir(&path, artifact_paths)?;
             }
         }
 
@@ -358,19 +379,138 @@ pub async fn get_project_artifacts(project_path: String) -> Result<Vec<ArtifactF
 
     // Read from subdirectories: kits, walkthroughs, agents, tasks, and diagrams
     let kits_dir = bluekit_path.join("kits");
-    read_artifact_files_from_dir(&kits_dir, &mut artifacts)?;
+    read_artifact_files_from_dir(&kits_dir, &mut artifact_paths)?;
 
     let walkthroughs_dir = bluekit_path.join("walkthroughs");
-    read_artifact_files_from_dir(&walkthroughs_dir, &mut artifacts)?;
+    read_artifact_files_from_dir(&walkthroughs_dir, &mut artifact_paths)?;
 
     let agents_dir = bluekit_path.join("agents");
-    read_artifact_files_from_dir(&agents_dir, &mut artifacts)?;
+    read_artifact_files_from_dir(&agents_dir, &mut artifact_paths)?;
 
     let tasks_dir = bluekit_path.join("tasks");
-    read_artifact_files_from_dir(&tasks_dir, &mut artifacts)?;
+    read_artifact_files_from_dir(&tasks_dir, &mut artifact_paths)?;
 
     let diagrams_dir = bluekit_path.join("diagrams");
-    read_artifact_files_from_dir(&diagrams_dir, &mut artifacts)?;
+    read_artifact_files_from_dir(&diagrams_dir, &mut artifact_paths)?;
+
+    // Read file contents using cache and parse front matter
+    let mut artifacts = Vec::new();
+    for path in artifact_paths {
+        // Get file name without extension
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Get full path as string
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| "Invalid path encoding".to_string())?
+            .to_string();
+
+        // Read content from cache
+        match cache.get_or_read(&path).await {
+            Ok(content) => {
+                // Parse front matter
+                let front_matter = parse_front_matter(&content);
+                
+                artifacts.push(ArtifactFile {
+                    name,
+                    path: path_str,
+                    content: Some(content),
+                    front_matter,
+                });
+            }
+            Err(e) => {
+                // If reading fails, still return the artifact without content
+                // This maintains backward compatibility
+                tracing::warn!("Failed to read file {}: {}", path.display(), e);
+                artifacts.push(ArtifactFile {
+                    name,
+                    path: path_str,
+                    content: None,
+                    front_matter: None,
+                });
+            }
+        }
+    }
+
+    Ok(artifacts)
+}
+
+/// Gets only changed artifacts based on file paths.
+///
+/// This command is used for incremental updates - when the file watcher
+/// detects changes, it sends the changed file paths, and this command
+/// returns only those artifacts that have actually changed (based on
+/// modification time comparison with cache).
+///
+/// # Arguments
+///
+/// * `project_path` - The path to the project root directory
+/// * `changed_paths` - Vector of file paths that were detected as changed
+///
+/// # Returns
+///
+/// A `Result<Vec<ArtifactFile>, String>` containing only changed artifacts
+/// with content and front_matter populated.
+#[tauri::command]
+pub async fn get_changed_artifacts(
+    _project_path: String,
+    changed_paths: Vec<String>,
+    cache: State<'_, ArtifactCache>,
+) -> Result<Vec<ArtifactFile>, String> {
+    let mut artifacts = Vec::new();
+
+    for path_str in changed_paths {
+        let path = PathBuf::from(&path_str);
+
+        // Skip if file doesn't exist (might have been deleted)
+        if !path.exists() {
+            // Invalidate cache entry for deleted file
+            cache.invalidate(&path).await;
+            tracing::debug!("File deleted or moved: {}", path.display());
+            continue;
+        }
+
+        // ALWAYS invalidate cache for changed paths to force re-read
+        // This ensures moved files are properly detected even if mod time unchanged
+        cache.invalidate(&path).await;
+
+        // Get file name without extension
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Read content from cache (will read from disk after invalidation)
+        match cache.get_or_read(&path).await {
+            Ok(content) => {
+                // Parse front matter
+                let front_matter = parse_front_matter(&content);
+
+                tracing::debug!("Re-read changed file: {} (name: {})", path.display(), name);
+                artifacts.push(ArtifactFile {
+                    name,
+                    path: path_str,
+                    content: Some(content),
+                    front_matter,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("Failed to read changed file {}: {}", path.display(), e);
+                // Still return artifact without content for error handling
+                artifacts.push(ArtifactFile {
+                    name,
+                    path: path_str,
+                    content: None,
+                    front_matter: None,
+                });
+            }
+        }
+    }
 
     Ok(artifacts)
 }
@@ -1110,6 +1250,8 @@ pub async fn get_folder_markdown_files(folder_path: String) -> Result<Vec<Artifa
                     files.push(ArtifactFile {
                         name,
                         path: path_str,
+                        content: None,
+                        front_matter: None,
                     });
                 }
             }
@@ -1192,6 +1334,8 @@ pub async fn get_plans_files(source: String) -> Result<Vec<ArtifactFile>, String
                     files.push(ArtifactFile {
                         name,
                         path: path_str,
+                        content: None,
+                        front_matter: None,
                     });
                 }
             }
@@ -1376,6 +1520,8 @@ pub async fn get_project_diagrams(project_path: String) -> Result<Vec<ArtifactFi
                         diagrams.push(ArtifactFile {
                             name,
                             path: path_str,
+                            content: None,
+                            front_matter: None,
                         });
                     }
                 }

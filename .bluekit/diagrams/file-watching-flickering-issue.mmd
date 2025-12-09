@@ -1,0 +1,205 @@
+---
+alias: File Watching Flickering Issue
+description: Diagram showing how file watching mechanisms cause multiple re-renders and UI flickering when new kits are loaded or resources are added to folders, illustrating the 3-4 flicker problem
+tags:
+  - architecture
+  - file-watching
+  - rendering
+  - performance
+  - debugging
+---
+```mermaid
+sequenceDiagram
+    participant FS as File System
+    participant RW as Rust Watcher<br/>(300ms debounce)
+    participant TE as Tauri Event<br/>Emission
+    participant FE as Frontend<br/>Event Listener
+    participant FD as Frontend<br/>Debouncer<br/>(200ms)
+    participant State as React State<br/>Updates
+    participant Memo as useMemo<br/>Recalculations
+    participant Comp as Components<br/>Re-renders
+
+    Note over FS,Comp: SCENARIO: New Kit Added or Resource Moved to Folder
+
+    %% Initial file system events
+    FS->>FS: File Created Event #1
+    FS->>FS: File Modified Event #2
+    FS->>FS: Directory Changed Event #3
+    Note over FS: Multiple events for<br/>single operation
+
+    %% Rust watcher processing
+    FS->>RW: Event #1 Received
+    FS->>RW: Event #2 Received (within 300ms)
+    FS->>RW: Event #3 Received (within 300ms)
+    
+    RW->>RW: Debounce Timer Starts<br/>(300ms window)
+    Note over RW: Collects all events<br/>in 300ms window
+    
+    RW->>TE: Emit "project-artifacts-changed-{path}"<br/>(after 300ms quiet period)
+    
+    %% Frontend receives event
+    TE->>FE: Tauri Event Received
+    
+    FE->>FD: Trigger debouncedLoadArtifacts()
+    Note over FD: Additional 200ms debounce<br/>(on top of 300ms)
+    
+    FD->>State: setArtifactsLoading(true)
+    Note over State: RENDER #1: Loading state<br/>causes first flicker
+    
+    State->>Comp: Re-render with loading=true
+    Comp->>Comp: ProjectDetailPage re-renders
+    Comp->>Comp: KitsTabContent re-renders
+    Comp->>Comp: WalkthroughsTabContent re-renders
+    Comp->>Comp: All tab components re-render
+    
+    %% Data loading
+    FD->>State: invokeGetProjectArtifacts()
+    State->>State: Promise.all([<br/>  invokeReadFile(kit1),<br/>  invokeReadFile(kit2),<br/>  ...<br/>])
+    
+    Note over State: Multiple async file reads<br/>for each artifact
+    
+    State->>State: parseFrontMatter() for each
+    State->>State: setArtifacts(newData)
+    Note over State: RENDER #2: New data<br/>causes second flicker
+    
+    State->>Memo: artifacts dependency changed
+    Memo->>Memo: Recalculate kitsOnly
+    Memo->>Memo: Recalculate walkthroughs
+    Memo->>Memo: Recalculate agents
+    Memo->>Memo: Recalculate diagrams
+    Memo->>Memo: Recalculate folderTree
+    
+    Memo->>Comp: New filtered arrays
+    Comp->>Comp: ProjectDetailPage re-renders
+    Comp->>Comp: KitsTabContent re-renders<br/>(receives new kits prop)
+    Comp->>Comp: WalkthroughsTabContent re-renders
+    Comp->>Comp: All tab components re-render
+    
+    State->>State: setArtifactsLoading(false)
+    Note over State: RENDER #3: Loading=false<br/>causes third flicker
+    
+    State->>Comp: Final state update
+    Comp->>Comp: ProjectDetailPage re-renders
+    Comp->>Comp: All tab components re-render
+    
+    Note over FS,Comp: PROBLEM: 3-4 separate renders<br/>for single file operation
+    
+    rect rgb(255, 200, 200)
+        Note over State,Comp: FLICKERING CAUSES:<br/>1. Loading state change (render #1)<br/>2. Data state change (render #2)<br/>3. Loading=false change (render #3)<br/>4. useMemo recalculations trigger<br/>   additional component updates
+    end
+```
+
+```mermaid
+graph TB
+    subgraph "FILE SYSTEM OPERATION"
+        FS1[File Created]
+        FS2[File Modified]
+        FS3[Directory Changed]
+        FS4[Config.json Updated]
+        
+        FS1 --> Events
+        FS2 --> Events
+        FS3 --> Events
+        FS4 --> Events
+        
+        Events[Multiple FS Events<br/>for Single Operation]
+    end
+    
+    subgraph "RUST BACKEND (watcher.rs)"
+        RW[Directory Watcher<br/>RecursiveMode::Recursive]
+        Debounce[Debouncer State<br/>300ms window]
+        Emit[Tauri Event Emit<br/>project-artifacts-changed-{path}]
+        
+        Events --> RW
+        RW --> Debounce
+        Debounce -->|After 300ms quiet| Emit
+    end
+    
+    subgraph "FRONTEND EVENT HANDLING"
+        Listener[Event Listener<br/>ProjectDetailPage]
+        FDebounce[Frontend Debouncer<br/>200ms additional]
+        LoadFunc[loadProjectArtifacts<br/>async function]
+        
+        Emit --> Listener
+        Listener --> FDebounce
+        FDebounce -->|After 200ms| LoadFunc
+    end
+    
+    subgraph "STATE UPDATE CASCADE"
+        S1[setArtifactsLoading: true]
+        S2[invokeGetProjectArtifacts]
+        S3[Promise.all: invokeReadFile]
+        S4[parseFrontMatter for each]
+        S5[setArtifacts: newData]
+        S6[setArtifactsLoading: false]
+        
+        LoadFunc --> S1
+        S1 -->|RENDER #1| Render1[UI Flicker #1<br/>Loading State]
+        S1 --> S2
+        S2 --> S3
+        S3 --> S4
+        S4 --> S5
+        S5 -->|RENDER #2| Render2[UI Flicker #2<br/>New Data]
+        S5 --> S6
+        S6 -->|RENDER #3| Render3[UI Flicker #3<br/>Loading Complete]
+    end
+    
+    subgraph "useMemo RECALCULATIONS"
+        M1[artifacts dependency changed]
+        M2[kitsOnly recalc]
+        M3[walkthroughs recalc]
+        M4[agents recalc]
+        M5[diagrams recalc]
+        M6[folderTree recalc]
+        
+        S5 --> M1
+        M1 --> M2
+        M1 --> M3
+        M1 --> M4
+        M1 --> M5
+        M1 --> M6
+    end
+    
+    subgraph "COMPONENT RE-RENDERS"
+        C1[ProjectDetailPage]
+        C2[KitsTabContent]
+        C3[WalkthroughsTabContent]
+        C4[AgentsTabContent]
+        C5[DiagramsTabContent]
+        C6[FolderCard components]
+        
+        Render1 --> C1
+        Render2 --> C1
+        Render3 --> C1
+        
+        C1 --> C2
+        C1 --> C3
+        C1 --> C4
+        C1 --> C5
+        C1 --> C6
+        
+        M2 --> C2
+        M3 --> C3
+        M4 --> C4
+        M5 --> C5
+        M6 --> C6
+        
+        C2 -->|RENDER #4| Render4[UI Flicker #4<br/>Component Updates]
+        C3 --> Render4
+        C4 --> Render4
+        C5 --> Render4
+        C6 --> Render4
+    end
+    
+    classDef problem fill:#ffcccc,stroke:#cc0000,stroke-width:3px
+    classDef backend fill:#cce5ff,stroke:#0066cc
+    classDef frontend fill:#e5ffcc,stroke:#00cc00
+    classDef state fill:#ffe5cc,stroke:#cc6600
+    classDef render fill:#ffccff,stroke:#cc00cc,stroke-width:2px
+    
+    class Events,Debounce,FDebounce problem
+    class RW,Emit backend
+    class Listener,LoadFunc frontend
+    class S1,S2,S3,S4,S5,S6,M1,M2,M3,M4,M5,M6 state
+    class Render1,Render2,Render3,Render4,C1,C2,C3,C4,C5,C6 render
+```

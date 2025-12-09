@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import {
   Box,
   Card,
@@ -37,11 +37,14 @@ interface KitsTabContentProps {
   projectPath: string;
   onViewKit: (kit: ArtifactFile) => void;
   onReload?: () => void;
+  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
+  onConfirmMove?: (oldPath: string, newPath: string) => void;
+  movingArtifacts?: Set<string>;
 }
 
 type ViewMode = 'card' | 'table';
 
-export default function KitsTabContent({
+function KitsTabContent({
   kits,
   kitsLoading,
   error,
@@ -49,6 +52,9 @@ export default function KitsTabContent({
   projectPath,
   onViewKit,
   onReload,
+  onOptimisticMove,
+  onConfirmMove,
+  movingArtifacts = new Set(),
 }: KitsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
@@ -58,7 +64,6 @@ export default function KitsTabContent({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
-  const [folderTree, setFolderTree] = useState<FolderTreeNode[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
@@ -124,16 +129,21 @@ export default function KitsTabContent({
       }
     };
 
-    loadFolders();
-  }, [projectPath]);
+    // Debounce folder loading to avoid excessive calls when artifacts update rapidly
+    const timeoutId = setTimeout(() => {
+      loadFolders();
+    }, 100); // 100ms debounce
 
-  // Build folder tree when folders or kits change
-  useEffect(() => {
+    return () => clearTimeout(timeoutId);
+  }, [projectPath, kits]); // Reload when kits change (from file watcher)
+
+  // Build folder tree when folders or kits change (memoized for performance)
+  const folderTree = useMemo(() => {
     const tree = buildFolderTree(folders, filteredKits, 'kits', projectPath);
-    setFolderTree(tree.map(node => ({
+    return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),
-    })));
+    }));
   }, [folders, filteredKits, projectPath, expandedFolders]);
 
   const handleViewKit = (kit: ArtifactFile) => {
@@ -146,21 +156,53 @@ export default function KitsTabContent({
 
     if (selectedKits.length === 0) return;
 
+    const rollbacks: (() => void)[] = [];
+
     try {
-      // Move all selected kits to the folder
+      // Optimistically update UI immediately for each item
       for (const item of selectedKits) {
-        if (item.path) {
-          await invokeMoveArtifactToFolder(item.path, folder.path);
+        if (item.path && onOptimisticMove) {
+          const rollback = onOptimisticMove(item.path, folder.path);
+          rollbacks.push(rollback);
         }
       }
 
-      // Clear selection and reload
-      clearSelection();
-      if (onReload) {
-        onReload();
+      // Expand folder so user can see the item being added
+      if (!expandedFolders.has(folder.path)) {
+        setExpandedFolders(prev => new Set(prev).add(folder.path));
       }
+
+      // Move all selected kits to the folder (backend operation)
+      for (const item of selectedKits) {
+        if (item.path) {
+          try {
+            const newPath = await invokeMoveArtifactToFolder(item.path, folder.path);
+            // Confirm the move with actual path from backend
+            // This updates the artifact path in the artifacts state immediately
+            if (onConfirmMove) {
+              onConfirmMove(item.path, newPath);
+            }
+          } catch (err) {
+            console.error(`Failed to move ${item.path}:`, err);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => selectedKits[idx].path === item.path);
+            if (rollback) rollback();
+            throw err;
+          }
+        }
+      }
+
+      // Don't reload folders here - it causes state mismatch with useDeferredValue
+      // The file watcher will update both artifacts and folders via incremental updates
+      // Optimistic updates already show the correct UI state immediately
+
+      // Clear selection
+      clearSelection();
     } catch (err) {
       console.error('Failed to move artifacts to folder:', err);
+      // Rollback all optimistic updates on error
+      rollbacks.forEach(rollback => rollback());
+      throw err;
     }
   };
 
@@ -219,13 +261,9 @@ export default function KitsTabContent({
         description: `Deleted ${deletingFolder.config?.name || deletingFolder.name}`,
       });
 
-      // Reload folders
-      const newFolders = await invokeGetArtifactFolders(projectPath, 'kits');
-      setFolders(newFolders);
-
-      if (onReload) {
-        onReload();
-      }
+      // Don't reload folders here - file watcher will update artifacts first,
+      // then the folder reload effect (with kits dependency) will sync folders
+      // Reloading now causes state mismatch with useDeferredValue
     } catch (error) {
       console.error('Failed to delete folder:', error);
       toaster.create({
@@ -239,13 +277,9 @@ export default function KitsTabContent({
 
   // Handle folder updated (after edit)
   const handleFolderUpdated = async () => {
-    // Reload folders
-    const newFolders = await invokeGetArtifactFolders(projectPath, 'kits');
-    setFolders(newFolders);
-
-    if (onReload) {
-      onReload();
-    }
+    // Don't reload folders here - if artifacts moved, file watcher will update them first,
+    // then the folder reload effect (with kits dependency) will sync folders
+    // For metadata-only changes (name, color), folders will reload from effect anyway
   };
 
   // Ref for filter button (used by FilterPanel for click-outside detection)
@@ -515,6 +549,7 @@ export default function KitsTabContent({
                       onDelete={handleDeleteFolder}
                       hasCompatibleSelection={selectedItems.some(item => item.type === 'Kit')}
                       renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                      movingArtifacts={movingArtifacts}
                     />
                   </MasonryItem>
                 ))}
@@ -807,6 +842,8 @@ export default function KitsTabContent({
         artifactType="kits"
         projectPath={projectPath}
         onUpdated={handleFolderUpdated}
+        onOptimisticMove={onOptimisticMove}
+        onConfirmMove={onConfirmMove}
       />
 
       <DeleteFolderDialog
@@ -818,4 +855,18 @@ export default function KitsTabContent({
     </Box>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when props actually change
+export default memo(KitsTabContent, (prevProps, nextProps) => {
+  return (
+    prevProps.kits === nextProps.kits &&
+    prevProps.kitsLoading === nextProps.kitsLoading &&
+    prevProps.error === nextProps.error &&
+    prevProps.projectsCount === nextProps.projectsCount &&
+    prevProps.projectPath === nextProps.projectPath &&
+    prevProps.onViewKit === nextProps.onViewKit &&
+    prevProps.onReload === nextProps.onReload
+  );
+});
 

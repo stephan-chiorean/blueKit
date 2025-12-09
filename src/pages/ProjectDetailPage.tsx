@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue } from 'react';
 import {
   Box,
   Tabs,
@@ -25,8 +25,7 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeWatchProjectArtifacts, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
-import { parseFrontMatter } from '../utils/parseFrontMatter';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 
 interface ProjectDetailPageProps {
@@ -36,6 +35,7 @@ interface ProjectDetailPageProps {
 }
 
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
+  // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
   const [artifactsLoading, setArtifactsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +43,19 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [currentTab, setCurrentTab] = useState<string>("kits");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
 
+  // Use transition for non-urgent updates (file watching updates)
+  const [isPending, startTransition] = useTransition();
+  
+  // Defer artifact updates to prevent blocking UI
+  const deferredArtifacts = useDeferredValue(artifacts);
+
   // Generic resource view state - for viewing any resource type
   const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
   const [resourceContent, setResourceContent] = useState<string | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType | null>(null);
 
+  // Duplicate detection: Track last load timestamp to prevent rapid duplicate calls
+  const lastLoadTimestampRef = useRef(0);
 
   // Load all projects for the dropdown
   useEffect(() => {
@@ -66,41 +74,139 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
   // Frontend filters by type later - see kitsOnly, walkthroughs, agents, blueprints memos below
   const loadProjectArtifacts = async () => {
+    // Duplicate detection: Skip if called within 100ms window
+    const now = Date.now();
+    if (now - lastLoadTimestampRef.current < 100) {
+      console.log('Skipping duplicate load (within 100ms window)');
+      return;
+    }
+    lastLoadTimestampRef.current = now;
+
     try {
+      // Only show loading on initial load
       setArtifactsLoading(true);
       setError(null);
 
       console.log(`Loading artifacts from project: ${project.path}`);
       const projectArtifacts = await invokeGetProjectArtifacts(project.path);
 
-      // Read file contents and parse front matter for each artifact
-      const artifactsWithFrontMatter = await Promise.all(
-        projectArtifacts.map(async (artifact) => {
-          try {
-            const content = await invokeReadFile(artifact.path);
-            const frontMatter = parseFrontMatter(content);
-            return {
-              ...artifact,
-              frontMatter,
-            };
-          } catch (err) {
-            console.error(`Error reading artifact file ${artifact.path}:`, err);
-            return artifact; // Return artifact without front matter if read fails
-          }
-        })
-      );
+      // Debug: Check if frontMatter is present
+      if (projectArtifacts.length > 0) {
+        console.log('Sample artifact:', {
+          name: projectArtifacts[0].name,
+          path: projectArtifacts[0].path,
+          hasFrontMatter: !!projectArtifacts[0].frontMatter,
+          frontMatter: projectArtifacts[0].frontMatter,
+        });
+      }
 
-      setArtifacts(artifactsWithFrontMatter);
+      // Atomic update: set both artifacts and loading in one state update
+      setArtifacts(projectArtifacts);
+      setArtifactsLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load artifacts');
       console.error('Error loading artifacts:', err);
-    } finally {
       setArtifactsLoading(false);
     }
   };
 
+  // Incremental update - only reload changed files
+  // Uses transition to mark as non-urgent, preventing UI blocking
+  const updateArtifactsIncremental = async (changedPaths: string[]) => {
+    console.log('[UpdateIncremental] 🔄 Starting incremental update');
+    console.log('[UpdateIncremental] 📋 Changed paths:', changedPaths);
+
+    if (changedPaths.length === 0) {
+      console.log('[UpdateIncremental] ⚠️ No changed paths, skipping');
+      return;
+    }
+
+    try {
+      console.log('[UpdateIncremental] 🔍 Fetching changed artifacts from backend...');
+      const changedArtifacts = await invokeGetChangedArtifacts(project.path, changedPaths);
+      console.log('[UpdateIncremental] ✅ Received', changedArtifacts.length, 'changed artifacts');
+      console.log('[UpdateIncremental] 📦 Changed artifacts:', changedArtifacts.map(a => ({ path: a.path, type: a.type })));
+
+      // Use transition for non-urgent update - prevents blocking UI
+      startTransition(() => {
+        // Merge into existing state - update existing, add new, remove deleted
+        setArtifacts(prev => {
+          const updated = new Map(prev.map(a => [a.path, a]));
+          
+          // Track which paths we've seen in the results
+          const seenPaths = new Set<string>();
+          
+          // Process changed artifacts
+          changedArtifacts.forEach(newArtifact => {
+            seenPaths.add(newArtifact.path);
+            
+            // Check if this is a moved file (same name, different path)
+            // First, try to find by old path in changedPaths (standard move detection)
+            let oldPath = Array.from(updated.keys()).find(oldPath => {
+              const oldArtifact = updated.get(oldPath);
+              return oldArtifact && 
+                     oldArtifact.name === newArtifact.name && 
+                     oldPath !== newArtifact.path &&
+                     changedPaths.includes(oldPath);
+            });
+            
+            // If not found, check if there's an artifact with predicted path (from optimistic update)
+            // The predicted path would be: folderPath + "/" + fileName
+            // We can detect this by matching filename and checking if current path doesn't match newPath
+            if (!oldPath) {
+              oldPath = Array.from(updated.keys()).find(currentPath => {
+                const currentArtifact = updated.get(currentPath);
+                if (!currentArtifact || currentArtifact.name !== newArtifact.name) {
+                  return false;
+                }
+                // Check if this is a predicted path (same filename, different full path)
+                // and the newPath is the actual path we want
+                return currentPath !== newArtifact.path && 
+                       currentPath.endsWith(`/${newArtifact.name}`);
+              });
+            }
+            
+            if (oldPath) {
+              // File was moved - remove old path (or predicted path)
+              updated.delete(oldPath);
+            }
+            
+            // Add/update with new artifact data (includes full frontMatter)
+            updated.set(newArtifact.path, newArtifact);
+          });
+
+          // Remove artifacts that were deleted (in changedPaths but not in results)
+          changedPaths.forEach(path => {
+            if (!seenPaths.has(path) && updated.has(path)) {
+              // Check if this file was moved (exists with same name but different path)
+              const oldArtifact = updated.get(path);
+              const wasMoved = oldArtifact && changedArtifacts.some(a => 
+                a.name === oldArtifact.name && a.path !== path
+              );
+              
+              if (!wasMoved) {
+                // File was actually deleted, not moved
+                updated.delete(path);
+              }
+            }
+          });
+
+          const finalArtifacts = Array.from(updated.values());
+          console.log('[UpdateIncremental] 💾 State updated with', finalArtifacts.length, 'total artifacts');
+          return finalArtifacts;
+        });
+        console.log('[UpdateIncremental] ✨ Transition complete');
+        // No loading state for incremental updates - they happen silently
+      });
+    } catch (err) {
+      console.error('[UpdateIncremental] ❌ Error updating artifacts incrementally:', err);
+      // Fallback to full reload on error
+      loadProjectArtifacts();
+    }
+  };
+
   useEffect(() => {
-    // Load artifacts on mount
+    // Load artifacts on mount (direct call, no debounce)
     loadProjectArtifacts();
 
     let isMounted = true;
@@ -109,7 +215,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
+        console.log('[Watcher] 🚀 Setting up file watcher for project:', project.path);
         await invokeWatchProjectArtifacts(project.path);
+        console.log('[Watcher] ✅ File watcher command sent to backend');
 
         // Generate the event name (must match the Rust code)
         const sanitizedPath = project.path
@@ -119,12 +227,23 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           .replace(/\./g, '_')
           .replace(/ /g, '_');
         const eventName = `project-artifacts-changed-${sanitizedPath}`;
+        console.log('[Watcher] 👂 Listening for events on:', eventName);
 
-        // Listen for file change events
-        unlisten = await listen(eventName, () => {
+        // Listen for file change events - receive changed file paths
+        unlisten = await listen<string[]>(eventName, (event) => {
           if (isMounted) {
-            console.log(`Artifacts directory changed for ${project.path}, reloading...`);
-            loadProjectArtifacts();
+            const changedPaths = event.payload;
+            console.log(`[Watcher] 📁 Artifacts directory changed for ${project.path}`);
+            console.log(`[Watcher] 📝 ${changedPaths.length} files changed:`, changedPaths);
+            if (changedPaths.length > 0) {
+              updateArtifactsIncremental(changedPaths);
+            } else {
+              // If no paths provided, fallback to full reload
+              console.log('[Watcher] ⚠️ No paths in payload, doing full reload');
+              loadProjectArtifacts();
+            }
+          } else {
+            console.log('[Watcher] ⚠️ Event received but component unmounted');
           }
         });
       } catch (error) {
@@ -144,35 +263,120 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     };
   }, [project.path]);
 
-  // Filter artifacts by type
+  // Track artifacts that are currently moving (for loading indicators)
+  const [movingArtifacts, setMovingArtifacts] = useState<Set<string>>(new Set());
+
+  // Optimistic update function for moving artifacts
+  // Immediately updates UI, then confirms with backend
+  const handleOptimisticMove = useMemo(() => {
+    return (artifactPath: string, targetFolderPath: string): (() => void) => {
+      // Find the artifact
+      const artifact = artifacts.find(a => a.path === artifactPath);
+      if (!artifact) {
+        console.warn('Artifact not found for optimistic update:', artifactPath);
+        return () => {}; // No-op rollback
+      }
+
+      // Calculate new path (backend will do this, but we need to predict it)
+      const fileName = artifactPath.split('/').pop() || '';
+      const predictedNewPath = `${targetFolderPath}/${fileName}`;
+
+      // Store original state for rollback
+      const originalArtifacts = [...artifacts];
+      const originalMoving = new Set(movingArtifacts);
+
+      // Mark as moving
+      setMovingArtifacts(prev => new Set(prev).add(predictedNewPath));
+
+      // Optimistically update: remove from old location, add to new with predicted path
+      startTransition(() => {
+        setArtifacts(prev => {
+          // Remove from old location
+          const filtered = prev.filter(a => a.path !== artifactPath);
+          
+          // Add to new location with predicted path
+          filtered.push({
+            ...artifact,
+            path: predictedNewPath,
+          });
+
+          return filtered;
+        });
+      });
+
+      // Return rollback function
+      return () => {
+        setArtifacts(originalArtifacts);
+        setMovingArtifacts(originalMoving);
+      };
+    };
+  }, [artifacts, movingArtifacts]);
+
+  // Confirm optimistic move (called after backend succeeds)
+  const handleConfirmMove = useMemo(() => {
+    return (oldPath: string, newPath: string) => {
+      startTransition(() => {
+        // Calculate the predicted path (same as in optimistic update)
+        // The predicted path is: targetFolderPath + "/" + fileName
+        // Since newPath is the actual path from backend, we can derive the folder path
+        const fileName = oldPath.split('/').pop() || '';
+        const folderPath = newPath.substring(0, newPath.lastIndexOf('/'));
+        const predictedPath = `${folderPath}/${fileName}`;
+
+        // Update artifact path to actual new path and remove moving flag
+        setArtifacts(prev => {
+          return prev.map(artifact => {
+            // Match by predicted path (set in optimistic update) or by old path
+            // The optimistic update changed the path to predictedPath, so we match that
+            if (artifact.path === predictedPath || artifact.path === oldPath) {
+              return {
+                ...artifact,
+                path: newPath, // Update to actual path from backend
+              };
+            }
+            return artifact;
+          });
+        });
+
+        // Remove from moving set - remove predicted path
+        setMovingArtifacts(prev => {
+          const next = new Set(prev);
+          next.delete(predictedPath);
+          return next;
+        });
+      });
+    };
+  }, []);
+
+  // Filter artifacts by type using deferred value to prevent blocking
   // This is where we separate the "load everything" approach into type-specific lists
   const kitsOnly = useMemo(() => {
-    return artifacts.filter(artifact => {
+    return deferredArtifacts.filter(artifact => {
       const type = artifact.frontMatter?.type;
       // Only include .md files that aren't other types
       return artifact.path.endsWith('.md') &&
              (!type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task'));
     });
-  }, [artifacts]);
+  }, [deferredArtifacts]);
 
   const walkthroughs = useMemo(() => {
-    return artifacts.filter(artifact => artifact.frontMatter?.type === 'walkthrough');
-  }, [artifacts]);
+    return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'walkthrough');
+  }, [deferredArtifacts]);
 
   const blueprints = useMemo(() => {
-    return artifacts.filter(artifact => artifact.frontMatter?.type === 'blueprint');
-  }, [artifacts]);
+    return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'blueprint');
+  }, [deferredArtifacts]);
 
   const agents = useMemo(() => {
-    return artifacts.filter(artifact => artifact.frontMatter?.type === 'agent');
-  }, [artifacts]);
+    return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'agent');
+  }, [deferredArtifacts]);
 
   const diagrams = useMemo(() => {
     // Filter for diagram files (.mmd or .mermaid extensions)
-    return artifacts.filter(artifact =>
+    return deferredArtifacts.filter(artifact =>
       artifact.path.endsWith('.mmd') || artifact.path.endsWith('.mermaid')
     );
-  }, [artifacts]);
+  }, [deferredArtifacts]);
 
   // Generic handler to view any resource type
   const handleViewResource = async (resource: ResourceFile, type: ResourceType) => {
@@ -433,6 +637,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 projectPath={project.path}
                 onViewKit={handleViewKit}
                 onReload={loadProjectArtifacts}
+                onOptimisticMove={handleOptimisticMove}
+                onConfirmMove={handleConfirmMove}
+                movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="blueprints">
@@ -451,6 +658,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 projectPath={project.path}
                 onViewKit={handleViewKit}
                 onReload={loadProjectArtifacts}
+                onOptimisticMove={handleOptimisticMove}
+                onConfirmMove={handleConfirmMove}
+                movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="agents" key="agents">
@@ -476,6 +686,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 projectPath={project.path}
                 onViewDiagram={handleViewDiagram}
                 onReload={loadProjectArtifacts}
+                onOptimisticMove={handleOptimisticMove}
+                onConfirmMove={handleConfirmMove}
+                movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
             <Tabs.Content value="clones">

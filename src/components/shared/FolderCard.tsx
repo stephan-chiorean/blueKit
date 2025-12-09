@@ -1,4 +1,4 @@
-import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Flex, Menu, IconButton, Badge, Checkbox, Portal } from '@chakra-ui/react';
+import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Flex, Menu, IconButton, Badge, Checkbox, Portal, Spinner } from '@chakra-ui/react';
 import { LuFolder, LuChevronRight, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2, LuPlus } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '../../ipc';
@@ -14,6 +14,7 @@ interface FolderCardProps {
   onDelete: (folder: ArtifactFolder) => void;
   hasCompatibleSelection: boolean;
   renderArtifactCard: (artifact: ArtifactFile) => React.ReactNode; // Currently unused, kept for API compatibility
+  movingArtifacts?: Set<string>;
 }
 
 /**
@@ -34,6 +35,7 @@ export function FolderCard({
   onEdit,
   onDelete,
   hasCompatibleSelection,
+  movingArtifacts = new Set(),
 }: FolderCardProps) {
   const { folder, children, artifacts, isExpanded } = node;
   const { isSelected, toggleItem } = useSelection();
@@ -232,12 +234,18 @@ export function FolderCard({
           )}
         </VStack>
 
-        {isExpanded && (artifacts.length > 0 || children.length > 0) && (
-          <Box mt={4} pt={4} borderTopWidth='1px' borderColor='border.subtle'>
-            <Text fontSize='sm' fontWeight='bold' color='text.tertiary' mb={2}>
-              CONTENTS:
-            </Text>
-            <VStack align='stretch' gap={2}>
+        <Box
+          maxHeight={isExpanded ? '2000px' : '0px'}
+          overflow='hidden'
+          opacity={isExpanded ? 1 : 0}
+          transition='max-height 0.3s ease-out, opacity 0.2s ease-out'
+        >
+          {(artifacts.length > 0 || children.length > 0) && (
+            <Box mt={4} pt={4} borderTopWidth='1px' borderColor='border.subtle'>
+              <Text fontSize='sm' fontWeight='bold' color='text.tertiary' mb={2}>
+                CONTENTS:
+              </Text>
+              <VStack align='stretch' gap={2}>
               {/* Child folders */}
               {children.map((childNode) => (
                 <Box key={childNode.folder.path} fontSize='md' color='text.secondary'>
@@ -260,44 +268,67 @@ export function FolderCard({
                                 </Text>
                               </HStack>
                         <VStack align='stretch' gap={2} pl={4}>
-                          {groupArtifacts.map((artifact) => (
-                            <HStack
-                              key={artifact.path}
-                              fontSize='md'
-                              color='text.secondary'
-                              cursor='pointer'
-                              _hover={{ color: 'blue.500' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onViewArtifact(artifact);
-                              }}
-                              gap={2}
-                              justify='space-between'
-                            >
-                              <HStack gap={2} flex={1}>
-                                <Icon boxSize={5}>
-                                  <ArtifactIcon />
-                                </Icon>
-                                <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
-                              </HStack>
-                              <Checkbox.Root
-                                checked={isSelected(artifact.path)}
-                                colorPalette='blue'
-                                onCheckedChange={() => {
-                                  handleArtifactToggle(artifact);
-                                }}
+                          {groupArtifacts.map((artifact) => {
+                            const isMoving = movingArtifacts.has(artifact.path);
+                            return (
+                              <HStack
+                                key={artifact.path}
+                                fontSize='md'
+                                color={isMoving ? 'text.tertiary' : 'text.secondary'}
+                                cursor={isMoving ? 'default' : 'pointer'}
+                                _hover={isMoving ? {} : { color: 'blue.500' }}
                                 onClick={(e) => {
-                                  e.stopPropagation();
+                                  if (!isMoving) {
+                                    e.stopPropagation();
+                                    onViewArtifact(artifact);
+                                  }
                                 }}
-                                cursor='pointer'
+                                gap={2}
+                                justify='space-between'
+                                opacity={isMoving ? 0.6 : 1}
+                                animation='fadeInUp 0.2s ease-out'
+                                css={{
+                                  '@keyframes fadeInUp': {
+                                    from: {
+                                      opacity: 0,
+                                      transform: 'translateY(8px)',
+                                    },
+                                    to: {
+                                      opacity: 1,
+                                      transform: 'translateY(0)',
+                                    },
+                                  },
+                                }}
                               >
-                                <Checkbox.HiddenInput />
-                                <Checkbox.Control cursor='pointer'>
-                                  <Checkbox.Indicator />
-                                </Checkbox.Control>
-                              </Checkbox.Root>
-                            </HStack>
-                          ))}
+                                <HStack gap={2} flex={1}>
+                                  {isMoving ? (
+                                    <Spinner size="sm" color="primary.500" />
+                                  ) : (
+                                    <Icon boxSize={5}>
+                                      <ArtifactIcon />
+                                    </Icon>
+                                  )}
+                                  <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
+                                </HStack>
+                                <Checkbox.Root
+                                  checked={isSelected(artifact.path)}
+                                  colorPalette='blue'
+                                  onCheckedChange={() => {
+                                    handleArtifactToggle(artifact);
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  cursor='pointer'
+                                >
+                                  <Checkbox.HiddenInput />
+                                  <Checkbox.Control cursor='pointer'>
+                                    <Checkbox.Indicator />
+                                  </Checkbox.Control>
+                                </Checkbox.Root>
+                              </HStack>
+                            );
+                          })}
                         </VStack>
                       </VStack>
                     </Box>
@@ -307,24 +338,46 @@ export function FolderCard({
                   {groupedData.ungroupedArtifacts.length > 0 && (
                     <Box pl={4} borderLeft='2px solid' borderColor='border.subtle'>
                       <VStack align='stretch' gap={2} pl={4}>
-                        {groupedData.ungroupedArtifacts.map((artifact) => (
+                        {groupedData.ungroupedArtifacts.map((artifact) => {
+                          const isMoving = movingArtifacts.has(artifact.path);
+                          return (
                           <HStack
                             key={artifact.path}
                             fontSize='md'
-                            color='text.secondary'
-                            cursor='pointer'
-                            _hover={{ color: 'blue.500' }}
+                            color={isMoving ? 'text.tertiary' : 'text.secondary'}
+                            cursor={isMoving ? 'default' : 'pointer'}
+                            _hover={isMoving ? {} : { color: 'blue.500' }}
                             onClick={(e) => {
-                              e.stopPropagation();
-                              onViewArtifact(artifact);
+                              if (!isMoving) {
+                                e.stopPropagation();
+                                onViewArtifact(artifact);
+                              }
                             }}
                             gap={2}
                             justify='space-between'
+                            opacity={isMoving ? 0.6 : 1}
+                            animation='fadeInUp 0.2s ease-out'
+                            css={{
+                              '@keyframes fadeInUp': {
+                                from: {
+                                  opacity: 0,
+                                  transform: 'translateY(8px)',
+                                },
+                                to: {
+                                  opacity: 1,
+                                  transform: 'translateY(0)',
+                                },
+                              },
+                            }}
                           >
                             <HStack gap={2} flex={1}>
-                              <Icon boxSize={5}>
-                                <ArtifactIcon />
-                              </Icon>
+                              {isMoving ? (
+                                <Spinner size="sm" color="primary.500" />
+                              ) : (
+                                <Icon boxSize={5}>
+                                  <ArtifactIcon />
+                                </Icon>
+                              )}
                               <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
                             </HStack>
                             <Checkbox.Root
@@ -344,7 +397,8 @@ export function FolderCard({
                               </Checkbox.Control>
                             </Checkbox.Root>
                           </HStack>
-                        ))}
+                          );
+                        })}
                       </VStack>
                     </Box>
                   )}
@@ -352,24 +406,46 @@ export function FolderCard({
               )}
 
               {/* Flat list of artifacts (if no groups) */}
-              {!groupedData && artifacts.map((artifact) => (
+              {!groupedData && artifacts.map((artifact) => {
+                const isMoving = movingArtifacts.has(artifact.path);
+                return (
                 <HStack
                   key={artifact.path}
                   fontSize='md'
-                  color='text.secondary'
-                  cursor='pointer'
-                  _hover={{ color: 'blue.500' }}
+                  color={isMoving ? 'text.tertiary' : 'text.secondary'}
+                  cursor={isMoving ? 'default' : 'pointer'}
+                  _hover={isMoving ? {} : { color: 'blue.500' }}
                   onClick={(e) => {
-                    e.stopPropagation();
-                    onViewArtifact(artifact);
+                    if (!isMoving) {
+                      e.stopPropagation();
+                      onViewArtifact(artifact);
+                    }
                   }}
                   gap={2}
                   justify='space-between'
+                  opacity={isMoving ? 0.6 : 1}
+                  animation='fadeInUp 0.2s ease-out'
+                  css={{
+                    '@keyframes fadeInUp': {
+                      from: {
+                        opacity: 0,
+                        transform: 'translateY(8px)',
+                      },
+                      to: {
+                        opacity: 1,
+                        transform: 'translateY(0)',
+                      },
+                    },
+                  }}
                 >
                   <HStack gap={2} flex={1}>
-                    <Icon boxSize={5}>
-                      <ArtifactIcon />
-                    </Icon>
+                    {isMoving ? (
+                      <Spinner size="sm" color="primary.500" />
+                    ) : (
+                      <Icon boxSize={5}>
+                        <ArtifactIcon />
+                      </Icon>
+                    )}
                     <Text fontSize='md'>{artifact.frontMatter?.alias || artifact.name}</Text>
                   </HStack>
                   <Checkbox.Root
@@ -389,10 +465,12 @@ export function FolderCard({
                     </Checkbox.Control>
                   </Checkbox.Root>
                 </HStack>
-              ))}
+                );
+              })}
             </VStack>
           </Box>
         )}
+        </Box>
       </CardBody>
     </Card.Root>
   );

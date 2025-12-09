@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import {
   Box,
   Card,
@@ -27,7 +27,7 @@ interface AgentsTabContentProps {
   onViewKit: (kit: ArtifactFile) => void;
 }
 
-export default function AgentsTabContent({
+function AgentsTabContent({
   kits,
   kitsLoading,
   error,
@@ -192,4 +192,16 @@ export default function AgentsTabContent({
     </Box>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when props actually change
+export default memo(AgentsTabContent, (prevProps, nextProps) => {
+  return (
+    prevProps.kits === nextProps.kits &&
+    prevProps.kitsLoading === nextProps.kitsLoading &&
+    prevProps.error === nextProps.error &&
+    prevProps.projectsCount === nextProps.projectsCount &&
+    prevProps.onViewKit === nextProps.onViewKit
+  );
+});
 
