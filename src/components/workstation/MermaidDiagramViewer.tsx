@@ -8,63 +8,20 @@ import {
   HStack,
   Tag,
   IconButton,
+  Code,
+  Button,
+  Alert,
 } from '@chakra-ui/react';
 import { ArtifactFile } from '../../ipc';
-import { LuMaximize2, LuMinimize2, LuStickyNote } from 'react-icons/lu';
+import { LuMaximize2, LuMinimize2, LuStickyNote, LuCopy } from 'react-icons/lu';
 import DraggableNotepad from './DraggableNotepad';
-import { useColorMode } from '../../contexts/ColorModeContext';
 
 interface MermaidDiagramViewerProps {
   diagram: ArtifactFile;
   content: string;
 }
 
-// Color palette array - colors are assigned sequentially to classes
-// Each entry is a light/dark color pair
-const CLASS_COLOR_PALETTE: Array<{ light: string; dark: string }> = [
-  // Architecture layers
-  { light: '#e3f2fd', dark: '#0c4a6e' },
-  { light: '#fff3e0', dark: '#7c2d12' },
-  { light: '#f3e5f5', dark: '#581c87' },
-  { light: '#e8f5e9', dark: '#14532d' },
-  { light: '#fff9c4', dark: '#78350f' },
-  { light: '#fce4ec', dark: '#831843' },
-  { light: '#e0f2f1', dark: '#134e4a' },
-  { light: '#f5f5f5', dark: '#1f2937' },
-  { light: '#e1f5fe', dark: '#0c4a6e' },
-  { light: '#ffebee', dark: '#7f1d1d' },
-  
-  // Common component types
-  { light: '#dbeafe', dark: '#1e40af' },
-  { light: '#bfdbfe', dark: '#3b82f6' },
-  { light: '#e0e7ff', dark: '#4338ca' },
-  
-  // Data flow
-  { light: '#dcfce7', dark: '#166534' },
-  { light: '#fef3c7', dark: '#92400e' },
-  { light: '#e0e7ff', dark: '#4338ca' },
-  
-  // Status/State
-  { light: '#dcfce7', dark: '#166534' },
-  { light: '#f3f4f6', dark: '#374151' },
-  { light: '#fee2e2', dark: '#991b1b' },
-  { light: '#fef3c7', dark: '#92400e' },
-  { light: '#d1fae5', dark: '#065f46' },
-  
-  // Process types
-  { light: '#e0f2fe', dark: '#0c4a6e' },
-  { light: '#f3e8ff', dark: '#6b21a8' },
-  { light: '#fef3c7', dark: '#92400e' },
-  { light: '#e0f2f1', dark: '#134e4a' },
-  
-  // Generic categories
-  { light: '#eff6ff', dark: '#1e3a8a' },
-  { light: '#f3f4f6', dark: '#374151' },
-  { light: '#f9fafb', dark: '#1f2937' },
-];
-
 export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagramViewerProps) {
-  const { colorMode } = useColorMode();
   const diagramRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const displayName = diagram.frontMatter?.alias || diagram.name;
@@ -74,12 +31,337 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   const startPanRef = useRef({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isNotepadOpen, setIsNotepadOpen] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Initialize Mermaid with dark theme (similar to ShikiCodeBlock always using github-dark)
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'dark',
+      themeVariables: {
+        primaryBorderColor: '#4287f5',
+        lineColor: '#4287f5',
+        arrowheadColor: '#4287f5',
+      },
+    });
+  }, []);
+
+  // Color palette mapping for different subgraph types
+  // Uses dark colorful fills for both light and dark modes, with light text for readability
+  const getClassColor = (className: string): { fill: string; text: string } => {
+    // Dark colorful palette - same for both modes
+    const palette: Record<string, { fill: string; text: string }> = {
+      uiLayer: {
+        fill: '#1e3a8a', // Dark blue
+        text: '#bfdbfe', // Light blue text
+      },
+      backendLayer: {
+        fill: '#6b21a8', // Dark purple
+        text: '#e9d5ff', // Light purple text
+      },
+      userAction: {
+        fill: '#c2410c', // Dark orange
+        text: '#fed7aa', // Light orange text
+      },
+      ipcLayer: {
+        fill: '#0f766e', // Dark teal
+        text: '#99f6e4', // Light teal text
+      },
+      fileSystem: {
+        fill: '#4c1d95', // Dark indigo
+        text: '#ddd6fe', // Light indigo text
+      },
+      watcher: {
+        fill: '#a16207', // Dark amber
+        text: '#fde68a', // Light amber text
+      },
+      uiUpdate: {
+        fill: '#155e75', // Dark cyan
+        text: '#a7f3d0', // Light cyan text
+      },
+      // Fallback for other class names
+      default: {
+        fill: '#374151', // Dark gray
+        text: '#f3f4f6', // Light gray text
+      },
+    };
+
+    // Match class name (case-insensitive) to palette keys
+    const classKey = Object.keys(palette).find(
+      key => key.toLowerCase() === className.toLowerCase()
+    ) || 'default';
+    
+    // Return the same dark fill and light text regardless of mode
+    return palette[classKey];
+  };
+
+  // Extract class definitions and node-class mappings from mermaid code
+  // Returns both class mappings and classDef fill colors
+  const extractClassMappings = (mermaidCode: string): {
+    classMap: Map<string, string[]>;
+    classDefColors: Map<string, { fill: string; text: string }>;
+  } => {
+    const classMap = new Map<string, string[]>();
+    const classDefColors = new Map<string, { fill: string; text: string }>();
+    
+    // Extract classDef statements: classDef className fill:#color,stroke:#color,...
+    // Pattern matches: classDef uiLayer fill:#1e3a8a,stroke:#333,stroke-width:2px
+    const classDefRegex = /classDef\s+(\w+)\s+([^\n]+)/g;
+    let classDefMatch;
+    
+    while ((classDefMatch = classDefRegex.exec(mermaidCode)) !== null) {
+      const className = classDefMatch[1].trim();
+      const styleString = classDefMatch[2].trim();
+      
+      // Extract fill color from style string
+      // Matches: fill:#1e3a8a or fill:#1e3a8a, or fill:#1e3a8a,stroke:...
+      const fillMatch = styleString.match(/fill:([^,]+)/);
+      const fillColor = fillMatch ? fillMatch[1].trim() : null;
+      
+      if (fillColor) {
+        console.log('MermaidDiagramViewer: Found classDef', { className, fillColor });
+        // Determine appropriate text color based on fill color brightness
+        // For dark fills, use light text; for light fills, use dark text
+        // Since we're using dark fills, default to light text
+        let textColor = '#bfdbfe'; // Default light text for dark fills
+        
+        // If fill is a hex color, try to determine if it's dark or light
+        if (fillColor.startsWith('#')) {
+          const hex = fillColor.replace('#', '');
+          if (hex.length === 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            // Calculate brightness (0-255)
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            // If bright (light fill), use dark text; if dark fill, use light text
+            textColor = brightness > 128 ? '#1f2937' : '#bfdbfe';
+            console.log('MermaidDiagramViewer: Determined textColor', { className, fillColor, textColor });
+          }
+        }
+        
+        classDefColors.set(className, {
+          fill: fillColor,
+          text: textColor,
+        });
+        console.log('MermaidDiagramViewer: Added classDef to classDefColors', { className, fillColor, textColor });
+      }
+    }
+    
+    // Extract class assignments: class NodeA,NodeB className
+    const classAssignRegex = /class\s+([\w,]+)\s+(\w+)/g;
+    let match;
+    
+    while ((match = classAssignRegex.exec(mermaidCode)) !== null) {
+      const nodeIds = match[1].split(',').map(id => id.trim());
+      const className = match[2].trim();
+      
+      nodeIds.forEach(nodeId => {
+        if (!classMap.has(nodeId)) {
+          classMap.set(nodeId, []);
+        }
+        classMap.get(nodeId)!.push(className);
+      });
+    }
+    
+    return { classMap, classDefColors };
+  };
+
+  // Apply class-based colors to SVG elements
+  // Uses classDefColors if available (from mermaid code), otherwise falls back to getClassColor palette
+  // Colors are the same for both light and dark modes (dark fills with light text)
+  const applyClassColors = (
+    svg: SVGElement, 
+    classMap: Map<string, string[]>, 
+    classDefColors?: Map<string, { fill: string; text: string }>
+  ) => {
+    // Find all node groups in the SVG (Mermaid typically wraps nodes in <g> elements with class="node")
+    const nodeGroups = svg.querySelectorAll('g.node');
+    
+    // Collect all found node IDs for debugging
+    const foundNodeIds: string[] = [];
+    
+    let nodesMatched = 0;
+    
+    nodeGroups.forEach((group) => {
+      // Try multiple methods to find the node ID
+      let nodeId = '';
+      
+      // Method 1: Check title element (most common in Mermaid)
+      const titleElement = group.querySelector('title');
+      if (titleElement) {
+        nodeId = titleElement.textContent?.trim() || '';
+      }
+      
+      // Method 2: Check id attribute on the group
+      if (!nodeId && group.id) {
+        nodeId = group.id;
+      }
+      
+      // Method 3: Check for id in the group's attributes
+      if (!nodeId) {
+        const idAttr = group.getAttribute('id');
+        if (idAttr) {
+          nodeId = idAttr;
+        }
+      }
+      
+      // Method 4: Check for data attributes
+      if (!nodeId) {
+        const dataId = (group as HTMLElement).dataset?.id;
+        if (dataId) {
+          nodeId = dataId;
+        }
+      }
+      
+      // Method 5: Try to extract from the group's class or other attributes
+      // Mermaid sometimes uses classes like "node-id-NodeName"
+      if (!nodeId) {
+        const classList = Array.from(group.classList);
+        for (const cls of classList) {
+          if (cls.startsWith('node-') || cls.includes('id-')) {
+            const match = cls.match(/id-([\w]+)/);
+            if (match) {
+              nodeId = match[1];
+              break;
+            }
+          }
+        }
+      }
+      
+      if (nodeId) {
+        foundNodeIds.push(nodeId);
+      }
+      
+      if (!nodeId) {
+        return;
+      }
+      
+      // Get classes for this node
+      let classes = classMap.get(nodeId) || [];
+      
+      // If no direct match, try alternative matching strategies
+      if (classes.length === 0) {
+        // Strategy 1: Case-insensitive matching
+        for (const [mapNodeId, mapClasses] of classMap.entries()) {
+          if (mapNodeId.toLowerCase() === nodeId.toLowerCase()) {
+            classes = mapClasses;
+            break;
+          }
+        }
+        
+        // Strategy 2: Try to match by text content (extract first word from node text)
+        if (classes.length === 0) {
+          const textElements = group.querySelectorAll('text');
+          for (const textEl of textElements) {
+            const textContent = textEl.textContent?.trim() || '';
+            // Try to match the first significant word from the text
+            const firstWord = textContent.split(/\s+/)[0];
+            if (firstWord && classMap.has(firstWord)) {
+              classes = classMap.get(firstWord)!;
+              break;
+            }
+          }
+        }
+        
+        // Strategy 3: Try partial matching (nodeId contains mapNodeId or vice versa)
+        if (classes.length === 0) {
+          for (const [mapNodeId, mapClasses] of classMap.entries()) {
+            if (nodeId.includes(mapNodeId) || mapNodeId.includes(nodeId)) {
+              classes = mapClasses;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (classes.length === 0) {
+        return;
+      }
+      
+      nodesMatched++;
+      
+      // Use the first class found (nodes can have multiple classes, but we'll use the first)
+      const className = classes[0];
+      // Use classDefColors if available (from mermaid code), otherwise use palette
+      const colors = classDefColors?.get(className) || getClassColor(className);
+      
+      // Find all shape elements within this node group
+      const shapes = group.querySelectorAll('rect, circle, ellipse, polygon, path');
+      
+      shapes.forEach((shape) => {
+        const element = shape as SVGElement;
+        const currentFill = element.getAttribute('fill') || element.style.fill || '';
+        
+        // Only skip if it's a gradient or pattern (url(...))
+        // Otherwise, always apply our class-based colors
+        if (currentFill && currentFill.startsWith('url(')) {
+          // Don't override gradients or patterns
+          return;
+        }
+        
+        // Apply the class-based fill color
+        element.setAttribute('fill', colors.fill);
+        element.style.fill = colors.fill;
+      });
+      
+      // Update text colors for better contrast
+      // Use querySelectorAll with descendant selector to find text elements even in nested groups
+      const textElements = group.querySelectorAll('text');
+      console.log('MermaidDiagramViewer: Found text elements', { textElements, nodeId, className, textColor: colors.text });
+      textElements.forEach((textEl) => {
+        const element = textEl as SVGElement;
+        // Set both attribute and style with !important to override Mermaid theme
+        element.setAttribute('fill', colors.text);
+        element.style.setProperty('fill', colors.text, 'important');
+        // Also remove any conflicting fill attributes from parent elements
+        const parent = element.parentElement;
+        if (parent && parent instanceof SVGElement) {
+          const parentFill = parent.getAttribute('fill');
+          if (parentFill && parentFill !== colors.text) {
+            // Clear parent fill if it conflicts
+            parent.removeAttribute('fill');
+          }
+        }
+      });
+    });
+    
+    // If no nodes were matched, log a warning
+    if (nodesMatched === 0 && nodeGroups.length > 0) {
+      console.warn('MermaidDiagramViewer: No nodes matched! This suggests a node ID mismatch issue.', {
+        foundNodeIds,
+        expectedNodeIds: Array.from(classMap.keys()),
+        suggestion: 'Check if Mermaid is transforming node IDs differently than expected'
+      });
+    }
+  };
+
+  // Parse Mermaid error message to extract useful information
+  const parseMermaidError = (errorMessage: string): string => {
+    // Extract line number if present
+    const lineMatch = errorMessage.match(/line (\d+)/i);
+    const lineNumber = lineMatch ? lineMatch[1] : null;
+    
+    // Extract what was expected vs got
+    const expectedMatch = errorMessage.match(/Expecting[^,]+/i);
+    const gotMatch = errorMessage.match(/got ['"]([^'"]+)['"]/i);
+    
+    const parsed = lineNumber || expectedMatch || gotMatch
+      ? `Parse error${lineNumber ? ` on line ${lineNumber}` : ''}${expectedMatch ? `: ${expectedMatch[0]}` : ''}${gotMatch ? `, got '${gotMatch[1]}'` : ''}`
+      : errorMessage || 'Syntax error in Mermaid diagram';
+    
+    return parsed;
+  };
 
   // Extract mermaid diagram code from content
   // Handles both raw mermaid code and markdown-wrapped code
   const extractMermaidCode = (content: string): string => {
-    if (!content) return '';
+    if (!content) {
+      console.warn('MermaidDiagramViewer: No content provided');
+      return '';
+    }
     
     // Remove front matter if present (matches YAML front matter between --- markers)
     let cleaned = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '');
@@ -100,17 +382,117 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     return cleaned.trim();
   };
 
-  // Mermaid is now initialized globally in ColorModeContext
-  // No need to initialize here - it's already done when color mode changes
+  // Apply BlueKit blue styling to SVG elements (arrows, lines, etc.)
+  const applyBlueKitBlueStyling = (svg: SVGElement) => {
+    const bluekitPrimary = '#4287f5';
+    
+    // Generic colors that should be replaced with BlueKit blue
+    const genericColors = [
+      '#333', '#333333', 'rgb(51, 51, 51)', 'rgb(51,51,51)',
+      '#000', '#000000', 'rgb(0, 0, 0)', 'rgb(0,0,0)',
+      '#666', '#666666', 'rgb(102, 102, 102)', 'rgb(102,102,102)',
+      '#999', '#999999', 'rgb(153, 153, 153)', 'rgb(153,153,153)',
+    ];
+    
+    // Check if a color is already BlueKit blue (or close to it)
+    const isBlueKitBlue = (color: string): boolean => {
+      if (!color) return false;
+      const lower = color.toLowerCase();
+      return lower === bluekitPrimary.toLowerCase() ||
+             lower === '#4287f5' ||
+             lower.includes('4287f5') ||
+             lower === 'rgb(66, 135, 245)' ||
+             lower === 'rgb(66,135,245)';
+    };
+    
+    const isGenericColor = (color: string): boolean => {
+      if (!color) return true;
+      return genericColors.some(gc => color.toLowerCase() === gc.toLowerCase());
+    };
+    
+    // Style marker elements (arrows) - always apply blue
+    const markers = svg.querySelectorAll('marker');
+    markers.forEach((marker) => {
+      const path = marker.querySelector('path');
+      if (path) {
+        path.setAttribute('fill', bluekitPrimary);
+        path.setAttribute('stroke', bluekitPrimary);
+        path.style.fill = bluekitPrimary;
+        path.style.stroke = bluekitPrimary;
+      }
+      // Also check for polygon in markers (some arrow styles use polygon)
+      const polygon = marker.querySelector('polygon');
+      if (polygon) {
+        polygon.setAttribute('fill', bluekitPrimary);
+        polygon.setAttribute('stroke', bluekitPrimary);
+        polygon.style.fill = bluekitPrimary;
+        polygon.style.stroke = bluekitPrimary;
+      }
+    });
+    
+    // Style all path elements - be more aggressive in identifying edges
+    const allPaths = svg.querySelectorAll('path');
+    allPaths.forEach((path) => {
+      const element = path as SVGElement;
+      const id = element.getAttribute('id') || '';
+      const classList = Array.from(element.classList);
+      const parent = element.parentElement;
+      const parentClassList = parent ? Array.from(parent.classList) : [];
+      
+      // Check if this is an edge/line path (not a node shape)
+      // Paths are edges if:
+      // 1. They have edge/flow/link in id or class
+      // 2. They're inside a group with edge/flow/link class
+      // 3. They're not inside a node group and don't form a closed shape
+      const isEdge = id.includes('edge') || 
+                     id.includes('flow') || 
+                     id.includes('link') ||
+                     classList.some(cls => cls.includes('edge') || cls.includes('flow') || cls.includes('link')) ||
+                     parentClassList.some(cls => cls.includes('edge') || cls.includes('flow') || cls.includes('link')) ||
+                     (!parentClassList.some(cls => cls.includes('node')) && 
+                      !classList.some(cls => cls.includes('node')) &&
+                      element.getAttribute('d')?.includes('M'));
+      
+      if (isEdge) {
+        const currentStroke = element.getAttribute('stroke') || element.style.stroke || '';
+        // Apply BlueKit blue unless it's already blue
+        if (!isBlueKitBlue(currentStroke) && (isGenericColor(currentStroke) || !currentStroke)) {
+          element.setAttribute('stroke', bluekitPrimary);
+          element.style.stroke = bluekitPrimary;
+        }
+      }
+    });
+    
+    // Style polyline elements (alternative line representation)
+    const polylines = svg.querySelectorAll('polyline');
+    polylines.forEach((polyline) => {
+      const element = polyline as SVGElement;
+      const currentStroke = element.getAttribute('stroke') || element.style.stroke || '';
+      if (!isBlueKitBlue(currentStroke) && (isGenericColor(currentStroke) || !currentStroke)) {
+        element.setAttribute('stroke', bluekitPrimary);
+        element.style.stroke = bluekitPrimary;
+      }
+    });
+    
+    // Style line elements (straight lines)
+    const lines = svg.querySelectorAll('line');
+    lines.forEach((line) => {
+      const element = line as SVGElement;
+      const currentStroke = element.getAttribute('stroke') || element.style.stroke || '';
+      if (!isBlueKitBlue(currentStroke) && (isGenericColor(currentStroke) || !currentStroke)) {
+        element.setAttribute('stroke', bluekitPrimary);
+        element.style.stroke = bluekitPrimary;
+      }
+    });
+  };
 
   useEffect(() => {
     if (!diagramRef.current || !content) {
-      console.log('MermaidDiagramViewer: Missing ref or content', { hasRef: !!diagramRef.current, hasContent: !!content });
       return;
     }
 
-    // When color mode changes, Mermaid needs to be re-initialized in ColorModeContext
-    // Add a small delay to ensure Mermaid is fully re-initialized before rendering
+    // Mermaid is initialized with dark theme in this component
+    // Add a small delay to ensure Mermaid is fully initialized before rendering
     const renderTimeout = setTimeout(() => {
       if (!diagramRef.current) return;
 
@@ -119,11 +501,6 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
 
       // Extract the mermaid code
       const mermaidCode = extractMermaidCode(content);
-      console.log('MermaidDiagramViewer: Extracted code', {
-        contentLength: content.length,
-        mermaidCodeLength: mermaidCode.length,
-        mermaidCodePreview: mermaidCode.substring(0, 100)
-      });
 
       if (!mermaidCode) {
         console.warn('MermaidDiagramViewer: No mermaid code found in content');
@@ -136,200 +513,157 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
       // Create a unique ID for this diagram
       const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      // Clear any previous errors
+      setRenderError(null);
+      
       // Render the diagram
-      console.log('MermaidDiagramViewer: Attempting to render diagram', { id, codeLength: mermaidCode.length });
       mermaid.render(id, mermaidCode).then((result) => {
-        console.log('MermaidDiagramViewer: Render successful', { svgLength: result.svg?.length });
         if (diagramRef.current) {
           diagramRef.current.innerHTML = result.svg;
           
-          // Apply BlueKit blue to arrows and lines after render
-          // This ensures all diagram types use the correct colors
-          const svg = diagramRef.current.querySelector('svg');
-          if (svg) {
-            const bluekitBlue = '#4287f5';
-            
-            // Style arrows (marker elements)
-            const markers = svg.querySelectorAll('marker');
-            markers.forEach((marker) => {
-              const path = marker.querySelector('path');
-              if (path) {
-                path.setAttribute('fill', bluekitBlue);
-                path.setAttribute('stroke', bluekitBlue);
-              }
-            });
-            
-            // Style lines and paths (arrows, connectors)
-            const paths = svg.querySelectorAll('path[stroke]');
-            paths.forEach((path) => {
-              const stroke = path.getAttribute('stroke');
-              // Only change if it's a line/arrow color (not text or other elements)
-              if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
-                path.setAttribute('stroke', bluekitBlue);
-              }
-            });
-            
-            // Style polyline arrows
-            const polylines = svg.querySelectorAll('polyline[stroke]');
-            polylines.forEach((polyline) => {
-              const stroke = polyline.getAttribute('stroke');
-              if (stroke && stroke !== 'none' && !stroke.includes('rgb(0,0,0)') && !stroke.includes('#000')) {
-                polyline.setAttribute('stroke', bluekitBlue);
-              }
-            });
+          // Extract class mappings and classDef colors from mermaid code
+          const { classMap, classDefColors } = extractClassMappings(mermaidCode);
 
-            // Apply class-based colors from front matter or palette
-            const frontMatterClasses = (diagram.frontMatter as any)?.classes;
-            console.log('MermaidDiagramViewer: Checking for class colors', {
-              hasFrontMatter: !!diagram.frontMatter,
-              frontMatterKeys: diagram.frontMatter ? Object.keys(diagram.frontMatter) : [],
-              rawClasses: frontMatterClasses,
-              isArray: Array.isArray(frontMatterClasses),
-            });
+          console.log('MermaidDiagramViewer: Extracted class mappings and classDef colors', { classMap, classDefColors });
+          // Apply colors function that can be called multiple times
+          const applyColorsToSVG = () => {
+            if (!diagramRef.current) return;
             
-            // Build class color map: assign colors sequentially from palette based on array order
-            const classColorMap: Record<string, { light: string; dark: string }> = {};
+            const svg = diagramRef.current.querySelector('svg');
+            if (!svg) return;
             
-            if (frontMatterClasses && Array.isArray(frontMatterClasses)) {
-              frontMatterClasses.forEach((className: string, index: number) => {
-                const colorIndex = index % CLASS_COLOR_PALETTE.length;
-                classColorMap[className] = CLASS_COLOR_PALETTE[colorIndex];
-              });
+            // First, apply BlueKit blue styling to arrows, lines, etc.
+            try {
+              applyBlueKitBlueStyling(svg);
+            } catch (error) {
+              console.warn('MermaidDiagramViewer: Error applying BlueKit blue styling', error);
             }
             
-            console.log('MermaidDiagramViewer: Built classColorMap', { classColorMap, colorMode });
+            // Then apply class-based colors if any classes are defined
+            if (classMap.size > 0) {
+              try {
+                applyClassColors(svg, classMap, classDefColors);
+              } catch (error) {
+                console.warn('MermaidDiagramViewer: Error applying class colors', error);
+              }
+            }
+          };
+          
+          // Apply colors immediately using requestAnimationFrame for better timing
+          requestAnimationFrame(() => {
+            applyColorsToSVG();
             
-            if (Object.keys(classColorMap).length > 0) {
-              console.log('MermaidDiagramViewer: Processing class colors', Object.keys(classColorMap));
+            // Also apply after a small delay as a fallback (in case SVG isn't fully ready)
+            setTimeout(() => {
+              applyColorsToSVG();
+            }, 50);
+            
+            // One more fallback for edge cases where SVG might not be fully rendered
+            setTimeout(() => {
+              applyColorsToSVG();
+            }, 200);
+            
+            // Additional pass to override Mermaid theme colors that might be applied later
+            setTimeout(() => {
+              applyColorsToSVG();
+            }, 500);
+          });
+          
+          // Check if the SVG contains error messages (Mermaid sometimes renders errors into SVG)
+          // Wait a tick for DOM to update, then check for error elements
+          setTimeout(() => {
+            if (!diagramRef.current) {
+              return;
+            }
+            
+            // Check for Mermaid error elements (they often have specific classes or text)
+            const svg = diagramRef.current.querySelector('svg');
+            
+            if (svg) {
+              // Look for text elements containing "Syntax error" or "error"
+              const textElements = svg.querySelectorAll('text');
               
-              Object.entries(classColorMap).forEach(([className, colors]) => {
-                const color = colorMode === 'dark' ? colors.dark : colors.light;
-                console.log(`MermaidDiagramViewer: Processing class "${className}"`, { color, colors, colorMode });
+              let foundError = false;
+              let errorText = '';
+              
+              // Define specific error patterns that indicate actual Mermaid errors
+              const errorPatterns = [
+                /syntax\s+error/i,
+                /parse\s+error/i,
+                /error\s+in\s+text/i,
+                /^error:/i,
+                /^error\s+at/i,
+                /rendering\s+error/i,
+                /diagram\s+error/i,
+              ];
+              
+              const isErrorText = (text: string): boolean => {
+                return errorPatterns.some(pattern => pattern.test(text));
+              };
+              
+              textElements.forEach((textEl) => {
+                const textContent = textEl.textContent || '';
                 
-                if (color) {
-                  // Find all elements with this class
-                  // Mermaid applies classes to g elements and their children
-                  const classElements = svg.querySelectorAll(`.${className}`);
-                  console.log(`MermaidDiagramViewer: Found ${classElements.length} elements with class "${className}"`);
-                  
-                  if (classElements.length === 0) {
-                    // Try alternative selectors - Mermaid might use different class naming
-                    const allClasses = Array.from(svg.querySelectorAll('[class]')).map(el => el.getAttribute('class'));
-                    console.log(`MermaidDiagramViewer: All classes found in SVG:`, allClasses);
-                    
-                    // Try with different class name formats
-                    const altSelectors = [
-                      `.node-${className}`,
-                      `[class*="${className}"]`,
-                      `[class~="${className}"]`,
-                    ];
-                    
-                    altSelectors.forEach(selector => {
-                      const altElements = svg.querySelectorAll(selector);
-                      if (altElements.length > 0) {
-                        console.log(`MermaidDiagramViewer: Found ${altElements.length} elements with selector "${selector}"`);
-                      }
-                    });
-                  }
-                  
-                  classElements.forEach((element, index) => {
-                    console.log(`MermaidDiagramViewer: Processing element ${index} for class "${className}"`, {
-                      tagName: element.tagName,
-                      className: element.getAttribute('class'),
-                      currentFill: element.getAttribute('fill'),
-                    });
-                    
-                    if (element instanceof SVGElement) {
-                      // Apply fill to the element itself if it's a shape
-                      if (element.tagName === 'rect' || element.tagName === 'circle' || 
-                          element.tagName === 'ellipse' || element.tagName === 'polygon' || 
-                          element.tagName === 'path') {
-                        const existingFill = element.getAttribute('fill');
-                        // Only apply if it's not explicitly set to none/transparent
-                        if (existingFill !== 'none' && existingFill !== 'transparent') {
-                          console.log(`MermaidDiagramViewer: Applying fill "${color}" to ${element.tagName}`);
-                          element.setAttribute('fill', color);
-                        }
-                      }
-                      
-                      // Also apply to child rect, circle, ellipse, polygon, path elements
-                      const shapes = element.querySelectorAll('rect, circle, ellipse, polygon, path');
-                      console.log(`MermaidDiagramViewer: Found ${shapes.length} child shapes in element ${index}`);
-                      
-                      shapes.forEach((shape, shapeIndex) => {
-                        const fill = shape.getAttribute('fill');
-                        const stroke = shape.getAttribute('stroke');
-                        const width = shape.getAttribute('width');
-                        const height = shape.getAttribute('height');
-                        
-                        // Get computed style to see what's actually being applied
-                        const computedStyle = window.getComputedStyle(shape as Element);
-                        const computedFill = computedStyle.fill;
-                        
-                        console.log(`MermaidDiagramViewer: Child shape ${shapeIndex}`, {
-                          tagName: shape.tagName,
-                          currentFill: fill,
-                          computedFill: computedFill,
-                          stroke: stroke,
-                          width: width,
-                          height: height,
-                          currentStyle: shape.getAttribute('style'),
-                        });
-                        
-                        // For rects, apply to background rects (ones without stroke, or the larger one)
-                        if (shape.tagName === 'rect') {
-                          // Skip border rects that have stroke
-                          if (stroke && stroke !== 'none' && stroke !== 'transparent') {
-                            console.log(`MermaidDiagramViewer: Skipping border rect ${shapeIndex} (has stroke: ${stroke})`);
-                            return;
-                          }
-                        }
-                        
-                        // Apply fill color - apply to all shapes that aren't explicitly transparent
-                        // Even if fill is null, we should apply it (it's using CSS/default)
-                        if (fill !== 'none' && fill !== 'transparent') {
-                          console.log(`MermaidDiagramViewer: Applying fill "${color}" to child ${shape.tagName} (was: ${fill || 'null/default'}, computed: ${computedFill})`);
-                          // Set both fill attribute and style attribute for maximum specificity
-                          shape.setAttribute('fill', color);
-                          // Get existing style and append/override fill
-                          const existingStyle = shape.getAttribute('style') || '';
-                          // Remove any existing fill from style
-                          const styleWithoutFill = existingStyle.replace(/fill:\s*[^;]+;?/gi, '').trim();
-                          const newStyle = styleWithoutFill ? `${styleWithoutFill}; fill: ${color};` : `fill: ${color};`;
-                          shape.setAttribute('style', newStyle);
-                          
-                          // Verify it was applied
-                          const afterFill = shape.getAttribute('fill');
-                          const afterStyle = shape.getAttribute('style');
-                          const afterComputed = window.getComputedStyle(shape as Element).fill;
-                          console.log(`MermaidDiagramViewer: After applying - fill: ${afterFill}, style: ${afterStyle}, computed: ${afterComputed}`);
-                        } else {
-                          console.log(`MermaidDiagramViewer: Skipping child ${shape.tagName} - fill is ${fill}`);
-                        }
-                      });
-                    }
-                  });
-                } else {
-                  console.log(`MermaidDiagramViewer: No color found for class "${className}" in ${colorMode} mode`);
+                if (isErrorText(textContent)) {
+                  foundError = true;
+                  errorText = textContent.trim();
                 }
               });
-            } else {
-              console.log('MermaidDiagramViewer: No classColors found in front matter');
+              
+              // Also check for foreignObject elements (Mermaid sometimes uses these for errors)
+              const foreignObjects = svg.querySelectorAll('foreignObject');
+              
+              foreignObjects.forEach((fo) => {
+                const textContent = fo.textContent || '';
+                
+                if (isErrorText(textContent)) {
+                  foundError = true;
+                  if (!errorText) {
+                    errorText = textContent.trim();
+                  }
+                }
+              });
+              
+              if (foundError) {
+                console.error('MermaidDiagramViewer: Error detected in rendered SVG', { errorText });
+                // Clear the SVG and show error
+                diagramRef.current.innerHTML = '';
+                const parsedError = parseMermaidError(errorText);
+                setRenderError(parsedError);
+              }
             }
-          }
+          }, 50);
         }
       }).catch((error) => {
-        console.error('MermaidDiagramViewer: Error rendering mermaid diagram:', error);
+        console.error('MermaidDiagramViewer: Error rendering mermaid diagram:', {
+          error,
+          errorMessage: error?.message,
+          errorStack: error?.stack,
+          errorName: error?.name,
+          mermaidCodeLength: mermaidCode.length,
+          mermaidCodePreview: mermaidCode.substring(0, 200),
+        });
+        
+        // Parse error message to extract useful information
+        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+        const parsed = parseMermaidError(errorMessage);
+        setRenderError(parsed);
+        
         if (diagramRef.current) {
-          diagramRef.current.innerHTML = `<p style="color: red;">Error rendering diagram: ${error.message}</p>`;
+          diagramRef.current.innerHTML = '';
         }
       });
-    }, 100); // Small delay to ensure Mermaid is re-initialized when color mode changes
+    }, 100); // Small delay to ensure Mermaid is fully initialized
 
     return () => {
       clearTimeout(renderTimeout);
     };
-  }, [content, diagram.path, colorMode]);
+  }, [content, diagram.path]);
+
+  // Clear error when content changes
+  useEffect(() => {
+    setRenderError(null);
+  }, [content]);
 
   // Smooth transform update using requestAnimationFrame
   const updateTransform = (isTransforming = true) => {
@@ -339,7 +673,9 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
 
     animationFrameRef.current = requestAnimationFrame(() => {
       const diagram = diagramRef.current;
-      if (!diagram) return;
+      if (!diagram) {
+        return;
+      }
 
       const { x, y } = positionRef.current;
       const scale = scaleRef.current;
@@ -351,7 +687,9 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   // Handle zoom with wheel/trackpad
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -386,6 +724,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
+    
     return () => {
       container.removeEventListener('wheel', handleWheel);
       if (wheelTimeout) clearTimeout(wheelTimeout);
@@ -419,7 +758,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   };
 
   return (
-    <Box p={6} maxW="100%" h="100%" overflow="auto" bg="transparent">
+    <Box p={6} maxW="100%" overflow="auto" bg="transparent">
       <VStack align="stretch" gap={6}>
         {/* Header */}
         <Box bg="transparent">
@@ -443,6 +782,53 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
             </HStack>
           )}
         </Box>
+
+        {/* Error Alert */}
+        {renderError && (
+          <Alert.Root status="error" variant="subtle">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Mermaid Syntax Error</Alert.Title>
+              <Alert.Description>
+                <VStack align="stretch" gap={3} mt={2}>
+                  <Code
+                    fontSize="xs"
+                    whiteSpace="pre-wrap"
+                    wordBreak="break-word"
+                    p={3}
+                    bg="bg.subtle"
+                    borderRadius="sm"
+                    borderWidth="1px"
+                    borderColor="border.subtle"
+                    maxH="150px"
+                    overflowY="auto"
+                    display="block"
+                  >
+                    {renderError}
+                  </Code>
+                  <HStack>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(renderError);
+                        } catch (err) {
+                          console.error('Failed to copy:', err);
+                        }
+                      }}
+                    >
+                      <HStack gap={1}>
+                        <LuCopy size={14} />
+                        <Text>Copy Error</Text>
+                      </HStack>
+                    </Button>
+                  </HStack>
+                </VStack>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
 
         {/* Diagram */}
         <Box

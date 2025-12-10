@@ -64,9 +64,5 @@ graph TB
     ClonesTab -->|On mount| GetClones
     TasksTab -->|On mount| GetTasks
     ScrapbookTab -->|On mount| GetArtifacts
-    
-    class Mount,LoadAll,AllArtifacts page
-    class FilterKits,FilterWalkthroughs,FilterAgents,FilterDiagrams filter
-    class KitsTab,WalkthroughsTab,AgentsTab,DiagramsTab,BlueprintsTab,ClonesTab,TasksTab,ScrapbookTab component
-    class GetArtifacts,GetBlueprints,GetClones,GetTasks ipc
+
 ```

@@ -1,0 +1,120 @@
+---
+alias: MermaidDiagramViewer Component Flow
+description: Complete flow of how MermaidDiagramViewer component works, from initialization through code extraction, Mermaid rendering, error handling, SVG styling with BlueKit blue and class-based colors, and user interactions like zoom, pan, and fullscreen
+tags:
+  - component
+  - mermaid
+  - rendering
+  - frontend
+  - react
+classes:
+  - initialization
+  - extraction
+  - rendering
+  - styling
+  - interaction
+  - error
+---
+```mermaid
+graph TB
+    subgraph Props["Component Props"]
+        DiagramProp[diagram: ArtifactFile<br/>frontMatter, path, name]
+        ContentProp[content: string<br/>Raw file content with YAML front matter]
+        
+        DiagramProp --> InitState
+        ContentProp --> InitState
+    end
+    
+    subgraph Component["MermaidDiagramViewer Component"]
+        InitState[Initialize State<br/>- colorMode from useColorMode<br/>- Refs: diagramRef, containerRef<br/>- State: isPanning, isFullscreen<br/>- State: renderError, isNotepadOpen]
+        
+        InitState --> ExtractCode
+    end
+    
+    subgraph Extraction["Code Extraction Process"]
+        ExtractCode[extractMermaidCode function<br/>1. Remove YAML front matter<br/>2. Try mermaid code block<br/>3. Try generic code block<br/>4. Fallback to raw content]
+        
+        ExtractCode --> ValidateCode{Code Found?}
+        ValidateCode -->|No| ShowNoCode[Display: No mermaid code found]
+        ValidateCode -->|Yes| GenerateID
+    end
+    
+    subgraph Rendering["Mermaid Rendering"]
+        GenerateID[Generate Unique ID<br/>mermaid-timestamp-random]
+        GenerateID --> MermaidRender[mermaid.render id, code]
+        
+        MermaidRender -->|Success| GetSVG[Get SVG from result]
+        MermaidRender -->|Error| ErrorHandler
+    end
+    
+    subgraph ErrorHandling["Error Detection & Display"]
+        ErrorHandler[Error Handler]
+        ErrorHandler --> ParseError[parseMermaidError<br/>Extract line number<br/>Extract expected/got tokens]
+        ParseError --> CheckSVGErrors[Check SVG for error messages<br/>Scan text elements<br/>Scan foreignObject elements]
+        CheckSVGErrors -->|Error Found| ClearSVG[Clear SVG content]
+        ClearSVG --> SetErrorState[setRenderError parsed error]
+        SetErrorState --> ShowAlert[Display Alert Component<br/>Error message + Copy button]
+        
+        MermaidRender -->|Promise Reject| ErrorHandler
+    end
+    
+    subgraph Styling["SVG Styling Process"]
+        GetSVG --> ApplyBlueKitBlue[Apply BlueKit Blue #4287f5<br/>1. Style marker elements arrows<br/>2. Style path elements lines<br/>3. Style polyline elements]
+        
+        ApplyBlueKitBlue --> CheckFrontMatter{Has frontMatter.classes?}
+        CheckFrontMatter -->|Yes| BuildColorMap[Build Class Color Map<br/>Sequential assignment from<br/>CLASS_COLOR_PALETTE<br/>index % palette.length]
+        CheckFrontMatter -->|No| SkipClassColors[Skip class-based coloring]
+        
+        BuildColorMap --> GetColorMode[Get current colorMode<br/>light or dark]
+        GetColorMode --> SelectColor[Select color from map<br/>colors.light or colors.dark]
+        SelectColor --> FindClassElements[Find SVG elements by class<br/>svg.querySelectorAll className]
+        FindClassElements --> ApplyClassColors[Apply fill color to shapes<br/>- rect, circle, ellipse, polygon, path<br/>- Skip transparent/none fills<br/>- Set both fill attr and style attr]
+        
+        ApplyClassColors --> InsertSVG[Insert SVG into diagramRef]
+        SkipClassColors --> InsertSVG
+    end
+    
+    subgraph Interactions["User Interactions"]
+        InsertSVG --> ZoomPan[Zoom & Pan Setup]
+        
+        ZoomPan --> WheelHandler[Wheel Event Handler<br/>Ctrl+Wheel: Zoom 1.0-5.0x<br/>Wheel: Pan diagram]
+        WheelHandler --> UpdateTransform[updateTransform<br/>requestAnimationFrame<br/>translate x, y scale]
+        
+        ZoomPan --> MouseHandler[Mouse Drag Handler<br/>onMouseDown: Start pan<br/>onMouseMove: Update position<br/>onMouseUp: End pan]
+        MouseHandler --> UpdateTransform
+        
+        UpdateTransform --> ApplyTransform[Apply CSS transform<br/>translate x, y scale]
+    end
+    
+    subgraph UI["UI Components"]
+        InsertSVG --> RenderUI[Render UI Components]
+        
+        RenderUI --> Header[Header Section<br/>- Display name alias<br/>- Description<br/>- Tags]
+        RenderUI --> ErrorAlert[Error Alert Conditional<br/>- Alert.Root status error<br/>- Code block with error<br/>- Copy button]
+        RenderUI --> DiagramContainer[Diagram Container<br/>- Border, padding, background<br/>- Fullscreen support<br/>- Icon buttons: fullscreen, notepad]
+        RenderUI --> DraggableNotepad[DraggableNotepad<br/>Conditional render]
+        
+        ShowAlert --> ErrorAlert
+    end
+    
+    subgraph ColorMode["Color Mode Integration"]
+        ColorModeChange[Color Mode Changes<br/>via ColorModeContext]
+        ColorModeChange --> ReinitMermaid[Mermaid Re-initialized<br/>in ColorModeContext<br/>with theme: default/dark]
+        ReinitMermaid --> DelayRender[100ms delay<br/>Ensure Mermaid ready]
+        DelayRender --> InitState
+        
+        InitState -.->|useEffect deps| ColorModeChange
+    end
+    
+    subgraph Effects["React Effects"]
+        ContentEffect[useEffect content, diagram.path, colorMode<br/>Triggers re-render on change]
+        ContentEffect --> InitState
+        
+        ClearErrorEffect[useEffect content<br/>Clear renderError on content change]
+        ClearErrorEffect --> InitState
+        
+        WheelEffect[useEffect wheel handler<br/>Setup/cleanup event listeners]
+        WheelEffect --> ZoomPan
+    end
+
+```

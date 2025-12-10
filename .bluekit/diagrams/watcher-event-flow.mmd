@@ -62,10 +62,5 @@ graph LR
     ReturnArtifacts -->|Vec&lt;ArtifactFile&gt;| InvokeCommand
     InvokeCommand -->|Artifacts| Handler
     Handler -->|Updates| UpdateState
-    
-    class FSChange filesystem
-    class NotifyCrate,Debounce,Dedupe,EmitEvent watcher
-    class Listen,ReceivePaths,Handler,InvokeCommand frontend
-    class GetChanged,ProcessPaths,ReturnArtifacts backend
-    class UpdateState state
+
 ```

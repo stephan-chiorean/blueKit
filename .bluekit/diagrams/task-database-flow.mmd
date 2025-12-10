@@ -102,10 +102,4 @@ graph TB
     TaskState -.->|Task data| TasksTab
     SelectionState -.->|Selected IDs| ActionBar
 
-    class TasksTab,CreateDialog,ActionBar,TaskState,SelectionState frontend
-    class GetTasks,GetProjectTasks,CreateTask,DeleteTask ipc
-    class DbGetTasks,DbGetProjectTasks,DbCreateTask,DbDeleteTask command
-    class GetOp,CreateOp,DeleteOp,GetProjectIds dbop
-    class TaskTable,TaskProjectTable database
-    class LoadAction,CreateAction,DeleteAction action
 ```

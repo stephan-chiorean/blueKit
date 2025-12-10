@@ -135,12 +135,4 @@ graph TB
     Watcher -.->|Uses| NotifyCrate
     Main_Module -.->|Uses| Tokio
 
-    class UI,IPC_Wrapper frontend
-    class IPC_Bridge,Event_System tauri
-    class Builder,Setup,Handler main
-    class Commands,Watcher,State,Utils module
-    class Ping,AppInfo,ProjectKits,ProjectRegistry,WatchKits,ReadFile,CopyKit,Scrapbook,FolderFiles,Blueprints,BlueprintTask,Diagrams command
-    class ProjectDir,RegistryFile,KitFiles,BlueprintFiles,DiagramFiles filesystem
-    class FileWatcher,DirWatcher,Notify watcher
-    class Serde,Tokio,NotifyCrate dependency
 ```

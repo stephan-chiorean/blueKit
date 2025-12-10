@@ -1,0 +1,140 @@
+---
+alias: Plan to Kit Conversion Flow
+description: Complete flow diagram showing how plans from Claude/Cursor plans directories are moved/copied and converted into kits in BlueKit projects, including user interaction, file operations, front matter transformation, and real-time UI updates
+tags:
+  - plans
+  - kits
+  - conversion
+  - file-operations
+  - ui-flow
+---
+```mermaid
+graph TB
+    subgraph UI["🖥️ FRONTEND LAYER"]
+        PlansPage[PlansPage Component]
+        PlansContent[PlansContent Component]
+        PlanCard[Plan Card/Row]
+        ConvertButton[Convert to Kit Button]
+        ProjectSelector[Project Selector Dialog]
+        ConfirmDialog[Confirm Move/Copy Dialog]
+        
+        PlansPage --> PlansContent
+        PlansContent --> PlanCard
+        PlanCard --> ConvertButton
+        ConvertButton --> ProjectSelector
+        ProjectSelector --> ConfirmDialog
+    end
+    
+    subgraph UserAction["👤 USER ACTION"]
+        UserSelectsPlan[User selects plan from list]
+        UserClicksConvert[User clicks Convert to Kit]
+        UserSelectsProject[User selects target project]
+        UserConfirmsOperation[User confirms move or copy]
+        
+        UserSelectsPlan --> UserClicksConvert
+        UserClicksConvert --> UserSelectsProject
+        UserSelectsProject --> UserConfirmsOperation
+    end
+    
+    subgraph IPC["🔌 IPC LAYER"]
+        InvokeConvertPlan[invoke convert_plan_to_kit<br/>planPath, projectPath, operationType]
+        InvokeReadPlan[invoke read_file<br/>planPath]
+        InvokeGetProjects[invoke get_project_registry]
+        
+        InvokeGetProjects --> InvokeConvertPlan
+        InvokeConvertPlan --> InvokeReadPlan
+    end
+    
+    subgraph Backend["🦀 BACKEND LAYER Rust"]
+        ConvertCommand[convert_plan_to_kit command]
+        ReadPlanFile[Read plan file from source<br/>~/.claude/plans or ~/.cursor/plans]
+        ParseContent[Parse file content<br/>Extract existing front matter]
+        CheckFrontMatter{Has valid<br/>front matter?}
+        ExtractTitle[Extract title from<br/>first heading if needed]
+        GenerateFrontMatter[Generate/Enhance front matter<br/>- id: generated from filename<br/>- alias: from title or filename<br/>- type: kit<br/>- description: optional<br/>- tags: preserve or add]
+        CreateKitContent[Create kit content with<br/>proper YAML front matter]
+        EnsureKitsDir[Ensure .bluekit/kits/<br/>directory exists]
+        CheckKitExists{Kit file<br/>already exists?}
+        HandleConflict[Handle naming conflict<br/>append number or prompt]
+        WriteKitFile[Write kit file to<br/>.bluekit/kits/filename.md]
+        DeleteOriginalPlan[Delete original plan file<br/>if move operation]
+        ReturnResult[Return success/error result]
+        
+        ConvertCommand --> ReadPlanFile
+        ReadPlanFile --> ParseContent
+        ParseContent --> CheckFrontMatter
+        CheckFrontMatter -->|No front matter| ExtractTitle
+        CheckFrontMatter -->|Has front matter| GenerateFrontMatter
+        ExtractTitle --> GenerateFrontMatter
+        GenerateFrontMatter --> CreateKitContent
+        CreateKitContent --> EnsureKitsDir
+        EnsureKitsDir --> CheckKitExists
+        CheckKitExists -->|Exists| HandleConflict
+        CheckKitExists -->|Not exists| WriteKitFile
+        HandleConflict --> WriteKitFile
+        WriteKitFile --> DeleteOriginalPlan
+        DeleteOriginalPlan --> ReturnResult
+    end
+    
+    subgraph FileSystem["📁 FILE SYSTEM"]
+        SourcePlansDir["Source Plans Directory<br/>~/.claude/plans/<br/>or ~/.cursor/plans/"]
+        PlanFile[Plan File<br/>plan-name.md]
+        TargetProject[Target Project Root]
+        BluekitDir[.bluekit/ directory]
+        KitsDir[kits/ subdirectory]
+        KitFile[Kit File<br/>plan-name.md]
+        
+        SourcePlansDir --> PlanFile
+        TargetProject --> BluekitDir
+        BluekitDir --> KitsDir
+        KitsDir --> KitFile
+    end
+    
+    subgraph Watcher["👁️ FILE WATCHER"]
+        WatchKitsDir[Watch .bluekit/kits/]
+        DetectNewKit[Detect new kit file]
+        EmitEvent[Emit project-kits-changed event]
+        DebounceEvent[300ms debounce]
+        
+        WatchKitsDir --> DetectNewKit
+        DetectNewKit --> DebounceEvent
+        DebounceEvent --> EmitEvent
+    end
+    
+    subgraph UIUpdate["🔄 UI UPDATE"]
+        ListenEvent[Frontend listens to<br/>project-kits-changed event]
+        ReloadKits[Reload kits list]
+        UpdateKitsView[Update KitsTabContent]
+        UpdatePlansView[Update PlansContent<br/>remove if moved]
+        ShowSuccess[Show success notification]
+        
+        ListenEvent --> ReloadKits
+        ReloadKits --> UpdateKitsView
+        ReloadKits --> UpdatePlansView
+        UpdateKitsView --> ShowSuccess
+    end
+    
+    UserConfirmsOperation --> InvokeConvertPlan
+    InvokeConvertPlan --> ConvertCommand
+    ReadPlanFile -.->|Reads from| PlanFile
+    WriteKitFile -.->|Writes to| KitFile
+    DeleteOriginalPlan -.->|Removes| PlanFile
+    WriteKitFile --> WatchKitsDir
+    EmitEvent --> ListenEvent
+    
+    classDef uiLayer fill:#4fc3f7
+    classDef userAction fill:#ffb74d
+    classDef ipcLayer fill:#66bb6a
+    classDef backendLayer fill:#f06292
+    classDef fileSystem fill:#ba68c8
+    classDef watcher fill:#ffd54f
+    classDef uiUpdate fill:#4db6ac
+    
+    class PlansPage,PlansContent,PlanCard,ConvertButton,ProjectSelector,ConfirmDialog uiLayer
+    class UserSelectsPlan,UserClicksConvert,UserSelectsProject,UserConfirmsOperation userAction
+    class InvokeConvertPlan,InvokeReadPlan,InvokeGetProjects ipcLayer
+    class ConvertCommand,ReadPlanFile,ParseContent,CheckFrontMatter,ExtractTitle,GenerateFrontMatter,CreateKitContent,EnsureKitsDir,CheckKitExists,HandleConflict,WriteKitFile,DeleteOriginalPlan,ReturnResult backendLayer
+    class SourcePlansDir,PlanFile,TargetProject,BluekitDir,KitsDir,KitFile fileSystem
+    class WatchKitsDir,DetectNewKit,EmitEvent,DebounceEvent watcher
+    class ListenEvent,ReloadKits,UpdateKitsView,UpdatePlansView,ShowSuccess uiUpdate
+```

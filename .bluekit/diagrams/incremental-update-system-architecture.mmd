@@ -109,11 +109,5 @@ graph TB
     IncrementalUpdate -->|Detects Moves| State
     IncrementalUpdate -->|Removes Old Path| State
     IncrementalUpdate -->|Adds New Path| State
-    
-    class ProjectPage,Mount,WatchSetup,EventListener,IncrementalUpdate,State frontend
-    class InvokeGetChanged,EventEmit,EventListen ipc
-    class NotifyCrate,Debounce,Dedupe,EmitEvent watcher
-    class GetChanged,InvalidateCache,ReadFile,ParseFrontMatter,ReturnArtifacts commands
-    class CacheStore,Invalidate,GetOrRead,GetIfUnchanged cache
-    class BluekitDir,FileMove,FileDelete,FileCreate,ConfigUpdate filesystem
+
 ```

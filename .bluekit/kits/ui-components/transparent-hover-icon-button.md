@@ -448,3 +448,7 @@ This pattern works with Chakra UI v3's component API:
 - `_hover` prop for hover states
 - `variant="ghost"` for minimal styling
 - Works with `Menu.Root` and `Menu.Trigger` composition
+
+
+
+

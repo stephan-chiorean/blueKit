@@ -137,13 +137,4 @@ graph TB
     IPCReturn -->|Returns to| LoadFunc
     WatchSetup -.->|Parallel setup| LoadFunc
 
-    class BackendEntry,BluekitDir,RecursiveScan,ArtifactStruct backend
-    class IPCWrapper,IPCReturn ipc
-    class WatchSetup,WatchDir,WatchEvent,Debounce watcher
-    class LoadFunc,ReadContent,ParseFront,ArtifactsState,Reload component
-    class FilterLogic,KitsFilter,WalkthroughsFilter,AgentsFilter,BlueprintsFilter,DiagramsFilter filter
-    class KitsTab,WalkthroughsTab,AgentsTab,BlueprintsTab,DiagramsTab,ScrapbookTab tab
-    class Principle1,Principle2,Principle3,Principle4,Why rationale
-    class BackendNote,IPCNote,WatchNote,StateNote,FilterNote,TabNote note
-    class ScrapbookLogic,ScrapbookReason scrapbook
 ```
