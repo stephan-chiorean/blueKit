@@ -234,13 +234,12 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                 <Field.Root>
                   <Field.Label>Complexity (optional)</Field.Label>
                   <SegmentGroup.Root
-                    value={complexity || ''}
+                    value={complexity || undefined}
                     onValueChange={(e) => setComplexity(e.value as TaskComplexity | '')}
                   >
                     <SegmentGroup.Indicator />
                     <SegmentGroup.Items
                       items={[
-                        { value: '', label: 'Not specified' },
                         { value: 'easy', label: 'Easy' },
                         { value: 'hard', label: 'Hard' },
                         { value: 'deep dive', label: 'Deep dive' },
