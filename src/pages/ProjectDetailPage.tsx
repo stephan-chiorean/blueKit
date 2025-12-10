@@ -64,7 +64,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         const projects = await invokeGetProjectRegistry();
         setAllProjects(projects);
       } catch (err) {
-        console.error('Failed to load projects:', err);
+        // Failed to load projects
       }
     };
     loadProjects();
@@ -77,7 +77,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // Duplicate detection: Skip if called within 100ms window
     const now = Date.now();
     if (now - lastLoadTimestampRef.current < 100) {
-      console.log('Skipping duplicate load (within 100ms window)');
       return;
     }
     lastLoadTimestampRef.current = now;
@@ -87,25 +86,13 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setArtifactsLoading(true);
       setError(null);
 
-      console.log(`Loading artifacts from project: ${project.path}`);
       const projectArtifacts = await invokeGetProjectArtifacts(project.path);
-
-      // Debug: Check if frontMatter is present
-      if (projectArtifacts.length > 0) {
-        console.log('Sample artifact:', {
-          name: projectArtifacts[0].name,
-          path: projectArtifacts[0].path,
-          hasFrontMatter: !!projectArtifacts[0].frontMatter,
-          frontMatter: projectArtifacts[0].frontMatter,
-        });
-      }
 
       // Atomic update: set both artifacts and loading in one state update
       setArtifacts(projectArtifacts);
       setArtifactsLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load artifacts');
-      console.error('Error loading artifacts:', err);
       setArtifactsLoading(false);
     }
   };
@@ -113,19 +100,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // Incremental update - only reload changed files
   // Uses transition to mark as non-urgent, preventing UI blocking
   const updateArtifactsIncremental = async (changedPaths: string[]) => {
-    console.log('[UpdateIncremental] 🔄 Starting incremental update');
-    console.log('[UpdateIncremental] 📋 Changed paths:', changedPaths);
-
     if (changedPaths.length === 0) {
-      console.log('[UpdateIncremental] ⚠️ No changed paths, skipping');
       return;
     }
 
     try {
-      console.log('[UpdateIncremental] 🔍 Fetching changed artifacts from backend...');
       const changedArtifacts = await invokeGetChangedArtifacts(project.path, changedPaths);
-      console.log('[UpdateIncremental] ✅ Received', changedArtifacts.length, 'changed artifacts');
-      console.log('[UpdateIncremental] 📦 Changed artifacts:', changedArtifacts.map(a => ({ path: a.path, type: a.type })));
 
       // Use transition for non-urgent update - prevents blocking UI
       startTransition(() => {
@@ -192,14 +172,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           });
 
           const finalArtifacts = Array.from(updated.values());
-          console.log('[UpdateIncremental] 💾 State updated with', finalArtifacts.length, 'total artifacts');
           return finalArtifacts;
         });
-        console.log('[UpdateIncremental] ✨ Transition complete');
         // No loading state for incremental updates - they happen silently
       });
     } catch (err) {
-      console.error('[UpdateIncremental] ❌ Error updating artifacts incrementally:', err);
       // Fallback to full reload on error
       loadProjectArtifacts();
     }
@@ -215,9 +192,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // Set up file watcher for this project
     const setupWatcher = async () => {
       try {
-        console.log('[Watcher] 🚀 Setting up file watcher for project:', project.path);
         await invokeWatchProjectArtifacts(project.path);
-        console.log('[Watcher] ✅ File watcher command sent to backend');
 
         // Generate the event name (must match the Rust code)
         const sanitizedPath = project.path
@@ -227,29 +202,22 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           .replace(/\./g, '_')
           .replace(/ /g, '_');
         const eventName = `project-artifacts-changed-${sanitizedPath}`;
-        console.log('[Watcher] 👂 Listening for events on:', eventName);
 
         // Listen for file change events - receive changed file paths
         unlisten = await listen<string[]>(eventName, (event) => {
           if (isMounted) {
             const changedPaths = event.payload;
-            console.log(`[Watcher] 📁 Artifacts directory changed for ${project.path}`);
-            console.log(`[Watcher] 📝 ${changedPaths.length} files changed:`, changedPaths);
             if (changedPaths.length > 0) {
               updateArtifactsIncremental(changedPaths);
             } else {
               // If no paths provided, fallback to full reload
-              console.log('[Watcher] ⚠️ No paths in payload, doing full reload');
               loadProjectArtifacts();
             }
-          } else {
-            console.log('[Watcher] ⚠️ Event received but component unmounted');
           }
         });
       } catch (error) {
-        console.error(`Failed to set up file watcher for ${project.path}:`, error);
         if (error instanceof TimeoutError) {
-          console.warn('File watcher setup timed out - watchers may not work');
+          // File watcher setup timed out - watchers may not work
         }
       }
     };
@@ -273,7 +241,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       // Find the artifact
       const artifact = artifacts.find(a => a.path === artifactPath);
       if (!artifact) {
-        console.warn('Artifact not found for optimistic update:', artifactPath);
         return () => {}; // No-op rollback
       }
 
@@ -386,7 +353,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setResourceContent(content);
       setResourceType(type);
     } catch (error) {
-      console.error('Failed to load resource content:', error);
+      // Failed to load resource content
     }
   };
 
@@ -418,7 +385,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setResourceContent(content);
       setResourceType('task');
     } catch (error) {
-      console.error('Failed to load task content:', error);
+      // Failed to load task content
     }
   };
 
@@ -538,14 +505,41 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 </Select.Root>
               </Flex>
               
-              {/* Centered: Tabs */}
+              {/* Centered: Tabs with horizontal scroll */}
               <Box 
                 position="absolute" 
                 left="50%" 
                 style={{ transform: 'translateX(-50%)' }}
+                maxW="650px"
+                overflowX="auto"
+                overflowY="hidden"
+                css={{
+                  '&::-webkit-scrollbar': {
+                    height: '4px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: 'transparent',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: 'colors.gray.300',
+                    borderRadius: '2px',
+                  },
+                  '&::-webkit-scrollbar-thumb:hover': {
+                    background: 'colors.gray.400',
+                  },
+                  // Enable momentum scrolling on iOS
+                  WebkitOverflowScrolling: 'touch',
+                  // Smooth scrolling
+                  scrollBehavior: 'smooth',
+                }}
               >
-                <Tabs.List>
-                  <Tabs.Trigger value="kits">
+                <Tabs.List
+                  display="flex"
+                  flexWrap="nowrap"
+                  gap={0}
+                  minW="fit-content"
+                >
+                  <Tabs.Trigger value="kits" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuPackage />
@@ -553,7 +547,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Kits</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="blueprints">
+                  <Tabs.Trigger value="blueprints" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <BsStack />
@@ -561,7 +555,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Blueprints</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="walkthroughs">
+                  <Tabs.Trigger value="walkthroughs" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuBookOpen />
@@ -569,7 +563,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Walkthroughs</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="agents">
+                  <Tabs.Trigger value="agents" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuBot />
@@ -577,7 +571,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Agents</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="scrapbook">
+                  <Tabs.Trigger value="scrapbook" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuNotebook />
@@ -585,7 +579,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Scrapbook</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="diagrams">
+                  <Tabs.Trigger value="diagrams" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuNetwork />
@@ -593,7 +587,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Diagrams</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="clones">
+                  <Tabs.Trigger value="clones" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuCopy />
@@ -601,7 +595,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Clones</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="tasks">
+                  <Tabs.Trigger value="tasks" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuListTodo />

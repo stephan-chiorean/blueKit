@@ -1,5 +1,16 @@
 import { useState, useMemo } from 'react';
-import { DialogRoot, DialogBackdrop, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogCloseTrigger, Button, Field, Input, Textarea, HStack, VStack } from '@chakra-ui/react';
+import {
+  Dialog,
+  Button,
+  Field,
+  Input,
+  Textarea,
+  HStack,
+  VStack,
+  Portal,
+  CloseButton,
+  TagsInput,
+} from '@chakra-ui/react';
 import { FolderConfig } from '../../ipc';
 
 interface CreateFolderDialogProps {
@@ -52,7 +63,7 @@ function slugify(text: string): string {
 export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDialogProps) {
   const [alias, setAlias] = useState('');
   const [description, setDescription] = useState('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
   // Generate folder-friendly name from alias
@@ -69,7 +80,7 @@ export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDi
       const config: Partial<FolderConfig> = {
         name: alias, // Alias is stored as the display name in config
         description: description || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t.length > 0) : [],
+        tags: tags,
       };
       // Pass folder-friendly name as the directory name, alias goes in config.name
       await onCreate(folderName, config);
@@ -77,7 +88,7 @@ export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDi
       // Reset form
       setAlias('');
       setDescription('');
-      setTags('');
+      setTags([]);
       onClose();
     } catch (error) {
       console.error('Failed to create folder:', error);
@@ -91,89 +102,100 @@ export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDi
       // Reset form on cancel
       setAlias('');
       setDescription('');
-      setTags('');
+      setTags([]);
       onClose();
     }
   };
 
   return (
-    <DialogRoot open={isOpen} onOpenChange={(details) => {
-      if (!details.open) {
-        handleClose();
-      }
-    }}>
-      <DialogBackdrop />
-      <DialogContent maxW="500px" position="fixed" top="50%" left="50%" transform="translate(-50%, -50%)" zIndex={1500}>
-        <DialogHeader>Create Folder</DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack align='stretch' gap={4}>
-            <Field.Root required>
-              <Field.Label>Alias</Field.Label>
-              <Input
-                value={alias}
-                onChange={(e) => setAlias(e.target.value)}
-                placeholder='UI Components'
-                disabled={isCreating}
-              />
-              <Field.HelperText>
-                Display name for the folder (what's rendered)
-              </Field.HelperText>
-            </Field.Root>
+    <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
+      <Dialog.Backdrop />
+      <Portal>
+        <Dialog.Positioner>
+          <Dialog.Content maxW="xl">
+            <Dialog.Header>
+              <Dialog.Title>Create Folder</Dialog.Title>
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" />
+              </Dialog.CloseTrigger>
+            </Dialog.Header>
 
-            <Field.Root>
-              <Field.Label>Folder Name</Field.Label>
-              <Input
-                value={folderName}
-                disabled
-                placeholder='ui-components'
-              />
-              <Field.HelperText>
-                Folder-friendly name (auto-generated from alias)
-              </Field.HelperText>
-            </Field.Root>
+            <Dialog.Body>
+              <VStack gap={4} align="stretch">
+                <Field.Root required>
+                  <Field.Label>Alias</Field.Label>
+                  <Input
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
+                    placeholder="UI Components"
+                    disabled={isCreating}
+                    autoFocus
+                    _placeholder={{ color: 'fg.muted', opacity: 0.6 }}
+                  />
+                  <Field.HelperText>
+                    Display name for the folder (what's rendered)
+                  </Field.HelperText>
+                </Field.Root>
 
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder='Reusable UI patterns'
-                rows={3}
-                disabled={isCreating}
-              />
-            </Field.Root>
+                <Field.Root>
+                  <Field.Label>Folder Name</Field.Label>
+                  <Input
+                    value={folderName}
+                    disabled
+                    placeholder="ui-components"
+                  />
+                  <Field.HelperText>
+                    Folder-friendly name (auto-generated from alias)
+                  </Field.HelperText>
+                </Field.Root>
 
-            <Field.Root>
-              <Field.Label>Tags (comma-separated)</Field.Label>
-              <Input
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder='ui, components, chakra'
-                disabled={isCreating}
-              />
-              <Field.HelperText>
-                Optional tags for categorization
-              </Field.HelperText>
-            </Field.Root>
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={3}>
-            <Button variant='ghost' onClick={handleClose} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette='blue'
-              onClick={handleCreate}
-              loading={isCreating}
-              disabled={!alias.trim() || !folderName || isCreating}
-            >
-              Create
-            </Button>
-          </HStack>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+                <Field.Root>
+                  <Field.Label>Description</Field.Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Reusable UI patterns"
+                    rows={3}
+                    disabled={isCreating}
+                    _placeholder={{ color: 'fg.muted', opacity: 0.6 }}
+                  />
+                </Field.Root>
+
+                <Field.Root>
+                  <TagsInput.Root
+                    value={tags}
+                    onValueChange={(details) => setTags(details.value)}
+                    disabled={isCreating}
+                  >
+                    <TagsInput.Label>Tags</TagsInput.Label>
+                    <TagsInput.Control>
+                      <TagsInput.Items />
+                      <TagsInput.Input placeholder="Add tag..." />
+                    </TagsInput.Control>
+                    <TagsInput.HiddenInput />
+                  </TagsInput.Root>
+                </Field.Root>
+              </VStack>
+            </Dialog.Body>
+
+            <Dialog.Footer>
+              <HStack gap={2}>
+                <Button variant="outline" onClick={handleClose} disabled={isCreating}>
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="primary"
+                  onClick={handleCreate}
+                  loading={isCreating}
+                  disabled={!alias.trim() || !folderName || isCreating}
+                >
+                  Create
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }
