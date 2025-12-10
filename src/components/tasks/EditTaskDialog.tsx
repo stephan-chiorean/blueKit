@@ -11,13 +11,14 @@ import {
   HStack,
   Field,
   Icon,
-  Menu,
+  SegmentGroup,
   TagsInput,
 } from '@chakra-ui/react';
-import { LuPin, LuCheck, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
+import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
 import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task';
-import { invokeDbUpdateTask } from '../../ipc';
+import { ProjectEntry, invokeDbUpdateTask, invokeGetProjectRegistry } from '../../ipc';
 import { toaster } from '../ui/toaster';
+import ProjectMultiSelect from './ProjectMultiSelect';
 
 interface EditTaskDialogProps {
   task: Task | null;
@@ -33,7 +34,22 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
   const [status, setStatus] = useState<TaskStatus>('backlog');
   const [complexity, setComplexity] = useState<TaskComplexity | ''>('');
   const [tags, setTags] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Load projects on mount
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const registryProjects = await invokeGetProjectRegistry();
+        setProjects(registryProjects);
+      } catch (error) {
+        console.error('Failed to load projects in EditTaskDialog:', error);
+      }
+    };
+    loadProjects();
+  }, []);
 
   // Initialize form when task changes
   useEffect(() => {
@@ -44,6 +60,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
       setStatus(task.status);
       setComplexity(task.complexity || '');
       setTags(task.tags);
+      setSelectedProjectIds(task.projectIds || []);
     }
   }, [task]);
 
@@ -68,7 +85,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
         description.trim() || undefined,
         priority,
         tags,
-        task.projectIds, // Keep existing project associations
+        selectedProjectIds,
         status,
         complexity || undefined
       );
@@ -102,7 +119,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="2xl">
+          <Dialog.Content maxW="4xl">
             <Dialog.Header>
               <Dialog.Title>Edit Task</Dialog.Title>
               <Dialog.CloseTrigger asChild>
@@ -122,259 +139,6 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                 </Field.Root>
 
                 <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Add details about this task..."
-                    rows={4}
-                  />
-                </Field.Root>
-
-                <Field.Root required>
-                  <Field.Label>Priority</Field.Label>
-                  <Menu.Root>
-                    <Menu.Trigger asChild>
-                      <Button variant="outline" w="100%" justifyContent="space-between">
-                        <HStack gap={2}>
-                      {priority === 'pinned' && (
-                            <Icon color="blue.500">
-                          <LuPin />
-                        </Icon>
-                      )}
-                          {priority === 'high' && (
-                            <Icon color="red.500">
-                              <LuArrowUp />
-                            </Icon>
-                          )}
-                          {priority === 'long term' && (
-                            <Icon color="purple.500">
-                              <LuClock />
-                            </Icon>
-                          )}
-                          {priority === 'nit' && (
-                            <Icon color="yellow.500">
-                              <LuSparkles />
-                            </Icon>
-                          )}
-                          {priority === 'standard' && (
-                            <Icon color="orange.500">
-                              <LuMinus />
-                            </Icon>
-                          )}
-                          <Text>
-                            {priority === 'pinned' && 'Pinned'}
-                            {priority === 'high' && 'High'}
-                            {priority === 'standard' && 'Standard'}
-                            {priority === 'long term' && 'Long Term'}
-                            {priority === 'nit' && 'Nit'}
-                          </Text>
-                        </HStack>
-                      </Button>
-                    </Menu.Trigger>
-                    <Menu.Positioner>
-                      <Menu.Content>
-                          <Menu.Item value="pinned" onSelect={() => setPriority('pinned')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <HStack gap={2}>
-                                <Icon color="blue.500">
-                                  <LuPin />
-                                </Icon>
-                                <Text>Pinned</Text>
-                              </HStack>
-                              {priority === 'pinned' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="high" onSelect={() => setPriority('high')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <HStack gap={2}>
-                                <Icon color="red.500">
-                                  <LuArrowUp />
-                                </Icon>
-                                <Text>High</Text>
-                              </HStack>
-                              {priority === 'high' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="standard" onSelect={() => setPriority('standard')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <HStack gap={2}>
-                                <Icon color="orange.500">
-                                  <LuMinus />
-                                </Icon>
-                                <Text>Standard</Text>
-                              </HStack>
-                              {priority === 'standard' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="long term" onSelect={() => setPriority('long term')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <HStack gap={2}>
-                                <Icon color="purple.500">
-                                  <LuClock />
-                                </Icon>
-                                <Text>Long Term</Text>
-                              </HStack>
-                              {priority === 'long term' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="nit" onSelect={() => setPriority('nit')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <HStack gap={2}>
-                                <Icon color="yellow.500">
-                                  <LuSparkles />
-                                </Icon>
-                                <Text>Nit</Text>
-                              </HStack>
-                              {priority === 'nit' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Positioner>
-                  </Menu.Root>
-                </Field.Root>
-
-                <Field.Root>
-                  <Field.Label>Complexity (optional)</Field.Label>
-                  <Menu.Root>
-                    <Menu.Trigger asChild>
-                      <Button variant="outline" w="100%" justifyContent="space-between">
-                        <Text>
-                          {complexity === '' && 'Not specified'}
-                          {complexity === 'easy' && 'Easy'}
-                          {complexity === 'hard' && 'Hard'}
-                          {complexity === 'deep dive' && 'Deep dive'}
-                        </Text>
-                      </Button>
-                    </Menu.Trigger>
-                    <Menu.Positioner>
-                      <Menu.Content>
-                          <Menu.Item value="" onSelect={() => setComplexity('')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Not specified</Text>
-                              {complexity === '' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="easy" onSelect={() => setComplexity('easy')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Easy</Text>
-                              {complexity === 'easy' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="hard" onSelect={() => setComplexity('hard')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Hard</Text>
-                              {complexity === 'hard' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="deep dive" onSelect={() => setComplexity('deep dive')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Deep dive</Text>
-                              {complexity === 'deep dive' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Positioner>
-                  </Menu.Root>
-                </Field.Root>
-
-                <Field.Root required>
-                  <Field.Label>Status</Field.Label>
-                  <Menu.Root>
-                    <Menu.Trigger asChild>
-                      <Button variant="outline" w="100%" justifyContent="space-between">
-                        <Text>
-                          {status === 'backlog' && 'Backlog'}
-                          {status === 'in_progress' && 'In Progress'}
-                          {status === 'completed' && 'Completed'}
-                          {status === 'blocked' && 'Blocked'}
-                        </Text>
-                      </Button>
-                    </Menu.Trigger>
-                    <Menu.Positioner>
-                      <Menu.Content>
-                          <Menu.Item value="backlog" onSelect={() => setStatus('backlog')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Backlog</Text>
-                              {status === 'backlog' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="in_progress" onSelect={() => setStatus('in_progress')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>In Progress</Text>
-                              {status === 'in_progress' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="completed" onSelect={() => setStatus('completed')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Completed</Text>
-                              {status === 'completed' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                          <Menu.Item value="blocked" onSelect={() => setStatus('blocked')}>
-                            <HStack gap={2} justify="space-between" width="100%">
-                              <Text>Blocked</Text>
-                              {status === 'blocked' && (
-                                <Icon color="blue.500">
-                                  <LuCheck />
-                                </Icon>
-                              )}
-                            </HStack>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Positioner>
-                  </Menu.Root>
-                </Field.Root>
-
-                <Field.Root>
                   <TagsInput.Root
                     value={tags}
                     onValueChange={(details) => setTags(details.value)}
@@ -387,6 +151,127 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                     <TagsInput.HiddenInput />
                   </TagsInput.Root>
                 </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Description</Field.Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Add details about this task..."
+                    rows={4}
+                  />
+                </Field.Root>
+
+                <Field.Root required>
+                  <Field.Label>Priority</Field.Label>
+                  <SegmentGroup.Root
+                    value={priority}
+                    onValueChange={(e) => setPriority(e.value as TaskPriority)}
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Items
+                      items={[
+                        {
+                          value: 'pinned',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="blue.500" size="sm">
+                                <LuPin />
+                              </Icon>
+                              <Text>Pinned</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'high',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="red.500" size="sm">
+                                <LuArrowUp />
+                              </Icon>
+                              <Text>High</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'standard',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="orange.500" size="sm">
+                                <LuMinus />
+                              </Icon>
+                              <Text>Standard</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'long term',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="purple.500" size="sm">
+                                <LuClock />
+                              </Icon>
+                              <Text>Long Term</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'nit',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="yellow.500" size="sm">
+                                <LuSparkles />
+                              </Icon>
+                              <Text>Nit</Text>
+                            </HStack>
+                          ),
+                        },
+                      ]}
+                    />
+                  </SegmentGroup.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Complexity (optional)</Field.Label>
+                  <SegmentGroup.Root
+                    value={complexity || ''}
+                    onValueChange={(e) => setComplexity(e.value as TaskComplexity | '')}
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Items
+                      items={[
+                        { value: '', label: 'Not specified' },
+                        { value: 'easy', label: 'Easy' },
+                        { value: 'hard', label: 'Hard' },
+                        { value: 'deep dive', label: 'Deep dive' },
+                      ]}
+                    />
+                  </SegmentGroup.Root>
+                </Field.Root>
+
+                <Field.Root required>
+                  <Field.Label>Status</Field.Label>
+                  <SegmentGroup.Root
+                    value={status}
+                    onValueChange={(e) => setStatus(e.value as TaskStatus)}
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Items
+                      items={[
+                        { value: 'backlog', label: 'Backlog' },
+                        { value: 'in_progress', label: 'In Progress' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'blocked', label: 'Blocked' },
+                      ]}
+                    />
+                  </SegmentGroup.Root>
+                </Field.Root>
+
+                <ProjectMultiSelect
+                  projects={projects}
+                  selectedProjectIds={selectedProjectIds}
+                  onChange={setSelectedProjectIds}
+                />
               </VStack>
             </Dialog.Body>
 
