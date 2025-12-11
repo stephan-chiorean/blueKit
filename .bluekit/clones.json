@@ -86,5 +86,21 @@
       "typescript"
     ],
     "createdAt": "2025-12-09T16:40:22.787Z"
+  },
+  {
+    "id": "bluekit-file-watcher-optimizations-20251211",
+    "name": "BlueKit - File Watcher Optimizations",
+    "description": "BlueKit app with comprehensive file watcher system optimizations: ExitReason tracking for clean cancellation, duplicate watcher prevention, oneshot channel cancellation, request deduplication, and clean logging. Includes detailed walkthrough and diagram documentation.",
+    "gitUrl": "https://github.com/stephan-chiorean/blueKit.git",
+    "gitCommit": "f01e9bbca22b41cc1ded075c47cceb4e51712f42",
+    "gitBranch": "main",
+    "tags": [
+      "optimized",
+      "file-watchers",
+      "tauri",
+      "rust",
+      "production-ready"
+    ],
+    "createdAt": "2025-12-11T06:13:54.524Z"
   }
 ]

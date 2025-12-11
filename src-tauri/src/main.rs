@@ -29,9 +29,14 @@ use tauri::Manager;
 #[tokio::main]
 async fn main() {
     // Initialize structured logging
+    // INFO level temporarily for debugging timeout issues
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG) // Changed from INFO to DEBUG for file watcher debugging
+        .with_max_level(tracing::Level::INFO)
         .with_target(false)
+        .with_env_filter(
+            // Set app logs to INFO, database logs to WARN
+            tracing_subscriber::EnvFilter::new("bluekit_app=info,sqlx=warn,sea_orm=warn")
+        )
         .init();
 
     // `tauri::Builder` is used to configure and create a Tauri application
@@ -68,6 +73,7 @@ async fn main() {
             commands::create_project_from_clone, // Create project from clone
             commands::create_new_project, // Create new project with files
             commands::get_watcher_health, // Get health status of all active file watchers
+            commands::stop_watcher, // Stop a file watcher by event name
             commands::db_get_tasks, // Get all tasks (database)
             commands::db_get_project_tasks, // Get tasks for a project (database)
             commands::db_get_task, // Get a single task (database)
@@ -116,6 +122,25 @@ async fn main() {
                     eprintln!("Failed to start file watcher: {}", e);
                 }
             }
+
+            // Register cleanup handler for app shutdown
+            let window = app.get_window("main").expect("Failed to get main window");
+
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    tracing::info!("App closing, cleaning up watchers...");
+
+                    // Block until cleanup completes
+                    tauri::async_runtime::block_on(async {
+                        if let Err(e) = crate::watcher::stop_all_watchers().await {
+                            tracing::error!("Watcher cleanup failed: {}", e);
+                        }
+                    });
+
+                    tracing::info!("Watcher cleanup complete");
+                }
+            });
+
             Ok(())
         })
         // `.run()` actually starts the Tauri application

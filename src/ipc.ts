@@ -24,6 +24,14 @@ import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity } from './type
 // Re-export TimeoutError for convenience
 export { TimeoutError };
 
+// ============================================================================
+// PROJECT REGISTRY CACHE
+// ============================================================================
+// Cache for project registry to prevent redundant IPC calls
+// Multiple components call invokeGetProjectRegistry on mount, this deduplicates them
+let projectRegistryCache: ProjectEntry[] | null = null;
+let projectRegistryPromise: Promise<ProjectEntry[]> | null = null;
+
 /**
  * Type definition for the AppInfo structure returned by `get_app_info`.
  * 
@@ -490,7 +498,49 @@ export async function invokeGetChangedArtifacts(
  * ```
  */
 export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
-  return await invokeWithTimeout<ProjectEntry[]>('get_project_registry');
+  // Return cached data if available
+  if (projectRegistryCache) {
+    return projectRegistryCache;
+  }
+
+  // If a request is already in flight, return that promise (deduplication)
+  if (projectRegistryPromise) {
+    return projectRegistryPromise;
+  }
+
+  // Make the request
+  projectRegistryPromise = invokeWithTimeout<ProjectEntry[]>('get_project_registry')
+    .then(result => {
+      projectRegistryCache = result;
+      projectRegistryPromise = null;
+      return result;
+    })
+    .catch(error => {
+      projectRegistryPromise = null; // Clear promise on error so retry is possible
+      throw error;
+    });
+
+  return projectRegistryPromise;
+}
+
+/**
+ * Invalidates the project registry cache.
+ *
+ * Call this when the project registry file changes to force a reload
+ * on the next call to invokeGetProjectRegistry.
+ *
+ * @example
+ * ```typescript
+ * // In your file watcher listener:
+ * listen('project-registry-changed', () => {
+ *   invalidateProjectRegistryCache();
+ *   loadProjects(); // This will now fetch fresh data
+ * });
+ * ```
+ */
+export function invalidateProjectRegistryCache(): void {
+  projectRegistryCache = null;
+  projectRegistryPromise = null;
 }
 
 /**
@@ -906,6 +956,25 @@ export async function invokeCreateNewProject(
  */
 export async function invokeGetWatcherHealth(): Promise<Record<string, boolean>> {
   return await invokeWithTimeout<Record<string, boolean>>('get_watcher_health', {}, 3000); // Quick health check
+}
+
+/**
+ * Stops a file watcher by event name.
+ *
+ * This function gracefully stops a running file watcher task by sending a
+ * cancellation signal and waiting for the task to complete (with 5s timeout).
+ *
+ * @param eventName - The event name of the watcher to stop (e.g., 'project-artifacts-changed-foo')
+ * @returns A promise that resolves when the watcher is stopped
+ *
+ * @example
+ * ```typescript
+ * await invokeStopWatcher('project-artifacts-changed-foo');
+ * console.log('Watcher stopped successfully');
+ * ```
+ */
+export async function invokeStopWatcher(eventName: string): Promise<void> {
+  return await invokeWithTimeout<void>('stop_watcher', { eventName }, 5000); // Allow time for graceful shutdown
 }
 
 /**

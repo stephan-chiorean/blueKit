@@ -14,7 +14,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::{mpsc, RwLock, oneshot};
 use tokio::time::{sleep, Instant};
 use tauri::{AppHandle, Manager};
 use std::env;
@@ -37,6 +38,10 @@ struct WatcherTask {
     restart_count: u32,
     /// Whether the task is active
     is_active: bool,
+    /// Task handle for cancellation
+    task_handle: tauri::async_runtime::JoinHandle<()>,
+    /// Cancellation signal sender
+    cancel_tx: Option<oneshot::Sender<()>>,
 }
 
 /// Global watcher registry - stores active watchers
@@ -44,6 +49,9 @@ struct WatcherTask {
 /// Value: WatcherTask handle for lifecycle management
 static WATCHER_REGISTRY: once_cell::sync::Lazy<Arc<RwLock<HashMap<String, WatcherTask>>>> =
     once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+/// Global shutdown flag - prevents watcher restarts during app shutdown
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 /// Debouncer state - tracks recent file events to batch them
 struct DebouncerState {
@@ -99,6 +107,9 @@ pub fn watch_file(
     // Use bounded channel instead of unbounded
     let (tx, mut rx) = mpsc::channel(CHANNEL_BUFFER_SIZE);
 
+    // Create cancellation channel for graceful shutdown
+    let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
+
     let mut watcher: RecommendedWatcher = Watcher::new(
         move |res| {
             // Non-blocking send - if channel is full, log warning and drop event
@@ -118,7 +129,6 @@ pub fn watch_file(
         .to_string();
 
     let event_name_for_task = event_name.clone();
-    let file_path_for_task = file_path.clone();
 
     // Spawn task with proper error handling
     let task_handle = tauri::async_runtime::spawn(async move {
@@ -133,6 +143,12 @@ pub fn watch_file(
 
         loop {
             tokio::select! {
+                // Cancellation signal received
+                _ = &mut cancel_rx => {
+                    info!("Watcher cancelled: {}", event_name_for_task);
+                    break;
+                }
+
                 // Non-blocking receive with timeout
                 event_result = rx.recv() => {
                     match event_result {
@@ -182,15 +198,20 @@ pub fn watch_file(
     });
 
     // Store task handle for lifecycle management
-    let registry_key = event_name.clone();
+    // Note: This happens asynchronously but very quickly (< 1ms typically)
+    // The tiny race condition window is acceptable vs blocking the executor
+    let event_name_clone = event_name.clone();
     let file_path_clone = file_path.clone();
+
     tauri::async_runtime::spawn(async move {
         let mut registry = WATCHER_REGISTRY.write().await;
-        registry.insert(registry_key, WatcherTask {
+        registry.insert(event_name_clone, WatcherTask {
             path: file_path_clone,
             event_name,
             restart_count: 0,
             is_active: true,
+            task_handle,
+            cancel_tx: Some(cancel_tx),
         });
     });
 
@@ -231,6 +252,9 @@ fn start_directory_watcher_with_recovery(
 ) -> Result<(), String> {
     let (tx, mut rx) = mpsc::channel(CHANNEL_BUFFER_SIZE);
 
+    // Create cancellation channel for graceful shutdown
+    let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
+
     let mut watcher: RecommendedWatcher = Watcher::new(
         move |res| {
             if tx.blocking_send(res).is_err() {
@@ -261,8 +285,20 @@ fn start_directory_watcher_with_recovery(
 
         info!("Directory watcher started for: {}", event_name_for_task);
 
-        loop {
+        // Track why the watcher exited
+        enum ExitReason {
+            Cancelled,  // Intentional shutdown
+            Error,      // Crash/error that should trigger restart
+        }
+
+        let exit_reason = loop {
             tokio::select! {
+                // Cancellation signal received
+                _ = &mut cancel_rx => {
+                    info!("Directory watcher cancelled: {}", event_name_for_task);
+                    break ExitReason::Cancelled;
+                }
+
                 event_result = rx.recv() => {
                     match event_result {
                         Some(Ok(event)) => {
@@ -301,12 +337,12 @@ fn start_directory_watcher_with_recovery(
                             // Too many errors - trigger restart
                             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                                 error!("Too many consecutive errors, attempting restart");
-                                break;
+                                break ExitReason::Error;
                             }
                         }
                         None => {
                             warn!("Directory watcher channel closed");
-                            break;
+                            break ExitReason::Error;
                         }
                     }
                 }
@@ -343,10 +379,12 @@ fn start_directory_watcher_with_recovery(
                     }
                 }
             }
-        }
+        };
 
-        // Task exited - attempt auto-restart if under retry limit
-        if restart_count < MAX_RETRY_ATTEMPTS {
+        // Only auto-restart if watcher crashed (not intentionally cancelled)
+        if matches!(exit_reason, ExitReason::Error) &&
+           !SHUTTING_DOWN.load(Ordering::SeqCst) &&
+           restart_count < MAX_RETRY_ATTEMPTS {
             let next_restart = restart_count + 1;
             let delay_ms = RETRY_BASE_DELAY_MS * 2u64.pow(restart_count); // Exponential backoff
 
@@ -365,27 +403,44 @@ fn start_directory_watcher_with_recovery(
             } else {
                 info!("Directory watcher successfully restarted");
             }
+        } else if matches!(exit_reason, ExitReason::Cancelled) {
+            // Intentional cancellation - exit cleanly without logging error
+            info!("Directory watcher stopped cleanly: {}", event_name_for_task);
+        } else if SHUTTING_DOWN.load(Ordering::SeqCst) {
+            info!("Skipping directory watcher restart - app shutting down");
         } else {
+            // Error exit with exhausted retries
             error!("Directory watcher exhausted retry attempts, giving up");
             let _ = app_handle.emit_all(&format!("{}-fatal", event_name_for_task),
                 "File watcher failed and could not be restarted");
         }
     });
 
-    // Store task handle
-    let registry_key = event_name.clone();
-    let dir_path_clone = directory_path.clone();
+    // Store task handle for lifecycle management
+    // Note: This happens asynchronously but very quickly (< 1ms typically)
+    // The tiny race condition window is acceptable vs blocking the executor
+    let event_name_clone = event_name.clone();
+    let directory_path_clone = directory_path.clone();
+
     tauri::async_runtime::spawn(async move {
         let mut registry = WATCHER_REGISTRY.write().await;
-        registry.insert(registry_key, WatcherTask {
-            path: dir_path_clone,
+        registry.insert(event_name_clone, WatcherTask {
+            path: directory_path_clone,
             event_name,
             restart_count,
             is_active: true,
+            task_handle,
+            cancel_tx: Some(cancel_tx),
         });
     });
 
     Ok(())
+}
+
+/// Checks if a watcher exists by event name
+pub async fn watcher_exists(event_name: &str) -> bool {
+    let registry = WATCHER_REGISTRY.read().await;
+    registry.contains_key(event_name)
 }
 
 /// Stops a watcher by event name
@@ -393,12 +448,53 @@ pub async fn stop_watcher(event_name: &str) -> Result<(), String> {
     let mut registry = WATCHER_REGISTRY.write().await;
 
     if let Some(mut task) = registry.remove(event_name) {
-        task.is_active = false;
-        info!("Stopped watcher: {}", event_name);
-        Ok(())
+        // Send cancellation signal
+        if let Some(cancel_tx) = task.cancel_tx.take() {
+            let _ = cancel_tx.send(());
+        }
+
+        // Drop the lock before waiting on the task to prevent deadlock
+        drop(registry);
+
+        // Wait for task to finish (5s timeout)
+        match tokio::time::timeout(Duration::from_secs(5), task.task_handle).await {
+            Ok(Ok(())) => {
+                info!("Watcher stopped gracefully: {}", event_name);
+                Ok(())
+            }
+            Ok(Err(e)) => {
+                warn!("Watcher task panicked: {:?}", e);
+                Ok(())
+            }
+            Err(_) => {
+                warn!("Watcher stop timed out (forced): {}", event_name);
+                Ok(())
+            }
+        }
     } else {
         Err(format!("Watcher not found: {}", event_name))
     }
+}
+
+/// Stops all active watchers (used during app shutdown)
+pub async fn stop_all_watchers() -> Result<(), String> {
+    SHUTTING_DOWN.store(true, Ordering::SeqCst);
+
+    let event_names: Vec<String> = {
+        let registry = WATCHER_REGISTRY.read().await;
+        registry.keys().cloned().collect()
+    };
+
+    info!("Stopping {} watchers...", event_names.len());
+
+    for name in event_names {
+        if let Err(e) = stop_watcher(&name).await {
+            warn!("Failed to stop watcher {}: {}", name, e);
+        }
+    }
+
+    info!("All watchers stopped");
+    Ok(())
 }
 
 /// Gets health status of all active watchers

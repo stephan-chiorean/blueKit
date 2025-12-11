@@ -29,6 +29,7 @@ import TasksTabContent, {
 } from "../components/tasks/TasksTabContent";
 import {
   invokeGetProjectRegistry,
+  invalidateProjectRegistryCache,
   invokeGetProjectArtifacts,
   invokeGetChangedArtifacts,
   invokeWatchProjectArtifacts,
@@ -187,7 +188,8 @@ export default function HomePage({
 
     const setupFileWatcher = async () => {
       const unlisten = await listen("project-registry-changed", () => {
-        // Reload projects when registry file changes
+        // Invalidate cache and reload projects when registry file changes
+        invalidateProjectRegistryCache();
         loadProjects();
       });
       unlistenFn = unlisten;

@@ -25,7 +25,7 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 
 interface ProjectDetailPageProps {
@@ -224,10 +224,23 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
     setupWatcher();
 
-    // Synchronous cleanup
+    // Cleanup function - called when component unmounts or project changes
     return () => {
       isMounted = false;
       if (unlisten) unlisten();
+
+      // Stop the backend watcher to prevent resource leaks
+      const sanitizedPath = project.path
+        .replace(/\//g, '_')
+        .replace(/\\/g, '_')
+        .replace(/:/g, '_')
+        .replace(/\./g, '_')
+        .replace(/ /g, '_');
+      const eventName = `project-artifacts-changed-${sanitizedPath}`;
+
+      invokeStopWatcher(eventName).catch(err => {
+        console.warn('Failed to stop backend watcher:', err);
+      });
     };
   }, [project.path]);
 

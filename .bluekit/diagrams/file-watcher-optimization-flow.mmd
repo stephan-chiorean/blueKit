@@ -1,0 +1,293 @@
+---
+alias: File Watcher Optimization Flow
+description: ''
+tags: []
+---
+
+# File Watcher System: Before vs After Optimization
+
+## Before: Multiple Issues
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend (4 Components)
+    participant IPC as IPC Layer
+    participant R as Rust Backend
+    participant W as File Watchers
+
+    Note over U,W: APP STARTUP
+
+    U->>F: Opens app
+    
+    rect rgb(255, 200, 200)
+        Note over F,IPC: PROBLEM: 4x Redundant Calls
+        F->>IPC: invokeGetProjectRegistry() #1
+        F->>IPC: invokeGetProjectRegistry() #2
+        F->>IPC: invokeGetProjectRegistry() #3
+        F->>IPC: invokeGetProjectRegistry() #4
+        
+        IPC->>R: get_project_registry (4 calls!)
+        R->>R: [Debug] Starting to load...<br/>[Debug] Home directory...<br/>[Debug] Looking for registry...<br/>(15+ debug prints × 4 calls)
+        
+        R-->>IPC: Projects data (4x)
+        IPC-->>F: Projects data (4x)
+    end
+
+    rect rgb(255, 220, 180)
+        Note over R,W: PROBLEM: Panic on block_on
+        R->>R: block_on(async { registry.insert() })
+        R-xF: PANIC! Cannot start runtime<br/>from within runtime
+    end
+
+    Note over U,W: NAVIGATION TO PROJECT
+
+    U->>F: Clicks project
+    F->>IPC: invokeWatchProjectArtifacts()
+    IPC->>R: watch_project_artifacts
+    
+    rect rgb(255, 200, 200)
+        Note over R,W: PROBLEM: Race Condition
+        R->>W: Start watcher task
+        R->>R: spawn(async { registry.insert() })
+        R-->>IPC: OK (returns immediately)
+        Note over W: Watcher checks cancel_rx<br/>BEFORE it's stored in registry!
+        W-xW: CRASH! Undefined behavior
+        W->>W: Auto-restart (1s delay)
+        W-xW: CRASH again!
+        W->>W: Auto-restart (2s delay)
+        W-xW: Keeps crashing...
+    end
+
+    Note over U,W: NAVIGATE AWAY FROM PROJECT
+
+    U->>F: Goes back to home
+    F->>F: Component unmounts
+    
+    rect rgb(255, 200, 200)
+        Note over F,W: PROBLEM: Resource Leak
+        F->>F: unlisten() (frontend only)
+        Note over W: Backend watcher STILL RUNNING!<br/>Consuming resources forever
+    end
+
+    U->>F: Clicks different project
+    IPC->>R: watch_project_artifacts (new)
+    R->>W: Start NEW watcher
+    
+    Note over W: Now 2 watchers running!<br/>(First one never stopped)
+
+    Note over U,W: APP CLOSE
+
+    U->>F: Closes app
+    
+    rect rgb(255, 200, 200)
+        Note over W: PROBLEM: No Cleanup
+        Note over W: All watchers keep running<br/>until process terminates
+    end
+```
+
+## After: All Issues Fixed
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend (4 Components)
+    participant C as Cache Layer
+    participant IPC as IPC Layer
+    participant R as Rust Backend
+    participant W as File Watchers
+
+    Note over U,W: APP STARTUP
+
+    U->>F: Opens app
+
+    rect rgb(200, 255, 200)
+        Note over F,C: ✅ FIX: Request Deduplication
+        F->>C: invokeGetProjectRegistry() #1
+        F->>C: invokeGetProjectRegistry() #2
+        F->>C: invokeGetProjectRegistry() #3
+        F->>C: invokeGetProjectRegistry() #4
+
+        C->>C: Cache miss, promise shared
+        C->>IPC: Single call
+        IPC->>R: get_project_registry (1 call!)
+
+        Note over R: ✅ FIX: Clean Logs<br/>(INFO level, SQL filtered)
+        R->>R: (Minimal logs)
+
+        R-->>IPC: Projects data
+        IPC-->>C: Projects data
+        C->>C: Cache result
+        C-->>F: Projects (all 4 components<br/>get same data from 1 call)
+    end
+
+    Note over U,W: NAVIGATION TO PROJECT
+
+    U->>F: Clicks project (HomePage loads)
+    F->>IPC: invokeWatchProjectArtifacts() × 10 projects
+
+    rect rgb(200, 255, 200)
+        Note over R,W: ✅ FIX: Duplicate Prevention
+
+        loop For each project
+            IPC->>R: watch_project_artifacts(projectPath)
+            R->>R: Check watcher_exists(eventName)?
+
+            alt Watcher already exists
+                R->>R: Skip (prevent duplicate)
+                R-->>IPC: OK (no-op)
+            else New watcher needed
+                R->>R: Create oneshot channel (cancel_tx, cancel_rx)
+                R->>W: Start watcher task with cancel_rx
+                R->>R: Fire-and-forget: spawn(async {<br/>  registry.insert(cancel_tx)<br/>})
+                R-->>IPC: OK
+                W->>W: Running with ExitReason tracking
+            end
+        end
+
+        Note over W: Only 1 watcher per project ✅
+    end
+
+    Note over U,W: NAVIGATE TO PROJECT DETAIL
+
+    U->>F: Clicks into project detail
+    F->>IPC: invokeWatchProjectArtifacts(project)
+    IPC->>R: watch_project_artifacts
+
+    rect rgb(200, 255, 200)
+        Note over R: ✅ Already exists (from HomePage)
+        R->>R: watcher_exists() = true
+        R-->>IPC: OK (no duplicate created)
+    end
+
+    Note over U,W: NAVIGATE AWAY FROM PROJECT
+
+    U->>F: Goes back to home
+    F->>F: Component unmounts
+
+    rect rgb(200, 255, 200)
+        Note over F,W: ✅ FIX: Proper Cleanup
+        F->>F: unlisten() (frontend)
+        F->>IPC: invokeStopWatcher(eventName)
+        IPC->>R: stop_watcher
+
+        R->>R: registry.remove(eventName)
+        R->>W: cancel_tx.send() (signal stop)
+
+        W->>W: Receives cancel signal
+        W->>W: break ExitReason::Cancelled
+
+        Note over W: ✅ FIX: Exit Reason Check
+        W->>W: if Cancelled { exit cleanly }
+        W->>W: "Watcher stopped cleanly"
+        W-->>R: Task finished
+
+        R-->>IPC: Stopped successfully
+        Note over W: No auto-restart ✅
+    end
+
+    U->>F: Navigate to different project
+    Note over W: HomePage still has watchers<br/>for all 10 projects (not stopped)
+
+    Note over U,W: APP CLOSE
+
+    U->>F: Closes app
+
+    rect rgb(200, 255, 200)
+        Note over R,W: ✅ FIX: Shutdown Hook
+        F->>R: WindowEvent::Destroyed
+        R->>R: stop_all_watchers()
+
+        R->>R: SHUTTING_DOWN = true
+
+        loop For each watcher
+            R->>W: cancel_tx.send()
+            W->>W: Receives cancel signal
+            W->>W: break ExitReason::Cancelled
+            W->>W: if Cancelled { exit cleanly }
+            W-->>R: Task finished
+        end
+
+        R->>R: All watchers stopped ✅
+    end
+```
+
+## Key Improvements Summary
+
+```mermaid
+graph TB
+    subgraph "Before (Problems)"
+        P1[🔴 4x Redundant API Calls]
+        P2[🔴 Duplicate Watchers Created]
+        P3[🔴 Watcher Resource Leaks]
+        P4[🔴 Auto-restart on Cancellation]
+        P5[🔴 Verbose Log Spam]
+        P6[🔴 No Shutdown Cleanup]
+        P7[🔴 Wrong Error Messages]
+    end
+
+    subgraph "After (Solutions)"
+        S1[✅ Request Deduplication Cache]
+        S2[✅ watcher_exists Check]
+        S3[✅ Oneshot Channel Cancellation]
+        S4[✅ ExitReason Enum Tracking]
+        S5[✅ INFO Log Level + SQL Filters]
+        S6[✅ Window Close Handler]
+        S7[✅ Clean Exit Messages]
+    end
+
+    P1 --> S1
+    P2 --> S2
+    P3 --> S3
+    P4 --> S4
+    P5 --> S5
+    P6 --> S6
+    P7 --> S7
+
+    style P1 fill:#ffcccc
+    style P2 fill:#ffcccc
+    style P3 fill:#ffcccc
+    style P4 fill:#ffcccc
+    style P5 fill:#ffcccc
+    style P6 fill:#ffcccc
+    style P7 fill:#ffcccc
+
+    style S1 fill:#ccffcc
+    style S2 fill:#ccffcc
+    style S3 fill:#ccffcc
+    style S4 fill:#ccffcc
+    style S5 fill:#ccffcc
+    style S6 fill:#ccffcc
+    style S7 fill:#ccffcc
+```
+
+## Performance Impact
+
+```mermaid
+graph LR
+    subgraph "API Calls"
+        B1[Before: 4 calls] -->|75% reduction| A1[After: 1 call]
+    end
+
+    subgraph "Log Lines"
+        B2[Before: ~500 lines] -->|90% reduction| A2[After: ~50 lines]
+    end
+
+    subgraph "Active Watchers"
+        B3[Before: Duplicates<br/>accumulating] -->|100% deduped| A3[After: 1 per project]
+    end
+
+    subgraph "Restart Loops"
+        B4[Before: Cancel->Restart<br/>infinite loops] -->|0 loops| A4[After: Clean exit]
+    end
+
+    style B1 fill:#ffcccc
+    style B2 fill:#ffcccc
+    style B3 fill:#ffcccc
+    style B4 fill:#ffcccc
+
+    style A1 fill:#ccffcc
+    style A2 fill:#ccffcc
+    style A3 fill:#ccffcc
+    style A4 fill:#ccffcc
+```

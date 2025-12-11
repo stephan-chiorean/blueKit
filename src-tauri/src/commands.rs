@@ -570,64 +570,45 @@ pub struct CloneMetadata {
 pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
     use std::fs;
 
-    eprintln!("[get_project_registry] Starting to load project registry...");
-
     // Get home directory
     let home_dir = env::var("HOME")
         .or_else(|_| env::var("USERPROFILE")) // Windows fallback
         .map_err(|e| {
             let error_msg = format!("Could not determine home directory: {:?}", e);
-            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            tracing::error!("Failed to get home directory: {}", error_msg);
             error_msg
         })?;
-
-    eprintln!("[get_project_registry] Home directory: {}", home_dir);
 
     // Construct path to project registry
     let registry_path = PathBuf::from(&home_dir)
         .join(".bluekit")
         .join("projectRegistry.json");
 
-    eprintln!("[get_project_registry] Looking for registry at: {:?}", registry_path);
-
     // Check if registry file exists
     if !registry_path.exists() {
-        eprintln!("[get_project_registry] WARNING: Project registry file does not exist at {:?}", registry_path);
         return Ok(Vec::new()); // Return empty vector if file doesn't exist
     }
-
-    eprintln!("[get_project_registry] Registry file exists, reading contents...");
 
     // Read the file
     let contents = fs::read_to_string(&registry_path)
         .map_err(|e| {
             let error_msg = format!("Failed to read project registry at {:?}: {}", registry_path, e);
-            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            tracing::error!("{}", error_msg);
             error_msg
         })?;
 
     // Handle empty file
     if contents.trim().is_empty() {
-        eprintln!("[get_project_registry] WARNING: Project registry file is empty");
         return Ok(Vec::new());
     }
-
-    eprintln!("[get_project_registry] Read {} bytes from registry file", contents.len());
-    eprintln!("[get_project_registry] Contents preview: {}", &contents[..contents.len().min(200)]);
 
     // Parse JSON
     let projects: Vec<ProjectEntry> = serde_json::from_str(&contents)
         .map_err(|e| {
-            let error_msg = format!("Failed to parse project registry JSON: {}. Content: {}", e, contents);
-            eprintln!("[get_project_registry] ERROR: {}", error_msg);
+            let error_msg = format!("Failed to parse project registry JSON: {}", e);
+            tracing::error!("{}", error_msg);
             error_msg
         })?;
-
-    eprintln!("[get_project_registry] SUCCESS: Parsed {} projects from registry", projects.len());
-    for (i, project) in projects.iter().enumerate() {
-        eprintln!("[get_project_registry]   Project {}: id={}, title={}, path={}",
-            i + 1, project.id, project.title, project.path);
-    }
 
     Ok(projects)
 }
@@ -675,14 +656,20 @@ pub async fn watch_project_artifacts(
         })
         .collect();
     let event_name = format!("project-artifacts-changed-{}", sanitized_path);
-    
+
+    // Check if watcher already exists - prevent duplicates
+    if watcher::watcher_exists(&event_name).await {
+        tracing::info!("Watcher already exists for: {}", event_name);
+        return Ok(());
+    }
+
     // Start watching the directory
     watcher::watch_directory(
         app_handle,
         bluekit_path,
         event_name,
     )?;
-    
+
     Ok(())
 }
 
@@ -2085,6 +2072,29 @@ use std::collections::HashMap;
 #[tauri::command]
 pub async fn get_watcher_health() -> Result<HashMap<String, bool>, String> {
     Ok(crate::watcher::get_watcher_health().await)
+}
+
+/// Stops a file watcher by event name.
+///
+/// This command gracefully stops a running file watcher task by sending a
+/// cancellation signal and waiting for the task to complete (with 5s timeout).
+///
+/// # Arguments
+///
+/// * `event_name` - The event name of the watcher to stop
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing success or error message
+///
+/// # Example
+///
+/// ```typescript
+/// await invoke('stop_watcher', { eventName: 'project-kits-changed-foo' });
+/// ```
+#[tauri::command]
+pub async fn stop_watcher(event_name: String) -> Result<(), String> {
+    crate::watcher::stop_watcher(&event_name).await
 }
 
 // ============================================================================
