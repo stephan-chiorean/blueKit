@@ -1,0 +1,1 @@
+go through project's .bluekit/walkthroughs directory and update out of date documentation. 

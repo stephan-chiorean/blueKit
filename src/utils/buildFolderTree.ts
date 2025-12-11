@@ -76,7 +76,9 @@ export function buildFolderTree(
   const rootFolders = folders
     .filter(f => {
       const folderParentDir = getParentDirectory(f.path);
-      return folderParentDir === rootDir;
+      const parentPathMatchesRoot = f.parentPath === rootDir;
+      const computedParentMatchesRoot = !f.parentPath && folderParentDir === rootDir;
+      return parentPathMatchesRoot || computedParentMatchesRoot;
     })
     .map(buildNode);
 

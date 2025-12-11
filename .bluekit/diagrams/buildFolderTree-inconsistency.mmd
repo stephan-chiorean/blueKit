@@ -1,0 +1,72 @@
+---
+alias: buildFolderTree Logic Inconsistency
+description: Diagram showing the inconsistency in buildFolderTree function where child-finding logic checks both parentPath and computed directory path, but root-filtering logic only checks computed directory path, ignoring parentPath field
+tags:
+  - bug
+  - logic
+  - folder-tree
+  - consistency
+  - buildFolderTree
+---
+```mermaid
+graph TB
+    subgraph "CHILD-FINDING LOGIC (Lines 58-61)"
+        CF1[For each folder f]
+        CF2{Check if f is child<br/>of current folder}
+        CF3[Condition 1:<br/>f.parentPath === folder.path]
+        CF4[Condition 2:<br/>!f.parentPath AND<br/>getParentDirectory f.path === folder.path]
+        CF5[If either condition true:<br/>Add as child]
+        
+        CF1 --> CF2
+        CF2 --> CF3
+        CF2 --> CF4
+        CF3 -->|OR| CF5
+        CF4 -->|OR| CF5
+    end
+    
+    subgraph "ROOT-FILTERING LOGIC (Lines 76-80)"
+        RF1[For each folder f]
+        RF2{Check if f is root folder}
+        RF3[Only checks:<br/>getParentDirectory f.path === rootDir]
+        RF4[Ignores:<br/>f.parentPath === rootDir]
+        RF5[If condition true:<br/>Add as root]
+        
+        RF1 --> RF2
+        RF2 --> RF3
+        RF3 --> RF5
+        RF4 -.->|NOT CHECKED| RF2
+    end
+    
+    subgraph "PROBLEM SCENARIO"
+        PS1[Folder with:<br/>path = /project/.bluekit/kits/nested/folder<br/>parentPath = /project/.bluekit/kits]
+        PS2[Child-finding logic:<br/>Would find this as child<br/>if parentPath matches]
+        PS3[Root-filtering logic:<br/>getParentDirectory returns<br/>/project/.bluekit/kits/nested<br/>NOT /project/.bluekit/kits]
+        PS4[Result:<br/>Folder incorrectly excluded<br/>from root level]
+        
+        PS1 --> PS2
+        PS1 --> PS3
+        PS3 --> PS4
+    end
+    
+    subgraph "EXPECTED BEHAVIOR"
+        EB1[Root-filtering should check:<br/>1. f.parentPath === rootDir OR<br/>2. !f.parentPath AND<br/>   getParentDirectory f.path === rootDir]
+        EB2[This matches the same<br/>dual-check pattern used<br/>in child-finding logic]
+        
+        EB1 --> EB2
+    end
+    
+    CF5 -.->|Inconsistent with| RF3
+    RF4 -.->|Missing check| EB1
+    
+    %% Define classes using colors from BlueKit palette
+    classDef childLogic fill:#0f766e,stroke:#4287f5,stroke-width:2px
+    classDef rootLogic fill:#c2410c,stroke:#4287f5,stroke-width:2px
+    classDef problem fill:#6b21a8,stroke:#4287f5,stroke-width:2px
+    classDef expected fill:#1e3a8a,stroke:#4287f5,stroke-width:2px
+    
+    %% Assign classes to nodes
+    class CF1,CF2,CF3,CF4,CF5 childLogic
+    class RF1,RF2,RF3,RF4,RF5 rootLogic
+    class PS1,PS2,PS3,PS4 problem
+    class EB1,EB2 expected
+```
