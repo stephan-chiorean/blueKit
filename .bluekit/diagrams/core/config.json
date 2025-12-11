@@ -3,6 +3,19 @@
   "name": "Core",
   "description": "Core",
   "tags": [],
+  "groups": [
+    {
+      "id": "group-1765427568629",
+      "order": 1,
+      "name": "File Watching",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/diagrams/core/file-watching-flickering-issue.mmd",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/diagrams/core/watcher-event-flow.mmd",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/diagrams/core/incremental-update-system-architecture.mmd",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/diagrams/core/artifact-flow-architecture.mmd"
+      ]
+    }
+  ],
   "createdAt": "2025-12-08T22:10:04.195Z",
-  "updatedAt": "2025-12-08T22:10:04.195Z"
+  "updatedAt": "2025-12-11T04:33:17.819530+00:00"
 }
