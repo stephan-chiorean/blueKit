@@ -1,5 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useEffect, useRef, useState } from 'react';
+import mermaid from 'mermaid';
 import {
   Box,
   Heading,
@@ -11,6 +13,7 @@ import {
   VStack,
   Link,
   List,
+  Alert,
 } from '@chakra-ui/react';
 import { open } from '@tauri-apps/api/shell';
 import { ResourceFile } from '../../types/resource';
@@ -20,6 +23,105 @@ import ShikiCodeBlock from './ShikiCodeBlock';
 interface ResourceMarkdownViewerProps {
   resource: ResourceFile;
   content: string;
+}
+
+// Track if mermaid has been initialized to avoid multiple initializations
+let mermaidInitialized = false;
+
+// Component to render mermaid diagrams inline in markdown
+function InlineMermaidDiagram({ code }: { code: string }) {
+  const diagramRef = useRef<HTMLDivElement>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+
+  // Initialize mermaid once globally
+  useEffect(() => {
+    if (!mermaidInitialized) {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose',
+        theme: 'dark',
+        themeVariables: {
+          primaryBorderColor: '#4287f5',
+          lineColor: '#4287f5',
+          arrowheadColor: '#4287f5',
+        },
+      });
+      mermaidInitialized = true;
+    }
+  }, []);
+
+  // Render the diagram
+  useEffect(() => {
+    if (!diagramRef.current || !code.trim()) {
+      return;
+    }
+
+    const renderTimeout = setTimeout(() => {
+      if (!diagramRef.current) return;
+
+      // Clear previous content and errors
+      diagramRef.current.innerHTML = '';
+      setRenderError(null);
+
+      const id = `mermaid-inline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      mermaid.render(id, code.trim())
+        .then((result) => {
+          if (diagramRef.current) {
+            diagramRef.current.innerHTML = result.svg;
+            
+            // Check for errors in the rendered SVG immediately
+            const svg = diagramRef.current.querySelector('svg');
+            if (svg) {
+              const svgText = svg.textContent || '';
+              const hasError = /syntax\s+error|parse\s+error|error\s+in\s+text/i.test(svgText);
+              
+              if (hasError) {
+                diagramRef.current.innerHTML = '';
+                setRenderError('Syntax error in Mermaid diagram');
+              }
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Error rendering mermaid diagram:', error);
+          if (diagramRef.current) {
+            diagramRef.current.innerHTML = '';
+          }
+          const errorMessage = error?.message || error?.toString() || 'Unknown error';
+          setRenderError(errorMessage.includes('syntax') || errorMessage.includes('parse')
+            ? 'Syntax error in Mermaid diagram'
+            : 'Error rendering Mermaid diagram');
+        });
+    }, 100);
+
+    return () => clearTimeout(renderTimeout);
+  }, [code]);
+
+  if (renderError) {
+    return (
+      <Alert.Root status="error" variant="subtle" mb={4}>
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Mermaid Error</Alert.Title>
+          <Alert.Description>{renderError}</Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    );
+  }
+
+  return (
+    <Box
+      ref={diagramRef}
+      mb={4}
+      p={4}
+      bg="bg.surface"
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="border.subtle"
+      overflow="auto"
+    />
+  );
 }
 
 export default function ResourceMarkdownViewer({ resource, content }: ResourceMarkdownViewerProps) {
@@ -197,6 +299,11 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                 // Code block with Shiki syntax highlighting
                 // Extract language, handling special formats like "78:93:src-tauri/src/main.rs"
                 let language = match ? match[1] : 'text';
+
+                // Special handling for mermaid diagrams
+                if (language === 'mermaid') {
+                  return <InlineMermaidDiagram code={codeString} />;
+                }
 
                 // Handle file reference format (e.g., "78:93:src-tauri/src/main.rs")
                 // Extract file extension to infer language

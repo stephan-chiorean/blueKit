@@ -132,6 +132,165 @@ pub struct GitHubToken {
 4. **Token validation**: Check token validity before making API calls
 5. **Secure deletion**: Properly clear tokens when user signs out
 
+### 2.5. Keychain Manager Architecture
+
+**Yes - Unified Keychain Manager Class**
+
+The Rust commands for OS keychain management will use a **unified `KeychainManager` class** that abstracts platform-specific implementations (keyring/winapi/secret-service) behind a common interface.
+
+**Location**: `src-tauri/src/keychain.rs`
+
+**Architecture:**
+
+```rust
+// Platform-agnostic trait
+pub trait KeychainBackend {
+    fn store(&self, service: &str, key: &str, value: &str) -> Result<(), String>;
+    fn retrieve(&self, service: &str, key: &str) -> Result<String, String>;
+    fn delete(&self, service: &str, key: &str) -> Result<(), String>;
+}
+
+// Platform-specific implementations
+#[cfg(target_os = "macos")]
+pub struct MacOSKeychain {
+    keyring: keyring::Entry,
+}
+
+#[cfg(target_os = "macos")]
+impl KeychainBackend for MacOSKeychain {
+    fn store(&self, service: &str, key: &str, value: &str) -> Result<(), String> {
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+        entry.set_password(value)
+            .map_err(|e| format!("Failed to store password: {}", e))?;
+        Ok(())
+    }
+    
+    fn retrieve(&self, service: &str, key: &str) -> Result<String, String> {
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+        entry.get_password()
+            .map_err(|e| format!("Failed to retrieve password: {}", e))
+    }
+    
+    fn delete(&self, service: &str, key: &str) -> Result<(), String> {
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+        entry.delete_password()
+            .map_err(|e| format!("Failed to delete password: {}", e))?;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub struct WindowsKeychain;
+
+#[cfg(target_os = "windows")]
+impl KeychainBackend for WindowsKeychain {
+    fn store(&self, service: &str, key: &str, value: &str) -> Result<(), String> {
+        use winapi::um::wincred::*;
+        // Windows Credential Manager implementation
+        // Store in Credential Manager with target name like "bluekit:github_token"
+        Ok(())
+    }
+    
+    fn retrieve(&self, service: &str, key: &str) -> Result<String, String> {
+        // Retrieve from Windows Credential Manager
+        Ok(String::new())
+    }
+    
+    fn delete(&self, service: &str, key: &str) -> Result<(), String> {
+        // Delete from Windows Credential Manager
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub struct LinuxKeychain;
+
+#[cfg(target_os = "linux")]
+impl KeychainBackend for LinuxKeychain {
+    fn store(&self, service: &str, key: &str, value: &str) -> Result<(), String> {
+        // Use secret-service crate for Linux
+        Ok(())
+    }
+    
+    fn retrieve(&self, service: &str, key: &str) -> Result<String, String> {
+        // Retrieve from Secret Service
+        Ok(String::new())
+    }
+    
+    fn delete(&self, service: &str, key: &str) -> Result<(), String> {
+        // Delete from Secret Service
+        Ok(())
+    }
+}
+
+// Unified manager
+pub struct KeychainManager {
+    backend: Box<dyn KeychainBackend>,
+}
+
+impl KeychainManager {
+    pub fn new() -> Result<Self, String> {
+        #[cfg(target_os = "macos")]
+        let backend: Box<dyn KeychainBackend> = Box::new(MacOSKeychain::new()?);
+        
+        #[cfg(target_os = "windows")]
+        let backend: Box<dyn KeychainBackend> = Box::new(WindowsKeychain::new()?);
+        
+        #[cfg(target_os = "linux")]
+        let backend: Box<dyn KeychainBackend> = Box::new(LinuxKeychain::new()?);
+        
+        Ok(Self { backend })
+    }
+    
+    pub fn store_token(&self, token: &GitHubToken) -> Result<(), String> {
+        let serialized = serde_json::to_string(token)
+            .map_err(|e| format!("Failed to serialize token: {}", e))?;
+        self.backend.store("bluekit", "github_token", &serialized)
+    }
+    
+    pub fn retrieve_token(&self) -> Result<GitHubToken, String> {
+        let serialized = self.backend.retrieve("bluekit", "github_token")?;
+        serde_json::from_str(&serialized)
+            .map_err(|e| format!("Failed to deserialize token: {}", e))
+    }
+    
+    pub fn delete_token(&self) -> Result<(), String> {
+        self.backend.delete("bluekit", "github_token")
+    }
+}
+```
+
+**Tauri Commands:**
+
+```rust
+#[tauri::command]
+pub fn keychain_store_token(token: GitHubToken) -> Result<(), String> {
+    let manager = KeychainManager::new()?;
+    manager.store_token(&token)
+}
+
+#[tauri::command]
+pub fn keychain_retrieve_token() -> Result<GitHubToken, String> {
+    let manager = KeychainManager::new()?;
+    manager.retrieve_token()
+}
+
+#[tauri::command]
+pub fn keychain_delete_token() -> Result<(), String> {
+    let manager = KeychainManager::new()?;
+    manager.delete_token()
+}
+```
+
+**Benefits:**
+- ✅ Single interface for all platforms
+- ✅ Easy to test (can mock the trait)
+- ✅ Platform-specific code isolated
+- ✅ Type-safe token storage/retrieval
+
 ## 3. GitHub API Client Architecture
 
 ### **Decision: Backend API Client (src-tauri)**
@@ -213,6 +372,125 @@ GitHub API has rate limits:
 - Implement request queuing if needed
 - Cache responses when appropriate
 - Handle 429 errors gracefully with retry logic
+
+### 3.5. Token Injection Points
+
+**When and Where is the GitHub API Token Injected?**
+
+The GitHub API token is injected at **two distinct points** in the Rust backend:
+
+#### 1. GitHub API Client (HTTP Requests)
+
+**Location**: `src-tauri/src/github.rs`
+
+The token is injected when:
+- Creating `GitHubClient` instance: `GitHubClient::new(token)`
+- Making HTTP requests: Token added as `Authorization: Bearer <token>` header
+
+**Implementation:**
+
+```rust
+impl GitHubClient {
+    pub fn new(token: String) -> Self {
+        Self {
+            token,
+            client: reqwest::Client::new(),
+        }
+    }
+    
+    async fn request<T>(&self, method: &str, endpoint: String, body: Option<serde_json::Value>) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let url = format!("https://api.github.com{}", endpoint);
+        let mut request = self.client
+            .request(method.parse().unwrap(), &url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "BlueKit/1.0");
+        
+        if let Some(body) = body {
+            request = request.json(&body);
+        }
+        
+        let response = request.send().await
+            .map_err(|e| format!("Request failed: {}", e))?;
+        
+        // ... handle response
+    }
+}
+```
+
+**Flow:**
+1. Tauri command called (e.g., `github_get_user()`)
+2. Command retrieves token from keychain: `keychain_retrieve_token()`
+3. Creates `GitHubClient` with token: `GitHubClient::new(token)`
+4. Makes API request with token in Authorization header
+5. Returns result to frontend
+
+#### 2. Libgit2 (Git Operations)
+
+**Is libgit2 for token injection?** 
+
+**No** - libgit2 is for **git operations** (push, pull, commit), not for token injection. However, the token **is injected** into libgit2's credential callbacks for authentication.
+
+**Location**: `src-tauri/src/git_operations.rs`
+
+**Token Injection in Git Operations:**
+
+```rust
+use git2::{Repository, Cred, RemoteCallbacks};
+
+impl GitOperations {
+    pub fn push_to_github(
+        repo: &Repository,
+        remote: &str,
+        branch: &str,
+        token: &str,  // Token passed as parameter
+    ) -> Result<(), String> {
+        let mut remote = repo.find_remote(remote)
+            .map_err(|e| format!("Remote not found: {}", e))?;
+        
+        // Create credential callback that injects token
+        let mut callbacks = RemoteCallbacks::new();
+        let token = token.to_string(); // Clone for closure
+        callbacks.credentials(move |_url, username, _allowed| {
+            // Inject token into git credential callback
+            Cred::userpass_plaintext(username.unwrap_or("x"), &token)
+        });
+        
+        let mut push_options = git2::PushOptions::new();
+        push_options.remote_callbacks(callbacks);
+        
+        remote.push(&[&format!("refs/heads/{}", branch)], Some(&mut push_options))
+            .map_err(|e| format!("Push failed: {}", e))?;
+        
+        Ok(())
+    }
+}
+```
+
+**Flow:**
+1. Tauri command called (e.g., `git_push()`)
+2. Command retrieves token from keychain: `keychain_retrieve_token()`
+3. Calls `push_to_github(repo, remote, branch, token)`
+4. Token injected into libgit2 credential callback
+5. Libgit2 uses token for HTTPS authentication with GitHub
+6. Push operation completes
+
+**Summary:**
+
+| Operation | Token Source | Injection Point | Purpose |
+|-----------|-------------|-----------------|---------|
+| GitHub API Calls | Keychain → `GitHubClient::new(token)` | HTTP Authorization header | Authenticate REST API requests |
+| Git Operations | Keychain → `push_to_github(..., token)` | Libgit2 credential callback | Authenticate git push/pull operations |
+
+**Key Points:**
+- ✅ Token stored once in keychain
+- ✅ Token retrieved when needed (lazy loading)
+- ✅ Token injected at operation time
+- ✅ Never stored in memory longer than necessary
+- ✅ Libgit2 handles HTTPS authentication, not token storage
 
 ## 4. Composable Authentication Module
 
@@ -610,54 +888,256 @@ pub async fn git_commit_and_push(
 ) -> Result<(), String>;
 ```
 
-## 8. Implementation Steps
+## 8. Implementation Steps (Detailed Phases)
 
-### Phase 1: Foundation & Auth Module
-1. ✅ Set up environment variables (Tauri system)
-2. ✅ Create composable auth module structure
-3. ✅ Implement token storage (Rust commands for secure storage)
-4. ✅ Implement device flow authentication (Rust backend)
-5. ✅ Create GitHub auth screen component
-6. ✅ Create GitHubAuthProvider context
-7. ✅ Update App.tsx routing
+**Note**: The library will be complex. These phases break down the work into manageable, testable increments.
 
-### Phase 2: Backend API Client
-1. ✅ Create GitHub API client in Rust (src-tauri/src/github.rs)
-2. ✅ Implement user information fetching
-3. ✅ Add error handling
-4. ✅ Create Tauri commands for API access
-5. ✅ Create TypeScript types for GitHub API responses
+### Phase 1A: Keychain Infrastructure (Week 1)
 
-### Phase 3: Library Foundation
-1. ✅ Design Library data model
-2. ✅ Create workspace management (Rust)
-3. ✅ Implement workspace storage (database or file)
-4. ✅ Create Library UI components
+**Goal**: Create unified keychain manager for all platforms
 
-### Phase 4: Publishing System
-1. ✅ Implement artifact selection UI
-2. ✅ Create publishing logic (local → GitHub)
-3. ✅ Implement file creation/updates via GitHub API
-4. ✅ Add commit and push functionality (libgit2)
+1. Create `src-tauri/src/keychain.rs` module
+2. Define `KeychainBackend` trait interface
+3. Implement macOS backend using `keyring` crate
+4. Implement Windows backend using `winapi` with Credential Manager
+5. Implement Linux backend using `secret-service` crate
+6. Create `KeychainManager` unified wrapper
+7. Add unit tests for each platform backend
+8. Create Tauri commands: `keychain_store_token`, `keychain_retrieve_token`, `keychain_delete_token`
+9. Test token storage/retrieval on each platform
 
-### Phase 5: Git Operations (Libgit2)
-1. ✅ Set up libgit2 in Cargo.toml
-2. ✅ Implement git operations module
-3. ✅ Create Tauri commands for git operations
-4. ✅ Test git operations with authentication
+**Deliverables:**
+- ✅ Working keychain manager for all platforms
+- ✅ Token storage/retrieval tested
+- ✅ Tauri commands exposed
 
-### Phase 6: Core Features
-1. ✅ Display user profile in UI
-2. ✅ Implement commit viewer
-3. ✅ Add repository creation dialog
-4. ✅ Integrate with existing project views
+### Phase 1B: Device Flow Authentication (Week 1-2)
 
-### Phase 7: Polish
-1. ✅ Error handling and user feedback
-2. ✅ Loading states
-3. ✅ Token refresh (if needed)
-4. ✅ Sign out functionality
-5. ✅ Documentation
+**Goal**: Implement GitHub device flow OAuth in Rust backend
+
+1. Create `src-tauri/src/auth.rs` module
+2. Implement device code request (`POST /login/device/code`)
+3. Implement polling mechanism (`POST /login/oauth/access_token`)
+4. Handle device code expiration
+5. Store received token in keychain
+6. Add error handling for auth failures
+7. Create Tauri commands: `auth_start_device_flow`, `auth_poll_token`, `auth_get_status`
+8. Test full device flow end-to-end
+
+**Deliverables:**
+- ✅ Device flow working in Rust
+- ✅ Token stored in keychain after auth
+- ✅ Error handling for all failure cases
+
+### Phase 1C: Frontend Auth Module (Week 2)
+
+**Goal**: Create composable React auth module
+
+1. Create `src/auth/github/` directory structure
+2. Create `GitHubAuthProvider.tsx` context provider
+3. Implement token loading from backend on mount
+4. Create `GitHubAuthScreen.tsx` component
+5. Display device code and user code
+6. Implement polling UI with status updates
+7. Add "Open GitHub" button functionality
+8. Create `useGitHubAuth.ts` custom hook
+9. Update `App.tsx` routing to include auth screen
+10. Test full auth flow in UI
+
+**Deliverables:**
+- ✅ Composable auth module structure
+- ✅ Working auth screen with device flow
+- ✅ Auth state available throughout app
+
+### Phase 2A: GitHub API Client Core (Week 2-3)
+
+**Goal**: Create GitHub API client with token injection
+
+1. Create `src-tauri/src/github.rs` module
+2. Implement `GitHubClient` struct with token storage
+3. Implement `request()` method with token injection in Authorization header
+4. Add rate limiting header tracking
+5. Implement `get_user()` endpoint
+6. Implement `get_user_repos()` endpoint
+7. Add error handling for 401, 403, 404, 429
+8. Create TypeScript types for `GitHubUser` and `GitHubRepo`
+9. Create Tauri commands: `github_get_user`, `github_get_repos`
+10. Test API calls with real GitHub token
+
+**Deliverables:**
+- ✅ GitHub API client with token injection
+- ✅ User info and repos fetching working
+- ✅ Error handling implemented
+
+### Phase 2B: GitHub API Content Operations (Week 3)
+
+**Goal**: Implement file CRUD operations for Library
+
+1. Implement `get_file_contents()` endpoint
+2. Implement `create_or_update_file()` endpoint
+3. Implement `delete_file()` endpoint
+4. Implement `get_tree()` for folder operations
+5. Add base64 encoding/decoding for file content
+6. Add conflict detection (file exists check)
+7. Create TypeScript types for content operations
+8. Create Tauri commands: `github_get_file`, `github_create_file`, `github_update_file`, `github_delete_file`
+9. Test file operations with test repo
+
+**Deliverables:**
+- ✅ Full file CRUD via GitHub API
+- ✅ Tree/blob operations working
+- ✅ Ready for Library publishing
+
+### Phase 3A: Library Data Model (Week 3-4)
+
+**Goal**: Design and implement Library workspace storage
+
+1. Design database schema for workspaces (SQLite)
+2. Create `LibraryWorkspace` struct
+3. Create `LibraryArtifact` struct
+4. Create `src-tauri/src/library.rs` module
+5. Implement workspace CRUD operations
+6. Implement workspace storage in database
+7. Add workspace metadata tracking
+8. Create Tauri commands: `library_create_workspace`, `library_list_workspaces`, `library_get_workspace`, `library_delete_workspace`
+9. Test workspace persistence
+
+**Deliverables:**
+- ✅ Library data model defined
+- ✅ Workspace storage working
+- ✅ Database schema implemented
+
+### Phase 3B: Library UI Foundation (Week 4)
+
+**Goal**: Create Library UI components
+
+1. Create `src/components/library/` directory
+2. Create `LibraryWorkspaceSelector.tsx` component
+3. Create workspace creation dialog
+4. Create `LibraryView.tsx` main view component
+5. Implement workspace switching logic
+6. Add workspace list display
+7. Create `LibraryArtifactCard.tsx` component (placeholder)
+8. Integrate Library view into app navigation
+9. Test UI with mock workspaces
+
+**Deliverables:**
+- ✅ Library UI components created
+- ✅ Workspace management in UI
+- ✅ Navigation integrated
+
+### Phase 4A: Publishing - File Operations (Week 4-5)
+
+**Goal**: Implement artifact selection and path mapping
+
+1. Create `PublishToLibraryDialog.tsx` component
+2. Implement artifact selection UI (individual items, folders)
+3. Create path mapping logic (local → Library paths)
+4. Implement file content reading from local filesystem
+5. Add base64 encoding for file content
+6. Implement conflict detection (check if file exists in repo)
+7. Add batch file operation preparation
+8. Create Tauri commands: `library_prepare_publish`, `library_check_conflicts`
+9. Test path mapping and file reading
+
+**Deliverables:**
+- ✅ Artifact selection UI working
+- ✅ Path mapping logic implemented
+- ✅ File content preparation ready
+
+### Phase 4B: Publishing - GitHub Integration (Week 5)
+
+**Goal**: Publish artifacts to GitHub via API
+
+1. Integrate publishing with GitHub API client
+2. Implement batch file creation/updates
+3. Add commit message handling
+4. Implement publishing progress tracking
+5. Add error recovery for failed file operations
+6. Create Tauri command: `library_publish_artifacts`
+7. Test publishing with real GitHub repo
+8. Handle edge cases (large files, many files, network failures)
+
+**Deliverables:**
+- ✅ Publishing to GitHub working
+- ✅ Batch operations implemented
+- ✅ Error recovery working
+
+### Phase 5A: Libgit2 Setup (Week 5)
+
+**Goal**: Set up libgit2 for git operations
+
+1. Add `git2` dependency to `Cargo.toml`
+2. Create `src-tauri/src/git_operations.rs` module
+3. Implement `init_repo()` function
+4. Implement `add_remote()` function
+5. Create credential callback structure
+6. Implement token injection in credential callback
+7. Test basic git operations (init, add remote)
+8. Test credential callback with GitHub token
+
+**Deliverables:**
+- ✅ Libgit2 integrated
+- ✅ Credential callback working
+- ✅ Basic git operations tested
+
+### Phase 5B: Git Push Integration (Week 5-6)
+
+**Goal**: Integrate git push with Library publishing
+
+1. Implement `push_to_github()` function
+2. Implement `commit_and_push()` function
+3. Integrate git push after GitHub API file creation
+4. Add error handling for git failures
+5. Handle merge conflicts
+6. Create Tauri commands: `git_push`, `git_commit_and_push`
+7. Test full publish flow: API → Git push
+8. Test with real GitHub repos
+
+**Deliverables:**
+- ✅ Git push integrated with publishing
+- ✅ Full publish flow working
+- ✅ Error handling for git operations
+
+### Phase 6: Core Features (Week 6-7)
+
+**Goal**: Add user-facing GitHub features
+
+1. Create `GitHubProfile.tsx` component
+2. Display user avatar and username
+3. Create `CommitViewer.tsx` component
+4. Implement commit list fetching
+5. Add commit details view
+6. Create `CreateRepoDialog.tsx` component
+7. Implement repository creation
+8. Integrate GitHub features into existing views
+9. Add GitHub links to artifacts
+
+**Deliverables:**
+- ✅ User profile display
+- ✅ Commit viewer working
+- ✅ Repository creation working
+
+### Phase 7: Polish & Testing (Week 7-8)
+
+**Goal**: Finalize and test entire system
+
+1. Comprehensive error handling throughout
+2. Loading states for all async operations
+3. Token validation before operations
+4. Sign out functionality
+5. Token refresh handling (if needed)
+6. End-to-end testing of full flows
+7. Performance optimization
+8. Documentation (code comments, user docs)
+9. Security audit
+10. Final testing on all platforms
+
+**Deliverables:**
+- ✅ Production-ready GitHub integration
+- ✅ Comprehensive error handling
+- ✅ Full documentation
+- ✅ Tested on all platforms
 
 ## 9. Dependencies to Add
 
@@ -945,6 +1425,284 @@ src-tauri/src/
 └── auth.rs                           # Auth-related commands (token storage)
 ```
 
+## 17.5. Team Sharing Architecture
+
+### Team Sharing Concept
+
+**Core Idea**: Teams can link multiple GitHub accounts to share Library workspaces. Team members can publish to shared repos, and changes sync across all team members automatically.
+
+### Use Cases
+
+1. **Team Collaboration**: Multiple developers share kits/walkthroughs in a team workspace
+2. **Organization Libraries**: GitHub organizations can have shared BlueKit libraries
+3. **Cross-Account Sharing**: Users can invite others to their workspaces
+4. **Permission Management**: Different roles (owner, admin, member) with different permissions
+
+### Data Model
+
+```rust
+// Team structure
+pub struct Team {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+// Team member (linked GitHub account)
+pub struct TeamMember {
+    pub id: String,
+    pub team_id: String,
+    pub github_username: String,
+    pub github_user_id: String,
+    pub github_avatar_url: Option<String>,
+    pub role: TeamRole, // owner, admin, member
+    pub joined_at: i64,
+    pub invited_by: Option<String>, // member_id who invited
+}
+
+pub enum TeamRole {
+    Owner,   // Can delete team, manage all members, all operations
+    Admin,   // Can manage members, all workspace operations
+    Member,  // Can publish to workspaces, view team content
+}
+
+// Shared workspace (team-owned)
+pub struct SharedWorkspace {
+    pub id: String,
+    pub team_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub github_owner: String, // Team org or shared account
+    pub github_repo: String,
+    pub created_by: String, // member_id
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+// Team invitation
+pub struct TeamInvitation {
+    pub id: String,
+    pub team_id: String,
+    pub github_username: String,
+    pub invited_by: String, // member_id
+    pub role: TeamRole,
+    pub created_at: i64,
+    pub expires_at: i64,
+    pub accepted: bool,
+}
+```
+
+### Team Workflow
+
+#### 1. Team Creation
+```
+User → Creates Team → Becomes Owner → Team ID Generated
+```
+
+#### 2. Inviting Members
+```
+Owner/Admin → Invites by GitHub Username → Invitation Created
+Invitee → Authenticates with GitHub → System Verifies Account → Joins Team
+```
+
+#### 3. Shared Workspaces
+```
+Team → Creates Shared Workspace → Links to GitHub Org Repo
+All Members → Can Publish to Workspace → Changes Visible to All
+```
+
+#### 4. Permissions Matrix
+
+| Action | Owner | Admin | Member |
+|--------|-------|-------|--------|
+| Delete team | ✅ | ❌ | ❌ |
+| Invite members | ✅ | ✅ | ❌ |
+| Remove members | ✅ | ✅ | ❌ |
+| Change member roles | ✅ | ✅ | ❌ |
+| Create workspace | ✅ | ✅ | ✅ |
+| Delete workspace | ✅ | ✅ | ❌ |
+| Publish to workspace | ✅ | ✅ | ✅ |
+| View team content | ✅ | ✅ | ✅ |
+
+### Implementation Approach
+
+**Recommended: GitHub Organizations**
+
+**Why GitHub Orgs?**
+- ✅ Built-in permission management
+- ✅ Secure (GitHub handles auth)
+- ✅ Scalable (unlimited members)
+- ✅ Professional (standard for teams)
+- ✅ No shared account security issues
+
+**How It Works:**
+1. Team creates/uses GitHub Organization
+2. Team members join GitHub org (via GitHub)
+3. Workspaces link to org repos
+4. GitHub handles permissions automatically
+5. BlueKit just needs org member's personal tokens
+
+**Alternative: Shared Account (Fallback)**
+- Use shared GitHub account for teams without orgs
+- All members use same token (less secure)
+- Simpler but less flexible
+- Good for small teams or personal projects
+
+**Hybrid Approach:**
+- Prefer GitHub orgs when available
+- Fallback to shared account
+- Best of both worlds
+
+### Team Sharing UI Components
+
+**Location**: `src/components/teams/`
+
+- `TeamSelector.tsx` - Select/create teams, show current team
+- `TeamMembersList.tsx` - View team members, roles, avatars
+- `InviteMemberDialog.tsx` - Invite by GitHub username, select role
+- `TeamSettings.tsx` - Team management, delete team, change name
+- `SharedWorkspaceCard.tsx` - Display shared workspaces with team info
+- `TeamRoleBadge.tsx` - Display member roles (Owner/Admin/Member)
+- `TeamInvitationsList.tsx` - View pending invitations
+
+### Backend Commands
+
+```rust
+// Team management
+#[tauri::command]
+pub async fn team_create(name: String, description: Option<String>) -> Result<Team, String>;
+
+#[tauri::command]
+pub async fn team_list() -> Result<Vec<Team>, String>;
+
+#[tauri::command]
+pub async fn team_get(team_id: String) -> Result<Team, String>;
+
+#[tauri::command]
+pub async fn team_update(team_id: String, name: Option<String>, description: Option<String>) -> Result<Team, String>;
+
+#[tauri::command]
+pub async fn team_delete(team_id: String) -> Result<(), String>;
+
+// Team members
+#[tauri::command]
+pub async fn team_invite_member(
+    team_id: String,
+    github_username: String,
+    role: TeamRole,
+) -> Result<TeamInvitation, String>;
+
+#[tauri::command]
+pub async fn team_list_members(team_id: String) -> Result<Vec<TeamMember>, String>;
+
+#[tauri::command]
+pub async fn team_remove_member(team_id: String, member_id: String) -> Result<(), String>;
+
+#[tauri::command]
+pub async fn team_update_member_role(
+    team_id: String,
+    member_id: String,
+    role: TeamRole,
+) -> Result<TeamMember, String>;
+
+#[tauri::command]
+pub async fn team_accept_invitation(invitation_id: String) -> Result<TeamMember, String>;
+
+#[tauri::command]
+pub async fn team_list_invitations(team_id: String) -> Result<Vec<TeamInvitation>, String>;
+
+// Shared workspaces
+#[tauri::command]
+pub async fn team_create_shared_workspace(
+    team_id: String,
+    name: String,
+    description: Option<String>,
+    github_org: String,
+    github_repo: String,
+) -> Result<SharedWorkspace, String>;
+
+#[tauri::command]
+pub async fn team_list_shared_workspaces(team_id: String) -> Result<Vec<SharedWorkspace>, String>;
+
+#[tauri::command]
+pub async fn team_delete_shared_workspace(workspace_id: String) -> Result<(), String>;
+```
+
+### Database Schema
+
+```sql
+-- Teams table
+CREATE TABLE teams (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Team members table
+CREATE TABLE team_members (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    github_username TEXT NOT NULL,
+    github_user_id TEXT NOT NULL,
+    github_avatar_url TEXT,
+    role TEXT NOT NULL, -- 'owner', 'admin', 'member'
+    joined_at INTEGER NOT NULL,
+    invited_by TEXT,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    UNIQUE(team_id, github_user_id)
+);
+
+-- Shared workspaces table
+CREATE TABLE shared_workspaces (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    github_owner TEXT NOT NULL,
+    github_repo TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES team_members(id)
+);
+
+-- Team invitations table
+CREATE TABLE team_invitations (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    github_username TEXT NOT NULL,
+    invited_by TEXT NOT NULL,
+    role TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by) REFERENCES team_members(id)
+);
+```
+
+### Security Considerations
+
+1. **Invitation Verification**: Verify GitHub username exists and matches authenticated user
+2. **Role-Based Access**: Enforce permissions at backend level, not just UI
+3. **Token Security**: Each member uses their own GitHub token (not shared)
+4. **Invitation Expiry**: Invitations expire after 7 days
+5. **Team Deletion**: Only owner can delete team, requires confirmation
+
+### Future Enhancements
+
+- **GitHub Org Integration**: Auto-detect org membership
+- **Team Activity Feed**: Show who published what
+- **Team Notifications**: Notify members of new publishes
+- **Workspace Permissions**: Per-workspace permissions (read-only, write, admin)
+- **Team Templates**: Pre-configured workspace templates
+- **Team Analytics**: Usage stats per team member
+
 ## 18. Next Steps
 
 1. **Review this plan** and confirm approach
@@ -955,6 +1713,6 @@ src-tauri/src/
 
 ---
 
-**Last Updated**: 2025-12-11
-**Status**: Planning Phase - Updated with Library Architecture
+**Last Updated**: 2025-01-27
+**Status**: Planning Phase - Updated with Keychain Architecture, Token Injection Details, Detailed Implementation Phases, and Team Sharing Design
 **Owner**: Development Team

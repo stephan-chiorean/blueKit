@@ -340,6 +340,13 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
 
   // Parse Mermaid error message to extract useful information
   const parseMermaidError = (errorMessage: string): string => {
+    if (!errorMessage) {
+      return 'Syntax error in Mermaid diagram';
+    }
+    
+    // Split by newlines to handle multi-line error messages
+    const lines = errorMessage.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
     // Extract line number if present
     const lineMatch = errorMessage.match(/line (\d+)/i);
     const lineNumber = lineMatch ? lineMatch[1] : null;
@@ -348,11 +355,42 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
     const expectedMatch = errorMessage.match(/Expecting[^,]+/i);
     const gotMatch = errorMessage.match(/got ['"]([^'"]+)['"]/i);
     
-    const parsed = lineNumber || expectedMatch || gotMatch
-      ? `Parse error${lineNumber ? ` on line ${lineNumber}` : ''}${expectedMatch ? `: ${expectedMatch[0]}` : ''}${gotMatch ? `, got '${gotMatch[1]}'` : ''}`
-      : errorMessage || 'Syntax error in Mermaid diagram';
+    // Check for common error patterns
+    if (errorMessage.toLowerCase().includes('syntax error in text')) {
+      // This is a generic syntax error - try to provide more context
+      const versionMatch = errorMessage.match(/mermaid\s+version\s+([\d.]+)/i);
+      const versionInfo = versionMatch ? ` (Mermaid ${versionMatch[1]})` : '';
+      
+      if (lineNumber) {
+        return `Syntax error on line ${lineNumber}${versionInfo}\n\nPlease check your Mermaid diagram syntax. Common issues include:\n- Missing or incorrect arrow syntax\n- Unclosed brackets or quotes\n- Invalid node or edge definitions`;
+      }
+      return `Syntax error in Mermaid diagram${versionInfo}\n\nPlease check your Mermaid diagram syntax.`;
+    }
     
-    return parsed;
+    // Build parsed error message
+    let parsed = '';
+    if (lineNumber || expectedMatch || gotMatch) {
+      parsed = `Parse error${lineNumber ? ` on line ${lineNumber}` : ''}`;
+      if (expectedMatch) {
+        parsed += `: ${expectedMatch[0]}`;
+      }
+      if (gotMatch) {
+        parsed += `, got '${gotMatch[1]}'`;
+      }
+    } else {
+      // Use the first meaningful line, or the whole message if it's short
+      parsed = lines.length > 0 ? lines[0] : errorMessage;
+    }
+    
+    // Add version info if present and not already included
+    if (!parsed.includes('mermaid version') && errorMessage.includes('mermaid version')) {
+      const versionMatch = errorMessage.match(/mermaid\s+version\s+([\d.]+)/i);
+      if (versionMatch) {
+        parsed += `\n\nMermaid version: ${versionMatch[1]}`;
+      }
+    }
+    
+    return parsed || 'Syntax error in Mermaid diagram';
   };
 
   // Extract mermaid diagram code from content
@@ -521,6 +559,23 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
         if (diagramRef.current) {
           diagramRef.current.innerHTML = result.svg;
           
+          // Immediately check for errors in the rendered SVG before applying any styling
+          const svg = diagramRef.current.querySelector('svg');
+          if (svg) {
+            // Quick check for error indicators
+            const svgText = svg.textContent || '';
+            const hasErrorIndicators = /syntax\s+error|parse\s+error|error\s+in\s+text/i.test(svgText);
+            
+            if (hasErrorIndicators) {
+              console.error('MermaidDiagramViewer: Error detected immediately in rendered SVG');
+              // Clear the SVG and show error
+              diagramRef.current.innerHTML = '';
+              const parsedError = parseMermaidError(svgText);
+              setRenderError(parsedError);
+              return; // Stop processing, error found
+            }
+          }
+          
           // Extract class mappings and classDef colors from mermaid code
           const { classMap, classDefColors } = extractClassMappings(mermaidCode);
 
@@ -570,8 +625,8 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
           });
           
           // Check if the SVG contains error messages (Mermaid sometimes renders errors into SVG)
-          // Wait a tick for DOM to update, then check for error elements
-          setTimeout(() => {
+          // Check immediately and also after a short delay to catch errors that render asynchronously
+          const checkForErrors = () => {
             if (!diagramRef.current) {
               return;
             }
@@ -585,6 +640,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
               
               let foundError = false;
               let errorText = '';
+              let versionText = '';
               
               // Define specific error patterns that indicate actual Mermaid errors
               const errorPatterns = [
@@ -601,8 +657,17 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
                 return errorPatterns.some(pattern => pattern.test(text));
               };
               
+              // Collect all text content to check for error patterns
+              const allTextContent: string[] = [];
+              
               textElements.forEach((textEl) => {
                 const textContent = textEl.textContent || '';
+                allTextContent.push(textContent);
+                
+                // Check for version info (often appears with errors)
+                if (textContent.includes('mermaid version')) {
+                  versionText = textContent.trim();
+                }
                 
                 if (isErrorText(textContent)) {
                   foundError = true;
@@ -615,6 +680,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
               
               foreignObjects.forEach((fo) => {
                 const textContent = fo.textContent || '';
+                allTextContent.push(textContent);
                 
                 if (isErrorText(textContent)) {
                   foundError = true;
@@ -624,14 +690,45 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
                 }
               });
               
+              // Check if any text contains both error indicators and version info (common error pattern)
+              const combinedText = allTextContent.join(' ').toLowerCase();
+              if (combinedText.includes('syntax error') && combinedText.includes('mermaid version')) {
+                foundError = true;
+                if (!errorText) {
+                  // Extract the error message from combined text
+                  const errorMatch = combinedText.match(/(syntax\s+error[^.]*)/i);
+                  if (errorMatch) {
+                    errorText = errorMatch[1].trim();
+                  }
+                }
+              }
+              
               if (foundError) {
-                console.error('MermaidDiagramViewer: Error detected in rendered SVG', { errorText });
+                console.error('MermaidDiagramViewer: Error detected in rendered SVG', { 
+                  errorText, 
+                  versionText,
+                  allTextContent: allTextContent.slice(0, 5) // Log first 5 for debugging
+                });
                 // Clear the SVG and show error
                 diagramRef.current.innerHTML = '';
-                const parsedError = parseMermaidError(errorText);
+                // Combine error text with version info if available
+                const fullErrorText = errorText + (versionText ? `\n${versionText}` : '');
+                const parsedError = parseMermaidError(fullErrorText);
                 setRenderError(parsedError);
+                return true; // Indicate error was found
               }
             }
+            return false; // No error found
+          };
+          
+          // Check immediately
+          if (checkForErrors()) {
+            return; // Error found, stop processing
+          }
+          
+          // Also check after a short delay in case errors render asynchronously
+          setTimeout(() => {
+            checkForErrors();
           }, 50);
         }
       }).catch((error) => {
