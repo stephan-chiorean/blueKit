@@ -15,6 +15,7 @@ import {
   VStack,
   Button,
   Badge,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
@@ -25,7 +26,6 @@ import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { FilterPanel } from '../shared/FilterPanel';
-import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
@@ -158,6 +158,15 @@ function WalkthroughsTabContent({
   // Build folder tree when folders or walkthroughs change (memoized for performance)
   const folderTree = useMemo(() => {
     const tree = buildFolderTree(folders, filteredWalkthroughs, 'walkthroughs', projectPath);
+    console.log('[WalkthroughFolders] 🌳 Built folder tree:', tree.length, 'root folders');
+    tree.forEach(node => {
+      console.log(`[WalkthroughFolders] 📁 ${node.folder.config?.name || node.folder.name}:`, {
+        path: node.folder.path,
+        children: node.children.length,
+        artifacts: node.artifacts.length,
+        childNames: node.children.map(c => c.folder.config?.name || c.folder.name)
+      });
+    });
     return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),
@@ -245,6 +254,19 @@ function WalkthroughsTabContent({
   };
 
   const toggleFolderExpanded = (folderPath: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        next.delete(folderPath);
+      } else {
+        next.add(folderPath);
+      }
+      return next;
+    });
+  };
+
+  // Handle nested folder expansion (for subfolders within folders)
+  const toggleNestedFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(folderPath)) {
@@ -565,24 +587,25 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <MasonryLayout columnCount={3}>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {folderTree.map((node) => (
-                <MasonryItem key={node.folder.path}>
-                    <FolderCard
-                      node={node}
-                      artifactType="walkthroughs"
-                      onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                      onViewArtifact={handleViewWalkthrough}
-                      onAddToFolder={handleAddToFolder}
-                      onEdit={handleEditFolder}
-                      onDelete={handleDeleteFolder}
-                      hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
-                      renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                      movingArtifacts={movingArtifacts}
-                    />
-                </MasonryItem>
+                <FolderCard
+                  key={node.folder.path}
+                  node={node}
+                  artifactType="walkthroughs"
+                  onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                  onViewArtifact={handleViewWalkthrough}
+                  onAddToFolder={handleAddToFolder}
+                  onEdit={handleEditFolder}
+                  onDelete={handleDeleteFolder}
+                  hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
+                  renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                  movingArtifacts={movingArtifacts}
+                  expandedNestedFolders={expandedFolders}
+                  onToggleNestedFolder={toggleNestedFolder}
+                />
               ))}
-            </MasonryLayout>
+            </SimpleGrid>
           ) : (
             <Table.Root size="sm" variant="outline">
               <Table.Header>
@@ -743,59 +766,61 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <MasonryLayout columnCount={3}>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {rootWalkthroughs.map((walkthrough) => (
-                <MasonryItem key={walkthrough.path}>
-                  <Card.Root
-                    variant="subtle"
-                    borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
-                    borderColor={isSelected(walkthrough.path) ? "primary.500" : "border.subtle"}
-                    bg={isSelected(walkthrough.path) ? "primary.hover.bg" : undefined}
-                    position="relative"
-                    cursor="pointer"
-                    onClick={() => handleViewWalkthrough(walkthrough)}
-                    _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
-                  >
-                    <CardHeader>
-                      <Flex align="center" justify="space-between" gap={4}>
-                        <HStack gap={2} align="center">
-                          <Heading size="md">{walkthrough.frontMatter?.alias || walkthrough.name}</Heading>
-                          {walkthrough.frontMatter?.is_base && (
-                            <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
-                          )}
-                        </HStack>
-                        <Checkbox.Root
-                          checked={isSelected(walkthrough.path)}
-                          colorPalette="blue"
-                          onCheckedChange={() => handleWalkthroughToggle(walkthrough)}
-                          onClick={(e) => e.stopPropagation()}
-                          cursor="pointer"
-                        >
-                          <Checkbox.HiddenInput />
-                          <Checkbox.Control cursor="pointer">
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Root>
-                      </Flex>
-                    </CardHeader>
-                    <CardBody display="flex" flexDirection="column" flex="1">
-                      <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                        {walkthrough.frontMatter?.description || walkthrough.path}
-                      </Text>
-                      {walkthrough.frontMatter?.tags && walkthrough.frontMatter.tags.length > 0 && (
-                        <HStack gap={2} flexWrap="wrap" mt="auto">
-                          {walkthrough.frontMatter.tags.map((tag) => (
-                            <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                              <Tag.Label>{tag}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      )}
-                    </CardBody>
-                  </Card.Root>
-                </MasonryItem>
+                <Card.Root
+                  key={walkthrough.path}
+                  variant="subtle"
+                  borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
+                  borderColor={isSelected(walkthrough.path) ? "primary.500" : "border.subtle"}
+                  bg={isSelected(walkthrough.path) ? "primary.hover.bg" : undefined}
+                  position="relative"
+                  cursor="pointer"
+                  onClick={() => handleViewWalkthrough(walkthrough)}
+                  _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+                  height="100%"
+                  display="flex"
+                  flexDirection="column"
+                >
+                  <CardHeader>
+                    <Flex align="center" justify="space-between" gap={4}>
+                      <HStack gap={2} align="center">
+                        <Heading size="md">{walkthrough.frontMatter?.alias || walkthrough.name}</Heading>
+                        {walkthrough.frontMatter?.is_base && (
+                          <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
+                        )}
+                      </HStack>
+                      <Checkbox.Root
+                        checked={isSelected(walkthrough.path)}
+                        colorPalette="blue"
+                        onCheckedChange={() => handleWalkthroughToggle(walkthrough)}
+                        onClick={(e) => e.stopPropagation()}
+                        cursor="pointer"
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control cursor="pointer">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox.Root>
+                    </Flex>
+                  </CardHeader>
+                  <CardBody display="flex" flexDirection="column" flex="1">
+                    <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                      {walkthrough.frontMatter?.description || walkthrough.path}
+                    </Text>
+                    {walkthrough.frontMatter?.tags && walkthrough.frontMatter.tags.length > 0 && (
+                      <HStack gap={2} flexWrap="wrap" mt="auto">
+                        {walkthrough.frontMatter.tags.map((tag) => (
+                          <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                            <Tag.Label>{tag}</Tag.Label>
+                          </Tag.Root>
+                        ))}
+                      </HStack>
+                    )}
+                  </CardBody>
+                </Card.Root>
               ))}
-            </MasonryLayout>
+            </SimpleGrid>
           ) : viewMode === 'table' ? (
             renderWalkthroughsTableView()
           ) : null}

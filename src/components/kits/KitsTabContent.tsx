@@ -15,6 +15,7 @@ import {
   VStack,
   Button,
   Badge,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
@@ -25,7 +26,6 @@ import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { FilterPanel } from '../shared/FilterPanel';
-import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
@@ -228,6 +228,19 @@ function KitsTabContent({
   };
 
   const toggleFolderExpanded = (folderPath: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        next.delete(folderPath);
+      } else {
+        next.add(folderPath);
+      }
+      return next;
+    });
+  };
+
+  // Handle nested folder expansion (for subfolders within folders)
+  const toggleNestedFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(folderPath)) {
@@ -536,24 +549,25 @@ function KitsTabContent({
             />
 
             {viewMode === 'card' ? (
-              <MasonryLayout columnCount={3}>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
                 {folderTree.map((node) => (
-                  <MasonryItem key={node.folder.path}>
-                    <FolderCard
-                      node={node}
-                      artifactType="kits"
-                      onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                      onViewArtifact={handleViewKit}
-                      onAddToFolder={handleAddToFolder}
-                      onEdit={handleEditFolder}
-                      onDelete={handleDeleteFolder}
-                      hasCompatibleSelection={selectedItems.some(item => item.type === 'Kit')}
-                      renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                      movingArtifacts={movingArtifacts}
-                    />
-                  </MasonryItem>
+                  <FolderCard
+                    key={node.folder.path}
+                    node={node}
+                    artifactType="kits"
+                    onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                    onViewArtifact={handleViewKit}
+                    onAddToFolder={handleAddToFolder}
+                    onEdit={handleEditFolder}
+                    onDelete={handleDeleteFolder}
+                    hasCompatibleSelection={selectedItems.some(item => item.type === 'Kit')}
+                    renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                    movingArtifacts={movingArtifacts}
+                    expandedNestedFolders={expandedFolders}
+                    onToggleNestedFolder={toggleNestedFolder}
+                  />
                 ))}
-              </MasonryLayout>
+              </SimpleGrid>
             ) : (
               <Table.Root size="sm" variant="outline">
                 <Table.Header>
@@ -769,59 +783,61 @@ function KitsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <MasonryLayout columnCount={3}>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {rootKits.map((kit) => (
-                <MasonryItem key={kit.path}>
-                  <Card.Root
-                    variant="subtle"
-                    borderWidth={isSelected(kit.path) ? "2px" : "1px"}
-                    borderColor={isSelected(kit.path) ? "primary.500" : "border.subtle"}
-                    bg={isSelected(kit.path) ? "primary.hover.bg" : undefined}
-                    position="relative"
-                    cursor="pointer"
-                    onClick={() => handleViewKit(kit)}
-                    _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
-                  >
-                    <CardHeader>
-                      <Flex align="center" justify="space-between" gap={4}>
-                        <HStack gap={2} align="center">
-                          <Heading size="md">{kit.frontMatter?.alias || kit.name}</Heading>
-                          {kit.frontMatter?.is_base && (
-                            <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
-                          )}
-                        </HStack>
-                        <Checkbox.Root
-                          checked={isSelected(kit.path)}
-                          colorPalette="blue"
-                          onCheckedChange={() => handleKitToggle(kit)}
-                          onClick={(e) => e.stopPropagation()}
-                          cursor="pointer"
-                        >
-                          <Checkbox.HiddenInput />
-                          <Checkbox.Control cursor="pointer">
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Root>
-                      </Flex>
-                    </CardHeader>
-                    <CardBody display="flex" flexDirection="column" flex="1">
-                      <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                        {kit.frontMatter?.description || kit.path}
-                      </Text>
-                      {kit.frontMatter?.tags && kit.frontMatter.tags.length > 0 && (
-                        <HStack gap={2} flexWrap="wrap" mt="auto">
-                          {kit.frontMatter.tags.map((tag) => (
-                            <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                              <Tag.Label>{tag}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      )}
-                    </CardBody>
-                  </Card.Root>
-                </MasonryItem>
+                <Card.Root
+                  key={kit.path}
+                  variant="subtle"
+                  borderWidth={isSelected(kit.path) ? "2px" : "1px"}
+                  borderColor={isSelected(kit.path) ? "primary.500" : "border.subtle"}
+                  bg={isSelected(kit.path) ? "primary.hover.bg" : undefined}
+                  position="relative"
+                  cursor="pointer"
+                  onClick={() => handleViewKit(kit)}
+                  _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+                  height="100%"
+                  display="flex"
+                  flexDirection="column"
+                >
+                  <CardHeader>
+                    <Flex align="center" justify="space-between" gap={4}>
+                      <HStack gap={2} align="center">
+                        <Heading size="md">{kit.frontMatter?.alias || kit.name}</Heading>
+                        {kit.frontMatter?.is_base && (
+                          <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
+                        )}
+                      </HStack>
+                      <Checkbox.Root
+                        checked={isSelected(kit.path)}
+                        colorPalette="blue"
+                        onCheckedChange={() => handleKitToggle(kit)}
+                        onClick={(e) => e.stopPropagation()}
+                        cursor="pointer"
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control cursor="pointer">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox.Root>
+                    </Flex>
+                  </CardHeader>
+                  <CardBody display="flex" flexDirection="column" flex="1">
+                    <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                      {kit.frontMatter?.description || kit.path}
+                    </Text>
+                    {kit.frontMatter?.tags && kit.frontMatter.tags.length > 0 && (
+                      <HStack gap={2} flexWrap="wrap" mt="auto">
+                        {kit.frontMatter.tags.map((tag) => (
+                          <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                            <Tag.Label>{tag}</Tag.Label>
+                          </Tag.Root>
+                        ))}
+                      </HStack>
+                    )}
+                  </CardBody>
+                </Card.Root>
               ))}
-            </MasonryLayout>
+            </SimpleGrid>
           ) : viewMode === 'table' ? (
             renderKitsTableView()
           ) : null}

@@ -3,6 +3,34 @@
   "name": "Guide",
   "description": "General guides of concepts",
   "tags": [],
+  "groups": [
+    {
+      "id": "group-bug-fixes-solutions",
+      "order": 1,
+      "name": "Bug Fixes & Solutions",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/bug-fixes-solutions/fixing-file-move-detection.md"
+      ]
+    },
+    {
+      "id": "group-getting-started",
+      "order": 2,
+      "name": "Getting Started",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/getting-started/understanding-tauri-ipc.md"
+      ]
+    },
+    {
+      "id": "group-ui-layout",
+      "order": 3,
+      "name": "UI Layout",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/ui-layout/color-mode-theming-system.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/ui-layout/folder-card-state-synchronization.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/ui-layout/javascript-masonry-layout.md"
+      ]
+    }
+  ],
   "createdAt": "2025-12-08T01:11:52.446Z",
   "updatedAt": "2025-12-08T01:11:52.446Z"
 }

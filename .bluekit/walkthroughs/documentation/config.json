@@ -5,13 +5,34 @@
   "tags": [],
   "groups": [
     {
-      "id": "group-1765158624857",
+      "id": "group-backend-architecture",
       "order": 1,
-      "name": "Core",
+      "name": "Backend Architecture",
       "resourcePaths": [
-        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/ipc-communication.md",
-        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/task-management-architecture.md",
-        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/task-database-flow.md"
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/backend-architecture/database-migrations-system.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/backend-architecture/database-state-injection.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/backend-architecture/rust-backend-overview.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/backend-architecture/task-database-flow.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/backend-architecture/understanding-rust-panics-in-tauri.md"
+      ]
+    },
+    {
+      "id": "group-core-systems",
+      "order": 2,
+      "name": "Core Systems",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/core-systems/cache-system-overview.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/core-systems/file-watching-system.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/core-systems/incremental-update-system.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/core-systems/ipc-communication.md"
+      ]
+    },
+    {
+      "id": "group-task-management",
+      "order": 3,
+      "name": "Task Management",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/documentation/task-management/task-management-architecture.md"
       ]
     }
   ],

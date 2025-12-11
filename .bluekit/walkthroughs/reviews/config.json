@@ -3,6 +3,24 @@
   "name": "Reviews",
   "description": "Major reviews/sensitive PRs to remind me",
   "tags": [],
+  "groups": [
+    {
+      "id": "group-feature-reviews",
+      "order": 1,
+      "name": "Feature Reviews",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/reviews/feature-reviews/folder-management-system-pr-review.md"
+      ]
+    },
+    {
+      "id": "group-system-optimizations",
+      "order": 2,
+      "name": "System Optimizations",
+      "resourcePaths": [
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/reviews/system-optimizations/file-watcher-optimization-guide.md"
+      ]
+    }
+  ],
   "createdAt": "2025-12-08T01:13:06.220Z",
   "updatedAt": "2025-12-08T01:13:06.220Z"
 }

@@ -324,7 +324,7 @@ export default function HomePage({
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
       {/* Header above everything */}
       <Box flexShrink={0}>
-        <Header />
+        <Header onNavigateToTasks={() => setActiveTab('tasks')} />
       </Box>
 
       {/* Full screen content area - no workstation until kit is selected */}

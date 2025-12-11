@@ -21,7 +21,12 @@ import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
 import { useColorMode } from '../contexts/ColorModeContext';
 
-export default function Header() {
+interface HeaderProps {
+  currentProject?: ProjectEntry;
+  onNavigateToTasks?: () => void;
+}
+
+export default function Header({ currentProject, onNavigateToTasks }: HeaderProps = {}) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -115,6 +120,8 @@ export default function Header() {
           <TaskManagerPopover
             onOpenTaskDialog={handleOpenTaskDialog}
             onOpenCreateDialog={handleOpenCreateDialog}
+            currentProject={currentProject}
+            onNavigateToTasks={onNavigateToTasks}
           />
 
           <IconButton variant="ghost" size="sm" aria-label="Notifications">

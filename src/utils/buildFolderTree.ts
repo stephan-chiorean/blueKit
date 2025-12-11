@@ -54,8 +54,11 @@ export function buildFolderTree(
     const children: FolderTreeNode[] = [];
 
     // Find and build child folders
+    // Match by parentPath if available, otherwise compute from path structure
     folders.forEach(f => {
-      if (f.parentPath === folder.path) {
+      const isChild = f.parentPath === folder.path || 
+        (!f.parentPath && getParentDirectory(f.path) === folder.path);
+      if (isChild) {
         children.push(buildNode(f));
       }
     });
@@ -68,9 +71,13 @@ export function buildFolderTree(
     };
   }
 
-  // Get root-level folders (no parent or parent is root dir)
+  // Get root-level folders (directly under rootDir, not nested)
+  // A folder is root-level if its parent directory (computed from path) equals rootDir
   const rootFolders = folders
-    .filter(f => !f.parentPath || f.parentPath === rootDir)
+    .filter(f => {
+      const folderParentDir = getParentDirectory(f.path);
+      return folderParentDir === rootDir;
+    })
     .map(buildNode);
 
   return rootFolders;

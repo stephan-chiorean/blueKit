@@ -14,6 +14,7 @@ import {
   Button,
   Table,
   Tag,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { LuNetwork, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
 import { useState, useEffect, useMemo, memo } from 'react';
@@ -23,7 +24,6 @@ import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
-import { MasonryLayout, MasonryItem } from '../shared/MasonryLayout';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
@@ -192,6 +192,19 @@ function DiagramsTabContent({
     });
   };
 
+  // Handle nested folder expansion (for subfolders within folders)
+  const toggleNestedFolder = (folderPath: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        next.delete(folderPath);
+      } else {
+        next.add(folderPath);
+      }
+      return next;
+    });
+  };
+
   // Handle edit folder
   const handleEditFolder = (folder: ArtifactFolder) => {
     setEditingFolder(folder);
@@ -343,24 +356,25 @@ function DiagramsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <MasonryLayout columnCount={3}>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
                 {folderTree.map((node) => (
-                  <MasonryItem key={node.folder.path}>
-                    <FolderCard
-                      node={node}
-                      artifactType="diagrams"
-                      onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                      onViewArtifact={handleDiagramClick}
-                      onAddToFolder={handleAddToFolder}
-                      onEdit={handleEditFolder}
-                      onDelete={handleDeleteFolder}
-                      hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
-                      renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                      movingArtifacts={movingArtifacts}
-                    />
-                  </MasonryItem>
+                  <FolderCard
+                    key={node.folder.path}
+                    node={node}
+                    artifactType="diagrams"
+                    onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
+                    onViewArtifact={handleDiagramClick}
+                    onAddToFolder={handleAddToFolder}
+                    onEdit={handleEditFolder}
+                    onDelete={handleDeleteFolder}
+                    hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}
+                    renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
+                    movingArtifacts={movingArtifacts}
+                    expandedNestedFolders={expandedFolders}
+                    onToggleNestedFolder={toggleNestedFolder}
+                  />
                 ))}
-              </MasonryLayout>
+              </SimpleGrid>
             ) : (
               <Table.Root size="sm" variant="outline">
                 <Table.Header>
@@ -541,66 +555,69 @@ function DiagramsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <MasonryLayout columnCount={3}>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {rootDiagrams.map((diagram) => {
                 const diagramSelected = isSelected(diagram.path);
                 const displayName = diagram.frontMatter?.alias || diagram.name;
                 const description = diagram.frontMatter?.description || diagram.path;
                 return (
-                  <MasonryItem key={diagram.path}>
-                    <Box
-                      borderWidth="2px"
-                      borderColor={diagramSelected ? "primary.500" : "transparent"}
-                      borderRadius="md"
-                      transition="border-color 0.2s"
-                      boxSizing="border-box"
+                  <Box
+                    key={diagram.path}
+                    borderWidth="2px"
+                    borderColor={diagramSelected ? "primary.500" : "transparent"}
+                    borderRadius="md"
+                    transition="border-color 0.2s"
+                    boxSizing="border-box"
+                    height="100%"
+                  >
+                    <Card.Root
+                      variant="subtle"
+                      borderWidth="1px"
+                      borderColor={diagramSelected ? "transparent" : "border.subtle"}
+                      bg={diagramSelected ? "primary.hover.bg" : undefined}
+                      cursor="pointer"
+                      onClick={() => handleDiagramClick(diagram)}
+                      _hover={{ borderColor: diagramSelected ? "transparent" : "primary.400", bg: "primary.hover.bg" }}
+                      transition="all 0.2s"
+                      height="100%"
+                      display="flex"
+                      flexDirection="column"
                     >
-                      <Card.Root
-                        variant="subtle"
-                        borderWidth="1px"
-                        borderColor={diagramSelected ? "transparent" : "border.subtle"}
-                        bg={diagramSelected ? "primary.hover.bg" : undefined}
-                        cursor="pointer"
-                        onClick={() => handleDiagramClick(diagram)}
-                        _hover={{ borderColor: diagramSelected ? "transparent" : "primary.400", bg: "primary.hover.bg" }}
-                        transition="all 0.2s"
-                      >
-                        <CardHeader>
-                          <Flex align="center" justify="space-between" gap={4}>
-                            <HStack gap={2} align="center" flex="1">
-                              <Icon boxSize={5} color="primary.500">
-                                <LuNetwork />
-                              </Icon>
-                              <Heading size="md">{displayName}</Heading>
-                            </HStack>
-                            <Checkbox.Root
-                              checked={diagramSelected}
-                              colorPalette="blue"
-                              onCheckedChange={() => handleDiagramToggle(diagram)}
-                              onClick={(e) => e.stopPropagation()}
-                              cursor="pointer"
-                            >
-                              <Checkbox.HiddenInput />
-                              <Checkbox.Control cursor="pointer">
-                                <Checkbox.Indicator />
-                              </Checkbox.Control>
-                            </Checkbox.Root>
-                          </Flex>
-                        </CardHeader>
-                        <CardBody display="flex" flexDirection="column" flex="1">
-                          <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                            {description}
-                          </Text>
-                          <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
-                            {diagram.path}
-                          </Text>
-                        </CardBody>
-                      </Card.Root>
-                    </Box>
-                  </MasonryItem>
+                      <CardHeader>
+                        <Flex align="center" justify="space-between" gap={4}>
+                          <HStack gap={2} align="center" flex="1">
+                            <Icon boxSize={5} color="primary.500">
+                              <LuNetwork />
+                            </Icon>
+                            <Heading size="md">{displayName}</Heading>
+                          </HStack>
+                          <Checkbox.Root
+                            checked={diagramSelected}
+                            colorPalette="blue"
+                            onCheckedChange={() => handleDiagramToggle(diagram)}
+                            onClick={(e) => e.stopPropagation()}
+                            cursor="pointer"
+                          >
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control cursor="pointer">
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                          </Checkbox.Root>
+                        </Flex>
+                      </CardHeader>
+                      <CardBody display="flex" flexDirection="column" flex="1">
+                        <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                          {description}
+                        </Text>
+                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                          {diagram.path}
+                        </Text>
+                      </CardBody>
+                    </Card.Root>
+                  </Box>
                 );
               })}
-            </MasonryLayout>
+            </SimpleGrid>
           ) : null}
         </Box>
       </VStack>

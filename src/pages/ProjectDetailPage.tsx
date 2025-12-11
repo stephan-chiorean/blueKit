@@ -443,7 +443,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
       {/* Header above everything */}
       <Box flexShrink={0}>
-        <Header />
+        <Header 
+          currentProject={project}
+          onNavigateToTasks={() => setCurrentTab('tasks')}
+        />
       </Box>
       
       {/* Full screen content area */}

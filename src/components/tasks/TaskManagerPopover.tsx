@@ -9,6 +9,8 @@ import {
   Box,
   Spinner,
   Badge,
+  Icon,
+  Flex,
 } from '@chakra-ui/react';
 import { LuPlus, LuListTodo } from 'react-icons/lu';
 import { Task } from '../../types/task';
@@ -17,15 +19,20 @@ import { ProjectEntry, invokeDbGetTasks, invokeGetProjectRegistry } from '../../
 interface TaskManagerPopoverProps {
   onOpenTaskDialog: (task: Task) => void;
   onOpenCreateDialog: (projects: ProjectEntry[]) => void;
+  currentProject?: ProjectEntry;
+  onNavigateToTasks?: () => void;
 }
 
 export default function TaskManagerPopover({
   onOpenTaskDialog,
   onOpenCreateDialog,
+  currentProject,
+  onNavigateToTasks,
 }: TaskManagerPopoverProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Load in-progress tasks and projects
   const loadInProgressTasks = async () => {
@@ -53,7 +60,7 @@ export default function TaskManagerPopover({
   const inProgressCount = tasks.length;
 
   return (
-    <Popover.Root>
+    <Popover.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)}>
       <Popover.Trigger asChild>
         <Button variant="ghost" size="sm" position="relative">
           <LuListTodo />
@@ -77,7 +84,22 @@ export default function TaskManagerPopover({
         <Popover.Positioner>
           <Popover.Content maxW="lg" width="400px">
             <Popover.Header>
-              <Text fontWeight="semibold">In Progress Tasks</Text>
+              <Flex align="center" justify="space-between" width="full">
+                <Text fontWeight="semibold">In Progress Tasks</Text>
+                {onNavigateToTasks && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onNavigateToTasks();
+                    }}
+                    colorPalette="gray"
+                  >
+                    <Text fontSize="sm">See All</Text>
+                  </Button>
+                )}
+              </Flex>
             </Popover.Header>
 
             <Popover.Body>
