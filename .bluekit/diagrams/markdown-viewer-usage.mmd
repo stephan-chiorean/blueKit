@@ -1,0 +1,102 @@
+---
+alias: Markdown Viewer Component Usage
+description: Diagram showing where KitMarkdownViewer and ResourceMarkdownViewer components are imported and used throughout the application, including the import chain from App.tsx through view pages to Workstation component
+tags:
+  - frontend
+  - components
+  - markdown
+  - architecture
+  - imports
+---
+```mermaid
+graph TB
+    subgraph App_Root["Application Root"]
+        App[App.tsx<br/>Root Component]
+        ResourceProvider[ResourceContext.tsx<br/>ResourceProvider<br/>Manages selectedResource state]
+    end
+
+    subgraph View_Pages["View Pages"]
+        KitViewPage[KitViewPage.tsx<br/>Kit Detail View<br/>Uses WorkstationContext]
+        WalkthroughViewPage[WalkthroughViewPage.tsx<br/>Walkthrough Detail View<br/>Uses WorkstationContext]
+        ResourceViewPage[ResourceViewPage.tsx<br/>Resource Detail View<br/>Uses ResourceContext]
+    end
+
+    subgraph Workstation_Components["Workstation Components"]
+        Workstation[Workstation.tsx<br/>Main Workstation Container<br/>imports ResourceMarkdownViewer]
+        ResourceMarkdownViewer[ResourceMarkdownViewer.tsx<br/>ACTIVE<br/>Renders markdown for resources<br/>Uses ShikiCodeBlock]
+        KitMarkdownViewer[KitMarkdownViewer.tsx<br/>UNUSED<br/>Not imported anywhere<br/>Legacy component]
+    end
+
+    subgraph Context_System["Context System"]
+        WorkstationContext[WorkstationContext.tsx<br/>DEPRECATED<br/>Alias for ResourceContext]
+        ResourceContext[ResourceContext.tsx<br/>ACTIVE<br/>Manages resource state]
+    end
+
+    subgraph Dependencies["External Dependencies"]
+        ReactMarkdown[react-markdown<br/>Markdown Parser]
+        RemarkGfm[remark-gfm<br/>GitHub Flavored Markdown]
+        ChakraUI[Chakra UI<br/>Component Library]
+        TauriShell[tauri-apps/api/shell<br/>open function for links]
+        ShikiCodeBlock[ShikiCodeBlock.tsx<br/>Syntax highlighting]
+    end
+
+    subgraph Other_Components["Other Components Using Markdown"]
+        TaskDetailModal[TaskDetailModal.tsx<br/>Blueprint Task Modal<br/>Renders markdown inline]
+    end
+
+    %% App to Context
+    App -->|wraps with| ResourceProvider
+
+    %% Context System
+    ResourceProvider -.->|provides| ResourceContext
+    WorkstationContext -.->|alias of| ResourceContext
+
+    %% View Pages to Context
+    KitViewPage -->|uses| WorkstationContext
+    WalkthroughViewPage -->|uses| WorkstationContext
+    ResourceViewPage -->|uses| ResourceContext
+
+    %% View Pages to Workstation
+    KitViewPage -->|imports and renders| Workstation
+    WalkthroughViewPage -->|imports and renders| Workstation
+    ResourceViewPage -->|imports and renders| Workstation
+
+    %% Workstation to Markdown Viewer
+    Workstation -->|imports and renders| ResourceMarkdownViewer
+    Workstation -.->|does not use| KitMarkdownViewer
+
+    %% Markdown Viewer Dependencies
+    ResourceMarkdownViewer -->|uses| ReactMarkdown
+    ResourceMarkdownViewer -->|uses| RemarkGfm
+    ResourceMarkdownViewer -->|uses| ChakraUI
+    ResourceMarkdownViewer -->|uses| TauriShell
+    ResourceMarkdownViewer -->|uses| ShikiCodeBlock
+
+    KitMarkdownViewer -.->|would use| ReactMarkdown
+    KitMarkdownViewer -.->|would use| RemarkGfm
+    KitMarkdownViewer -.->|would use| ChakraUI
+    KitMarkdownViewer -.->|would use| TauriShell
+
+    %% TaskDetailModal
+    TaskDetailModal -->|renders markdown inline| ReactMarkdown
+    TaskDetailModal -->|uses| RemarkGfm
+    TaskDetailModal -->|uses| ChakraUI
+    TaskDetailModal -->|uses| TauriShell
+
+    %% Styling using BlueKit color palette
+    classDef active fill:#0f766e,stroke:#4287f5,stroke-width:2px
+    classDef unused fill:#c2410c,stroke:#4287f5,stroke-width:2px,stroke-dasharray: 5 5
+    classDef deprecated fill:#a16207,stroke:#4287f5,stroke-width:2px
+    classDef component fill:#1e3a8a,stroke:#4287f5,stroke-width:2px
+    classDef page fill:#155e75,stroke:#4287f5,stroke-width:2px
+    classDef context fill:#6b21a8,stroke:#4287f5,stroke-width:2px
+    classDef dependency fill:#4c1d95,stroke:#4287f5,stroke-width:2px
+
+    class ResourceMarkdownViewer,ResourceContext,ResourceProvider active
+    class KitMarkdownViewer unused
+    class WorkstationContext deprecated
+    class Workstation,TaskDetailModal component
+    class KitViewPage,WalkthroughViewPage,ResourceViewPage page
+    class ResourceContext,WorkstationContext context
+    class ReactMarkdown,RemarkGfm,ChakraUI,TauriShell,ShikiCodeBlock dependency
+```

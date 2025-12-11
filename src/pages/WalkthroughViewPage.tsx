@@ -7,7 +7,7 @@ import {
 import Header from '../components/Header';
 import KitOverview from '../components/kits/KitOverview';
 import Workstation from '../components/workstation/Workstation';
-import { useWorkstation } from '../contexts/WorkstationContext';
+import { useResource } from '../contexts/ResourceContext';
 import { ArtifactFile } from '../ipc';
 
 interface WalkthroughViewPageProps {
@@ -17,17 +17,17 @@ interface WalkthroughViewPageProps {
 }
 
 export default function WalkthroughViewPage({ kit, kitContent, onBack }: WalkthroughViewPageProps) {
-  const { setSelectedKit, clearSelectedKit } = useWorkstation();
+  const { setSelectedResource, clearSelectedResource } = useResource();
 
-  // Set the selected kit when component mounts
+  // Set the selected resource when component mounts
   useEffect(() => {
-    setSelectedKit(kit, kitContent);
+    setSelectedResource(kit, kitContent, 'walkthrough');
     
-    // Cleanup: clear selected kit when component unmounts
+    // Cleanup: clear selected resource when component unmounts
     return () => {
-      clearSelectedKit();
+      clearSelectedResource();
     };
-  }, [kit, kitContent, setSelectedKit, clearSelectedKit]);
+  }, [kit, kitContent, setSelectedResource, clearSelectedResource]);
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">

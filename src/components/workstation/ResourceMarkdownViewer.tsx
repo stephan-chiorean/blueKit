@@ -12,6 +12,7 @@ import {
   Link,
   List,
 } from '@chakra-ui/react';
+import { open } from '@tauri-apps/api/shell';
 import { ResourceFile } from '../../types/resource';
 import { getResourceDisplayName } from '../../types/resource';
 import ShikiCodeBlock from './ShikiCodeBlock';
@@ -226,11 +227,39 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
 
                 return <ShikiCodeBlock code={codeString} language={language} />;
               },
-              a: ({ href, children }) => (
-                <Link href={href} color="primary.500" textDecoration="underline" _hover={{ color: 'primary.600' }}>
-                  {children}
-                </Link>
-              ),
+              a: ({ href, children }) => {
+                const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+                  e.preventDefault();
+                  if (href) {
+                    // Check if it's an external link (http/https)
+                    if (href.startsWith('http://') || href.startsWith('https://')) {
+                      // Open in system browser
+                      try {
+                        await open(href);
+                      } catch (error) {
+                        console.error('Failed to open link:', error);
+                      }
+                    } else {
+                      // For relative/internal links, you might want to handle them differently
+                      // For now, we'll just prevent navigation
+                      console.log('Internal link clicked:', href);
+                    }
+                  }
+                };
+
+                return (
+                  <Link
+                    href={href}
+                    onClick={handleClick}
+                    color="primary.500"
+                    textDecoration="underline"
+                    _hover={{ color: 'primary.600' }}
+                    cursor="pointer"
+                  >
+                    {children}
+                  </Link>
+                );
+              },
               blockquote: ({ children }) => (
                 <Box
                   as="blockquote"

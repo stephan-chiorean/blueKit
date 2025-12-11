@@ -66,8 +66,3 @@ export function useResource() {
   }
   return context;
 }
-
-// Backwards compatibility: export WorkstationContext as an alias
-export const WorkstationContext = ResourceContext;
-export const WorkstationProvider = ResourceProvider;
-export const useWorkstation = useResource;

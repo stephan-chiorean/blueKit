@@ -1,0 +1,106 @@
+---
+alias: Markdown Viewer Component Usage
+description: Diagram showing where KitMarkdownViewer and ResourceMarkdownViewer are imported and used throughout the application
+tags:
+  - frontend
+  - components
+  - markdown
+  - architecture
+  - imports
+classes:
+  - component
+  - page
+  - context
+  - unused
+---
+
+```mermaid
+graph TB
+    subgraph App_Root["Application Root"]
+        App[App.tsx<br/>Root Component]
+        ResourceProvider[ResourceContext.tsx<br/>ResourceProvider<br/>Manages selectedResource state]
+    end
+
+    subgraph View_Pages["View Pages"]
+        KitViewPage[KitViewPage.tsx<br/>Kit Detail View<br/>Uses WorkstationContext]
+        WalkthroughViewPage[WalkthroughViewPage.tsx<br/>Walkthrough Detail View<br/>Uses WorkstationContext]
+        ResourceViewPage[ResourceViewPage.tsx<br/>Resource Detail View<br/>Uses ResourceContext]
+    end
+
+    subgraph Workstation_Components["Workstation Components"]
+        Workstation[Workstation.tsx<br/>Main Workstation Container<br/>imports ResourceMarkdownViewer]
+        ResourceMarkdownViewer[ResourceMarkdownViewer.tsx<br/>ACTIVE<br/>Renders markdown for resources<br/>Uses ShikiCodeBlock]
+        KitMarkdownViewer[KitMarkdownViewer.tsx<br/>UNUSED<br/>Not imported anywhere<br/>Legacy component]
+    end
+
+    subgraph Context_System["Context System"]
+        WorkstationContext[WorkstationContext.tsx<br/>DEPRECATED<br/>Alias for ResourceContext]
+        ResourceContext[ResourceContext.tsx<br/>ACTIVE<br/>Manages resource state]
+    end
+
+    subgraph Dependencies["External Dependencies"]
+        ReactMarkdown[react-markdown<br/>Markdown Parser]
+        RemarkGfm[remark-gfm<br/>GitHub Flavored Markdown]
+        ChakraUI[Chakra UI<br/>Component Library]
+        TauriShell[tauri-apps/api/shell<br/>open function for links]
+        ShikiCodeBlock[ShikiCodeBlock.tsx<br/>Syntax highlighting]
+    end
+
+    subgraph Other_Components["Other Components Using Markdown"]
+        TaskDetailModal[TaskDetailModal.tsx<br/>Blueprint Task Modal<br/>Renders markdown inline]
+    end
+
+    %% App to Context
+    App -->|wraps with| ResourceProvider
+
+    %% Context System
+    ResourceProvider -.->|provides| ResourceContext
+    WorkstationContext -.->|alias of| ResourceContext
+
+    %% View Pages to Context
+    KitViewPage -->|uses| WorkstationContext
+    WalkthroughViewPage -->|uses| WorkstationContext
+    ResourceViewPage -->|uses| ResourceContext
+
+    %% View Pages to Workstation
+    KitViewPage -->|imports and renders| Workstation
+    WalkthroughViewPage -->|imports and renders| Workstation
+    ResourceViewPage -->|imports and renders| Workstation
+
+    %% Workstation to Markdown Viewer
+    Workstation -->|imports and renders| ResourceMarkdownViewer
+    Workstation -.->|does not use| KitMarkdownViewer
+
+    %% Markdown Viewer Dependencies
+    ResourceMarkdownViewer -->|uses| ReactMarkdown
+    ResourceMarkdownViewer -->|uses| RemarkGfm
+    ResourceMarkdownViewer -->|uses| ChakraUI
+    ResourceMarkdownViewer -->|uses| TauriShell
+    ResourceMarkdownViewer -->|uses| ShikiCodeBlock
+
+    KitMarkdownViewer -.->|would use| ReactMarkdown
+    KitMarkdownViewer -.->|would use| RemarkGfm
+    KitMarkdownViewer -.->|would use| ChakraUI
+    KitMarkdownViewer -.->|would use| TauriShell
+
+    %% TaskDetailModal
+    TaskDetailModal -->|renders markdown inline| ReactMarkdown
+    TaskDetailModal -->|uses| RemarkGfm
+    TaskDetailModal -->|uses| ChakraUI
+    TaskDetailModal -->|uses| TauriShell
+
+    %% Styling
+    classDef active fill:#d4edda,stroke:#28a745,stroke-width:2px
+    classDef unused fill:#f8d7da,stroke:#dc3545,stroke-width:2px,stroke-dasharray: 5 5
+    classDef deprecated fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    classDef component fill:#cfe2ff,stroke:#0d6efd,stroke-width:2px
+    classDef page fill:#d1ecf1,stroke:#0dcaf0,stroke-width:2px
+    classDef context fill:#e7d4f8,stroke:#6f42c1,stroke-width:2px
+
+    class ResourceMarkdownViewer,ResourceContext,ResourceProvider active
+    class KitMarkdownViewer unused
+    class WorkstationContext deprecated
+    class Workstation,TaskDetailModal component
+    class KitViewPage,WalkthroughViewPage,ResourceViewPage page
+    class ResourceContext,WorkstationContext context
+```
