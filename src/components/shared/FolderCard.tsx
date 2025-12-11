@@ -144,6 +144,9 @@ export function FolderCard({
       _hover={{ borderColor: 'blue.400', bg: 'primary.hover.bg' }}
       position='relative'
       overflow='visible'
+      css={{
+        contain: 'layout style',
+      }}
     >
       <CardHeader>
         <Flex align='center' justify='space-between' gap={4}>

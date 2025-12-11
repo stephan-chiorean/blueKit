@@ -548,47 +548,55 @@ function DiagramsTabContent({
                 const description = diagram.frontMatter?.description || diagram.path;
                 return (
                   <MasonryItem key={diagram.path}>
-                    <Card.Root
-                      variant="subtle"
-                      borderWidth={diagramSelected ? "2px" : "1px"}
-                      borderColor={diagramSelected ? "primary.500" : "border.subtle"}
-                      bg={diagramSelected ? "primary.hover.bg" : undefined}
-                      cursor="pointer"
-                      onClick={() => handleDiagramClick(diagram)}
-                      _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
-                      transition="all 0.2s"
+                    <Box
+                      borderWidth="2px"
+                      borderColor={diagramSelected ? "primary.500" : "transparent"}
+                      borderRadius="md"
+                      transition="border-color 0.2s"
+                      boxSizing="border-box"
                     >
-                      <CardHeader>
-                        <Flex align="center" justify="space-between" gap={4}>
-                          <HStack gap={2} align="center" flex="1">
-                            <Icon boxSize={5} color="primary.500">
-                              <LuNetwork />
-                            </Icon>
-                            <Heading size="md">{displayName}</Heading>
-                          </HStack>
-                          <Checkbox.Root
-                            checked={diagramSelected}
-                            colorPalette="blue"
-                            onCheckedChange={() => handleDiagramToggle(diagram)}
-                            onClick={(e) => e.stopPropagation()}
-                            cursor="pointer"
-                          >
-                            <Checkbox.HiddenInput />
-                            <Checkbox.Control cursor="pointer">
-                              <Checkbox.Indicator />
-                            </Checkbox.Control>
-                          </Checkbox.Root>
-                        </Flex>
-                      </CardHeader>
-                      <CardBody display="flex" flexDirection="column" flex="1">
-                        <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                          {description}
-                        </Text>
-                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
-                          {diagram.path}
-                        </Text>
-                      </CardBody>
-                    </Card.Root>
+                      <Card.Root
+                        variant="subtle"
+                        borderWidth="1px"
+                        borderColor={diagramSelected ? "transparent" : "border.subtle"}
+                        bg={diagramSelected ? "primary.hover.bg" : undefined}
+                        cursor="pointer"
+                        onClick={() => handleDiagramClick(diagram)}
+                        _hover={{ borderColor: diagramSelected ? "transparent" : "primary.400", bg: "primary.hover.bg" }}
+                        transition="all 0.2s"
+                      >
+                        <CardHeader>
+                          <Flex align="center" justify="space-between" gap={4}>
+                            <HStack gap={2} align="center" flex="1">
+                              <Icon boxSize={5} color="primary.500">
+                                <LuNetwork />
+                              </Icon>
+                              <Heading size="md">{displayName}</Heading>
+                            </HStack>
+                            <Checkbox.Root
+                              checked={diagramSelected}
+                              colorPalette="blue"
+                              onCheckedChange={() => handleDiagramToggle(diagram)}
+                              onClick={(e) => e.stopPropagation()}
+                              cursor="pointer"
+                            >
+                              <Checkbox.HiddenInput />
+                              <Checkbox.Control cursor="pointer">
+                                <Checkbox.Indicator />
+                              </Checkbox.Control>
+                            </Checkbox.Root>
+                          </Flex>
+                        </CardHeader>
+                        <CardBody display="flex" flexDirection="column" flex="1">
+                          <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
+                            {description}
+                          </Text>
+                          <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                            {diagram.path}
+                          </Text>
+                        </CardBody>
+                      </Card.Root>
+                    </Box>
                   </MasonryItem>
                 );
               })}
