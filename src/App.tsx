@@ -9,6 +9,7 @@ import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ResourceProvider } from './contexts/ResourceContext';
 import { NotepadProvider } from './contexts/NotepadContext';
+import { TimerProvider } from './contexts/TimerContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { ProjectEntry } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
@@ -116,7 +117,9 @@ function App() {
   return (
     <GitHubAuthProvider>
       <NotepadProvider>
-        <AppContent />
+        <TimerProvider>
+          <AppContent />
+        </TimerProvider>
       </NotepadProvider>
     </GitHubAuthProvider>
   );

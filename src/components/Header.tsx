@@ -24,6 +24,8 @@ import TaskCreateDialog from './tasks/TaskCreateDialog';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
 import { useNotepad } from '../contexts/NotepadContext';
+import { useTimer } from '../contexts/TimerContext';
+import TimerPopover from './shared/TimerPopover';
 
 interface HeaderProps {
   currentProject?: ProjectEntry;
@@ -38,6 +40,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
+  const { isPinned, elapsedTime, formatTime } = useTimer();
 
   // Load projects on mount
   useEffect(() => {
@@ -101,6 +104,21 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
 
         {/* Right side icons */}
         <HStack gap={2} flex="1" justify="flex-end">
+          {/* Pinned Timer Display */}
+          {isPinned && (
+            <Text
+              fontSize="sm"
+              fontWeight="medium"
+              fontFamily="mono"
+              color="primary.500"
+              letterSpacing="0.05em"
+              px={2}
+              py={1}
+            >
+              {formatTime(elapsedTime)}
+            </Text>
+          )}
+
           {/* Dark Mode Toggle */}
           <Switch.Root
             colorPalette="blue"
@@ -129,6 +147,8 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             currentProject={currentProject}
             onNavigateToTasks={onNavigateToTasks}
           />
+
+          <TimerPopover />
 
           <IconButton
             variant="ghost"

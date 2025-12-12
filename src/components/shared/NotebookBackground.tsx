@@ -17,14 +17,16 @@ export default function NotebookBackground() {
       bottom={0}
       pointerEvents="none"
       zIndex={0}
-      overflow="hidden"
+      overflow="visible"
+      minWidth="100%"
+      minHeight="100%"
     >
       <Box
         position="absolute"
-        top="-50%"
-        left="-50%"
-        width="200%"
-        height="200%"
+        top="-100%"
+        left="-100%"
+        width="800%"
+        height="800%"
         style={{
           transform: 'rotate(45deg)',
           transformOrigin: 'center center',
@@ -34,6 +36,7 @@ export default function NotebookBackground() {
           width="100%"
           height="100%"
           xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
           style={{
             opacity,
           }}
@@ -56,7 +59,7 @@ export default function NotebookBackground() {
             </pattern>
           </defs>
           
-          {/* Grid background */}
+          {/* Grid background - pattern naturally repeats, so 100% will cover the full container */}
           <rect width="100%" height="100%" fill="url(#graph-grid)" />
         </svg>
       </Box>
