@@ -341,7 +341,6 @@ export default function AddToProjectPopover({
                     onSelect={() => {
                       toggleProject(project.id);
                     }}
-                    bg={isSelected ? 'primary.hover.bg' : undefined}
                   >
                     <HStack gap={2} justify="space-between" width="100%" minW={0}>
                       <HStack gap={2} flex="1" minW={0} overflow="hidden">

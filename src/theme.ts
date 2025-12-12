@@ -38,7 +38,7 @@ export const system = createSystem(defaultConfig, {
           border: { value: '{colors.primary.200}' },
         },
         // Hover/selected background for cards and interactive elements
-        'primary.hover.bg': { value: { _light: '{colors.primary.50}', _dark: 'rgba(66, 135, 245, 0.1)' } },
+        'primary.hover.bg': { value: { _light: '{colors.primary.50}', _dark: 'rgba(66, 135, 245, 0.3)' } },
         // Priority-based subtle backgrounds for task cards
         'blue.subtle': { value: { _light: '{colors.blue.100}', _dark: 'rgba(59, 130, 246, 0.15)' } },
         'red.subtle': { value: { _light: '{colors.red.100}', _dark: 'rgba(239, 68, 68, 0.15)' } },

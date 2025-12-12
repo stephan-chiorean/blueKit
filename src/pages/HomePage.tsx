@@ -27,6 +27,7 @@ import WorkflowsTabContent from "../components/workflows/WorkflowsTabContent";
 import TasksTabContent, {
   TasksTabContentRef,
 } from "../components/tasks/TasksTabContent";
+import NotebookBackground from "../components/shared/NotebookBackground";
 import {
   invokeGetProjectRegistry,
   invalidateProjectRegistryCache,
@@ -330,6 +331,8 @@ export default function HomePage({
       {/* Full screen content area - no workstation until kit is selected */}
       <Box flex="1" minH={0} overflow="hidden">
         <Box h="100%" p={6} position="relative" overflow="auto">
+          <NotebookBackground />
+          <Box position="relative" zIndex={1}>
           <Tabs.Root
             defaultValue="projects"
             variant="enclosed"
@@ -448,6 +451,7 @@ export default function HomePage({
               />
             </Tabs.Content>
           </Tabs.Root>
+          </Box>
         </Box>
       </Box>
     </VStack>

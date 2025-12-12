@@ -148,7 +148,7 @@ export default function TasksActionBar({
   return (
     <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
       <Portal>
-        <ActionBar.Positioner>
+        <ActionBar.Positioner zIndex={1000}>
           <ActionBar.Content>
             <Button
               variant="surface"

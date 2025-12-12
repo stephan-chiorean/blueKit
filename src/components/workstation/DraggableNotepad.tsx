@@ -6,8 +6,12 @@ import {
   HStack,
   Text,
   Icon,
+  Card,
+  CardHeader,
+  CardBody,
 } from '@chakra-ui/react';
-import { LuCopy, LuCheck, LuX } from 'react-icons/lu';
+import { LuCopy, LuCheck, LuX, LuTrash2 } from 'react-icons/lu';
+import { useNotepad } from '../../contexts/NotepadContext';
 
 interface DraggableNotepadProps {
   isOpen: boolean;
@@ -15,7 +19,7 @@ interface DraggableNotepadProps {
 }
 
 export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadProps) {
-  const [notes, setNotes] = useState('');
+  const { notes, setNotes, clearNotes } = useNotepad();
   const [copied, setCopied] = useState(false);
   const [position, setPosition] = useState({ x: 100, y: 100 });
   const [size, setSize] = useState({ width: 400, height: 300 });
@@ -113,22 +117,28 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
   if (!isOpen) return null;
 
   return (
-    <Box
+    <Card.Root
       ref={notepadRef}
-      position="absolute"
+      position="fixed"
       left={`${position.x}px`}
       top={`${position.y}px`}
       width={`${size.width}px`}
       height={`${size.height}px`}
-      bg="white"
-      borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="md"
-      boxShadow="lg"
+      variant="subtle"
+      borderWidth="2px"
+      borderColor="gray.300"
       zIndex={1000}
       display="flex"
       flexDirection="column"
       overflow="hidden"
+      _focus={{ 
+        boxShadow: 'none',
+        outline: 'none',
+      }}
+      _focusVisible={{ 
+        boxShadow: 'none',
+        outline: 'none',
+      }}
       onMouseDown={(e) => e.stopPropagation()} // Prevent diagram panning when clicking on notepad
       css={{
         animation: 'slideIn 0.2s ease-out',
@@ -145,13 +155,10 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
       }}
     >
       {/* Header - draggable */}
-      <Box
+      <CardHeader
         ref={headerRef}
         px={3}
         py={2}
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.subtle"
         cursor={isDragging ? 'grabbing' : 'grab'}
         onMouseDown={handleHeaderMouseDown}
         display="flex"
@@ -178,6 +185,18 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
           <IconButton
             size="xs"
             variant="ghost"
+            onClick={clearNotes}
+            disabled={!notes}
+            aria-label="Clear notes"
+            colorPalette="red"
+          >
+            <Icon>
+              <LuTrash2 />
+            </Icon>
+          </IconButton>
+          <IconButton
+            size="xs"
+            variant="ghost"
             onClick={onClose}
             aria-label="Close notepad"
           >
@@ -186,13 +205,14 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
             </Icon>
           </IconButton>
         </HStack>
-      </Box>
+      </CardHeader>
 
       {/* Textarea */}
-      <Box 
+      <CardBody
         flex="1" 
         position="relative" 
         overflow="hidden"
+        p={0}
         onMouseDown={(e) => e.stopPropagation()} // Prevent diagram panning when clicking in textarea
       >
         <Textarea
@@ -203,10 +223,22 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
           fontSize="sm"
           borderWidth={0}
           h="100%"
-          _focus={{ boxShadow: 'none' }}
+          p={3}
+          _focus={{ 
+            boxShadow: 'none',
+            outline: 'none',
+            borderWidth: 0,
+            borderColor: 'transparent',
+          }}
+          _focusVisible={{ 
+            boxShadow: 'none',
+            outline: 'none',
+            borderWidth: 0,
+            borderColor: 'transparent',
+          }}
           onMouseDown={(e) => e.stopPropagation()} // Prevent diagram panning
         />
-      </Box>
+      </CardBody>
 
       {/* Resize handle */}
       <Box
@@ -234,7 +266,7 @@ export default function DraggableNotepad({ isOpen, onClose }: DraggableNotepadPr
           },
         }}
       />
-    </Box>
+    </Card.Root>
   );
 }
 

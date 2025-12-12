@@ -332,7 +332,7 @@ function WalkthroughsTabContent({
   const renderWalkthroughsTableView = () => (
     <Table.Root size="sm" variant="outline">
       <Table.Header>
-        <Table.Row>
+        <Table.Row bg="bg.subtle">
           <Table.ColumnHeader w="6">
             <Checkbox.Root
               size="sm"
@@ -371,6 +371,7 @@ function WalkthroughsTabContent({
               key={walkthrough.path}
               cursor="pointer"
               onClick={() => handleViewWalkthrough(walkthrough)}
+              bg="bg.surface"
               _hover={{ bg: "bg.subtle" }}
               data-selected={walkthroughSelected ? "" : undefined}
             >
@@ -609,7 +610,7 @@ function WalkthroughsTabContent({
           ) : (
             <Table.Root size="sm" variant="outline">
               <Table.Header>
-                <Table.Row>
+                <Table.Row bg="bg.subtle">
                   <Table.ColumnHeader w="6"></Table.ColumnHeader>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Description</Table.ColumnHeader>
@@ -630,6 +631,7 @@ function WalkthroughsTabContent({
                         key={node.folder.path}
                         cursor="pointer"
                         onClick={() => toggleFolderExpanded(node.folder.path)}
+                        bg="bg.surface"
                         _hover={{ bg: "bg.subtle" }}
                       >
                         <Table.Cell>
@@ -679,6 +681,7 @@ function WalkthroughsTabContent({
                           <Table.Row
                             key={artifact.path}
                             cursor="pointer"
+                            bg="bg.surface"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleViewWalkthrough(artifact);
@@ -773,11 +776,10 @@ function WalkthroughsTabContent({
                   variant="subtle"
                   borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
                   borderColor={isSelected(walkthrough.path) ? "primary.500" : "border.subtle"}
-                  bg={isSelected(walkthrough.path) ? "primary.hover.bg" : undefined}
                   position="relative"
                   cursor="pointer"
                   onClick={() => handleViewWalkthrough(walkthrough)}
-                  _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+                  _hover={{ borderColor: "primary.400" }}
                   height="100%"
                   display="flex"
                   flexDirection="column"

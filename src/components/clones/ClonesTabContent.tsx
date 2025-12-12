@@ -241,7 +241,7 @@ export default function ClonesTabContent({
           variant="subtle"
           borderWidth="1px"
           borderColor="border.subtle"
-          _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+          _hover={{ borderColor: "primary.400" }}
           transition="all 0.2s"
         >
           <CardHeader>
@@ -329,7 +329,7 @@ export default function ClonesTabContent({
   const renderTableView = () => (
     <Table.Root size="sm" variant="outline">
       <Table.Header>
-        <Table.Row>
+        <Table.Row bg="bg.subtle">
           <Table.ColumnHeader>Name</Table.ColumnHeader>
           <Table.ColumnHeader>Description</Table.ColumnHeader>
           <Table.ColumnHeader>Git Info</Table.ColumnHeader>
@@ -341,6 +341,7 @@ export default function ClonesTabContent({
         {filteredClones.map((clone) => (
           <Table.Row
             key={clone.id}
+            bg="bg.surface"
             _hover={{ bg: "bg.subtle" }}
           >
             <Table.Cell>

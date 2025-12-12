@@ -8,13 +8,13 @@ import {
   HStack,
   Tag,
   IconButton,
+  Icon,
   Code,
   Button,
   Alert,
 } from '@chakra-ui/react';
 import { ArtifactFile } from '../../ipc';
-import { LuMaximize2, LuMinimize2, LuStickyNote, LuCopy } from 'react-icons/lu';
-import DraggableNotepad from './DraggableNotepad';
+import { LuMaximize2, LuMinimize2, LuCopy } from 'react-icons/lu';
 
 interface MermaidDiagramViewerProps {
   diagram: ArtifactFile;
@@ -30,7 +30,6 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   const [isPanning, setIsPanning] = useState(false);
   const startPanRef = useRef({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isNotepadOpen, setIsNotepadOpen] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
@@ -958,32 +957,17 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
             onClick={() => setIsFullscreen(!isFullscreen)}
             size="sm"
             variant="ghost"
+            colorPalette="primary"
           >
-            {isFullscreen ? <LuMinimize2 /> : <LuMaximize2 />}
-          </IconButton>
-          <IconButton
-            position="absolute"
-            top={4}
-            right={isFullscreen ? 16 : 16}
-            transform={isFullscreen ? 'translateX(-40px)' : 'translateX(-40px)'}
-            zIndex={10}
-            aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
-            onClick={() => setIsNotepadOpen(!isNotepadOpen)}
-            size="sm"
-            variant="ghost"
-          >
-            <LuStickyNote />
+            <Icon color="primary.600">
+              {isFullscreen ? <LuMinimize2 /> : <LuMaximize2 />}
+            </Icon>
           </IconButton>
           <Box
             ref={diagramRef}
             style={{
               transformOrigin: 'center',
             }}
-          />
-          {/* Draggable Notepad */}
-          <DraggableNotepad
-            isOpen={isNotepadOpen}
-            onClose={() => setIsNotepadOpen(false)}
           />
         </Box>
       </VStack>

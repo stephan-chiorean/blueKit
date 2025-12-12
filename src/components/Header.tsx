@@ -14,7 +14,7 @@ import {
   Menu,
   VStack,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser, LuLogOut } from 'react-icons/lu';
+import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen } from 'react-icons/lu';
 import { FaMoon, FaSun } from "react-icons/fa";
 import { Task } from '../types/task';
 import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
@@ -23,6 +23,7 @@ import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
+import { useNotepad } from '../contexts/NotepadContext';
 
 interface HeaderProps {
   currentProject?: ProjectEntry;
@@ -36,6 +37,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
+  const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
 
   // Load projects on mount
   useEffect(() => {
@@ -127,6 +129,16 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             currentProject={currentProject}
             onNavigateToTasks={onNavigateToTasks}
           />
+
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
+            onClick={toggleNotepad}
+            colorPalette={isNotepadOpen ? 'primary' : undefined}
+          >
+            <LuNotebookPen />
+          </IconButton>
 
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />

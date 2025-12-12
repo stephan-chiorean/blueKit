@@ -378,7 +378,7 @@ function DiagramsTabContent({
             ) : (
               <Table.Root size="sm" variant="outline">
                 <Table.Header>
-                  <Table.Row>
+                  <Table.Row bg="bg.subtle">
                     <Table.ColumnHeader w="6"></Table.ColumnHeader>
                     <Table.ColumnHeader>Name</Table.ColumnHeader>
                     <Table.ColumnHeader>Description</Table.ColumnHeader>
@@ -399,7 +399,7 @@ function DiagramsTabContent({
                           key={node.folder.path}
                           cursor="pointer"
                           onClick={() => toggleFolderExpanded(node.folder.path)}
-                          _hover={{ bg: "bg.subtle" }}
+                          bg="bg.surface"
                         >
                           <Table.Cell>
                             <Icon
@@ -448,12 +448,11 @@ function DiagramsTabContent({
                             <Table.Row
                               key={artifact.path}
                               cursor="pointer"
+                              bg="bg.surface"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDiagramClick(artifact);
                               }}
-                              _hover={{ bg: "bg.subtle" }}
-                              bg="bg.subtle"
                               data-selected={artifactSelected ? "" : undefined}
                             >
                               <Table.Cell>
@@ -574,10 +573,9 @@ function DiagramsTabContent({
                       variant="subtle"
                       borderWidth="1px"
                       borderColor={diagramSelected ? "transparent" : "border.subtle"}
-                      bg={diagramSelected ? "primary.hover.bg" : undefined}
                       cursor="pointer"
                       onClick={() => handleDiagramClick(diagram)}
-                      _hover={{ borderColor: diagramSelected ? "transparent" : "primary.400", bg: "primary.hover.bg" }}
+                      _hover={{ borderColor: diagramSelected ? "transparent" : "primary.400" }}
                       transition="all 0.2s"
                       height="100%"
                       display="flex"

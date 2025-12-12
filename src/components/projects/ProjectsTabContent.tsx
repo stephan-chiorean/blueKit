@@ -94,7 +94,7 @@ export default function ProjectsTabContent({
             borderWidth="1px"
             borderColor="border.subtle"
             cursor="pointer"
-            _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+            _hover={{ borderColor: "primary.400" }}
             transition="all 0.2s"
             onClick={() => onProjectSelect(project)}
             position="relative"

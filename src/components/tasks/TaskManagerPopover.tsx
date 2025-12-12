@@ -135,7 +135,7 @@ export default function TaskManagerPopover({
                         borderColor="border.subtle"
                         cursor="pointer"
                         onClick={() => onOpenTaskDialog(task)}
-                        _hover={{ bg: 'primary.hover.bg', borderColor: 'primary.400' }}
+                        _hover={{ borderColor: 'primary.400' }}
                       >
                         <Text fontWeight="medium" fontSize="sm">
                           {task.title}

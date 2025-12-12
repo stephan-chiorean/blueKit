@@ -8,14 +8,18 @@ import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ResourceProvider } from './contexts/ResourceContext';
+import { NotepadProvider } from './contexts/NotepadContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { ProjectEntry } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
+import DraggableNotepad from './components/workstation/DraggableNotepad';
+import { useNotepad } from './contexts/NotepadContext';
 
 type View = 'welcome' | 'github-auth' | 'home' | 'project-detail' | 'plans';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useGitHubAuth();
+  const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const [currentView, setCurrentView] = useState<View>('welcome');
   const [selectedProject, setSelectedProject] = useState<ProjectEntry | null>(null);
   const [plansSource, setPlansSource] = useState<'claude' | 'cursor' | null>(null);
@@ -97,6 +101,10 @@ function AppContent() {
               <HomePage onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
             )}
             <GlobalActionBar />
+            <DraggableNotepad
+              isOpen={isNotepadOpen}
+              onClose={toggleNotepad}
+            />
           </SelectionProvider>
         </ResourceProvider>
       </FeatureFlagsProvider>
@@ -107,7 +115,9 @@ function AppContent() {
 function App() {
   return (
     <GitHubAuthProvider>
-      <AppContent />
+      <NotepadProvider>
+        <AppContent />
+      </NotepadProvider>
     </GitHubAuthProvider>
   );
 }

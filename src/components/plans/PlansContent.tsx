@@ -145,7 +145,7 @@ export default function PlansContent({
             borderColor="border.subtle"
             cursor="pointer"
             onClick={() => handleViewPlan(plan)}
-            _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+            _hover={{ borderColor: "primary.400" }}
           >
             <CardHeader>
               <Heading size="md">{displayName}</Heading>
@@ -164,7 +164,7 @@ export default function PlansContent({
   const renderTableView = () => (
     <Table.Root size="sm" variant="outline">
       <Table.Header>
-        <Table.Row>
+        <Table.Row bg="bg.subtle">
           <Table.ColumnHeader>Title</Table.ColumnHeader>
           <Table.ColumnHeader>Path</Table.ColumnHeader>
         </Table.Row>
@@ -183,6 +183,7 @@ export default function PlansContent({
               key={plan.path}
               cursor="pointer"
               onClick={() => handleViewPlan(plan)}
+              bg="bg.surface"
               _hover={{ bg: "bg.subtle" }}
             >
               <Table.Cell>

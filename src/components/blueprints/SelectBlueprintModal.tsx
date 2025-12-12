@@ -50,7 +50,7 @@ export default function SelectBlueprintModal({
                       key={blueprint.id}
                       variant="subtle"
                       cursor="pointer"
-                      _hover={{ bg: 'primary.hover.bg', borderColor: 'primary.300' }}
+                      _hover={{ borderColor: 'primary.300' }}
                       borderWidth="1px"
                       borderColor="border.subtle"
                       onClick={() => {

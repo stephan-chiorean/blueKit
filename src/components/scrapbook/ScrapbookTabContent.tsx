@@ -161,7 +161,7 @@ export default function ScrapbookTabContent({
                 borderColor="border.subtle"
                 cursor="pointer"
                 onClick={() => handleFileClick(file)}
-                _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+                _hover={{ borderColor: "primary.400" }}
                 transition="all 0.2s"
               >
                 <CardHeader>

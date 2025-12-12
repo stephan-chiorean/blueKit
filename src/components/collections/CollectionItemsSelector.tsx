@@ -125,7 +125,6 @@ export default function CollectionItemsSelector({
                   variant="subtle"
                   borderWidth={kitSelected ? "2px" : "1px"}
                   borderColor={kitSelected ? "primary.500" : "border.subtle"}
-                  bg={kitSelected ? "primary.hover.bg" : undefined}
                 >
                   <CardHeader>
                     <Heading size="md">{kit.name}</Heading>

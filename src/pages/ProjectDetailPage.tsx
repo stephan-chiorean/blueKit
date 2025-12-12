@@ -24,6 +24,7 @@ import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
+import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
@@ -452,6 +453,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       {/* Full screen content area */}
       <Box flex="1" minH={0} overflow="hidden">
         <Box h="100%" p={6} position="relative" overflow="auto">
+          <NotebookBackground />
+          <Box position="relative" zIndex={1}>
           <Tabs.Root
             value={currentTab}
             onValueChange={(details) => setCurrentTab(details.value)}
@@ -714,6 +717,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               />
             </Tabs.Content>
           </Tabs.Root>
+          </Box>
         </Box>
       </Box>
     </VStack>

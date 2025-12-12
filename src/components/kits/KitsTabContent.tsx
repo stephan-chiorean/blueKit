@@ -338,7 +338,7 @@ function KitsTabContent({
   const renderKitsTableView = () => (
     <Table.Root size="sm" variant="outline">
       <Table.Header>
-        <Table.Row>
+        <Table.Row bg="bg.subtle">
           <Table.ColumnHeader w="6">
               <Checkbox.Root
               size="sm"
@@ -378,6 +378,7 @@ function KitsTabContent({
               key={kit.path}
               cursor="pointer"
               onClick={() => handleViewKit(kit)}
+              bg="bg.surface"
               _hover={{ bg: "bg.subtle" }}
               data-selected={kitSelected ? "" : undefined}
             >
@@ -571,7 +572,7 @@ function KitsTabContent({
             ) : (
               <Table.Root size="sm" variant="outline">
                 <Table.Header>
-                  <Table.Row>
+                  <Table.Row bg="bg.subtle">
                     <Table.ColumnHeader w="6"></Table.ColumnHeader>
                     <Table.ColumnHeader>Name</Table.ColumnHeader>
                     <Table.ColumnHeader>Description</Table.ColumnHeader>
@@ -592,6 +593,7 @@ function KitsTabContent({
                           key={node.folder.path}
                           cursor="pointer"
                           onClick={() => toggleFolderExpanded(node.folder.path)}
+                          bg="bg.surface"
                           _hover={{ bg: "bg.subtle" }}
                         >
                           <Table.Cell>
@@ -641,6 +643,7 @@ function KitsTabContent({
                             <Table.Row
                               key={artifact.path}
                               cursor="pointer"
+                              bg="bg.surface"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewKit(artifact);
@@ -790,11 +793,10 @@ function KitsTabContent({
                   variant="subtle"
                   borderWidth={isSelected(kit.path) ? "2px" : "1px"}
                   borderColor={isSelected(kit.path) ? "primary.500" : "border.subtle"}
-                  bg={isSelected(kit.path) ? "primary.hover.bg" : undefined}
                   position="relative"
                   cursor="pointer"
                   onClick={() => handleViewKit(kit)}
-                  _hover={{ borderColor: "primary.400", bg: "primary.hover.bg" }}
+                  _hover={{ borderColor: "primary.400" }}
                   height="100%"
                   display="flex"
                   flexDirection="column"

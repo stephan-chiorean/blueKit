@@ -383,11 +383,10 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         variant="subtle"
         borderWidth={taskSelected ? "2px" : "1px"}
         borderColor={taskSelected ? "primary.500" : "border.subtle"}
-        bg={taskSelected ? "primary.hover.bg" : undefined}
         position="relative"
         cursor="pointer"
         onClick={() => handleViewTask(task)}
-        _hover={{ borderColor: hoverColors.borderColor, bg: hoverColors.bg }}
+        _hover={{ borderColor: hoverColors.borderColor }}
       >
         <CardHeader>
           <VStack align="stretch" gap={3}>
@@ -717,7 +716,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         ) : (
           <Table.Root size="sm" variant="outline">
             <Table.Header>
-              <Table.Row>
+              <Table.Row bg="bg.subtle">
                 <Table.ColumnHeader w="6"></Table.ColumnHeader>
                 <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
                 <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
@@ -737,7 +736,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                     key={task.id}
                     cursor="pointer"
                     onClick={() => handleViewTask(task)}
-                    _hover={{ bg: hoverColors.bg, borderColor: hoverColors.borderColor }}
+                    bg="bg.surface"
+                    _hover={{ borderColor: hoverColors.borderColor }}
                     data-selected={taskSelected ? "" : undefined}
                   >
                     <Table.Cell>
@@ -855,7 +855,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         ) : (
           <Table.Root size="sm" variant="outline">
             <Table.Header>
-              <Table.Row>
+              <Table.Row bg="bg.subtle">
                 <Table.ColumnHeader w="6"></Table.ColumnHeader>
                 <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
                 <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
@@ -875,7 +875,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                     key={task.id}
                     cursor="pointer"
                     onClick={() => handleViewTask(task)}
-                    _hover={{ bg: hoverColors.bg, borderColor: hoverColors.borderColor }}
+                    bg="bg.surface"
+                    _hover={{ borderColor: hoverColors.borderColor }}
                     data-selected={taskSelected ? "" : undefined}
                   >
                     <Table.Cell>
