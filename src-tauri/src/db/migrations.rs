@@ -11,6 +11,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Add status and complexity columns to tasks table
     add_task_status_and_complexity_columns(db).await?;
 
+    // Add type column to tasks table
+    add_task_type_column(db).await?;
+
     // Create library tables
     create_library_workspaces_table(db).await?;
     create_library_artifacts_table(db).await?;
@@ -143,6 +146,44 @@ async fn add_task_status_and_complexity_columns(db: &DatabaseConnection) -> Resu
         info!("Added complexity column to tasks table");
     } else {
         info!("Complexity column already exists in tasks table");
+    }
+
+    Ok(())
+}
+
+async fn add_task_type_column(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if type column exists
+    let check_type_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('tasks')
+        WHERE name='type'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_type_sql.to_string(),
+    )).await?;
+
+    let type_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    // Add type column if it doesn't exist
+    if !type_exists {
+        let add_type_sql = r#"
+            ALTER TABLE tasks ADD COLUMN type TEXT
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_type_sql.to_string(),
+        )).await?;
+
+        info!("Added type column to tasks table");
+    } else {
+        info!("Type column already exists in tasks table");
     }
 
     Ok(())

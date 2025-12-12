@@ -23,13 +23,13 @@ import {
   IconButton,
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
-import { Task, TaskPriority } from '../../types/task';
+import { Task, TaskPriority, TaskType } from '../../types/task';
 import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
 import { toaster } from '../ui/toaster';
-import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette } from '../../utils/taskUtils';
+import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project
@@ -71,6 +71,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
   const [selectedComplexities, setSelectedComplexities] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<TaskType[]>([]);
 
   // Load tasks from database
   const loadTasks = async () => {
@@ -203,6 +204,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     }
   };
 
+
   // Get all unique tags, priorities, and complexities from tasks
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -214,6 +216,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
 
   const allPriorities: TaskPriority[] = ['pinned', 'high', 'standard', 'long term', 'nit'];
   const allComplexities = ['easy', 'hard', 'deep dive'];
+  const allTypes: TaskType[] = ['bug', 'investigation', 'feature', 'cleanup', 'optimization', 'chore'];
 
   // Sort tasks based on selected sort option, filtering out completed tasks
   const sortedTasks = useMemo(() => {
@@ -285,9 +288,13 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       const matchesComplexity = selectedComplexities.length === 0 ||
         (task.complexity && selectedComplexities.includes(task.complexity));
 
-      return matchesTitle && matchesTags && matchesPriority && matchesComplexity;
+      // Type filter
+      const matchesType = selectedTypes.length === 0 ||
+        (task.type && selectedTypes.includes(task.type));
+
+      return matchesTitle && matchesTags && matchesPriority && matchesComplexity && matchesType;
     });
-  }, [sortedTasks, titleFilter, selectedTags, selectedPriorities, selectedComplexities]);
+  }, [sortedTasks, titleFilter, selectedTags, selectedPriorities, selectedComplexities, selectedTypes]);
 
   // Split filtered tasks into In Progress and Backlog sections
   const inProgressTasks = useMemo(() => {
@@ -325,6 +332,16 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         return prev.filter(c => c !== complexity);
       } else {
         return [...prev, complexity];
+      }
+    });
+  };
+
+  const toggleType = (type: TaskType) => {
+    setSelectedTypes(prev => {
+      if (prev.includes(type)) {
+        return prev.filter(t => t !== type);
+      } else {
+        return [...prev, type];
       }
     });
   };
@@ -374,6 +391,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   const renderTaskCard = (task: Task) => {
     const taskSelected = isSelected(task.id);
     const complexityLabel = getComplexityLabel(task.complexity);
+    const typeLabel = getTypeLabel(task.type);
+    const typeIcon = task.type ? getTypeIcon(task.type) : null;
     const priorityIcon = getPriorityIcon(task.priority);
     const hoverColors = getPriorityHoverColors(task.priority);
 
@@ -422,6 +441,17 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
               {complexityLabel && (
                 <Badge size="sm" variant="outline" colorPalette="gray">
                   {complexityLabel}
+                </Badge>
+              )}
+              {/* Show type if available */}
+              {typeLabel && typeIcon && (
+                <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                  <HStack gap={1}>
+                    <Icon color={typeIcon.color} boxSize={3}>
+                      <typeIcon.icon />
+                    </Icon>
+                    <Text>{typeLabel}</Text>
+                  </HStack>
                 </Badge>
               )}
             </HStack>
@@ -518,9 +548,9 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                     <LuFilter />
                   </Icon>
                   <Text>Filter</Text>
-                  {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0) && (
+                  {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0) && (
                     <Badge size="sm" colorPalette="primary" variant="solid">
-                      {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length]
+                      {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length, selectedTypes.length]
                         .filter(Boolean)
                         .reduce((a, b) => (a || 0) + (b || 0), 0)}
                     </Badge>
@@ -647,6 +677,29 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                         })}
                       </HStack>
                     </Field.Root>
+
+                    <Field.Root>
+                      <Field.Label>Type</Field.Label>
+                      <HStack gap={1} flexWrap="wrap" mt={2}>
+                        {allTypes.map((type) => {
+                          const isSelected = selectedTypes.includes(type);
+                          return (
+                            <Tag.Root
+                              key={type}
+                              size="sm"
+                              variant={isSelected ? 'solid' : 'subtle'}
+                              colorPalette={isSelected ? 'primary' : undefined}
+                              cursor="pointer"
+                              onClick={() => toggleType(type)}
+                              opacity={isSelected ? 1 : 0.6}
+                              _hover={{ opacity: 1 }}
+                            >
+                              <Tag.Label>{getTypeLabel(type)}</Tag.Label>
+                            </Tag.Root>
+                          );
+                        })}
+                      </HStack>
+                    </Field.Root>
                   </VStack>
                 </Box>
               )}
@@ -701,7 +754,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             textAlign="center"
           >
             <Text color="text.muted" fontSize="sm">
-              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0)
+              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
                 ? 'No tasks in progress match the current filters'
                 : context === 'workspace'
                 ? 'No tasks in progress'
@@ -718,10 +771,11 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             <Table.Header>
               <Table.Row bg="bg.subtle">
                 <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
-                <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
-                <Table.ColumnHeader w="20%">Projects</Table.ColumnHeader>
-                <Table.ColumnHeader w="20%">Tags</Table.ColumnHeader>
+                <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
+                <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
+                <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
+                <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
+                <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
                 <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
@@ -729,6 +783,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
               {inProgressTasks.map((task) => {
                 const taskSelected = isSelected(task.id);
                 const complexityLabel = getComplexityLabel(task.complexity);
+                const typeLabel = getTypeLabel(task.type);
+                const typeIcon = task.type ? getTypeIcon(task.type) : null;
                 const priorityIcon = getPriorityIcon(task.priority);
                 const hoverColors = getPriorityHoverColors(task.priority);
                 return (
@@ -773,6 +829,20 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                       {complexityLabel ? (
                         <Badge size="sm" variant="outline" colorPalette="gray">
                           {complexityLabel}
+                        </Badge>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {typeLabel && typeIcon ? (
+                        <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                          <HStack gap={1}>
+                            <Icon color={typeIcon.color} boxSize={3}>
+                              <typeIcon.icon />
+                            </Icon>
+                            <Text>{typeLabel}</Text>
+                          </HStack>
                         </Badge>
                       ) : (
                         <Text fontSize="sm" color="text.tertiary">—</Text>
@@ -842,7 +912,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             textAlign="center"
           >
             <Text color="text.muted" fontSize="sm">
-              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0)
+              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
                 ? 'No tasks in backlog match the current filters'
                 : 'No tasks in backlog'
               }
@@ -857,10 +927,11 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             <Table.Header>
               <Table.Row bg="bg.subtle">
                 <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                <Table.ColumnHeader w="30%">Title</Table.ColumnHeader>
-                <Table.ColumnHeader w="15%">Complexity</Table.ColumnHeader>
-                <Table.ColumnHeader w="20%">Projects</Table.ColumnHeader>
-                <Table.ColumnHeader w="20%">Tags</Table.ColumnHeader>
+                <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
+                <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
+                <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
+                <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
+                <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
                 <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
@@ -868,6 +939,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
               {backlogTasks.map((task) => {
                 const taskSelected = isSelected(task.id);
                 const complexityLabel = getComplexityLabel(task.complexity);
+                const typeLabel = getTypeLabel(task.type);
+                const typeIcon = task.type ? getTypeIcon(task.type) : null;
                 const priorityIcon = getPriorityIcon(task.priority);
                 const hoverColors = getPriorityHoverColors(task.priority);
                 return (
@@ -912,6 +985,20 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                       {complexityLabel ? (
                         <Badge size="sm" variant="outline" colorPalette="gray">
                           {complexityLabel}
+                        </Badge>
+                      ) : (
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {typeLabel && typeIcon ? (
+                        <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                          <HStack gap={1}>
+                            <Icon color={typeIcon.color} boxSize={3}>
+                              <typeIcon.icon />
+                            </Icon>
+                            <Text>{typeLabel}</Text>
+                          </HStack>
                         </Badge>
                       ) : (
                         <Text fontSize="sm" color="text.tertiary">—</Text>

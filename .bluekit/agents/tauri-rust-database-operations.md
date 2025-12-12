@@ -239,6 +239,7 @@ pub async fn update_task(
     project_ids: Option<Vec<String>>,
     status: Option<String>,
     complexity: Option<Option<String>>,
+    type_: Option<Option<String>>,  // ✅ Note: type_ in Rust (type is reserved keyword)
 ) -> Result<TaskDto, DbErr> {
     // Load existing task
     let task = Task::find_by_id(task_id.clone())
@@ -272,6 +273,10 @@ pub async fn update_task(
     
     if let Some(c) = complexity {
         task_active.complexity = Set(c);
+    }
+    
+    if let Some(t) = type_ {
+        task_active.type_ = Set(t);
     }
     
     // Always update timestamp
@@ -411,6 +416,7 @@ export async function invokeDbCreateTask(
 export type TaskPriority = 'pinned' | 'high' | 'standard' | 'long term' | 'nit';
 export type TaskStatus = 'backlog' | 'in_progress' | 'completed' | 'blocked';
 export type TaskComplexity = 'easy' | 'hard' | 'deep dive';
+export type TaskType = 'bug' | 'investigation' | 'feature' | 'cleanup' | 'optimization' | 'chore';
 
 export interface Task {
   id: string;
@@ -423,8 +429,15 @@ export interface Task {
   projectIds: string[];   // ✅ camelCase
   status: TaskStatus;
   complexity?: TaskComplexity;
+  type?: TaskType;        // ✅ camelCase (maps to type_ in Rust)
 }
 ```
+
+**Important: Reserved Keywords**
+When a Rust field uses a reserved keyword (like `type`), use snake_case with underscore in Rust (`type_`), but send camelCase from TypeScript (`type`). Tauri handles the conversion automatically:
+- TypeScript sends: `{ type: "investigation" }`
+- Tauri converts to: `type_: Some(Some("investigation"))` in Rust
+- This works because reserved keywords can be used as property names in JavaScript object literals
 
 ### 7. Error Handling Best Practices
 
@@ -571,6 +584,39 @@ pub async fn run_migrations(db: &DatabaseConnection) {
 }
 ```
 
+**Pitfall 6: Handling reserved keywords (type, class, etc.)**
+```rust
+// Rust: Use snake_case with underscore suffix for reserved keywords
+#[tauri::command]
+pub async fn db_update_task(
+    type_: Option<Option<String>>,  // ✅ type_ in Rust (type is reserved)
+) -> Result<TaskDto, String> {
+    // ...
+}
+```
+
+```typescript
+// TypeScript: Use camelCase property name (type, not type_)
+// Even though 'type' is reserved, it works as a property name in object literals
+export async function invokeDbUpdateTask(
+  type?: TaskType | null
+): Promise<DbTask> {
+  return await invokeWithTimeout<DbTask>(
+    'db_update_task',
+    {
+      type: type  // ✅ Use 'type' (camelCase), Tauri maps to 'type_' in Rust
+    },
+    10000
+  );
+}
+```
+
+**Why this works:**
+- Tauri automatically converts camelCase → snake_case
+- `type` (JavaScript) → `type_` (Rust)
+- Reserved keywords can be used as property names in object literals
+- The key is consistency: use camelCase in TypeScript, snake_case in Rust
+
 ## Red Flags 🚩
 
 - **TypeScript uses snake_case in IPC objects** → Will cause "missing required key" errors
@@ -580,6 +626,8 @@ pub async fn run_migrations(db: &DatabaseConnection) {
 - **No error context** → Use `.map_err(|e| format!("Context: {}", e))`
 - **Missing indexes on foreign keys** → Poor query performance
 - **Not handling CASCADE deletes** → Orphaned records
+- **Using snake_case for reserved keywords in TypeScript** → Use camelCase (`type`), Tauri maps to snake_case (`type_`) automatically
+- **Inconsistent Option<Option<String>> handling** → Make sure all nullable update fields use the same pattern
 
 ## Quality Standards
 
@@ -807,7 +855,28 @@ export async function invokeDbCreateTask(
     10000
   );
 }
+
+// For update operations with Option<Option<String>>:
+export async function invokeDbUpdateTask(
+  // ... existing params
+  assignee?: string | null  // ✅ Can be undefined, null, or string
+): Promise<DbTask> {
+  return await invokeWithTimeout<DbTask>(
+    'db_update_task',
+    {
+      // ... existing fields
+      assignee  // ✅ Send directly - undefined = don't update, null = clear, string = set value
+    },
+    10000
+  );
+}
 ```
+
+**Note on Option<Option<String>>:**
+- `undefined` (field omitted) → Rust gets `None` (don't update field)
+- `null` → Rust gets `Some(None)` (set field to null/clear)
+- `"value"` → Rust gets `Some(Some("value"))` (set field to value)
+- Tauri's serde automatically handles this deserialization
 
 ### Step 8: Update UI Components
 ```typescript

@@ -1,5 +1,5 @@
-import { TaskPriority } from '../types/task';
-import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
+import { TaskPriority, TaskType } from '../types/task';
+import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus, LuBug, LuSearch, LuStar, LuBrush, LuZap, LuSquareCheck } from 'react-icons/lu';
 
 /**
  * Maps priority values to display labels
@@ -85,6 +85,73 @@ export function getPriorityColorPalette(priority: TaskPriority): string | undefi
       return 'yellow';
     case 'standard':
       return 'orange';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Gets the type icon component and color
+ */
+export function getTypeIcon(type: TaskType): { icon: React.ComponentType; color: string } | null {
+  switch (type) {
+    case 'bug':
+      return { icon: LuBug, color: 'red.500' };
+    case 'investigation':
+      return { icon: LuSearch, color: 'purple.500' };
+    case 'feature':
+      return { icon: LuStar, color: 'blue.500' };
+    case 'cleanup':
+      return { icon: LuBrush, color: 'gray.500' };
+    case 'optimization':
+      return { icon: LuZap, color: 'yellow.500' };
+    case 'chore':
+      return { icon: LuSquareCheck, color: 'green.500' };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Maps type values to display labels
+ */
+export function getTypeLabel(type?: TaskType): string | null {
+  if (!type) return null;
+  switch (type) {
+    case 'bug':
+      return 'Bug';
+    case 'investigation':
+      return 'Investigation';
+    case 'feature':
+      return 'Feature';
+    case 'cleanup':
+      return 'Cleanup';
+    case 'optimization':
+      return 'Optimization';
+    case 'chore':
+      return 'Chore';
+    default:
+      return type;
+  }
+}
+
+/**
+ * Gets the color palette name for Chakra UI components based on type
+ */
+export function getTypeColorPalette(type: TaskType): string | undefined {
+  switch (type) {
+    case 'bug':
+      return 'red';
+    case 'investigation':
+      return 'purple';
+    case 'feature':
+      return 'blue';
+    case 'cleanup':
+      return 'gray';
+    case 'optimization':
+      return 'yellow';
+    case 'chore':
+      return 'green';
     default:
       return undefined;
   }

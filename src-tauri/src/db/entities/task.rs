@@ -14,6 +14,9 @@ pub struct Model {
     pub updated_at: String,
     pub status: String,   // "backlog", "in_progress", "completed", "blocked"
     pub complexity: Option<String>, // Optional: "easy", "hard", "deep dive"
+    #[sea_orm(column_name = "type")]
+    #[serde(rename = "type")]
+    pub type_: Option<String>, // Optional: "bug", "investigation", "feature", "cleanup", "optimization", "chore"
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

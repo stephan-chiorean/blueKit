@@ -19,7 +19,7 @@
  */
 
 import { invokeWithTimeout, TimeoutError } from './utils/ipcTimeout';
-import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity } from './types/task';
+import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity, TaskType } from './types/task';
 
 // Re-export TimeoutError for convenience
 export { TimeoutError };
@@ -1040,7 +1040,8 @@ export async function invokeDbCreateTask(
   tags: string[],
   projectIds: string[],
   status?: TaskStatus,
-  complexity?: TaskComplexity
+  complexity?: TaskComplexity,
+  type?: TaskType
 ): Promise<DbTask> {
   return await invokeWithTimeout<DbTask>(
     'db_create_task',
@@ -1051,7 +1052,8 @@ export async function invokeDbCreateTask(
       tags,
       projectIds,
       status: status ?? null,
-      complexity: complexity ?? null
+      complexity: complexity ?? null,
+      type: type && type.trim().length > 0 ? type : null
     },
     10000
   );
@@ -1068,7 +1070,8 @@ export async function invokeDbUpdateTask(
   tags?: string[],
   projectIds?: string[],
   status?: TaskStatus,
-  complexity?: TaskComplexity | null
+  complexity?: TaskComplexity | null,
+  type?: TaskType | null
 ): Promise<DbTask> {
   return await invokeWithTimeout<DbTask>(
     'db_update_task',
@@ -1080,7 +1083,8 @@ export async function invokeDbUpdateTask(
       tags,
       projectIds,
       status,
-      complexity
+      complexity,
+      type: type
     },
     10000
   );

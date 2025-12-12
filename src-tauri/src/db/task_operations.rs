@@ -20,6 +20,8 @@ pub struct TaskDto {
     pub project_ids: Vec<String>,
     pub status: String,
     pub complexity: Option<String>,
+    #[serde(rename = "type")]
+    pub type_: Option<String>,
 }
 
 /// Get all tasks (optionally filtered by project IDs)
@@ -89,6 +91,7 @@ pub async fn create_task(
     project_ids: Vec<String>,
     status: Option<String>,
     complexity: Option<String>,
+    type_: Option<String>,
 ) -> Result<TaskDto, DbErr> {
     let now = Utc::now().to_rfc3339();
     let task_id = Uuid::new_v4().to_string();
@@ -107,6 +110,7 @@ pub async fn create_task(
         updated_at: Set(now),
         status: Set(status.unwrap_or_else(|| "backlog".to_string())),
         complexity: Set(complexity),
+        type_: Set(type_),
     };
 
     let task_model = task_active_model.insert(db).await?;
@@ -135,6 +139,7 @@ pub async fn update_task(
     project_ids: Option<Vec<String>>,
     status: Option<String>,
     complexity: Option<Option<String>>,
+    type_: Option<Option<String>>,
 ) -> Result<TaskDto, DbErr> {
     // Find existing task
     let task_model = task::Entity::find_by_id(&task_id)
@@ -159,6 +164,12 @@ pub async fn update_task(
     }
     if let Some(c) = complexity {
         task_active_model.complexity = Set(c);
+    }
+    if let Some(t) = type_ {
+        eprintln!("[update_task] Setting type_ to: {:?}", t);
+        task_active_model.type_ = Set(t);
+    } else {
+        eprintln!("[update_task] type_ is None, not updating field");
     }
     if let Some(t) = tags {
         let tags_json = serde_json::to_string(&t).unwrap_or_else(|_| "[]".to_string());
@@ -234,5 +245,6 @@ fn model_to_dto(model: task::Model, project_ids: Vec<String>) -> TaskDto {
         project_ids,
         status: model.status,
         complexity: model.complexity,
+        type_: model.type_,
     }
 }

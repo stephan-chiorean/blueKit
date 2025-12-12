@@ -2144,7 +2144,10 @@ pub async fn db_create_task(
     project_ids: Vec<String>,
     status: Option<String>,
     complexity: Option<String>,
+    type_: Option<String>,
 ) -> Result<crate::db::task_operations::TaskDto, String> {
+    eprintln!("[db_create_task] Received type_: {:?}", type_);
+    
     crate::db::task_operations::create_task(
         db.inner(),
         title,
@@ -2154,6 +2157,7 @@ pub async fn db_create_task(
         project_ids,
         status,
         complexity,
+        type_,
     )
     .await
     .map_err(|e| format!("Failed to create task: {}", e))
@@ -2171,7 +2175,10 @@ pub async fn db_update_task(
     project_ids: Option<Vec<String>>,
     status: Option<String>,
     complexity: Option<Option<String>>,
+    type_: Option<Option<String>>,
 ) -> Result<crate::db::task_operations::TaskDto, String> {
+    eprintln!("[db_update_task] Received type_: {:?}", type_);
+    
     crate::db::task_operations::update_task(
         db.inner(),
         task_id,
@@ -2182,6 +2189,7 @@ pub async fn db_update_task(
         project_ids,
         status,
         complexity,
+        type_,
     )
     .await
     .map_err(|e| format!("Failed to update task: {}", e))

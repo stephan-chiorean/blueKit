@@ -14,8 +14,8 @@ import {
   SegmentGroup,
   TagsInput,
 } from '@chakra-ui/react';
-import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus } from 'react-icons/lu';
-import { Task, TaskPriority, TaskStatus, TaskComplexity } from '../../types/task';
+import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus, LuBug, LuSearch, LuStar, LuBrush, LuZap, LuSquareCheck } from 'react-icons/lu';
+import { Task, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '../../types/task';
 import { ProjectEntry, invokeDbUpdateTask, invokeGetProjectRegistry } from '../../ipc';
 import { toaster } from '../ui/toaster';
 import ProjectMultiSelect from './ProjectMultiSelect';
@@ -33,6 +33,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
   const [priority, setPriority] = useState<TaskPriority>('standard');
   const [status, setStatus] = useState<TaskStatus>('backlog');
   const [complexity, setComplexity] = useState<TaskComplexity | ''>('');
+  const [type, setType] = useState<TaskType | ''>('');
   const [tags, setTags] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
@@ -59,6 +60,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
       setPriority(task.priority);
       setStatus(task.status);
       setComplexity(task.complexity || '');
+      setType(task.type || '');
       setTags(task.tags);
       setSelectedProjectIds(task.projectIds || []);
     }
@@ -87,7 +89,8 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
         tags,
         selectedProjectIds,
         status,
-        complexity || undefined
+        complexity || undefined,
+        type || undefined
       );
 
       toaster.create({
@@ -243,6 +246,86 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                         { value: 'easy', label: 'Easy' },
                         { value: 'hard', label: 'Hard' },
                         { value: 'deep dive', label: 'Deep dive' },
+                      ]}
+                    />
+                  </SegmentGroup.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Type (optional)</Field.Label>
+                  <SegmentGroup.Root
+                    value={type || undefined}
+                    onValueChange={(e) => setType(e.value as TaskType | '')}
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Items
+                      items={[
+                        {
+                          value: 'bug',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="red.500" size="sm">
+                                <LuBug />
+                              </Icon>
+                              <Text>Bug</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'investigation',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="purple.500" size="sm">
+                                <LuSearch />
+                              </Icon>
+                              <Text>Investigation</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'feature',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="blue.500" size="sm">
+                                <LuStar />
+                              </Icon>
+                              <Text>Feature</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'cleanup',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="gray.500" size="sm">
+                                <LuBrush />
+                              </Icon>
+                              <Text>Cleanup</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'optimization',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="yellow.500" size="sm">
+                                <LuZap />
+                              </Icon>
+                              <Text>Optimization</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'chore',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="green.500" size="sm">
+                                <LuSquareCheck />
+                              </Icon>
+                              <Text>Chore</Text>
+                            </HStack>
+                          ),
+                        },
                       ]}
                     />
                   </SegmentGroup.Root>
