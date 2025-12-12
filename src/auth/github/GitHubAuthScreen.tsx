@@ -182,12 +182,20 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
         <Box
           bg="bg.surface"
           borderRadius="xl"
-          p={8}
+          pt={4}
+          px={8}
+          pb={8}
           w="400px"
           boxShadow="lg"
         >
-          <VStack gap={6}>
-            <Heading size="xl" fontWeight="bold" textAlign="center">
+          <VStack gap={3}>
+            <Heading size="lg" textAlign="center">
+              <Text as="span" color="primary.500">
+                blue
+              </Text>
+              <Text as="span">Kit</Text>
+            </Heading>
+            <Heading size="2xl" fontWeight="bold" textAlign="center">
               Sign In
             </Heading>
             <Text color="fg.muted" textAlign="center">
@@ -204,19 +212,24 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
       <Box
         bg="bg.surface"
         borderRadius="xl"
-        p={8}
+        pt={4}
+        px={8}
+        pb={8}
         w="400px"
         boxShadow="lg"
       >
-        <VStack gap={6} align="stretch">
-          <Heading size="xl" fontWeight="bold" textAlign="center">
+        <VStack gap={3} align="stretch">
+          <Heading size="lg" textAlign="center">
+            <Text as="span" color="primary.500">
+              blue
+            </Text>
+            <Text as="span">Kit</Text>
+          </Heading>
+          <Heading size="3xl" fontWeight="bold" textAlign="center">
             Sign In
           </Heading>
 
           <VStack gap={4}>
-            <Text color="fg.muted" textAlign="center">
-              Click the button below to sign in with GitHub. You'll be redirected to GitHub to authorize the application.
-            </Text>
 
             <Button
               onClick={handleOpenGitHub}
@@ -227,7 +240,7 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
               disabled={isExchanging}
             >
               <FaGithub style={{ marginRight: '8px' }} />
-              {isExchanging ? 'Completing sign in...' : 'Sign In with GitHub'}
+              {isExchanging ? 'Completing sign in...' : 'Continue with GitHub'}
             </Button>
 
             {isExchanging && (
