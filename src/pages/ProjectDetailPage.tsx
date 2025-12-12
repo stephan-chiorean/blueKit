@@ -451,10 +451,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       </Box>
       
       {/* Full screen content area */}
-      <Box flex="1" minH={0} overflow="hidden">
-        <Box h="100%" p={6} position="relative" overflow="auto">
+      <Box flex="1" minH={0} overflow="hidden" width="100%">
+        <Box h="100%" p={6} position="relative" overflow="auto" width="100%" maxW="100%">
           <NotebookBackground />
-          <Box position="relative" zIndex={1}>
+          <Box position="relative" zIndex={1} width="100%" maxW="100%">
           <Tabs.Root
             value={currentTab}
             onValueChange={(details) => setCurrentTab(details.value)}
@@ -466,7 +466,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             }}
           >
             {/* Back button, project title, and tabs all on the same row */}
-            <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%">
+            <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%" maxW="100%">
               {/* Left side: Back button and project title */}
               <Flex align="center" gap={4}>
                 <Button
@@ -529,7 +529,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 position="absolute" 
                 left="50%" 
                 style={{ transform: 'translateX(-50%)' }}
-                maxW="650px"
+                maxW="min(700px, calc(100vw - 450px))"
                 overflowX="auto"
                 overflowY="hidden"
                 css={{

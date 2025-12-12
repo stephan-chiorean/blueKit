@@ -159,6 +159,59 @@ function DiagramsTabContent({
     }
   };
 
+  // Handle removing selected items from folder
+  const handleRemoveFromFolder = async (folder: ArtifactFolder) => {
+    const selectedDiagrams = selectedItems.filter(item => item.type === 'Diagram');
+
+    if (selectedDiagrams.length === 0) return;
+
+    // Calculate artifact type root directory
+    const artifactTypeRoot = `${projectPath}/.bluekit/diagrams`;
+    const rollbacks: (() => void)[] = [];
+
+    try {
+      // Optimistically update UI immediately for each item
+      for (const item of selectedDiagrams) {
+        if (item.path && onOptimisticMove) {
+          const rollback = onOptimisticMove(item.path, artifactTypeRoot);
+          rollbacks.push(rollback);
+        }
+      }
+
+      // Move all selected diagrams back to the artifact type root directory
+      for (const item of selectedDiagrams) {
+        if (item.path) {
+          try {
+            const newPath = await invokeMoveArtifactToFolder(item.path, artifactTypeRoot);
+            // Confirm the move with actual path from backend
+            if (onConfirmMove) {
+              onConfirmMove(item.path, newPath);
+            }
+          } catch (err) {
+            console.error(`Failed to remove ${item.path}:`, err);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => selectedDiagrams[idx].path === item.path);
+            if (rollback) rollback();
+            throw err;
+          }
+        }
+      }
+
+      // Clear selection
+      clearSelection();
+    } catch (err) {
+      console.error('Failed to remove artifacts from folder:', err);
+      // Rollback all optimistic updates on error
+      rollbacks.forEach(rollback => rollback());
+      toaster.create({
+        type: 'error',
+        title: 'Failed to remove artifacts',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        closable: true,
+      });
+    }
+  };
+
   // Handle create folder
   const handleCreateFolder = async (name: string, config: Partial<FolderConfig>) => {
     const fullConfig: FolderConfig = {
@@ -356,7 +409,13 @@ function DiagramsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              <SimpleGrid 
+                columns={{ base: 1, md: 2, lg: 3 }} 
+                gap={4}
+                css={{
+                  alignItems: 'start',
+                }}
+              >
                 {folderTree.map((node) => (
                   <FolderCard
                     key={node.folder.path}
@@ -365,6 +424,7 @@ function DiagramsTabContent({
                     onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
                     onViewArtifact={handleDiagramClick}
                     onAddToFolder={handleAddToFolder}
+                    onRemoveFromFolder={handleRemoveFromFolder}
                     onEdit={handleEditFolder}
                     onDelete={handleDeleteFolder}
                     hasCompatibleSelection={selectedItems.some(item => item.type === 'Diagram')}

@@ -206,6 +206,59 @@ function KitsTabContent({
     }
   };
 
+  // Handle removing selected items from folder
+  const handleRemoveFromFolder = async (folder: ArtifactFolder) => {
+    const selectedKits = selectedItems.filter(item => item.type === 'Kit');
+
+    if (selectedKits.length === 0) return;
+
+    // Calculate artifact type root directory
+    const artifactTypeRoot = `${projectPath}/.bluekit/kits`;
+    const rollbacks: (() => void)[] = [];
+
+    try {
+      // Optimistically update UI immediately for each item
+      for (const item of selectedKits) {
+        if (item.path && onOptimisticMove) {
+          const rollback = onOptimisticMove(item.path, artifactTypeRoot);
+          rollbacks.push(rollback);
+        }
+      }
+
+      // Move all selected kits back to the artifact type root directory
+      for (const item of selectedKits) {
+        if (item.path) {
+          try {
+            const newPath = await invokeMoveArtifactToFolder(item.path, artifactTypeRoot);
+            // Confirm the move with actual path from backend
+            if (onConfirmMove) {
+              onConfirmMove(item.path, newPath);
+            }
+          } catch (err) {
+            console.error(`Failed to remove ${item.path}:`, err);
+            // Rollback this specific item
+            const rollback = rollbacks.find((_, idx) => selectedKits[idx].path === item.path);
+            if (rollback) rollback();
+            throw err;
+          }
+        }
+      }
+
+      // Clear selection
+      clearSelection();
+    } catch (err) {
+      console.error('Failed to remove artifacts from folder:', err);
+      // Rollback all optimistic updates on error
+      rollbacks.forEach(rollback => rollback());
+      toaster.create({
+        type: 'error',
+        title: 'Failed to remove artifacts',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        closable: true,
+      });
+    }
+  };
+
   // Handle create folder
   const handleCreateFolder = async (name: string, config: Partial<FolderConfig>) => {
     const fullConfig: FolderConfig = {
@@ -448,8 +501,8 @@ function KitsTabContent({
   );
 
   return (
-    <Box position="relative">
-      <VStack align="stretch" gap={6}>
+    <Box position="relative" width="100%" maxW="100%" overflow="hidden">
+      <VStack align="stretch" gap={6} width="100%">
         {/* Folders Section - only show if folders exist */}
         {folderTree.length > 0 && (
           <Box position="relative">
@@ -550,7 +603,15 @@ function KitsTabContent({
             />
 
             {viewMode === 'card' ? (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              <SimpleGrid 
+                columns={{ base: 1, md: 2, lg: 3 }} 
+                gap={4} 
+                width="100%" 
+                maxW="100%"
+                css={{
+                  alignItems: 'start',
+                }}
+              >
                 {folderTree.map((node) => (
                   <FolderCard
                     key={node.folder.path}
@@ -559,6 +620,7 @@ function KitsTabContent({
                     onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
                     onViewArtifact={handleViewKit}
                     onAddToFolder={handleAddToFolder}
+                    onRemoveFromFolder={handleRemoveFromFolder}
                     onEdit={handleEditFolder}
                     onDelete={handleDeleteFolder}
                     hasCompatibleSelection={selectedItems.some(item => item.type === 'Kit')}
@@ -708,7 +770,7 @@ function KitsTabContent({
         )}
 
         {/* Kits Section */}
-        <Box mb={8} position="relative" overflow="visible">
+        <Box mb={8} position="relative" width="100%" maxW="100%" overflow="hidden">
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">Kits</Heading>
             <Text fontSize="sm" color="text.muted">
@@ -717,7 +779,7 @@ function KitsTabContent({
             {/* Show Filter and New Folder buttons if no folders exist */}
             {folderTree.length === 0 && (
               <>
-                <Box position="relative" overflow="visible">
+                <Box position="relative" overflow="hidden">
                   <Button
                     ref={filterButtonRef}
                     variant="ghost"
@@ -786,7 +848,15 @@ function KitsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+            <SimpleGrid 
+              columns={{ base: 1, md: 2, lg: 3 }} 
+              gap={4} 
+              width="100%" 
+              maxW="100%"
+              css={{
+                alignItems: 'start',
+              }}
+            >
               {rootKits.map((kit) => (
                 <Card.Root
                   key={kit.path}

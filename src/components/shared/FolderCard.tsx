@@ -1,5 +1,5 @@
 import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Flex, Menu, IconButton, Badge, Checkbox, Portal, Spinner } from '@chakra-ui/react';
-import { LuFolder, LuChevronRight, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2, LuPlus } from 'react-icons/lu';
+import { LuFolder, LuChevronRight, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2, LuPlus, LuMinus } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
@@ -10,6 +10,7 @@ interface FolderCardProps {
   onToggleExpand: () => void;
   onViewArtifact: (artifact: ArtifactFile) => void;
   onAddToFolder: (folder: ArtifactFolder) => void;
+  onRemoveFromFolder?: (folder: ArtifactFolder) => void;
   onEdit: (folder: ArtifactFolder) => void;
   onDelete: (folder: ArtifactFolder) => void;
   hasCompatibleSelection: boolean;
@@ -35,6 +36,7 @@ export function FolderCard({
   onToggleExpand,
   onViewArtifact,
   onAddToFolder,
+  onRemoveFromFolder,
   onEdit,
   onDelete,
   hasCompatibleSelection,
@@ -55,7 +57,7 @@ export function FolderCard({
       childNames: children.map(c => c.folder.config?.name || c.folder.name)
     });
   }
-  const { isSelected, toggleItem } = useSelection();
+  const { isSelected, toggleItem, selectedItems } = useSelection();
 
   const displayName = folder.config?.name || folder.name;
   const description = folder.config?.description;
@@ -84,6 +86,20 @@ export function FolderCard({
       path: artifact.path,
     });
   };
+
+  // Check if any selected items are already in this folder
+  const getSelectedItemsInFolder = () => {
+    if (!isExpanded || !hasCompatibleSelection) return [];
+    return selectedItems.filter(item => 
+      item.type === selectionType && 
+      item.path && 
+      artifacts.some(artifact => artifact.path === item.path)
+    );
+  };
+
+  const selectedItemsInFolder = getSelectedItemsInFolder();
+  const hasSelectedItemsInFolder = selectedItemsInFolder.length > 0;
+  const shouldShowRemove = isExpanded && hasSelectedItemsInFolder && onRemoveFromFolder;
 
   // Get the icon for the artifact type (matching tab icons)
   const getArtifactIcon = () => {
@@ -160,10 +176,10 @@ export function FolderCard({
       onClick={onToggleExpand}
       _hover={{ borderColor: 'blue.400' }}
       position='relative'
-      overflow='visible'
-      css={{
-        contain: 'layout style',
-      }}
+      overflow='hidden'
+      width='100%'
+      height='fit-content'
+      alignSelf='start'
     >
       <CardHeader>
         <Flex align='center' justify='space-between' gap={4}>
@@ -181,20 +197,39 @@ export function FolderCard({
           </HStack>
           <Box flexShrink={0}>
             {hasCompatibleSelection ? (
-              <IconButton
-                variant='ghost'
-                size='sm'
-                aria-label='Add selected items to folder'
-                colorPalette='blue'
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToFolder(folder);
-                }}
-              >
-                <Icon>
-                  <LuPlus />
-                </Icon>
-              </IconButton>
+              shouldShowRemove ? (
+                <IconButton
+                  variant='ghost'
+                  size='sm'
+                  aria-label='Remove selected items from folder'
+                  colorPalette='red'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRemoveFromFolder) {
+                      onRemoveFromFolder(folder);
+                    }
+                  }}
+                >
+                  <Icon>
+                    <LuMinus />
+                  </Icon>
+                </IconButton>
+              ) : (
+                <IconButton
+                  variant='ghost'
+                  size='sm'
+                  aria-label='Add selected items to folder'
+                  colorPalette='blue'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToFolder(folder);
+                  }}
+                >
+                  <Icon>
+                    <LuPlus />
+                  </Icon>
+                </IconButton>
+              )
             ) : (
               <Menu.Root>
                 <Menu.Trigger asChild>
@@ -255,17 +290,21 @@ export function FolderCard({
         </VStack>
 
         <Box
-          maxHeight={isExpanded ? '2000px' : '0px'}
-          overflow='hidden'
+          display='grid'
+          css={{
+            gridTemplateRows: isExpanded ? '1fr' : '0fr',
+            transition: 'grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out',
+          }}
           opacity={isExpanded ? 1 : 0}
-          transition='max-height 0.3s ease-out, opacity 0.2s ease-out'
+          overflow='hidden'
         >
-          {isExpanded && (artifacts.length > 0 || children.length > 0) && (
-            <Box mt={4} pt={4} borderTopWidth='1px' borderColor='border.subtle'>
-              <Text fontSize='sm' fontWeight='bold' color='text.tertiary' mb={2}>
-                CONTENTS:
-              </Text>
-              <VStack align='stretch' gap={2}>
+          <Box minHeight={0}>
+            {(artifacts.length > 0 || children.length > 0) && (
+              <Box mt={4} pt={4} borderTopWidth='1px' borderColor='border.subtle'>
+                <Text fontSize='sm' fontWeight='bold' color='text.tertiary' mb={2}>
+                  CONTENTS:
+                </Text>
+                <VStack align='stretch' gap={2}>
               {/* Child folders - rendered as expandable nested folders */}
               {children.map((childNode) => {
                 const childDisplayName = childNode.folder.config?.name || childNode.folder.name;
@@ -396,15 +435,19 @@ export function FolderCard({
                     </HStack>
                     {/* Nested folder contents */}
                     <Box
-                      maxHeight={isNestedExpanded ? '2000px' : '0px'}
-                      overflow='hidden'
+                      display='grid'
+                      css={{
+                        gridTemplateRows: isNestedExpanded ? '1fr' : '0fr',
+                        transition: 'grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out',
+                      }}
                       opacity={isNestedExpanded ? 1 : 0}
-                      transition='max-height 0.3s ease-out, opacity 0.2s ease-out'
+                      overflow='hidden'
                       pl={4}
                       mt={1}
                     >
-                      {(childNode.artifacts.length > 0 || childNode.children.length > 0) && (
-                        <VStack align='stretch' gap={2} pt={2}>
+                      <Box minHeight={0}>
+                        {(childNode.artifacts.length > 0 || childNode.children.length > 0) && (
+                          <VStack align='stretch' gap={2} pt={2}>
                           {/* Nested subfolders (recursive) */}
                           {childNode.children.length > 0 && (
                             <VStack align='stretch' gap={1}>
@@ -494,14 +537,18 @@ export function FolderCard({
                                     </HStack>
                                     {/* Deeply nested contents */}
                                     <Box
-                                      maxHeight={nestedIsExpanded ? '2000px' : '0px'}
-                                      overflow='hidden'
+                                      display='grid'
+                                      css={{
+                                        gridTemplateRows: nestedIsExpanded ? '1fr' : '0fr',
+                                        transition: 'grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out',
+                                      }}
                                       opacity={nestedIsExpanded ? 1 : 0}
-                                      transition='max-height 0.3s ease-out, opacity 0.2s ease-out'
+                                      overflow='hidden'
                                       pl={4}
                                       mt={1}
                                     >
-                                      <VStack align='stretch' gap={1} pt={1}>
+                                      <Box minHeight={0}>
+                                        <VStack align='stretch' gap={1} pt={1}>
                                         {nestedChildNode.artifacts.map((artifact) => {
                                           const isMoving = movingArtifacts.has(artifact.path);
                                           const artifactSelected = isSelected(artifact.path);
@@ -546,7 +593,8 @@ export function FolderCard({
                                             </HStack>
                                           );
                                         })}
-                                      </VStack>
+                                        </VStack>
+                                      </Box>
                                     </Box>
                                   </Box>
                                 );
@@ -709,8 +757,9 @@ export function FolderCard({
                               })}
                             </VStack>
                           )}
-                        </VStack>
-                      )}
+                          </VStack>
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                 );
@@ -930,9 +979,10 @@ export function FolderCard({
                 </HStack>
                 );
               })}
-            </VStack>
+                </VStack>
+              </Box>
+            )}
           </Box>
-        )}
         </Box>
       </CardBody>
     </Card.Root>

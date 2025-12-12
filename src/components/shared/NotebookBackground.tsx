@@ -17,9 +17,9 @@ export default function NotebookBackground() {
       bottom={0}
       pointerEvents="none"
       zIndex={0}
-      overflow="visible"
-      minWidth="100%"
-      minHeight="100%"
+      overflow="hidden"
+      width="100%"
+      height="100%"
     >
       <Box
         position="absolute"
