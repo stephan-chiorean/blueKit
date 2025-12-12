@@ -4,12 +4,11 @@
 
 // Module declarations: tell Rust about other modules in this crate
 // These must match the file names in the `src/` directory
-mod cache;    // File content caching
-mod commands; // IPC command handlers
-mod db;       // Database layer (SeaORM + SQLite)
-mod state;    // Application state management
-mod utils;    // Utility functions
-mod watcher;  // File watching functionality
+mod commands;      // IPC command handlers
+mod core;          // Core application functionality
+mod db;            // Database layer (SeaORM + SQLite)
+mod integrations;  // External service integrations (GitHub, Git, etc.)
+mod library;       // Library workspace management
 
 // Import statements: bring items from other modules into scope
 // `use` statements allow us to reference items without their full path
@@ -28,6 +27,14 @@ use tauri::Manager;
 /// 4. Runs the application, which opens the window and starts the event loop
 #[tokio::main]
 async fn main() {
+    // Load environment variables from .env file (for development)
+    #[cfg(debug_assertions)]
+    {
+        if let Err(e) = dotenv::dotenv() {
+            tracing::warn!("Failed to load .env file: {}", e);
+        }
+    }
+    
     // Initialize structured logging
     // INFO level temporarily for debugging timeout issues
     tracing_subscriber::fmt()
@@ -89,6 +96,24 @@ async fn main() {
             commands::move_artifact_to_folder, // Move artifact into folder
             commands::move_folder_to_folder, // Move folder into folder (nesting)
             commands::open_project_in_editor, // Open project in Cursor or VSCode
+            commands::keychain_store_token, // Store GitHub token in keychain
+            commands::keychain_retrieve_token, // Retrieve GitHub token from keychain
+            commands::keychain_delete_token, // Delete GitHub token from keychain
+            commands::auth_start_authorization, // Start GitHub authorization code flow
+            commands::auth_exchange_code, // Exchange authorization code for token
+            commands::auth_get_status, // Get current authentication status
+            commands::github_get_user, // Get authenticated GitHub user
+            commands::github_get_repos, // Get user's GitHub repositories
+            commands::github_get_file, // Get file contents from repository
+            commands::github_create_or_update_file, // Create or update file in repository
+            commands::github_delete_file, // Delete file from repository
+            commands::github_get_file_sha, // Get file SHA (for conflict detection)
+            commands::github_get_tree, // Get tree (directory) from repository
+            commands::library_create_workspace, // Create Library workspace
+            commands::library_list_workspaces, // List Library workspaces
+            commands::library_get_workspace, // Get Library workspace
+            commands::library_delete_workspace, // Delete Library workspace
+            commands::library_get_artifacts, // Get Library artifacts
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands
@@ -108,13 +133,18 @@ async fn main() {
             app.manage(db);
 
             // Initialize and register artifact cache
-            use crate::cache::ArtifactCache;
+            use crate::core::cache::ArtifactCache;
             app.manage(ArtifactCache::new());
+            
+            // Initialize OAuth state management (state -> code_verifier mapping)
+            use std::collections::HashMap;
+            use std::sync::{Arc, Mutex};
+            app.manage(Arc::new(Mutex::new(HashMap::<String, String>::new())));
 
             // Set up file watcher for project registry
             let app_handle = app.handle();
-            if let Ok(registry_path) = watcher::get_registry_path() {
-                if let Err(e) = watcher::watch_file(
+            if let Ok(registry_path) = core::watcher::get_registry_path() {
+                if let Err(e) = core::watcher::watch_file(
                     app_handle.clone(),
                     registry_path,
                     "project-registry-changed".to_string(),
@@ -132,7 +162,7 @@ async fn main() {
 
                     // Block until cleanup completes
                     tauri::async_runtime::block_on(async {
-                        if let Err(e) = crate::watcher::stop_all_watchers().await {
+                        if let Err(e) = crate::core::watcher::stop_all_watchers().await {
                             tracing::error!("Watcher cleanup failed: {}", e);
                         }
                     });

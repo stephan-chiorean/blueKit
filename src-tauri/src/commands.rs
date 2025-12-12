@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::env;
 use tauri::{AppHandle, State};
-use crate::cache::ArtifactCache;
+use crate::core::cache::ArtifactCache;
+use std::collections::HashMap;
 
 /// Parses YAML front matter from markdown content.
 ///
@@ -640,7 +641,7 @@ pub async fn watch_project_artifacts(
     app_handle: AppHandle,
     project_path: String,
 ) -> Result<(), String> {
-    use crate::watcher;
+    use crate::core::watcher;
 
     // Construct the path to .bluekit directory
     let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
@@ -2052,8 +2053,6 @@ pub async fn create_new_project(
 // }
 // ```
 
-use std::collections::HashMap;
-
 /// Gets the health status of all active file watchers.
 ///
 /// Returns a HashMap where keys are event names and values are boolean
@@ -2071,7 +2070,7 @@ use std::collections::HashMap;
 /// ```
 #[tauri::command]
 pub async fn get_watcher_health() -> Result<HashMap<String, bool>, String> {
-    Ok(crate::watcher::get_watcher_health().await)
+    Ok(crate::core::watcher::get_watcher_health().await)
 }
 
 /// Stops a file watcher by event name.
@@ -2094,7 +2093,7 @@ pub async fn get_watcher_health() -> Result<HashMap<String, bool>, String> {
 /// ```
 #[tauri::command]
 pub async fn stop_watcher(event_name: String) -> Result<(), String> {
-    crate::watcher::stop_watcher(&event_name).await
+    crate::core::watcher::stop_watcher(&event_name).await
 }
 
 // ============================================================================
@@ -2808,5 +2807,248 @@ pub async fn open_project_in_editor(
     }
 
     Ok(())
+}
+
+// ============================================================================
+// KEYCHAIN COMMANDS
+// ============================================================================
+
+use crate::integrations::github::keychain::{KeychainManager, GitHubToken};
+
+/// Stores a GitHub token in the OS keychain.
+#[tauri::command]
+pub async fn keychain_store_token(token: GitHubToken) -> Result<(), String> {
+    let manager = KeychainManager::new()?;
+    manager.store_token(&token)
+}
+
+/// Retrieves a GitHub token from the OS keychain.
+#[tauri::command]
+pub async fn keychain_retrieve_token() -> Result<GitHubToken, String> {
+    let manager = KeychainManager::new()?;
+    manager.retrieve_token()
+}
+
+/// Deletes a GitHub token from the OS keychain.
+#[tauri::command]
+pub async fn keychain_delete_token() -> Result<(), String> {
+    let manager = KeychainManager::new()?;
+    manager.delete_token()
+}
+
+// ============================================================================
+// AUTHENTICATION COMMANDS
+// ============================================================================
+
+use crate::integrations::github::auth::{exchange_code_for_token, get_auth_status, AuthStatus};
+use crate::integrations::github::oauth_server::start_oauth_server;
+use std::sync::{Arc, Mutex};
+
+/// Shared state for OAuth flow (state -> code_verifier mapping).
+type OAuthState = Arc<Mutex<HashMap<String, String>>>;
+
+/// Starts the GitHub authorization code flow.
+/// 
+/// Generates authorization URL, starts local HTTP server, and returns the URL.
+/// The server will listen for the OAuth callback and emit a Tauri event.
+#[tauri::command]
+pub async fn auth_start_authorization(
+    app_handle: AppHandle,
+    oauth_state: State<'_, OAuthState>,
+) -> Result<String, String> {
+    // Generate state first
+    let state = crate::integrations::github::auth::generate_state();
+    
+    // Generate code verifier BEFORE starting server (to avoid race condition)
+    let code_verifier = crate::integrations::github::auth::generate_code_verifier();
+    let code_challenge = crate::integrations::github::auth::generate_code_challenge(&code_verifier);
+    
+    // Store verifier mapped to state BEFORE starting server
+    {
+        let mut state_map = oauth_state.lock().unwrap();
+        state_map.insert(state.clone(), code_verifier.clone());
+        tracing::info!("Stored code_verifier for state: {} (map now has {} entries)", 
+            state, 
+            state_map.len());
+    }
+    
+    // Start OAuth server in background to get the port
+    let app_handle_clone = app_handle.clone();
+    let oauth_state_clone = oauth_state.inner().clone();
+    let state_clone = state.clone();
+    
+    // Start server and get port (this will try ports starting from 8080)
+    let port = start_oauth_server(app_handle_clone, oauth_state_clone, state_clone).await?;
+    
+    // Generate authorization URL with the actual port, state, and challenge
+    let auth_url = {
+        let client_id = std::env::var("GITHUB_CLIENT_ID")
+            .map_err(|_| "GITHUB_CLIENT_ID not set in environment variables".to_string())?;
+        let redirect_uri = format!("http://localhost:{}/oauth/callback", port);
+        
+        format!(
+            "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=repo,user,read:org,write:org,user:follow&state={}&code_challenge={}&code_challenge_method=S256",
+            urlencoding::encode(&client_id),
+            urlencoding::encode(&redirect_uri),
+            urlencoding::encode(&state),
+            urlencoding::encode(&code_challenge)
+        )
+    };
+    
+    Ok(auth_url)
+}
+
+/// Exchanges the authorization code for an access token.
+#[tauri::command]
+pub async fn auth_exchange_code(
+    code: String,
+    state: String, // State is validated by the server, kept for API consistency
+    codeVerifier: String, // Tauri v1.5 expects camelCase parameter names
+    redirectUri: String, // Must match the redirect_uri used in authorization request
+) -> Result<AuthStatus, String> {
+    tracing::info!("auth_exchange_code called with code (len={}), state (len={}), codeVerifier (len={}), redirectUri={}", 
+        code.len(), state.len(), codeVerifier.len(), redirectUri);
+    exchange_code_for_token(&code, &codeVerifier, &redirectUri).await
+}
+
+/// Gets the current authentication status.
+#[tauri::command]
+pub async fn auth_get_status() -> Result<AuthStatus, String> {
+    get_auth_status()
+}
+
+// ============================================================================
+// GITHUB API COMMANDS
+// ============================================================================
+
+use crate::integrations::github::github::{GitHubClient, GitHubUser, GitHubRepo, GitHubFileResponse, GitHubTreeResponse};
+
+/// Gets the authenticated user's information from GitHub.
+#[tauri::command]
+pub async fn github_get_user() -> Result<GitHubUser, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.get_user().await
+}
+
+/// Gets the authenticated user's repositories from GitHub.
+#[tauri::command]
+pub async fn github_get_repos() -> Result<Vec<GitHubRepo>, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.get_user_repos().await
+}
+
+/// Gets the contents of a file from a GitHub repository.
+#[tauri::command]
+pub async fn github_get_file(
+    owner: String,
+    repo: String,
+    path: String,
+) -> Result<String, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.get_file_contents(&owner, &repo, &path).await
+}
+
+/// Creates or updates a file in a GitHub repository.
+#[tauri::command]
+pub async fn github_create_or_update_file(
+    owner: String,
+    repo: String,
+    path: String,
+    content: String,
+    message: String,
+    sha: Option<String>, // Required for updates
+) -> Result<GitHubFileResponse, String> {
+    let client = GitHubClient::from_keychain()?;
+    client
+        .create_or_update_file(&owner, &repo, &path, &content, &message, sha.as_deref())
+        .await
+}
+
+/// Deletes a file from a GitHub repository.
+#[tauri::command]
+pub async fn github_delete_file(
+    owner: String,
+    repo: String,
+    path: String,
+    message: String,
+    sha: String, // Required for deletion
+) -> Result<GitHubFileResponse, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.delete_file(&owner, &repo, &path, &message, &sha).await
+}
+
+/// Gets a file's SHA (for checking if file exists).
+#[tauri::command]
+pub async fn github_get_file_sha(
+    owner: String,
+    repo: String,
+    path: String,
+) -> Result<Option<String>, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.get_file_sha(&owner, &repo, &path).await
+}
+
+/// Gets a tree (directory contents) from a GitHub repository.
+#[tauri::command]
+pub async fn github_get_tree(
+    owner: String,
+    repo: String,
+    tree_sha: String,
+) -> Result<GitHubTreeResponse, String> {
+    let client = GitHubClient::from_keychain()?;
+    client.get_tree(&owner, &repo, &tree_sha).await
+}
+
+// ============================================================================
+// LIBRARY COMMANDS
+// ============================================================================
+
+use crate::library::library::{LibraryWorkspace, LibraryArtifact};
+use sea_orm::DatabaseConnection;
+
+/// Creates a new Library workspace.
+#[tauri::command]
+pub async fn library_create_workspace(
+    db: State<'_, DatabaseConnection>,
+    name: String,
+    github_owner: String,
+    github_repo: String,
+) -> Result<LibraryWorkspace, String> {
+    crate::library::library::create_workspace(&*db, name, github_owner, github_repo).await
+}
+
+/// Lists all Library workspaces.
+#[tauri::command]
+pub async fn library_list_workspaces(
+    db: State<'_, DatabaseConnection>,
+) -> Result<Vec<LibraryWorkspace>, String> {
+    crate::library::library::list_workspaces(&*db).await
+}
+
+/// Gets a Library workspace by ID.
+#[tauri::command]
+pub async fn library_get_workspace(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+) -> Result<LibraryWorkspace, String> {
+    crate::library::library::get_workspace(&*db, workspace_id).await
+}
+
+/// Deletes a Library workspace.
+#[tauri::command]
+pub async fn library_delete_workspace(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+) -> Result<(), String> {
+    crate::library::library::delete_workspace(&*db, workspace_id).await
+}
+
+/// Lists all artifacts in a workspace (or all workspaces if None).
+#[tauri::command]
+pub async fn library_get_artifacts(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: Option<String>,
+) -> Result<Vec<LibraryArtifact>, String> {
+    crate::library::library::list_artifacts(&*db, workspace_id).await
 }
 

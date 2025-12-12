@@ -11,6 +11,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Add status and complexity columns to tasks table
     add_task_status_and_complexity_columns(db).await?;
 
+    // Create library tables
+    create_library_workspaces_table(db).await?;
+    create_library_artifacts_table(db).await?;
+
     Ok(())
 }
 
@@ -140,6 +144,66 @@ async fn add_task_status_and_complexity_columns(db: &DatabaseConnection) -> Resu
     } else {
         info!("Complexity column already exists in tasks table");
     }
+
+    Ok(())
+}
+
+async fn create_library_workspaces_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_workspaces (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            github_owner TEXT NOT NULL,
+            github_repo TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    info!("Library workspaces table created or already exists");
+
+    Ok(())
+}
+
+async fn create_library_artifacts_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_artifacts (
+            id TEXT PRIMARY KEY NOT NULL,
+            workspace_id TEXT NOT NULL,
+            local_path TEXT NOT NULL,
+            library_path TEXT NOT NULL,
+            artifact_type TEXT NOT NULL,
+            published_at INTEGER NOT NULL,
+            last_synced_at INTEGER NOT NULL,
+            FOREIGN KEY (workspace_id) REFERENCES library_workspaces(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes for better query performance
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_artifacts_workspace_id ON library_artifacts(workspace_id);
+        CREATE INDEX IF NOT EXISTS idx_library_artifacts_local_path ON library_artifacts(local_path);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Library artifacts table and indexes created or already exist");
 
     Ok(())
 }

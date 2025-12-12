@@ -27,6 +27,28 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-native-tls", "macros"] }
 sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-native-tls", "macros"] }
 sea-orm-migration = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-native-tls"] }
+# HTTP client for GitHub API
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+# Environment variables (for development)
+dotenv = "0.15"
+# Base64 encoding/decoding
+base64 = "0.21"
+# HTTP server for OAuth callback
+axum = { version = "0.7", features = ["tokio"] }
+# Random number generation for PKCE
+rand = "0.8"
+# SHA-256 hashing for PKCE code challenge
+sha2 = "0.10"
+# URL encoding
+urlencoding = "2.1"
+
+# Keychain dependencies (platform-specific)
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = "2.0"
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["wincred"] }
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = "3.0"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem

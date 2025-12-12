@@ -17,7 +17,8 @@
       "order": 2,
       "name": "Getting Started",
       "resourcePaths": [
-        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/getting-started/understanding-tauri-ipc.md"
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/getting-started/understanding-tauri-ipc.md",
+        "/Users/stephanchiorean/Documents/projects/blueKitApps/blueKit/.bluekit/walkthroughs/guide/getting-started/setting-up-github-oauth-app.md"
       ]
     },
     {

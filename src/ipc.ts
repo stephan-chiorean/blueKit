@@ -1373,3 +1373,455 @@ export async function invokeOpenProjectInEditor(
   );
 }
 
+// ============================================================================
+// KEYCHAIN IPC WRAPPERS
+// ============================================================================
+
+import { GitHubToken } from './types/github';
+
+/**
+ * Stores a GitHub token in the OS keychain.
+ *
+ * @param token - The GitHub token to store
+ * @returns Promise that resolves when the token is stored
+ *
+ * @example
+ * ```typescript
+ * const token: GitHubToken = {
+ *   access_token: 'gho_...',
+ *   token_type: 'bearer',
+ *   scope: 'repo,user',
+ * };
+ * await invokeKeychainStoreToken(token);
+ * ```
+ */
+export async function invokeKeychainStoreToken(token: GitHubToken): Promise<void> {
+  return await invokeWithTimeout<void>('keychain_store_token', { token }, 5000);
+}
+
+/**
+ * Retrieves a GitHub token from the OS keychain.
+ *
+ * @returns Promise that resolves to the stored GitHub token, or rejects if not found
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   const token = await invokeKeychainRetrieveToken();
+ *   console.log('Token found:', token.access_token);
+ * } catch (error) {
+ *   console.log('No token stored');
+ * }
+ * ```
+ */
+export async function invokeKeychainRetrieveToken(): Promise<GitHubToken> {
+  return await invokeWithTimeout<GitHubToken>('keychain_retrieve_token', {}, 5000);
+}
+
+/**
+ * Deletes a GitHub token from the OS keychain.
+ *
+ * @returns Promise that resolves when the token is deleted
+ *
+ * @example
+ * ```typescript
+ * await invokeKeychainDeleteToken();
+ * console.log('Token deleted');
+ * ```
+ */
+export async function invokeKeychainDeleteToken(): Promise<void> {
+  return await invokeWithTimeout<void>('keychain_delete_token', {}, 5000);
+}
+
+// ============================================================================
+// AUTHENTICATION IPC WRAPPERS
+// ============================================================================
+
+import { AuthStatus } from './types/github';
+
+/**
+ * Starts the GitHub authorization code flow.
+ *
+ * Generates authorization URL, starts local HTTP server, and returns the URL.
+ * The server will listen for the OAuth callback and emit a Tauri event.
+ *
+ * @returns Promise that resolves to the authorization URL
+ *
+ * @example
+ * ```typescript
+ * const authUrl = await invokeAuthStartAuthorization();
+ * // Open URL in browser, then listen for 'oauth-callback' event
+ * ```
+ */
+export async function invokeAuthStartAuthorization(): Promise<string> {
+  return await invokeWithTimeout<string>(
+    'auth_start_authorization',
+    {},
+    10000
+  );
+}
+
+/**
+ * Exchanges the authorization code for an access token.
+ *
+ * @param code - The authorization code from GitHub
+ * @param state - The state parameter for CSRF protection
+ * @param codeVerifier - The PKCE code verifier
+ * @param redirectUri - The redirect URI used in the authorization request (must match exactly)
+ * @returns Promise that resolves to the authentication status
+ *
+ * @example
+ * ```typescript
+ * const status = await invokeAuthExchangeCode(code, state, codeVerifier, redirectUri);
+ * if (status.type === 'authorized') {
+ *   console.log('Authenticated!');
+ * }
+ * ```
+ */
+export async function invokeAuthExchangeCode(
+  code: string,
+  state: string,
+  codeVerifier: string,
+  redirectUri: string
+): Promise<AuthStatus> {
+  // Tauri v1.5 expects camelCase parameter names to match Rust function parameters
+  const args = {
+    code: code,
+    state: state,
+    codeVerifier: codeVerifier,
+    redirectUri: redirectUri,
+  };
+  console.log('Invoking auth_exchange_code with args:', {
+    code: code.substring(0, 10) + '...',
+    state: state,
+    codeVerifier: codeVerifier.substring(0, 10) + '...',
+    redirectUri: redirectUri,
+    argsKeys: Object.keys(args)
+  });
+  return await invokeWithTimeout<AuthStatus>(
+    'auth_exchange_code',
+    args,
+    15000
+  );
+}
+
+/**
+ * Gets the current authentication status.
+ *
+ * @returns Promise that resolves to the current authentication status
+ *
+ * @example
+ * ```typescript
+ * const status = await invokeAuthGetStatus();
+ * if (status.type === 'authorized') {
+ *   console.log('User is authenticated');
+ * }
+ * ```
+ */
+export async function invokeAuthGetStatus(): Promise<AuthStatus> {
+  return await invokeWithTimeout<AuthStatus>('auth_get_status', {}, 5000);
+}
+
+// ============================================================================
+// GITHUB API IPC WRAPPERS
+// ============================================================================
+
+import { GitHubUser, GitHubRepo, GitHubFileResponse, GitHubTreeResponse } from './types/github';
+
+/**
+ * Gets the authenticated user's information from GitHub.
+ *
+ * @returns Promise that resolves to the GitHub user information
+ *
+ * @example
+ * ```typescript
+ * const user = await invokeGitHubGetUser();
+ * console.log('Logged in as:', user.login);
+ * ```
+ */
+export async function invokeGitHubGetUser(): Promise<GitHubUser> {
+  return await invokeWithTimeout<GitHubUser>('github_get_user', {}, 10000);
+}
+
+/**
+ * Gets the authenticated user's repositories from GitHub.
+ *
+ * @returns Promise that resolves to an array of GitHub repositories
+ *
+ * @example
+ * ```typescript
+ * const repos = await invokeGitHubGetRepos();
+ * console.log('You have', repos.length, 'repositories');
+ * ```
+ */
+export async function invokeGitHubGetRepos(): Promise<GitHubRepo[]> {
+  return await invokeWithTimeout<GitHubRepo[]>('github_get_repos', {}, 15000);
+}
+
+/**
+ * Gets the contents of a file from a GitHub repository.
+ *
+ * @param owner - Repository owner (username or org)
+ * @param repo - Repository name
+ * @param path - File path in repository
+ * @returns Promise that resolves to the file contents
+ *
+ * @example
+ * ```typescript
+ * const content = await invokeGitHubGetFile('owner', 'repo', 'path/to/file.md');
+ * ```
+ */
+export async function invokeGitHubGetFile(
+  owner: string,
+  repo: string,
+  path: string
+): Promise<string> {
+  return await invokeWithTimeout<string>(
+    'github_get_file',
+    { owner, repo, path },
+    10000
+  );
+}
+
+/**
+ * Creates or updates a file in a GitHub repository.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param path - File path in repository
+ * @param content - File content
+ * @param message - Commit message
+ * @param sha - Optional SHA of existing file (required for updates)
+ * @returns Promise that resolves to the file operation response
+ *
+ * @example
+ * ```typescript
+ * const response = await invokeGitHubCreateOrUpdateFile(
+ *   'owner',
+ *   'repo',
+ *   'path/to/file.md',
+ *   '# Content',
+ *   'Add new file',
+ *   undefined // No SHA for new file
+ * );
+ * ```
+ */
+export async function invokeGitHubCreateOrUpdateFile(
+  owner: string,
+  repo: string,
+  path: string,
+  content: string,
+  message: string,
+  sha?: string
+): Promise<GitHubFileResponse> {
+  return await invokeWithTimeout<GitHubFileResponse>(
+    'github_create_or_update_file',
+    { owner, repo, path, content, message, sha },
+    15000
+  );
+}
+
+/**
+ * Deletes a file from a GitHub repository.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param path - File path in repository
+ * @param message - Commit message
+ * @param sha - SHA of file to delete (required)
+ * @returns Promise that resolves to the deletion response
+ *
+ * @example
+ * ```typescript
+ * const response = await invokeGitHubDeleteFile(
+ *   'owner',
+ *   'repo',
+ *   'path/to/file.md',
+ *   'Delete file',
+ *   'abc123...'
+ * );
+ * ```
+ */
+export async function invokeGitHubDeleteFile(
+  owner: string,
+  repo: string,
+  path: string,
+  message: string,
+  sha: string
+): Promise<GitHubFileResponse> {
+  return await invokeWithTimeout<GitHubFileResponse>(
+    'github_delete_file',
+    { owner, repo, path, message, sha },
+    15000
+  );
+}
+
+/**
+ * Gets a file's SHA (for checking if file exists and getting SHA for updates).
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param path - File path in repository
+ * @returns Promise that resolves to the file SHA, or null if file doesn't exist
+ *
+ * @example
+ * ```typescript
+ * const sha = await invokeGitHubGetFileSha('owner', 'repo', 'path/to/file.md');
+ * if (sha) {
+ *   console.log('File exists, SHA:', sha);
+ * } else {
+ *   console.log('File does not exist');
+ * }
+ * ```
+ */
+export async function invokeGitHubGetFileSha(
+  owner: string,
+  repo: string,
+  path: string
+): Promise<string | null> {
+  return await invokeWithTimeout<string | null>(
+    'github_get_file_sha',
+    { owner, repo, path },
+    10000
+  );
+}
+
+/**
+ * Gets a tree (directory contents) from a GitHub repository.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param treeSha - Tree SHA (can be branch name, commit SHA, or tree SHA)
+ * @returns Promise that resolves to the tree response
+ *
+ * @example
+ * ```typescript
+ * const tree = await invokeGitHubGetTree('owner', 'repo', 'main');
+ * console.log('Files in tree:', tree.tree.length);
+ * ```
+ */
+export async function invokeGitHubGetTree(
+  owner: string,
+  repo: string,
+  treeSha: string
+): Promise<GitHubTreeResponse> {
+  return await invokeWithTimeout<GitHubTreeResponse>(
+    'github_get_tree',
+    { owner, repo, treeSha },
+    15000
+  );
+}
+
+// ============================================================================
+// LIBRARY IPC WRAPPERS
+// ============================================================================
+
+import { LibraryWorkspace, LibraryArtifact } from './types/github';
+
+/**
+ * Creates a new Library workspace.
+ *
+ * @param name - Workspace name
+ * @param githubOwner - GitHub owner (username or org)
+ * @param githubRepo - GitHub repository name
+ * @returns Promise that resolves to the created workspace
+ *
+ * @example
+ * ```typescript
+ * const workspace = await invokeLibraryCreateWorkspace(
+ *   'My Workspace',
+ *   'username',
+ *   'my-repo'
+ * );
+ * ```
+ */
+export async function invokeLibraryCreateWorkspace(
+  name: string,
+  githubOwner: string,
+  githubRepo: string
+): Promise<LibraryWorkspace> {
+  return await invokeWithTimeout<LibraryWorkspace>(
+    'library_create_workspace',
+    { name, githubOwner, githubRepo },
+    10000
+  );
+}
+
+/**
+ * Lists all Library workspaces.
+ *
+ * @returns Promise that resolves to an array of workspaces
+ *
+ * @example
+ * ```typescript
+ * const workspaces = await invokeLibraryListWorkspaces();
+ * console.log('You have', workspaces.length, 'workspaces');
+ * ```
+ */
+export async function invokeLibraryListWorkspaces(): Promise<LibraryWorkspace[]> {
+  return await invokeWithTimeout<LibraryWorkspace[]>('library_list_workspaces', {}, 10000);
+}
+
+/**
+ * Gets a Library workspace by ID.
+ *
+ * @param workspaceId - Workspace ID
+ * @returns Promise that resolves to the workspace
+ *
+ * @example
+ * ```typescript
+ * const workspace = await invokeLibraryGetWorkspace('workspace-id');
+ * ```
+ */
+export async function invokeLibraryGetWorkspace(
+  workspaceId: string
+): Promise<LibraryWorkspace> {
+  return await invokeWithTimeout<LibraryWorkspace>(
+    'library_get_workspace',
+    { workspaceId },
+    10000
+  );
+}
+
+/**
+ * Deletes a Library workspace.
+ *
+ * @param workspaceId - Workspace ID
+ * @returns Promise that resolves when the workspace is deleted
+ *
+ * @example
+ * ```typescript
+ * await invokeLibraryDeleteWorkspace('workspace-id');
+ * ```
+ */
+export async function invokeLibraryDeleteWorkspace(workspaceId: string): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'library_delete_workspace',
+    { workspaceId },
+    10000
+  );
+}
+
+/**
+ * Lists all artifacts in a workspace (or all workspaces if None).
+ *
+ * @param workspaceId - Optional workspace ID (if not provided, returns all artifacts)
+ * @returns Promise that resolves to an array of artifacts
+ *
+ * @example
+ * ```typescript
+ * const artifacts = await invokeLibraryGetArtifacts('workspace-id');
+ * // or
+ * const allArtifacts = await invokeLibraryGetArtifacts(undefined);
+ * ```
+ */
+export async function invokeLibraryGetArtifacts(
+  workspaceId?: string
+): Promise<LibraryArtifact[]> {
+  return await invokeWithTimeout<LibraryArtifact[]>(
+    'library_get_artifacts',
+    { workspaceId },
+    10000
+  );
+}
+

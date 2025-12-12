@@ -1,7 +1,7 @@
 import { HStack, Button, Icon, Text, Flex } from '@chakra-ui/react';
 import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable } from 'react-icons/lu';
 
-interface ArtifactActionBarProps {
+interface ArtifactToolbarProps {
   onNewFolder: () => void;
   onToggleFilter: () => void;
   isFilterOpen: boolean;
@@ -12,14 +12,17 @@ interface ArtifactActionBarProps {
 }
 
 /**
- * ArtifactActionBar - Shared action bar for artifact tabs (kits, walkthroughs, diagrams).
+ * ArtifactToolbar - Shared toolbar for artifact tabs (kits, walkthroughs, diagrams).
  * 
  * Provides consistent layout with:
  * - Filter button (left)
  * - New Folder button (right)
  * - Optional view mode switcher (card/table)
+ * 
+ * Note: This is a regular toolbar component, not a Chakra UI ActionBar.
+ * For floating action bars that appear on selection, see GlobalActionBar.
  */
-export function ArtifactActionBar({
+export function ArtifactToolbar({
   onNewFolder,
   onToggleFilter,
   isFilterOpen,
@@ -27,7 +30,7 @@ export function ArtifactActionBar({
   onViewModeChange,
   showViewModeSwitcher = true,
   filterButtonRef,
-}: ArtifactActionBarProps) {
+}: ArtifactToolbarProps) {
   return (
     <Flex justify="space-between" align="center">
       <HStack gap={2}>
@@ -106,4 +109,3 @@ export function ArtifactActionBar({
     </Flex>
   );
 }
-

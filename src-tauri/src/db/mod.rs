@@ -1,7 +1,7 @@
 use sea_orm::{Database, DatabaseConnection, DbErr};
 use std::env;
 use std::path::PathBuf;
-use tracing::{info, error};
+use tracing::info;
 
 pub mod entities;
 pub mod migrations;

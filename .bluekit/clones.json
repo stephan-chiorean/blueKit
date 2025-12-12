@@ -102,5 +102,19 @@
       "production-ready"
     ],
     "createdAt": "2025-12-11T06:13:54.524Z"
+  },
+  {
+    "id": "bluekit-20251211",
+    "name": "BlueKit",
+    "description": "Main BlueKit application - AI-assisted development artifact management system",
+    "gitUrl": "https://github.com/stephan-chiorean/blueKit.git",
+    "gitCommit": "a7b777fb61977bb5cb6266fe88d5a2661cb6d7c5",
+    "gitBranch": "main",
+    "tags": [
+      "foundation",
+      "main-app",
+      "tauri"
+    ],
+    "createdAt": "2025-12-11T20:36:20.143Z"
   }
 ]

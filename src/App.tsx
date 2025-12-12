@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Box, Spinner } from '@chakra-ui/react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
@@ -7,17 +8,31 @@ import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ResourceProvider } from './contexts/ResourceContext';
+import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { ProjectEntry } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
 
-type View = 'welcome' | 'home' | 'project-detail' | 'plans';
+type View = 'welcome' | 'github-auth' | 'home' | 'project-detail' | 'plans';
 
-function App() {
+function AppContent() {
+  const { isAuthenticated, isLoading } = useGitHubAuth();
   const [currentView, setCurrentView] = useState<View>('welcome');
   const [selectedProject, setSelectedProject] = useState<ProjectEntry | null>(null);
   const [plansSource, setPlansSource] = useState<'claude' | 'cursor' | null>(null);
 
   const handleGetStarted = () => {
+    if (isAuthenticated) {
+      setCurrentView('home');
+    } else {
+      setCurrentView('github-auth');
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setCurrentView('home');
+  };
+
+  const handleSkipAuth = () => {
     setCurrentView('home');
   };
 
@@ -41,6 +56,23 @@ function App() {
     setPlansSource(null);
   };
 
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <ColorModeProvider>
+        <FeatureFlagsProvider>
+          <ResourceProvider>
+            <SelectionProvider>
+              <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
+                <Spinner size="xl" />
+              </Box>
+            </SelectionProvider>
+          </ResourceProvider>
+        </FeatureFlagsProvider>
+      </ColorModeProvider>
+    );
+  }
+
   return (
     <ColorModeProvider>
       <FeatureFlagsProvider>
@@ -48,6 +80,8 @@ function App() {
           <SelectionProvider>
             {currentView === 'welcome' ? (
               <WelcomeScreen onGetStarted={handleGetStarted} />
+            ) : currentView === 'github-auth' ? (
+              <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
             ) : currentView === 'project-detail' && selectedProject ? (
               <ProjectDetailPage
                 project={selectedProject}
@@ -67,6 +101,14 @@ function App() {
         </ResourceProvider>
       </FeatureFlagsProvider>
     </ColorModeProvider>
+  );
+}
+
+function App() {
+  return (
+    <GitHubAuthProvider>
+      <AppContent />
+    </GitHubAuthProvider>
   );
 }
 

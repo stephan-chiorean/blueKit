@@ -5,8 +5,8 @@ const themeColors = {
   // Primary color palette - using #4287f5 as base
   primary: {
     50: { value: '#eff6ff' },
-    100: { value: '#dbeafe' },
-    200: { value: '#bfdbfe' },
+    100: { value: '#FFE6BF' },
+    200: { value: '#FAEDE3' },
     300: { value: '#93c5fd' },
     400: { value: '#60a5fa' },
     500: { value: '#4287f5' },
@@ -57,6 +57,7 @@ export const system = createSystem(defaultConfig, {
         // Text color - uses blue in dark mode
         'text.primary': { value: { _light: '{colors.gray.900}', _dark: '{colors.primary.200}' } },
         'text.secondary': { value: { _light: '{colors.gray.600}', _dark: '{colors.primary.400}' } },
+        'text.tertiary': { value: { _light: '{colors.gray.500}', _dark: '#A69385' } },
         // Default foreground color - uses blue in dark mode
         fg: { value: { _light: '{colors.gray.900}', _dark: '{colors.primary.200}' } },
         'fg.muted': { value: { _light: '{colors.gray.600}', _dark: '{colors.primary.400}' } },

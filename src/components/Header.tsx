@@ -11,8 +11,10 @@ import {
   Text,
   Switch,
   Icon,
+  Menu,
+  VStack,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser } from 'react-icons/lu';
+import { LuSearch, LuBell, LuUser, LuLogOut } from 'react-icons/lu';
 import { FaMoon, FaSun } from "react-icons/fa";
 import { Task } from '../types/task';
 import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
@@ -20,6 +22,7 @@ import TaskManagerPopover from './tasks/TaskManagerPopover';
 import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
 import { useColorMode } from '../contexts/ColorModeContext';
+import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
 
 interface HeaderProps {
   currentProject?: ProjectEntry;
@@ -32,6 +35,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const { colorMode, toggleColorMode } = useColorMode();
+  const { isAuthenticated, user, signOut } = useGitHubAuth();
 
   // Load projects on mount
   useEffect(() => {
@@ -127,11 +131,66 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           <IconButton variant="ghost" size="sm" aria-label="Notifications">
             <LuBell />
           </IconButton>
-          <Avatar.Root size="sm">
-            <Avatar.Fallback>
-              <LuUser />
-            </Avatar.Fallback>
-          </Avatar.Root>
+          
+          {/* User Menu */}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Box as="button" cursor="pointer">
+                <Avatar.Root size="sm">
+                  {isAuthenticated && user?.avatar_url ? (
+                    <Avatar.Image src={user.avatar_url} alt={user.login || 'User'} />
+                  ) : null}
+                  <Avatar.Fallback>
+                    <LuUser />
+                  </Avatar.Fallback>
+                </Avatar.Root>
+              </Box>
+            </Menu.Trigger>
+            <Menu.Positioner>
+              <Menu.Content width="240px">
+                {isAuthenticated && user ? (
+                  <>
+                    {/* User Info */}
+                    <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                      <VStack align="start" gap={1}>
+                        <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
+                          {user.name || user.login}
+                        </Text>
+                        <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+                          @{user.login}
+                        </Text>
+                      </VStack>
+                    </Box>
+                    
+                    {/* Logout */}
+                    <Menu.Item
+                      value="logout"
+                      onSelect={async () => {
+                        try {
+                          await signOut();
+                        } catch (error) {
+                          console.error('Failed to sign out:', error);
+                        }
+                      }}
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuLogOut />
+                        </Icon>
+                        <Text>Sign Out</Text>
+                      </HStack>
+                    </Menu.Item>
+                  </>
+                ) : (
+                  <Menu.Item value="signin" disabled>
+                    <Text fontSize="sm" color="fg.muted">
+                      Not signed in
+                    </Text>
+                  </Menu.Item>
+                )}
+              </Menu.Content>
+            </Menu.Positioner>
+          </Menu.Root>
         </HStack>
       </Flex>
 
