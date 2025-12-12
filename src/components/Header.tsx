@@ -14,7 +14,7 @@ import {
   Menu,
   VStack,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen } from 'react-icons/lu';
+import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen, LuLogIn } from 'react-icons/lu';
 import { FaMoon, FaSun } from "react-icons/fa";
 import { Task } from '../types/task';
 import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
@@ -26,6 +26,7 @@ import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
 import { useNotepad } from '../contexts/NotepadContext';
 import { useTimer } from '../contexts/TimerContext';
 import TimerPopover from './shared/TimerPopover';
+import SignInPopover from './shared/SignInPopover';
 
 interface HeaderProps {
   currentProject?: ProjectEntry;
@@ -37,6 +38,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
@@ -165,64 +167,72 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           </IconButton>
           
           {/* User Menu */}
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Box as="button" cursor="pointer">
-                <Avatar.Root size="sm">
-                  {isAuthenticated && user?.avatar_url ? (
-                    <Avatar.Image src={user.avatar_url} alt={user.login || 'User'} />
-                  ) : null}
-                  <Avatar.Fallback>
-                    <LuUser />
-                  </Avatar.Fallback>
-                </Avatar.Root>
-              </Box>
-            </Menu.Trigger>
-            <Menu.Positioner>
-              <Menu.Content width="240px">
-                {isAuthenticated && user ? (
-                  <>
-                    {/* User Info */}
-                    <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                      <VStack align="start" gap={1}>
-                        <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
-                          {user.name || user.login}
-                        </Text>
-                        <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-                          @{user.login}
-                        </Text>
-                      </VStack>
-                    </Box>
-                    
-                    {/* Logout */}
-                    <Menu.Item
-                      value="logout"
-                      onSelect={async () => {
-                        try {
-                          await signOut();
-                        } catch (error) {
-                          console.error('Failed to sign out:', error);
-                        }
-                      }}
-                    >
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuLogOut />
-                        </Icon>
-                        <Text>Sign Out</Text>
-                      </HStack>
-                    </Menu.Item>
-                  </>
-                ) : (
-                  <Menu.Item value="signin" disabled>
-                    <Text fontSize="sm" color="fg.muted">
-                      Not signed in
-                    </Text>
+          {isAuthenticated && user ? (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Box as="button" cursor="pointer">
+                  <Avatar.Root size="sm">
+                    {user.avatar_url ? (
+                      <Avatar.Image src={user.avatar_url} alt={user.login || 'User'} />
+                    ) : null}
+                    <Avatar.Fallback>
+                      <LuUser />
+                    </Avatar.Fallback>
+                  </Avatar.Root>
+                </Box>
+              </Menu.Trigger>
+              <Menu.Positioner>
+                <Menu.Content width="240px">
+                  {/* User Info */}
+                  <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                    <VStack align="start" gap={1}>
+                      <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
+                        {user.name || user.login}
+                      </Text>
+                      <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+                        @{user.login}
+                      </Text>
+                    </VStack>
+                  </Box>
+                  
+                  {/* Logout */}
+                  <Menu.Item
+                    value="logout"
+                    onSelect={async () => {
+                      try {
+                        await signOut();
+                        // Close sign-in popover if it's open
+                        setIsSignInPopoverOpen(false);
+                      } catch (error) {
+                        console.error('Failed to sign out:', error);
+                      }
+                    }}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuLogOut />
+                      </Icon>
+                      <Text>Sign Out</Text>
+                    </HStack>
                   </Menu.Item>
-                )}
-              </Menu.Content>
-            </Menu.Positioner>
-          </Menu.Root>
+                </Menu.Content>
+              </Menu.Positioner>
+            </Menu.Root>
+          ) : (
+            <SignInPopover
+              isOpen={isSignInPopoverOpen}
+              onOpenChange={setIsSignInPopoverOpen}
+              trigger={
+                <Box as="button" cursor="pointer">
+                  <Avatar.Root size="sm">
+                    <Avatar.Fallback>
+                      <LuUser />
+                    </Avatar.Fallback>
+                  </Avatar.Root>
+                </Box>
+              }
+            />
+          )}
         </HStack>
       </Flex>
 

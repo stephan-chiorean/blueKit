@@ -94,14 +94,23 @@ export function GitHubAuthProvider({ children }: { children: React.ReactNode }) 
       if (status.type === 'authorized') {
         setToken(status.token);
         setIsAuthenticated(true);
+        // Fetch user info from GitHub API
+        try {
+          const userInfo = await invokeGitHubGetUser();
+          setUser(userInfo);
+        } catch (error) {
+          console.warn('Failed to fetch user info:', error);
+        }
       } else {
         setToken(null);
         setIsAuthenticated(false);
+        setUser(null);
       }
     } catch (error) {
       console.error('Failed to refresh auth:', error);
       setToken(null);
       setIsAuthenticated(false);
+      setUser(null);
     }
   }, []);
 
