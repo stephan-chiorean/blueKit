@@ -3,7 +3,7 @@ id: ipc-communication
 alias: IPC Communication
 type: walkthrough
 is_base: false
-version: 2
+version: 3
 tags: [ipc, tauri, typescript, rust, communication, frontend, backend]
 description: "Comprehensive technical reference for IPC communication in BlueKit, covering frontend TypeScript layer, Rust backend handlers, type safety, error handling, and how to add new commands"
 complexity: comprehensive
@@ -50,7 +50,7 @@ Inter-Process Communication (IPC) is the mechanism that allows the frontend (Rea
          │ 1. Calls invokePing()
          ▼
 ┌─────────────────┐
-│   src/ipc.ts    │
+│  src/ipc/index.ts│
 │  (TypeScript)   │
 └────────┬────────┘
          │ 2. invoke('ping')
@@ -81,9 +81,77 @@ Inter-Process Communication (IPC) is the mechanism that allows the frontend (Rea
 
 ### The Frontend Layer: TypeScript IPC Wrappers
 
-#### Location: `src/ipc.ts`
+#### Location: `src/ipc/` (Modular Directory Structure)
 
-The frontend IPC layer serves as a type-safe bridge between React components and Tauri's `invoke` API. Instead of calling `invoke` directly with string command names, we create typed wrapper functions.
+The frontend IPC layer is organized as a modular directory structure that serves as a type-safe bridge between React components and Tauri's `invoke` API. Instead of calling `invoke` directly with string command names, we create typed wrapper functions organized by domain.
+
+#### Directory Structure
+
+The IPC layer is split into domain-specific modules for better organization and maintainability:
+
+```
+src/ipc/
+├── index.ts              # Main entry point - re-exports everything
+├── types.ts              # All TypeScript interfaces/types
+├── core.ts               # Basic commands (ping, app_info, example_error)
+├── projects.ts           # Project registry, artifacts, watchers, project creation
+├── files.ts              # File operations (read, write)
+├── artifacts.ts          # Artifact operations (kits, walkthroughs, diagrams, blueprints, etc.)
+├── folders.ts            # Folder operations
+├── tasks.ts              # Database-backed task operations
+├── keychain.ts           # Keychain operations
+├── auth.ts               # Authentication operations
+├── github.ts             # GitHub API operations
+└── library.ts            # Library operations
+```
+
+**Key Benefits:**
+- **Organization**: Related commands are grouped together
+- **Maintainability**: Easier to find and modify specific functionality
+- **Scalability**: New commands can be added to appropriate modules
+- **Backward Compatibility**: `index.ts` re-exports everything, so existing imports continue to work
+
+#### Module Organization
+
+Each module is self-contained and imports only what it needs:
+
+```typescript
+// src/ipc/projects.ts
+import { invokeWithTimeout } from '../utils/ipcTimeout';
+import type { ProjectEntry, ArtifactFile } from './types';
+
+// Module-level state (e.g., cache)
+let projectRegistryCache: ProjectEntry[] | null = null;
+
+// Functions exported from this module
+export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
+  // Implementation...
+}
+
+export function invalidateProjectRegistryCache(): void {
+  // Implementation...
+}
+```
+
+The `index.ts` file re-exports everything:
+
+```typescript
+// src/ipc/index.ts
+export * from './types';      // Re-export all types
+export * from './core';       // Re-export core commands
+export * from './projects';   // Re-export project commands
+// ... etc
+```
+
+This means components can still import from `'../ipc'` and get everything:
+
+```typescript
+import { 
+  invokePing,              // from core.ts
+  invokeGetProjectRegistry, // from projects.ts
+  ArtifactFile             // from types.ts
+} from '../ipc';
+```
 
 #### Why Use Wrapper Functions?
 
@@ -95,25 +163,30 @@ The frontend IPC layer serves as a type-safe bridge between React components and
 
 #### Basic Structure
 
+Each module uses `invokeWithTimeout` (a wrapper around Tauri's `invoke`) for consistent timeout handling:
+
 ```typescript
-import { invoke } from '@tauri-apps/api/tauri';
+// src/ipc/core.ts
+import { invokeWithTimeout } from '../utils/ipcTimeout';
 
 export async function invokePing(): Promise<string> {
-  return await invoke<string>('ping');
+  return await invokeWithTimeout<string>('ping', {}, 5000);
 }
 ```
 
 **Breaking it down:**
-- `invoke<T>` is Tauri's function to call backend commands
+- `invokeWithTimeout<T>` is a wrapper around Tauri's `invoke` that adds timeout handling
 - `<string>` is the TypeScript generic type parameter (the return type)
 - `'ping'` is the command name (must match the Rust function name)
-- The second argument (optional) contains parameters: `{ param: value }`
+- The second argument contains parameters: `{ param: value }` (empty object `{}` if no params)
+- The third argument is the timeout in milliseconds (optional, defaults to 30s)
 
 #### Type Definitions
 
-TypeScript interfaces must match Rust structs exactly:
+All TypeScript interfaces are centralized in `src/ipc/types.ts`:
 
 ```typescript
+// src/ipc/types.ts
 export interface AppInfo {
   name: string;
   version: string;
@@ -123,40 +196,54 @@ export interface AppInfo {
 
 This interface corresponds to the `AppInfo` struct in Rust. The types must match because Tauri serializes Rust structs to JSON, which TypeScript then deserializes.
 
+**Type Organization:**
+- All shared types are in `src/ipc/types.ts`
+- Domain-specific types (like `GitHubToken`) are imported from their respective type files
+- All types are re-exported from `src/ipc/index.ts` for convenience
+
 #### Example: Simple Command (No Parameters)
 
 ```typescript
+// src/ipc/core.ts
+import { invokeWithTimeout } from '../utils/ipcTimeout';
+
 /**
  * Simple ping command to test IPC communication.
  * 
  * @returns A promise that resolves to "pong"
  */
 export async function invokePing(): Promise<string> {
-  return await invoke<string>('ping');
+  return await invokeWithTimeout<string>('ping', {}, 5000);
 }
 ```
 
 **Usage in React:**
 ```typescript
-import { invokePing } from './ipc';
+import { invokePing } from '../ipc';  // Imports from src/ipc/index.ts
 
 const result = await invokePing();
 console.log(result); // "pong"
 ```
 
+**Note:** Even though the function is defined in `src/ipc/core.ts`, it's imported from `'../ipc'` because `index.ts` re-exports everything. This maintains backward compatibility with existing code.
+
 #### Example: Command with Parameters
 
 ```typescript
+// src/ipc/projects.ts
+import { invokeWithTimeout } from '../utils/ipcTimeout';
+import type { ArtifactFile } from './types';
+
 /**
- * Gets the list of kit files from a project's .bluekit directory.
+ * Gets all artifact files from a project's .bluekit directory.
  * 
  * @param projectPath - The path to the project root directory
- * @returns A promise that resolves to an array of KitFile objects
+ * @returns A promise that resolves to an array of ArtifactFile objects
  */
-export async function invokeGetProjectKits(
+export async function invokeGetProjectArtifacts(
   projectPath: string
-): Promise<KitFile[]> {
-  return await invoke<KitFile[]>('get_project_kits', { projectPath });
+): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_project_artifacts', { projectPath });
 }
 ```
 
@@ -164,35 +251,41 @@ export async function invokeGetProjectKits(
 - Parameters are passed as an object: `{ projectPath }`
 - The keys must match the parameter names in the Rust function
 - TypeScript infers the parameter types from the function signature
+- Functions are organized by domain (this one is in `projects.ts`)
 
 **Usage in React:**
 ```typescript
-import { invokeGetProjectKits } from './ipc';
+import { invokeGetProjectArtifacts } from '../ipc';  // Still imports from index.ts
 
-const kits = await invokeGetProjectKits('/path/to/project');
-kits.forEach(kit => {
-  console.log(kit.name);
-  console.log(kit.path);
+const artifacts = await invokeGetProjectArtifacts('/path/to/project');
+artifacts.forEach(artifact => {
+  console.log(artifact.name);
+  console.log(artifact.path);
 });
 ```
 
 #### Example: Complex Return Types
 
 ```typescript
-export interface KitFile {
+// src/ipc/types.ts
+export interface ArtifactFile {
   name: string;
   path: string;
+  content?: string;
   frontMatter?: KitFrontMatter;
 }
 
-export async function invokeGetProjectKits(
+// src/ipc/projects.ts
+import type { ArtifactFile } from './types';
+
+export async function invokeGetProjectArtifacts(
   projectPath: string
-): Promise<KitFile[]> {
-  return await invoke<KitFile[]>('get_project_kits', { projectPath });
+): Promise<ArtifactFile[]> {
+  return await invokeWithTimeout<ArtifactFile[]>('get_project_artifacts', { projectPath });
 }
 ```
 
-The return type `Promise<KitFile[]>` tells TypeScript that this function returns an array of `KitFile` objects, providing full type checking and autocomplete.
+The return type `Promise<ArtifactFile[]>` tells TypeScript that this function returns an array of `ArtifactFile` objects, providing full type checking and autocomplete. Types are imported from `./types` to maintain separation of concerns.
 
 ### The Backend Layer: Rust Command Handlers
 
@@ -350,12 +443,13 @@ async fn main() {
 
 #### The Complete Flow
 
-1. **Frontend calls**: `invokePing()` in `src/ipc.ts`
-2. **IPC wrapper calls**: `invoke<string>('ping')`
-3. **Tauri routes**: Based on the command name, finds the registered handler
-4. **Rust executes**: The `ping()` function in `commands.rs`
-5. **Result serialized**: Rust `Result` → JSON
-6. **Frontend receives**: Promise resolves/rejects with the result
+1. **Frontend calls**: `invokePing()` imported from `src/ipc` (resolves to `index.ts`)
+2. **Index re-exports**: `index.ts` re-exports from `core.ts`
+3. **IPC wrapper calls**: `invokeWithTimeout<string>('ping', {}, 5000)` in `core.ts`
+4. **Tauri routes**: Based on the command name, finds the registered handler
+5. **Rust executes**: The `ping()` function in `commands.rs`
+6. **Result serialized**: Rust `Result` → JSON
+7. **Frontend receives**: Promise resolves/rejects with the result
 
 ### Type Safety and Serialization
 
@@ -638,9 +732,12 @@ In `src-tauri/src/main.rs`, add to the handler list:
 
 ##### Step 3: Create TypeScript Wrapper
 
-In `src/ipc.ts`:
+Choose the appropriate module based on the command's domain. For example, if it's a project-related command, add it to `src/ipc/projects.ts`:
 
 ```typescript
+// src/ipc/projects.ts (or appropriate domain file)
+import { invokeWithTimeout } from '../utils/ipcTimeout';
+
 /**
  * My new command description.
  * 
@@ -652,14 +749,28 @@ export async function invokeMyNewCommand(
   param1: string,
   param2: number
 ): Promise<string> {
-  return await invoke<string>('my_new_command', { param1, param2 });
+  return await invokeWithTimeout<string>('my_new_command', { param1, param2 }, 10000);
 }
 ```
+
+**Module Selection Guide:**
+- **Core commands**: `core.ts` (ping, app_info, example_error)
+- **Project operations**: `projects.ts` (registry, artifacts, watchers, project creation)
+- **File operations**: `files.ts` (read, write)
+- **Artifact operations**: `artifacts.ts` (kits, walkthroughs, diagrams, blueprints, scrapbook, plans, clones)
+- **Folder operations**: `folders.ts` (create, update, delete, move folders)
+- **Task operations**: `tasks.ts` (database-backed tasks)
+- **Keychain operations**: `keychain.ts` (token storage)
+- **Authentication**: `auth.ts` (OAuth flow)
+- **GitHub API**: `github.ts` (GitHub API calls)
+- **Library operations**: `library.ts` (workspace management)
+
+**Note:** The function is automatically available through `index.ts` re-exports, so no changes needed there.
 
 ##### Step 4: Use in React Components
 
 ```typescript
-import { invokeMyNewCommand } from './ipc';
+import { invokeMyNewCommand } from '../ipc';  // Imports from src/ipc/index.ts
 
 const handleClick = async () => {
   try {
@@ -671,15 +782,19 @@ const handleClick = async () => {
 };
 ```
 
+**Import Path:** Always import from `'../ipc'` (or `'./ipc'` depending on your location). The `index.ts` file automatically re-exports all functions from all modules, maintaining backward compatibility.
+
 #### Checklist
 
 - [ ] Rust function has `#[tauri::command]` attribute
 - [ ] Rust function returns `Result<T, E>`
 - [ ] Command registered in `main.rs`
-- [ ] TypeScript wrapper function created
-- [ ] TypeScript types defined (if returning structs)
+- [ ] TypeScript wrapper function created in appropriate domain module
+- [ ] TypeScript types defined in `types.ts` (if returning structs)
+- [ ] Function uses `invokeWithTimeout` for consistent timeout handling
 - [ ] Error handling implemented
 - [ ] JSDoc comments added
+- [ ] Function is automatically available via `index.ts` re-exports (no manual export needed)
 - [ ] Tested in the application
 
 ### Best Practices
@@ -720,12 +835,16 @@ const handleClick = async () => {
 
 The IPC system in this Tauri application provides a type-safe, well-structured way for the React frontend to communicate with the Rust backend. Key takeaways:
 
-1. **Frontend layer** (`src/ipc.ts`) provides typed wrapper functions
+1. **Frontend layer** (`src/ipc/`) provides typed wrapper functions organized by domain:
+   - `index.ts` - Main entry point that re-exports everything
+   - `types.ts` - All shared TypeScript interfaces
+   - Domain modules (`core.ts`, `projects.ts`, `files.ts`, etc.) - Grouped by functionality
 2. **Backend layer** (`src-tauri/src/commands.rs`) contains command handlers
 3. **Registration** (`src-tauri/src/main.rs`) connects the two layers
 4. **Type safety** is maintained through matching TypeScript interfaces and Rust structs
-5. **Error handling** uses Rust's `Result` type and JavaScript Promises
-6. **Adding commands** follows a clear 4-step process
+5. **Error handling** uses Rust's `Result` type and JavaScript Promises, with timeout support via `invokeWithTimeout`
+6. **Adding commands** follows a clear 4-step process, with functions placed in appropriate domain modules
+7. **Backward compatibility** is maintained through `index.ts` re-exports, so existing imports continue to work
 
-This architecture ensures type safety, good developer experience, and maintainable code as the application grows.
+This modular architecture ensures type safety, good developer experience, maintainable code, and scalability as the application grows. The domain-based organization makes it easy to find related functionality and add new commands in the appropriate location.
 
