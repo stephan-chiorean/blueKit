@@ -676,7 +676,77 @@ function DiagramsTabContent({
                 );
               })}
             </SimpleGrid>
-          ) : null}
+          ) : (
+            <Table.Root size="sm" variant="outline">
+              <Table.Header>
+                <Table.Row bg="bg.subtle">
+                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Description</Table.ColumnHeader>
+                  <Table.ColumnHeader>Tags</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {rootDiagrams.map((diagram) => {
+                  const diagramSelected = isSelected(diagram.path);
+                  const displayName = diagram.frontMatter?.alias || diagram.name;
+                  return (
+                    <Table.Row
+                      key={diagram.path}
+                      cursor="pointer"
+                      onClick={() => handleDiagramClick(diagram)}
+                      bg="bg.surface"
+                      data-selected={diagramSelected ? "" : undefined}
+                    >
+                      <Table.Cell>
+                        <Checkbox.Root
+                          size="sm"
+                          colorPalette="blue"
+                          checked={diagramSelected}
+                          onCheckedChange={() => handleDiagramToggle(diagram)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          cursor="pointer"
+                        >
+                          <Checkbox.HiddenInput />
+                          <Checkbox.Control cursor="pointer">
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                        </Checkbox.Root>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Icon boxSize={4} color="primary.500">
+                            <LuNetwork />
+                          </Icon>
+                          <Text>{displayName}</Text>
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.secondary" lineClamp={1}>
+                          {diagram.frontMatter?.description || '—'}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {diagram.frontMatter?.tags && diagram.frontMatter.tags.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {diagram.frontMatter.tags.map((tag) => (
+                              <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                                <Tag.Label>{tag}</Tag.Label>
+                              </Tag.Root>
+                            ))}
+                          </HStack>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Root>
+          )}
         </Box>
       </VStack>
 
