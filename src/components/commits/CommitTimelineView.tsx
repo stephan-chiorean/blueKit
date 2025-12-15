@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Card,
   CardBody,
@@ -14,16 +14,36 @@ import {
   Icon,
   Flex,
   Badge,
-} from '@chakra-ui/react';
-import { toaster } from '../ui/toaster';
-import { LuGitBranch, LuExternalLink, LuBookmark, LuTrash2, LuFolderPlus, LuRefreshCw } from 'react-icons/lu';
-import type { GitHubCommit, Checkpoint } from '../../ipc/types';
-import { invokeFetchProjectCommits, invokeOpenCommitInGitHub, invokeInvalidateCommitCache } from '../../ipc/commits';
-import { invokeConnectProjectGit } from '../../ipc/projects';
-import { invokeGetProjectCheckpoints, invokeUnpinCheckpoint, invokeCreateProjectFromCheckpoint } from '../../ipc/checkpoints';
-import { getCheckpointTypeColor, getCheckpointTypeLabel, getCheckpointTypeIcon, getCheckpointTypeColorPalette } from '../../utils/checkpointUtils';
-import PinCheckpointModal from './PinCheckpointModal';
-import { open } from '@tauri-apps/api/dialog';
+} from "@chakra-ui/react";
+import { toaster } from "../ui/toaster";
+import {
+  LuGitBranch,
+  LuExternalLink,
+  LuBookmark,
+  LuTrash2,
+  LuFolderPlus,
+  LuRefreshCw,
+} from "react-icons/lu";
+import type { GitHubCommit, Checkpoint } from "../../ipc/types";
+import {
+  invokeFetchProjectCommits,
+  invokeOpenCommitInGitHub,
+  invokeInvalidateCommitCache,
+} from "../../ipc/commits";
+import { invokeConnectProjectGit } from "../../ipc/projects";
+import {
+  invokeGetProjectCheckpoints,
+  invokeUnpinCheckpoint,
+  invokeCreateProjectFromCheckpoint,
+} from "../../ipc/checkpoints";
+import {
+  getCheckpointTypeColor,
+  getCheckpointTypeLabel,
+  getCheckpointTypeIcon,
+  getCheckpointTypeColorPalette,
+} from "../../utils/checkpointUtils";
+import PinCheckpointModal from "./PinCheckpointModal";
+import { open } from "@tauri-apps/api/dialog";
 
 interface CommitTimelineViewProps {
   projectId: string;
@@ -32,7 +52,7 @@ interface CommitTimelineViewProps {
   onGitConnected?: () => void;
 }
 
-type ViewMode = 'commits' | 'checkpoints';
+type ViewMode = "commits" | "checkpoints";
 
 export default function CommitTimelineView({
   projectId,
@@ -40,7 +60,7 @@ export default function CommitTimelineView({
   gitConnected,
   onGitConnected,
 }: CommitTimelineViewProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('commits');
+  const [viewMode, setViewMode] = useState<ViewMode>("commits");
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +71,9 @@ export default function CommitTimelineView({
   const [hasMore, setHasMore] = useState(true);
   const [connectingGit, setConnectingGit] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
-  const [selectedCommit, setSelectedCommit] = useState<GitHubCommit | null>(null);
+  const [selectedCommit, setSelectedCommit] = useState<GitHubCommit | null>(
+    null
+  );
   const perPage = 30;
 
   // Load commits
@@ -72,7 +94,7 @@ export default function CommitTimelineView({
       );
 
       if (append) {
-        setCommits(prev => [...prev, ...fetchedCommits]);
+        setCommits((prev) => [...prev, ...fetchedCommits]);
       } else {
         setCommits(fetchedCommits);
       }
@@ -80,14 +102,15 @@ export default function CommitTimelineView({
       // If we got fewer commits than requested, there are no more
       setHasMore(fetchedCommits.length === perPage);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load commits';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load commits";
       setError(errorMessage);
-      console.error('Error loading commits:', err);
+      console.error("Error loading commits:", err);
 
       toaster.create({
-        title: 'Failed to load commits',
+        title: "Failed to load commits",
         description: errorMessage,
-        type: 'error',
+        type: "error",
         duration: 5000,
       });
     } finally {
@@ -99,17 +122,17 @@ export default function CommitTimelineView({
   // Load checkpoints
   const loadCheckpoints = async () => {
     if (!projectId) return;
-    
+
     try {
       setLoadingCheckpoints(true);
       const loadedCheckpoints = await invokeGetProjectCheckpoints(projectId);
       setCheckpoints(loadedCheckpoints);
     } catch (err) {
-      console.error('Error loading checkpoints:', err);
+      console.error("Error loading checkpoints:", err);
       toaster.create({
-        title: 'Failed to load checkpoints',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        type: 'error',
+        title: "Failed to load checkpoints",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
         duration: 5000,
       });
     } finally {
@@ -128,7 +151,7 @@ export default function CommitTimelineView({
 
   // Load checkpoints when switching to checkpoints view or when project changes
   useEffect(() => {
-    if (viewMode === 'checkpoints' && projectId) {
+    if (viewMode === "checkpoints" && projectId) {
       loadCheckpoints();
     }
   }, [viewMode, projectId]);
@@ -143,19 +166,21 @@ export default function CommitTimelineView({
   const handleCheckpointPinned = () => {
     loadCheckpoints();
     // If we're in checkpoints view, refresh it
-    if (viewMode === 'checkpoints') {
+    if (viewMode === "checkpoints") {
       loadCheckpoints();
     }
   };
 
   // Check if a commit is already pinned
   const isCommitPinned = (commitSha: string): boolean => {
-    return checkpoints.some(cp => cp.gitCommitSha === commitSha);
+    return checkpoints.some((cp) => cp.gitCommitSha === commitSha);
   };
 
   // Get checkpoint for a commit SHA
-  const getCheckpointForCommit = (commitSha: string): Checkpoint | undefined => {
-    return checkpoints.find(cp => cp.gitCommitSha === commitSha);
+  const getCheckpointForCommit = (
+    commitSha: string
+  ): Checkpoint | undefined => {
+    return checkpoints.find((cp) => cp.gitCommitSha === commitSha);
   };
 
   // Handle load more
@@ -176,11 +201,11 @@ export default function CommitTimelineView({
       // Reload commits from page 1
       await loadCommits(1, false);
     } catch (err) {
-      console.error('Error syncing commits:', err);
+      console.error("Error syncing commits:", err);
       toaster.create({
-        title: 'Failed to sync commits',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        type: 'error',
+        title: "Failed to sync commits",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
         duration: 5000,
       });
     }
@@ -190,9 +215,9 @@ export default function CommitTimelineView({
   const handleConnectGit = async () => {
     if (!projectId) {
       toaster.create({
-        title: 'No project ID',
-        description: 'Cannot connect git: missing project ID',
-        type: 'error',
+        title: "No project ID",
+        description: "Cannot connect git: missing project ID",
+        type: "error",
         duration: 3000,
       });
       return;
@@ -203,9 +228,9 @@ export default function CommitTimelineView({
       await invokeConnectProjectGit(projectId);
 
       toaster.create({
-        title: 'Git connected',
-        description: 'Successfully connected project to git',
-        type: 'success',
+        title: "Git connected",
+        description: "Successfully connected project to git",
+        type: "success",
         duration: 3000,
       });
 
@@ -214,11 +239,12 @@ export default function CommitTimelineView({
         onGitConnected();
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to connect git';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to connect git";
       toaster.create({
-        title: 'Failed to connect git',
+        title: "Failed to connect git",
         description: errorMessage,
-        type: 'error',
+        type: "error",
         duration: 5000,
       });
     } finally {
@@ -230,9 +256,9 @@ export default function CommitTimelineView({
   const handleViewDiff = async (commit: GitHubCommit) => {
     if (!gitUrl) {
       toaster.create({
-        title: 'No git URL',
-        description: 'Cannot open commit: project has no git URL',
-        type: 'error',
+        title: "No git URL",
+        description: "Cannot open commit: project has no git URL",
+        type: "error",
         duration: 3000,
       });
       return;
@@ -241,11 +267,12 @@ export default function CommitTimelineView({
     try {
       await invokeOpenCommitInGitHub(gitUrl, commit.sha);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to open commit';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to open commit";
       toaster.create({
-        title: 'Failed to open commit',
+        title: "Failed to open commit",
         description: errorMessage,
-        type: 'error',
+        type: "error",
         duration: 3000,
       });
     }
@@ -262,16 +289,16 @@ export default function CommitTimelineView({
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       if (diffHours === 0) {
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
-        return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+        return `${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""} ago`;
       }
-      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
     } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
     } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
       });
     }
   };
@@ -317,9 +344,7 @@ export default function CommitTimelineView({
         <EmptyState.Content>
           <EmptyState.Title>Failed to load commits</EmptyState.Title>
           <EmptyState.Description>{error}</EmptyState.Description>
-          <Button onClick={() => loadCommits(1)}>
-            Try Again
-          </Button>
+          <Button onClick={() => loadCommits(1)}>Try Again</Button>
         </EmptyState.Content>
       </EmptyState.Root>
     );
@@ -342,7 +367,7 @@ export default function CommitTimelineView({
   // View mode switcher
   const renderViewModeSwitcher = () => (
     <Flex justify="space-between" align="center" mb={4}>
-      {viewMode === 'commits' && (
+      {viewMode === "commits" && (
         <Button
           onClick={handleSync}
           variant="outline"
@@ -358,23 +383,23 @@ export default function CommitTimelineView({
           </HStack>
         </Button>
       )}
-      <HStack 
-        gap={0} 
-        borderRadius="md" 
-        overflow="hidden" 
-        bg="bg.subtle" 
+      <HStack
+        gap={0}
+        borderRadius="md"
+        overflow="hidden"
+        bg="bg.subtle"
         shadow="sm"
         ml="auto"
       >
         <Button
-          onClick={() => setViewMode('commits')}
+          onClick={() => setViewMode("commits")}
           variant="ghost"
           borderRadius={0}
           borderRightWidth="1px"
           borderRightColor="border.subtle"
-          bg={viewMode === 'commits' ? 'bg.surface' : 'transparent'}
-          color={viewMode === 'commits' ? 'text.primary' : 'text.secondary'}
-          _hover={{ bg: viewMode === 'commits' ? 'bg.surface' : 'bg.subtle' }}
+          bg={viewMode === "commits" ? "bg.surface" : "transparent"}
+          color={viewMode === "commits" ? "text.primary" : "text.secondary"}
+          _hover={{ bg: viewMode === "commits" ? "bg.surface" : "bg.subtle" }}
           size="sm"
         >
           <HStack gap={2}>
@@ -385,12 +410,14 @@ export default function CommitTimelineView({
           </HStack>
         </Button>
         <Button
-          onClick={() => setViewMode('checkpoints')}
+          onClick={() => setViewMode("checkpoints")}
           variant="ghost"
           borderRadius={0}
-          bg={viewMode === 'checkpoints' ? 'bg.surface' : 'transparent'}
-          color={viewMode === 'checkpoints' ? 'text.primary' : 'text.secondary'}
-          _hover={{ bg: viewMode === 'checkpoints' ? 'bg.surface' : 'bg.subtle' }}
+          bg={viewMode === "checkpoints" ? "bg.surface" : "transparent"}
+          color={viewMode === "checkpoints" ? "text.primary" : "text.secondary"}
+          _hover={{
+            bg: viewMode === "checkpoints" ? "bg.surface" : "bg.subtle",
+          }}
           size="sm"
         >
           <HStack gap={2}>
@@ -408,148 +435,161 @@ export default function CommitTimelineView({
   return (
     <VStack align="stretch" gap={4} py={4}>
       {renderViewModeSwitcher()}
-      
-      {viewMode === 'commits' ? (
+
+      {viewMode === "commits" ? (
         <>
-        <Box
-          css={{
-          // Target all possible connector selectors with maximum specificity
-          '& [data-part="connector"]': {
-            borderColor: '#4287f5 !important',
-            borderWidth: '2px !important',
-            borderStyle: 'solid !important',
-            opacity: '1 !important',
-            display: 'block !important',
-            visibility: 'visible !important',
-          },
-          '& [data-part="connector-line"]': {
-            borderColor: '#4287f5 !important',
-            borderWidth: '2px !important',
-            borderStyle: 'solid !important',
-            opacity: '1 !important',
-            display: 'block !important',
-            visibility: 'visible !important',
-          },
-          // Target by class if Chakra uses classes
-          '& .chakra-timeline__connector': {
-            borderColor: '#4287f5 !important',
-            borderWidth: '2px !important',
-            borderStyle: 'solid !important',
-            opacity: '1 !important',
-            display: 'block !important',
-            visibility: 'visible !important',
-          },
-          // More generic selector for any connector element
-          '& [class*="connector"]': {
-            borderColor: '#4287f5 !important',
-            borderWidth: '2px !important',
-            borderStyle: 'solid !important',
-            opacity: '1 !important',
-            display: 'block !important',
-            visibility: 'visible !important',
-          },
-          // Target any element that might be the connector line
-          '& [class*="timeline"] [class*="connector"]': {
-            borderColor: '#4287f5 !important',
-            borderWidth: '2px !important',
-            borderStyle: 'solid !important',
-            opacity: '1 !important',
-            display: 'block !important',
-            visibility: 'visible !important',
-          },
-        }}
-      >
-      <Timeline.Root variant="subtle" colorPalette="blue">
-        {commits.map((commit, index) => {
-          const commitMessage = commit.commit.message.split('\n')[0]; // First line only
-          const commitBody = commit.commit.message.split('\n').slice(1).join('\n').trim();
-          const pinnedCheckpoint = getCheckpointForCommit(commit.sha);
-          const isPinned = !!pinnedCheckpoint;
-          const checkpointTypeColor = pinnedCheckpoint ? getCheckpointTypeColor(pinnedCheckpoint.checkpointType) : undefined;
+          <Box
+            css={{
+              // Target all possible connector selectors with maximum specificity
+              '& [data-part="connector"]': {
+                borderColor: "#4287f5 !important",
+                borderWidth: "2px !important",
+                borderStyle: "solid !important",
+                opacity: "1 !important",
+                display: "block !important",
+                visibility: "visible !important",
+              },
+              '& [data-part="connector-line"]': {
+                borderColor: "#4287f5 !important",
+                borderWidth: "2px !important",
+                borderStyle: "solid !important",
+                opacity: "1 !important",
+                display: "block !important",
+                visibility: "visible !important",
+              },
+              // Target by class if Chakra uses classes
+              "& .chakra-timeline__connector": {
+                borderColor: "#4287f5 !important",
+                borderWidth: "2px !important",
+                borderStyle: "solid !important",
+                opacity: "1 !important",
+                display: "block !important",
+                visibility: "visible !important",
+              },
+              // More generic selector for any connector element
+              '& [class*="connector"]': {
+                borderColor: "#4287f5 !important",
+                borderWidth: "2px !important",
+                borderStyle: "solid !important",
+                opacity: "1 !important",
+                display: "block !important",
+                visibility: "visible !important",
+              },
+              // Target any element that might be the connector line
+              '& [class*="timeline"] [class*="connector"]': {
+                borderColor: "#4287f5 !important",
+                borderWidth: "2px !important",
+                borderStyle: "solid !important",
+                opacity: "1 !important",
+                display: "block !important",
+                visibility: "visible !important",
+              },
+            }}
+          >
+            <Timeline.Root variant="subtle" colorPalette="blue">
+              {commits.map((commit, index) => {
+                const commitMessage = commit.commit.message.split("\n")[0]; // First line only
+                const commitBody = commit.commit.message
+                  .split("\n")
+                  .slice(1)
+                  .join("\n")
+                  .trim();
+                const pinnedCheckpoint = getCheckpointForCommit(commit.sha);
+                const isPinned = !!pinnedCheckpoint;
+                const checkpointTypeColor = pinnedCheckpoint
+                  ? getCheckpointTypeColor(pinnedCheckpoint.checkpointType)
+                  : undefined;
 
-          return (
-            <Timeline.Item key={commit.sha}>
-              <Timeline.Indicator
-                bg={checkpointTypeColor || undefined}
-                color={isPinned ? 'white' : undefined}
-              >
-                {isPinned ? <LuBookmark /> : <LuGitBranch />}
-              </Timeline.Indicator>
-              <Timeline.Content>
-                <Card.Root
-                  borderWidth={isPinned ? "1px" : undefined}
-                  borderColor={checkpointTypeColor || undefined}
-                >
-                  <CardHeader pb={2}>
-                    <HStack justify="space-between" align="start">
-                      <VStack align="start" gap={1} flex={1}>
-                        <Text fontWeight="semibold" fontSize="sm">
-                          {commitMessage}
-                        </Text>
-                        <HStack gap={2} fontSize="xs" color="fg.muted">
-                          <Text>{commit.commit.author.name}</Text>
-                          <Text>•</Text>
-                          <Text>{formatDate(commit.commit.author.date)}</Text>
-                        </HStack>
-                      </VStack>
-                      <HStack gap={2}>
-                        {!isPinned && (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => handlePinCheckpoint(commit)}
-                          >
-                            <LuBookmark />
-                            Pin
-                          </Button>
-                        )}
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => handleViewDiff(commit)}
-                        >
-                          <LuExternalLink />
-                          View Diff
-                        </Button>
-                      </HStack>
-                    </HStack>
-                  </CardHeader>
-                  <CardBody pt={2}>
-                    {commitBody && (
-                      <Text fontSize="xs" color="fg.muted" mb={2}>
-                        {commitBody}
-                      </Text>
-                    )}
-                    <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
-                      {commit.sha.substring(0, 7)}
-                    </Text>
-                  </CardBody>
-                </Card.Root>
-              </Timeline.Content>
-            </Timeline.Item>
-          );
-        })}
-      </Timeline.Root>
-      </Box>
+                return (
+                  <Timeline.Item key={commit.sha}>
+                    <Timeline.Indicator
+                      bg={checkpointTypeColor || undefined}
+                      color={isPinned ? "white" : undefined}
+                    >
+                      {isPinned ? <LuBookmark /> : <LuGitBranch />}
+                    </Timeline.Indicator>
+                    <Timeline.Content>
+                      <Card.Root
+                        borderWidth={isPinned ? "1px" : undefined}
+                        borderColor={checkpointTypeColor || undefined}
+                      >
+                        <CardHeader pb={2}>
+                          <HStack justify="space-between" align="start">
+                            <VStack align="start" gap={1} flex={1}>
+                              <Text fontWeight="semibold" fontSize="sm">
+                                {commitMessage}
+                              </Text>
+                              <HStack gap={2} fontSize="xs" color="fg.muted">
+                                <Text>{commit.commit.author.name}</Text>
+                                <Text>•</Text>
+                                <Text>
+                                  {formatDate(commit.commit.author.date)}
+                                </Text>
+                              </HStack>
+                            </VStack>
+                            <HStack gap={2}>
+                              {!isPinned && (
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => handlePinCheckpoint(commit)}
+                                >
+                                  <LuBookmark />
+                                  Pin
+                                </Button>
+                              )}
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => handleViewDiff(commit)}
+                              >
+                                <LuExternalLink />
+                                View Diff
+                              </Button>
+                            </HStack>
+                          </HStack>
+                        </CardHeader>
+                        <CardBody pt={2}>
+                          {commitBody && (
+                            <Text
+                              fontSize="xs"
+                              color="blue.300"
+                              mb={2}
+                              whiteSpace="pre-wrap"
+                            >
+                              {commitBody}
+                            </Text>
+                          )}
+                          <Text fontSize="xs" fontFamily="mono">
+                            {commit.sha.substring(0, 7)}
+                          </Text>
+                        </CardBody>
+                      </Card.Root>
+                    </Timeline.Content>
+                  </Timeline.Item>
+                );
+              })}
+            </Timeline.Root>
+          </Box>
 
-      {/* Load More Button */}
-      {hasMore && (
-        <Button
-          variant="outline"
-          onClick={handleLoadMore}
-          loading={loadingMore}
-          loadingText="Loading more commits..."
-        >
-          Load More
-        </Button>
-      )}
+          {/* Load More Button */}
+          {hasMore && (
+            <Button
+              variant="outline"
+              onClick={handleLoadMore}
+              loading={loadingMore}
+              loadingText="Loading more commits..."
+            >
+              Load More
+            </Button>
+          )}
 
-      {/* End of commits message */}
-      {!hasMore && commits.length > 0 && (
-        <Text fontSize="sm" textAlign="center" color="fg.muted" py={4}>
-          End of commit history
-        </Text>
-      )}
+          {/* End of commits message */}
+          {!hasMore && commits.length > 0 && (
+            <Text fontSize="sm" textAlign="center" color="fg.muted" py={4}>
+              End of commit history
+            </Text>
+          )}
         </>
       ) : (
         // Checkpoints view
@@ -598,17 +638,17 @@ function CheckpointsView({
     try {
       await invokeUnpinCheckpoint(checkpointId);
       toaster.create({
-        title: 'Checkpoint Unpinned',
-        description: 'Checkpoint has been removed',
-        type: 'success',
+        title: "Checkpoint Unpinned",
+        description: "Checkpoint has been removed",
+        type: "success",
         duration: 3000,
       });
       onCheckpointsUpdated();
     } catch (err) {
       toaster.create({
-        title: 'Failed to Unpin Checkpoint',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        type: 'error',
+        title: "Failed to Unpin Checkpoint",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
         duration: 5000,
       });
     }
@@ -620,19 +660,19 @@ function CheckpointsView({
       const selectedPath = await open({
         directory: true,
         multiple: false,
-        title: 'Select Parent Directory for New Project',
+        title: "Select Parent Directory for New Project",
       });
 
-      if (!selectedPath || typeof selectedPath !== 'string') {
+      if (!selectedPath || typeof selectedPath !== "string") {
         return;
       }
 
       // Create project name from checkpoint name
       const projectDirName = checkpoint.name
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
       const targetPath = `${selectedPath}/${projectDirName}`;
 
       const result = await invokeCreateProjectFromCheckpoint(
@@ -643,16 +683,16 @@ function CheckpointsView({
       );
 
       toaster.create({
-        title: 'Project Created',
+        title: "Project Created",
         description: result,
-        type: 'success',
+        type: "success",
         duration: 5000,
       });
     } catch (err) {
       toaster.create({
-        title: 'Failed to Create Project',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        type: 'error',
+        title: "Failed to Create Project",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
         duration: 5000,
       });
     }
@@ -685,12 +725,12 @@ function CheckpointsView({
     <Box
       css={{
         '& [data-part="connector"]': {
-          borderColor: '#4287f5 !important',
-          borderWidth: '2px !important',
-          borderStyle: 'solid !important',
-          opacity: '1 !important',
-          display: 'block !important',
-          visibility: 'visible !important',
+          borderColor: "#4287f5 !important",
+          borderWidth: "2px !important",
+          borderStyle: "solid !important",
+          opacity: "1 !important",
+          display: "block !important",
+          visibility: "visible !important",
         },
       }}
     >
@@ -698,85 +738,98 @@ function CheckpointsView({
         {checkpoints.map((checkpoint, index) => {
           const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
           const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
-          const typeColorPalette = getCheckpointTypeColorPalette(checkpoint.checkpointType);
+          const typeColorPalette = getCheckpointTypeColorPalette(
+            checkpoint.checkpointType
+          );
           return (
-          <Timeline.Item key={checkpoint.id}>
-            <Timeline.Indicator
-              bg={`${typeColor}`}
-              color="white"
-            >
-              <LuBookmark />
-            </Timeline.Indicator>
-            <Timeline.Content>
-              <Card.Root>
-                <CardHeader pb={2}>
-                  <HStack justify="space-between" align="start">
-                    <VStack align="start" gap={1} flex={1}>
-                      <HStack gap={2} flexWrap="wrap">
-                        <Text fontWeight="semibold" fontSize="sm">
-                          {checkpoint.name}
-                        </Text>
-                        {(() => {
-                          const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
-                          const typeLabel = getCheckpointTypeLabel(checkpoint.checkpointType);
-                          const typeColorPalette = getCheckpointTypeColorPalette(checkpoint.checkpointType);
-                          return typeIcon && typeLabel && typeColorPalette ? (
-                            <Badge size="sm" variant="outline" colorPalette={typeColorPalette}>
-                              <HStack gap={1}>
-                                <Icon color={typeIcon.color} boxSize={3}>
-                                  <typeIcon.icon />
-                                </Icon>
-                                <Text>{typeLabel}</Text>
-                              </HStack>
-                            </Badge>
-                          ) : null;
-                        })()}
-                      </HStack>
-                      {checkpoint.description && (
-                        <Text fontSize="xs" color="fg.muted">
-                          {checkpoint.description}
-                        </Text>
-                      )}
-                    </VStack>
-                    <HStack gap={2}>
-                      {gitUrl && (
+            <Timeline.Item key={checkpoint.id}>
+              <Timeline.Indicator bg={`${typeColor}`} color="white">
+                <LuBookmark />
+              </Timeline.Indicator>
+              <Timeline.Content>
+                <Card.Root>
+                  <CardHeader pb={2}>
+                    <HStack justify="space-between" align="start">
+                      <VStack align="start" gap={1} flex={1}>
+                        <HStack gap={2} flexWrap="wrap">
+                          <Text fontWeight="semibold" fontSize="sm">
+                            {checkpoint.name}
+                          </Text>
+                          {(() => {
+                            const typeIcon = getCheckpointTypeIcon(
+                              checkpoint.checkpointType
+                            );
+                            const typeLabel = getCheckpointTypeLabel(
+                              checkpoint.checkpointType
+                            );
+                            const typeColorPalette =
+                              getCheckpointTypeColorPalette(
+                                checkpoint.checkpointType
+                              );
+                            return typeIcon && typeLabel && typeColorPalette ? (
+                              <Badge
+                                size="sm"
+                                variant="outline"
+                                colorPalette={typeColorPalette}
+                              >
+                                <HStack gap={1}>
+                                  <Icon color={typeIcon.color} boxSize={3}>
+                                    <typeIcon.icon />
+                                  </Icon>
+                                  <Text>{typeLabel}</Text>
+                                </HStack>
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </HStack>
+                        {checkpoint.description && (
+                          <Text fontSize="xs" color="fg.muted">
+                            {checkpoint.description}
+                          </Text>
+                        )}
+                      </VStack>
+                      <HStack gap={2}>
+                        {gitUrl && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => {
+                              invokeOpenCommitInGitHub(
+                                gitUrl,
+                                checkpoint.gitCommitSha
+                              ).catch(console.error);
+                            }}
+                          >
+                            <LuExternalLink />
+                          </Button>
+                        )}
                         <Button
                           size="xs"
                           variant="ghost"
-                          onClick={() => {
-                            invokeOpenCommitInGitHub(gitUrl, checkpoint.gitCommitSha).catch(console.error);
-                          }}
+                          colorPalette="green"
+                          onClick={() => handleCreateProject(checkpoint)}
                         >
-                          <LuExternalLink />
+                          <LuFolderPlus />
                         </Button>
-                      )}
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="green"
-                        onClick={() => handleCreateProject(checkpoint)}
-                      >
-                        <LuFolderPlus />
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        onClick={() => handleUnpin(checkpoint.id)}
-                      >
-                        <LuTrash2 />
-                      </Button>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          colorPalette="red"
+                          onClick={() => handleUnpin(checkpoint.id)}
+                        >
+                          <LuTrash2 />
+                        </Button>
+                      </HStack>
                     </HStack>
-                  </HStack>
-                </CardHeader>
-                <CardBody pt={2}>
-                  <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
-                    {checkpoint.gitCommitSha.substring(0, 7)}
-                  </Text>
-                </CardBody>
-              </Card.Root>
-            </Timeline.Content>
-          </Timeline.Item>
+                  </CardHeader>
+                  <CardBody pt={2}>
+                    <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
+                      {checkpoint.gitCommitSha.substring(0, 7)}
+                    </Text>
+                  </CardBody>
+                </Card.Root>
+              </Timeline.Content>
+            </Timeline.Item>
           );
         })}
       </Timeline.Root>
