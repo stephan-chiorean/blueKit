@@ -516,7 +516,12 @@ export default function CommitTimelineView({
                         <CardHeader pb={2}>
                           <HStack justify="space-between" align="start">
                             <VStack align="start" gap={1} flex={1}>
-                              <Text fontWeight="semibold" fontSize="sm">
+                              <Text
+                                fontWeight="semibold"
+                                fontSize="sm"
+                                color="blue.700"
+                                _dark={{ color: "inherit" }}
+                              >
                                 {commitMessage}
                               </Text>
                               <HStack gap={2} fontSize="xs" color="fg.muted">
@@ -553,14 +558,19 @@ export default function CommitTimelineView({
                           {commitBody && (
                             <Text
                               fontSize="xs"
-                              color="blue.300"
                               mb={2}
                               whiteSpace="pre-wrap"
+                              _dark={{ color: "blue.300" }}
                             >
                               {commitBody}
                             </Text>
                           )}
-                          <Text fontSize="xs" fontFamily="mono">
+                          <Text
+                            fontSize="xs"
+                            fontFamily="mono"
+                            color="blue.700"
+                            _dark={{ color: "inherit" }}
+                          >
                             {commit.sha.substring(0, 7)}
                           </Text>
                         </CardBody>
