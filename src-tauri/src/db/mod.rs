@@ -6,6 +6,7 @@ use tracing::info;
 pub mod entities;
 pub mod migrations;
 pub mod task_operations;
+pub mod project_operations;
 
 /// Get the path to the SQLite database file
 pub fn get_db_path() -> Result<PathBuf, String> {

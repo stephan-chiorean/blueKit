@@ -46,17 +46,6 @@ export function FolderCard({
   depth = 0,
 }: FolderCardProps) {
   const { folder, children, artifacts, isExpanded } = node;
-  
-  // Debug logging
-  if (depth === 0) {
-    console.log(`[FolderCard] Rendering folder: ${folder.config?.name || folder.name}`, {
-      path: folder.path,
-      children: children.length,
-      artifacts: artifacts.length,
-      isExpanded,
-      childNames: children.map(c => c.folder.config?.name || c.folder.name)
-    });
-  }
   const { isSelected, toggleItem, selectedItems } = useSelection();
 
   const displayName = folder.config?.name || folder.name;

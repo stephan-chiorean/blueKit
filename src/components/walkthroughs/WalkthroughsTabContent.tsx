@@ -126,31 +126,21 @@ function WalkthroughsTabContent({
 
   // Load folders from backend
   useEffect(() => {
-    console.log('[WalkthroughFolders] 🎯 Effect triggered - walkthroughs count:', walkthroughs.length);
-    console.log('[WalkthroughFolders] 📝 Walkthrough paths:', walkthroughs.map(w => w.path));
-
     const loadFolders = async () => {
       try {
-        console.log('[WalkthroughFolders] 🔍 Fetching folders from backend...');
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
-        console.log('[WalkthroughFolders] ✅ Received', loadedFolders.length, 'folders');
-        console.log('[WalkthroughFolders] 📁 Folder paths:', loadedFolders.map(f => f.path));
         setFolders(loadedFolders);
-        console.log('[WalkthroughFolders] 💾 Folders state updated');
       } catch (err) {
         console.error('[WalkthroughFolders] ❌ Failed to load folders:', err);
       }
     };
 
     // Debounce folder loading to avoid excessive calls when artifacts update rapidly
-    console.log('[WalkthroughFolders] ⏱️ Starting 100ms debounce timer...');
     const timeoutId = setTimeout(() => {
-      console.log('[WalkthroughFolders] ⏰ Debounce complete, loading folders now');
       loadFolders();
     }, 100); // 100ms debounce
 
     return () => {
-      console.log('[WalkthroughFolders] 🧹 Cleanup - canceling debounce timer');
       clearTimeout(timeoutId);
     };
   }, [projectPath, walkthroughs]); // Reload when walkthroughs change (from file watcher)
@@ -158,15 +148,6 @@ function WalkthroughsTabContent({
   // Build folder tree when folders or walkthroughs change (memoized for performance)
   const folderTree = useMemo(() => {
     const tree = buildFolderTree(folders, filteredWalkthroughs, 'walkthroughs', projectPath);
-    console.log('[WalkthroughFolders] 🌳 Built folder tree:', tree.length, 'root folders');
-    tree.forEach(node => {
-      console.log(`[WalkthroughFolders] 📁 ${node.folder.config?.name || node.folder.name}:`, {
-        path: node.folder.path,
-        children: node.children.length,
-        artifacts: node.artifacts.length,
-        childNames: node.children.map(c => c.folder.config?.name || c.folder.name)
-      });
-    });
     return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),

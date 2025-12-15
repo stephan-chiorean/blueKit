@@ -3060,3 +3060,511 @@ pub async fn library_get_artifacts(
     crate::library::library::list_artifacts(&*db, workspace_id).await
 }
 
+// ============================================================================
+// PROJECT DATABASE COMMANDS (Phase 1)
+// ============================================================================
+
+/// Migrates projectRegistry.json and clones.json to database
+#[tauri::command]
+pub async fn migrate_projects_to_database(
+    db: State<'_, DatabaseConnection>,
+) -> Result<crate::db::project_operations::MigrationSummary, String> {
+    crate::db::project_operations::migrate_json_to_database(&*db)
+        .await
+        .map_err(|e| format!("Migration failed: {}", e))
+}
+
+/// Gets all projects from database
+#[tauri::command]
+pub async fn db_get_projects(
+    db: State<'_, DatabaseConnection>,
+) -> Result<Vec<crate::db::entities::project::Model>, String> {
+    use sea_orm::EntityTrait;
+    crate::db::entities::project::Entity::find()
+        .all(&*db)
+        .await
+        .map_err(|e| format!("Failed to get projects: {}", e))
+}
+
+/// Creates a new project in database
+#[tauri::command]
+pub async fn db_create_project(
+    db: State<'_, DatabaseConnection>,
+    name: String,
+    path: String,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+) -> Result<crate::db::entities::project::Model, String> {
+    use sea_orm::*;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    let now = Utc::now().timestamp_millis();
+    let id = Uuid::new_v4().to_string();
+
+    let project = crate::db::entities::project::ActiveModel {
+        id: Set(id),
+        name: Set(name),
+        path: Set(path),
+        description: Set(description),
+        tags: Set(tags.and_then(|t| {
+            if t.is_empty() { None } else { Some(serde_json::to_string(&t).unwrap()) }
+        })),
+        git_connected: Set(false),
+        git_url: Set(None),
+        git_branch: Set(None),
+        git_remote: Set(None),
+        last_commit_sha: Set(None),
+        last_synced_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_opened_at: Set(None),
+    };
+
+    project.insert(&*db).await
+        .map_err(|e| format!("Failed to create project: {}", e))
+}
+
+/// Connects a project to its git repository
+#[tauri::command]
+pub async fn connect_project_git(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+) -> Result<crate::db::entities::project::Model, String> {
+    use sea_orm::*;
+    use chrono::Utc;
+
+    // 1. Get project
+    let project = crate::db::entities::project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    // 2. Detect git metadata
+    let git_metadata = crate::integrations::git::detect_git_metadata(&project.path)?;
+
+    // 3. Update project
+    let mut project_active: crate::db::entities::project::ActiveModel = project.into();
+    project_active.git_connected = Set(true);
+    project_active.git_url = Set(Some(git_metadata.remote_url));
+    project_active.git_branch = Set(Some(git_metadata.current_branch));
+    project_active.git_remote = Set(Some(git_metadata.remote_name));
+    project_active.last_commit_sha = Set(Some(git_metadata.latest_commit_sha));
+    project_active.last_synced_at = Set(Some(Utc::now().timestamp_millis()));
+    project_active.updated_at = Set(Utc::now().timestamp_millis());
+
+    project_active.update(&*db).await
+        .map_err(|e| format!("Failed to update project: {}", e))
+}
+
+/// Disconnects a project from git
+#[tauri::command]
+pub async fn disconnect_project_git(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+) -> Result<crate::db::entities::project::Model, String> {
+    use sea_orm::*;
+    use chrono::Utc;
+
+    let project = crate::db::entities::project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let mut project_active: crate::db::entities::project::ActiveModel = project.into();
+    project_active.git_connected = Set(false);
+    project_active.git_url = Set(None);
+    project_active.git_branch = Set(None);
+    project_active.git_remote = Set(None);
+    project_active.last_commit_sha = Set(None);
+    project_active.last_synced_at = Set(None);
+    project_active.updated_at = Set(Utc::now().timestamp_millis());
+
+    project_active.update(&*db).await
+        .map_err(|e| format!("Failed to update project: {}", e))
+}
+
+// ============================================================================
+// COMMIT TIMELINE COMMANDS (Phase 2)
+// ============================================================================
+
+use crate::integrations::github::{GitHubCommit, CommitCache};
+
+/// Parse GitHub URL to extract owner and repo.
+/// Handles both HTTPS and SSH formats.
+fn parse_github_url(git_url: &str) -> Result<(String, String), String> {
+    // Handle both HTTPS and SSH URLs
+    let url_clean = git_url
+        .trim_end_matches(".git")
+        .replace("git@github.com:", "https://github.com/");
+
+    let parts: Vec<&str> = url_clean
+        .trim_start_matches("https://github.com/")
+        .split('/')
+        .collect();
+
+    if parts.len() >= 2 {
+        Ok((parts[0].to_string(), parts[1].to_string()))
+    } else {
+        Err(format!("Invalid GitHub URL: {}", git_url))
+    }
+}
+
+/// Fetch commits for a project from GitHub API (with caching).
+#[tauri::command]
+pub async fn fetch_project_commits(
+    db: State<'_, DatabaseConnection>,
+    commit_cache: State<'_, CommitCache>,
+    project_id: String,
+    branch: Option<String>,
+    page: Option<u32>,
+    per_page: Option<u32>,
+) -> Result<Vec<GitHubCommit>, String> {
+    use crate::db::entities::project;
+    use sea_orm::EntityTrait;
+    use crate::integrations::github::github::GitHubClient;
+
+    // Check cache first
+    let page_num = page.unwrap_or(1);
+    if let Some(cached_commits) = commit_cache.get(&project_id, branch.as_deref(), page_num) {
+        return Ok(cached_commits);
+    }
+
+    // Get project from database
+    let project = project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or("Project not found")?;
+
+    // Validate git connection
+    if !project.git_connected {
+        return Err("Project is not connected to git. Click 'Connect Git' first.".to_string());
+    }
+
+    let git_url = project.git_url
+        .ok_or("Project has no git URL")?;
+
+    // Parse owner/repo from git URL
+    let (owner, repo) = parse_github_url(&git_url)?;
+
+    // Use project's branch if not specified
+    let branch_to_use = branch.clone().or(project.git_branch);
+
+    // Create GitHub client and fetch commits
+    let client = GitHubClient::from_keychain()?;
+    let commits = client
+        .get_commits(
+            &owner,
+            &repo,
+            branch_to_use.as_deref(),
+            per_page,
+            Some(page_num),
+        )
+        .await?;
+
+    // Cache the results
+    commit_cache.set(&project_id, branch.as_deref(), page_num, commits.clone());
+
+    Ok(commits)
+}
+
+/// Open a commit diff in GitHub (in default browser).
+#[tauri::command]
+pub async fn open_commit_in_github(
+    git_url: String,
+    commit_sha: String,
+) -> Result<(), String> {
+    use std::process::Command;
+
+    let (owner, repo) = parse_github_url(&git_url)?;
+    let url = format!("https://github.com/{}/{}/commit/{}", owner, repo, commit_sha);
+
+    // Open URL in default browser using platform-specific command
+    #[cfg(target_os = "macos")]
+    let status = Command::new("open")
+        .arg(&url)
+        .status()
+        .map_err(|e| format!("Failed to open URL: {}", e))?;
+
+    #[cfg(target_os = "linux")]
+    let status = Command::new("xdg-open")
+        .arg(&url)
+        .status()
+        .map_err(|e| format!("Failed to open URL: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("cmd")
+        .args(&["/C", "start", &url])
+        .status()
+        .map_err(|e| format!("Failed to open URL: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("Failed to open URL: command exited with status {}", status));
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// CHECKPOINT COMMANDS (Phase 3)
+// ============================================================================
+
+use crate::db::entities::checkpoint;
+use chrono::Utc;
+
+/// Pin a commit as a checkpoint.
+#[tauri::command]
+pub async fn pin_checkpoint(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+    git_commit_sha: String,
+    name: String,
+    checkpoint_type: String,
+    description: Option<String>,
+    git_branch: Option<String>,
+    git_url: Option<String>,
+    tags: Option<Vec<String>>,
+) -> Result<checkpoint::Model, String> {
+    use sea_orm::*;
+
+    // Validate checkpoint type
+    let valid_types = ["milestone", "experiment", "template", "backup"];
+    if !valid_types.contains(&checkpoint_type.as_str()) {
+        return Err(format!("Invalid checkpoint type: {}. Must be one of: milestone, experiment, template, backup", checkpoint_type));
+    }
+
+    // Check if checkpoint already exists for this commit
+    let existing = checkpoint::Entity::find()
+        .filter(checkpoint::Column::ProjectId.eq(&project_id))
+        .filter(checkpoint::Column::GitCommitSha.eq(&git_commit_sha))
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    if existing.is_some() {
+        return Err("This commit is already pinned as a checkpoint".to_string());
+    }
+
+    // Generate checkpoint ID
+    let checkpoint_id = format!("checkpoint-{}-{}", project_id, Utc::now().timestamp_millis());
+
+    // Serialize tags to JSON
+    let tags_json = tags.and_then(|t| {
+        if t.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&t).ok()
+        }
+    });
+
+    let now = Utc::now().timestamp_millis();
+
+    let checkpoint = checkpoint::ActiveModel {
+        id: Set(checkpoint_id),
+        project_id: Set(project_id),
+        git_commit_sha: Set(git_commit_sha),
+        git_branch: Set(git_branch),
+        git_url: Set(git_url),
+        name: Set(name),
+        description: Set(description),
+        tags: Set(tags_json),
+        checkpoint_type: Set(checkpoint_type),
+        parent_checkpoint_id: Set(None), // Lineage tracking deferred to Phase 4
+        created_from_project_id: Set(None),
+        pinned_at: Set(now),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    let result = checkpoint.insert(&*db)
+        .await
+        .map_err(|e| format!("Failed to create checkpoint: {}", e))?;
+
+    Ok(result)
+}
+
+/// Get all checkpoints for a project.
+#[tauri::command]
+pub async fn get_project_checkpoints(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+) -> Result<Vec<checkpoint::Model>, String> {
+    use sea_orm::*;
+
+    let checkpoints = checkpoint::Entity::find()
+        .filter(checkpoint::Column::ProjectId.eq(&project_id))
+        .order_by_desc(checkpoint::Column::PinnedAt)
+        .all(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(checkpoints)
+}
+
+/// Unpin a checkpoint (delete it).
+#[tauri::command]
+pub async fn unpin_checkpoint(
+    db: State<'_, DatabaseConnection>,
+    checkpoint_id: String,
+) -> Result<(), String> {
+    use sea_orm::*;
+
+    let checkpoint = checkpoint::Entity::find_by_id(&checkpoint_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Checkpoint not found".to_string())?;
+
+    checkpoint::Entity::delete_by_id(&checkpoint_id)
+        .exec(&*db)
+        .await
+        .map_err(|e| format!("Failed to delete checkpoint: {}", e))?;
+
+    Ok(())
+}
+
+/// Create a new project from a checkpoint (reuses clone logic).
+#[tauri::command]
+pub async fn create_project_from_checkpoint(
+    db: State<'_, DatabaseConnection>,
+    checkpoint_id: String,
+    target_path: String,
+    project_title: Option<String>,
+    register_project: bool,
+) -> Result<String, String> {
+    use sea_orm::*;
+    use std::fs;
+    use std::process::Command;
+    use std::path::PathBuf;
+
+    // Get checkpoint
+    let checkpoint = checkpoint::Entity::find_by_id(&checkpoint_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Checkpoint not found".to_string())?;
+
+    let git_url = checkpoint.git_url
+        .ok_or_else(|| "Checkpoint has no git URL".to_string())?;
+
+    // Validate target path
+    let target = PathBuf::from(&target_path);
+    if target.exists() {
+        return Err(format!("Target path already exists: {}", target_path));
+    }
+
+    // Ensure target path is absolute
+    let target = if target.is_absolute() {
+        target
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?
+            .join(target)
+    };
+
+    // Create temp directory
+    let temp_dir = std::env::temp_dir().join(format!("bluekit-checkpoint-{}", std::process::id()));
+
+    // Ensure temp directory doesn't exist
+    if temp_dir.exists() {
+        fs::remove_dir_all(&temp_dir)
+            .map_err(|e| format!("Failed to remove existing temp directory: {}", e))?;
+    }
+
+    // Ensure cleanup happens
+    let cleanup_temp = || {
+        if temp_dir.exists() {
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
+    };
+
+    // Clone repository
+    let clone_output = Command::new("git")
+        .arg("clone")
+        .arg("--quiet")
+        .arg(&git_url)
+        .arg(&temp_dir)
+        .output()
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to clone repository: {}", e)
+        })?;
+
+    if !clone_output.status.success() {
+        cleanup_temp();
+        let error = String::from_utf8_lossy(&clone_output.stderr);
+        return Err(format!("Git clone failed: {}", error));
+    }
+
+    // Checkout commit
+    let checkout_output = Command::new("git")
+        .arg("-C")
+        .arg(&temp_dir)
+        .arg("checkout")
+        .arg(&checkpoint.git_commit_sha)
+        .output()
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to checkout commit: {}", e)
+        })?;
+
+    if !checkout_output.status.success() {
+        cleanup_temp();
+        let error = String::from_utf8_lossy(&checkout_output.stderr);
+        return Err(format!("Git checkout failed: {}", error));
+    }
+
+    // Copy files to target (excluding .git)
+    fs::create_dir_all(&target)
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to create target directory: {}", e)
+        })?;
+
+    // Copy all files except .git using existing helper
+    copy_directory_excluding(&temp_dir, &target, &[".git"])
+        .map_err(|e| {
+            cleanup_temp();
+            format!("Failed to copy files: {}", e)
+        })?;
+
+    // Register project if requested
+    if register_project {
+        use crate::db::entities::project;
+        use sea_orm::*;
+        
+        let project_name = project_title.unwrap_or_else(|| checkpoint.name.clone());
+        let now = Utc::now().timestamp_millis();
+        let project_id = format!("project-{}", now);
+        
+        let project_model = project::ActiveModel {
+            id: Set(project_id),
+            name: Set(project_name),
+            path: Set(target.to_string_lossy().to_string()),
+            description: Set(Some(format!("Created from checkpoint: {}", checkpoint.name))),
+            tags: Set(None),
+            git_connected: Set(false),
+            git_url: Set(None),
+            git_branch: Set(None),
+            git_remote: Set(None),
+            last_commit_sha: Set(None),
+            last_synced_at: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            last_opened_at: Set(None),
+        };
+        
+        let _ = project_model.insert(&*db)
+            .await
+            .map_err(|e| format!("Failed to register project: {}", e))?;
+    }
+
+    // Cleanup temp directory
+    cleanup_temp();
+
+    Ok(format!("Project created successfully at: {}", target.to_string_lossy()))
+}
+

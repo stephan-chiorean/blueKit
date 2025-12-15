@@ -114,6 +114,17 @@ async fn main() {
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
             commands::library_get_artifacts, // Get Library artifacts
+            commands::migrate_projects_to_database, // Migrate JSON to database (Phase 1)
+            commands::db_get_projects, // Get all projects from database (Phase 1)
+            commands::db_create_project, // Create new project in database (Phase 1)
+            commands::connect_project_git, // Connect project to git (Phase 1)
+            commands::disconnect_project_git, // Disconnect project from git (Phase 1)
+            commands::fetch_project_commits, // Fetch commits from GitHub API (Phase 2)
+            commands::open_commit_in_github, // Open commit diff in GitHub (Phase 2)
+            commands::pin_checkpoint, // Pin commit as checkpoint (Phase 3)
+            commands::get_project_checkpoints, // Get project checkpoints (Phase 3)
+            commands::unpin_checkpoint, // Unpin checkpoint (Phase 3)
+            commands::create_project_from_checkpoint, // Create project from checkpoint (Phase 3)
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands
@@ -130,16 +141,37 @@ async fn main() {
                 .expect("Database initialization channel closed unexpectedly")
                 .expect("Failed to initialize database");
 
-            app.manage(db);
+            app.manage(db.clone());
+
+            // Auto-migrate projects on startup if projectRegistry.json exists
+            let db_clone = db.clone();
+            tauri::async_runtime::spawn(async move {
+                match crate::db::project_operations::migrate_json_to_database(&db_clone).await {
+                    Ok(summary) => {
+                        if summary.projects_migrated > 0 {
+                            tracing::info!(
+                                "Auto-migrated {} projects and {} checkpoints",
+                                summary.projects_migrated,
+                                summary.checkpoints_migrated
+                            );
+                        }
+                    }
+                    Err(e) => tracing::warn!("Auto-migration failed: {}", e),
+                }
+            });
 
             // Initialize and register artifact cache
             use crate::core::cache::ArtifactCache;
             app.manage(ArtifactCache::new());
-            
+
             // Initialize OAuth state management (state -> code_verifier mapping)
             use std::collections::HashMap;
             use std::sync::{Arc, Mutex};
             app.manage(Arc::new(Mutex::new(HashMap::<String, String>::new())));
+
+            // Initialize and register commit cache (Phase 2)
+            use crate::integrations::github::CommitCache;
+            app.manage(CommitCache::new());
 
             // Set up file watcher for project registry
             let app_handle = app.handle();

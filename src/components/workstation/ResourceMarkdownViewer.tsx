@@ -182,10 +182,11 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
               mb: 4,
             },
             '& h2': {
-              fontSize: 'xl',
+              fontSize: '2xl',
               fontWeight: 'semibold',
               mt: 5,
               mb: 3,
+              color: 'primary.500',
             },
             '& h3': {
               fontSize: 'lg',
@@ -258,7 +259,7 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
             remarkPlugins={[remarkGfm]}
             components={{
               h1: ({ children }) => <Heading as="h1" size="2xl" mt={6} mb={4}>{children}</Heading>,
-              h2: ({ children }) => <Heading as="h2" size="xl" mt={5} mb={3}>{children}</Heading>,
+              h2: ({ children }) => <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">{children}</Heading>,
               h3: ({ children }) => <Heading as="h3" size="lg" mt={4} mb={2}>{children}</Heading>,
               h4: ({ children }) => <Heading as="h4" size="md" mt={3} mb={2}>{children}</Heading>,
               h5: ({ children }) => <Heading as="h5" size="sm" mt={3} mb={2}>{children}</Heading>,

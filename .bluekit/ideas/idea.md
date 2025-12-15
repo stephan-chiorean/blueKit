@@ -10,3 +10,5 @@ experiment with walkthrough types... delegation to different types.. pr review, 
 
 choices when building project from clone so it's easy to generate new repo, branch off, reconnect or whatever options
 
+TEams >> contributors, maintainer, consumer the roles
+Maintainers can approve changes

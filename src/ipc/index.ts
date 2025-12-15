@@ -82,3 +82,9 @@ export * from './github';
 // Re-export Library commands
 export * from './library';
 
+// Re-export Commit Timeline commands
+export * from './commits';
+
+// Re-export Checkpoint commands
+export * from './checkpoints';
+

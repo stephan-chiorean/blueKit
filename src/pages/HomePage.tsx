@@ -64,6 +64,34 @@ export default function HomePage({
     selectedItemIds: string[];
   }
   const [collections, setCollections] = useState<CollectionWithItems[]>([]);
+  const [, setResizeKey] = useState(0);
+
+  // Handle window resize to fix layout cutoff issues
+  useEffect(() => {
+    const handleResize = () => {
+      // Force a re-render to recalculate layout
+      setResizeKey(prev => prev + 1);
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Also listen for Tauri window resize events if available
+    if (window.addEventListener) {
+      try {
+        window.addEventListener('tauri://resize', handleResize);
+      } catch (e) {
+        // Tauri event might not be available in all contexts
+      }
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      try {
+        window.removeEventListener('tauri://resize', handleResize);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    };
+  }, []);
 
   const handleCollectionCreated = (
     collection: Collection,
@@ -96,19 +124,9 @@ export default function HomePage({
     try {
       setProjectsLoading(true);
       setProjectsError(null);
-      console.log("[loadProjects] Starting to load projects from registry...");
       const registryProjects = await invokeGetProjectRegistry();
       clearTimeout(timeoutId);
-      console.log(
-        "[loadProjects] Successfully loaded projects:",
-        registryProjects
-      );
-      console.log(
-        "[loadProjects] Number of projects:",
-        registryProjects.length
-      );
       setProjects(registryProjects);
-      console.log("[loadProjects] State updated with projects");
     } catch (error) {
       clearTimeout(timeoutId);
       console.error("[loadProjects] ERROR loading project registry:", error);
@@ -132,9 +150,6 @@ export default function HomePage({
       setProjectsError(errorMessage);
     } finally {
       setProjectsLoading(false);
-      console.log(
-        "[loadProjects] Loading complete, projectsLoading set to false"
-      );
     }
   };
 
@@ -314,23 +329,17 @@ export default function HomePage({
   }, [projects]);
 
   const selectedCount = selectedItems.length;
-  console.log(
-    "[HomePage] Render - selectedCount:",
-    selectedCount,
-    "selectedItems:",
-    selectedItems
-  );
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" style={{ height: '100vh', maxHeight: '100vh' }}>
       {/* Header above everything */}
       <Box flexShrink={0}>
         <Header onNavigateToTasks={() => setActiveTab('tasks')} />
       </Box>
 
       {/* Full screen content area - no workstation until kit is selected */}
-      <Box flex="1" minH={0} overflow="hidden">
-        <Box h="100%" p={6} position="relative" overflow="auto">
+      <Box flex="1" minH={0} overflow="hidden" style={{ height: '100%', maxHeight: '100%' }}>
+        <Box h="100%" p={6} position="relative" overflow="auto" style={{ height: '100%', maxHeight: '100%' }}>
           <NotebookBackground />
           <Box position="relative" zIndex={1}>
           <Tabs.Root

@@ -331,3 +331,137 @@ export interface Task {
   due_date?: string;
 }
 
+/**
+ * Type definition for a project in the database.
+ *
+ * This interface must match the `project::Model` struct in `src-tauri/src/db/entities/project.rs`.
+ */
+export interface Project {
+  /** Unique identifier for the project */
+  id: string;
+  /** Project name */
+  name: string;
+  /** Absolute path to the project directory */
+  path: string;
+  /** Optional project description */
+  description?: string;
+  /** Tags for categorization (JSON array) */
+  tags?: string;
+  /** Whether the project is connected to git */
+  gitConnected: boolean;
+  /** Git remote URL (if connected) */
+  gitUrl?: string;
+  /** Current git branch (if connected) */
+  gitBranch?: string;
+  /** Git remote name (if connected) */
+  gitRemote?: string;
+  /** Latest commit SHA (if connected) */
+  lastCommitSha?: string;
+  /** Last sync timestamp in milliseconds (if connected) */
+  lastSyncedAt?: number;
+  /** Creation timestamp in milliseconds */
+  createdAt: number;
+  /** Last updated timestamp in milliseconds */
+  updatedAt: number;
+  /** Last opened timestamp in milliseconds (optional) */
+  lastOpenedAt?: number;
+}
+
+/**
+ * Type definition for GitHub commit author information.
+ *
+ * This interface must match the `GitHubCommitAuthor` struct in `src-tauri/src/integrations/github/github.rs`.
+ */
+export interface GitHubCommitAuthor {
+  /** Author name */
+  name: string;
+  /** Author email */
+  email: string;
+  /** Commit date (ISO 8601) */
+  date: string;
+}
+
+/**
+ * Type definition for GitHub commit details.
+ *
+ * This interface must match the `GitHubCommitDetails` struct in `src-tauri/src/integrations/github/github.rs`.
+ */
+export interface GitHubCommitInfo {
+  /** Commit message */
+  message: string;
+  /** Commit author */
+  author: GitHubCommitAuthor;
+  /** Committer */
+  committer: GitHubCommitAuthor;
+}
+
+/**
+ * Type definition for a checkpoint (pinned commit).
+ *
+ * This interface must match the `checkpoint::Model` struct in `src-tauri/src/db/entities/checkpoint.rs`.
+ */
+export interface Checkpoint {
+  /** Unique identifier for the checkpoint */
+  id: string;
+  /** Project ID this checkpoint belongs to */
+  projectId: string;
+  /** Git commit SHA (40-char hex string) */
+  gitCommitSha: string;
+  /** Git branch name (optional) */
+  gitBranch?: string;
+  /** Git remote URL (optional) */
+  gitUrl?: string;
+  /** Checkpoint name */
+  name: string;
+  /** Optional description */
+  description?: string;
+  /** Tags as JSON array string (optional) */
+  tags?: string;
+  /** Checkpoint type: "milestone" | "experiment" | "template" | "backup" */
+  checkpointType: string;
+  /** Parent checkpoint ID for lineage tracking (optional, Phase 4) */
+  parentCheckpointId?: string;
+  /** Project ID if this checkpoint was used to create a new project (optional) */
+  createdFromProjectId?: string;
+  /** Timestamp when checkpoint was pinned (milliseconds) */
+  pinnedAt: number;
+  /** Creation timestamp (milliseconds) */
+  createdAt: number;
+  /** Last updated timestamp (milliseconds) */
+  updatedAt: number;
+}
+
+/**
+ * Type definition for GitHub user information (simplified version from commit responses).
+ *
+ * This interface must match the `GitHubCommitUser` struct in `src-tauri/src/integrations/github/github.rs`.
+ */
+export interface GitHubUser {
+  /** GitHub user login (username) */
+  login: string;
+  /** User ID */
+  id: number;
+  /** Avatar URL */
+  avatar_url: string;
+  /** HTML URL to user profile */
+  html_url: string;
+}
+
+/**
+ * Type definition for GitHub commit from API.
+ *
+ * This interface must match the `GitHubCommit` struct in `src-tauri/src/integrations/github/github.rs`.
+ */
+export interface GitHubCommit {
+  /** Commit SHA */
+  sha: string;
+  /** Commit details */
+  commit: GitHubCommitInfo;
+  /** Commit author (GitHub user) */
+  author?: GitHubUser;
+  /** Committer (GitHub user) */
+  committer?: GitHubUser;
+  /** URL to commit on GitHub */
+  html_url: string;
+}
+

@@ -30,8 +30,6 @@ const SelectionContext = createContext<SelectionContextType | undefined>(undefin
 
 export function SelectionProvider({ children }: { children: ReactNode }) {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
-  
-  console.log('[SelectionProvider] Render - selectedItems:', selectedItems);
 
   const addItem = (item: SelectedItem) => {
     setSelectedItems((prev) => {
@@ -48,16 +46,11 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleItem = (item: SelectedItem) => {
-    console.log('[SelectionContext] toggleItem called:', item);
     setSelectedItems((prev) => {
-      console.log('[SelectionContext] Previous items:', prev);
       const exists = prev.some((i) => i.id === item.id);
-      console.log('[SelectionContext] Item exists?', exists);
-      const newItems = exists
+      return exists
         ? prev.filter((i) => i.id !== item.id)
         : [...prev, item];
-      console.log('[SelectionContext] New items:', newItems);
-      return newItems;
     });
   };
 

@@ -13,7 +13,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus, LuGitBranch } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -23,10 +23,11 @@ import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
+import CommitTimelineView from '../components/commits/CommitTimelineView';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, ArtifactFile, ProjectEntry, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 
 interface ProjectDetailPageProps {
@@ -43,6 +44,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
   const [currentTab, setCurrentTab] = useState<string>("kits");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
+
+  // Database project (for git metadata)
+  const [dbProject, setDbProject] = useState<Project | null>(null);
 
   // Use transition for non-urgent updates (file watching updates)
   const [isPending, startTransition] = useTransition();
@@ -70,6 +74,22 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     };
     loadProjects();
   }, []);
+
+  // Load database project for git metadata
+  useEffect(() => {
+    const loadDbProject = async () => {
+      try {
+        const projects = await invokeDbGetProjects();
+        // Find project by matching path
+        const matchingProject = projects.find(p => p.path === project.path);
+        setDbProject(matchingProject || null);
+      } catch (err) {
+        console.error('Failed to load database project:', err);
+        setDbProject(null);
+      }
+    };
+    loadDbProject();
+  }, [project.path]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -606,12 +626,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Diagrams</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="clones" flexShrink={0}>
+                  <Tabs.Trigger value="timeline" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
-                        <LuCopy />
+                        <LuGitBranch />
                       </Icon>
-                      <Text>Clones</Text>
+                      <Text>Timeline</Text>
                     </HStack>
                   </Tabs.Trigger>
                   <Tabs.Trigger value="tasks" flexShrink={0}>
@@ -704,9 +724,18 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
-            <Tabs.Content value="clones">
-              <ClonesTabContent
-                projectPath={project.path}
+            <Tabs.Content value="timeline">
+              <CommitTimelineView
+                projectId={dbProject?.id || ''}
+                gitUrl={dbProject?.gitUrl}
+                gitConnected={dbProject?.gitConnected || false}
+                onGitConnected={() => {
+                  // Reload database project to get updated git metadata
+                  invokeDbGetProjects().then(projects => {
+                    const matchingProject = projects.find(p => p.path === project.path);
+                    setDbProject(matchingProject || null);
+                  });
+                }}
               />
             </Tabs.Content>
             <Tabs.Content value="tasks">

@@ -12,5 +12,4 @@ pub mod utils;
 pub mod watcher;
 
 // Re-export commonly used types
-pub use cache::ArtifactCache;
 pub use state::AppState;

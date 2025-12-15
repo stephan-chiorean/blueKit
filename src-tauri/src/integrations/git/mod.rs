@@ -1,8 +1,6 @@
 //! Git operations module.
-//! 
-//! This module will contain git operations using libgit2.
-//! Currently a placeholder for future implementation.
+//!
+//! This module provides git operations using git CLI commands.
 
-// Future: git operations using libgit2
-// pub mod operations;
-// pub use operations::GitOperations;
+pub mod operations;
+pub use operations::{GitMetadata, detect_git_metadata};

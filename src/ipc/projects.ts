@@ -3,7 +3,7 @@
  */
 
 import { invokeWithTimeout } from '../utils/ipcTimeout';
-import type { ProjectEntry, ArtifactFile } from './types';
+import type { ProjectEntry, ArtifactFile, Project } from './types';
 
 // ============================================================================
 // PROJECT REGISTRY CACHE
@@ -296,5 +296,94 @@ export async function invokeOpenProjectInEditor(
     },
     10000 // 10 second timeout for opening editor
   );
+}
+
+// ============================================================================
+// DATABASE-BACKED PROJECT MANAGEMENT (Phase 1)
+// ============================================================================
+
+/**
+ * Gets all projects from the database.
+ *
+ * @returns A promise that resolves to an array of Project objects from the database
+ *
+ * @example
+ * ```typescript
+ * const projects = await invokeDbGetProjects();
+ * projects.forEach(project => {
+ *   console.log(project.name, project.gitConnected);
+ * });
+ * ```
+ */
+export async function invokeDbGetProjects(): Promise<Project[]> {
+  return await invokeWithTimeout<Project[]>('db_get_projects');
+}
+
+/**
+ * Creates a new project in the database.
+ *
+ * @param name - Project name
+ * @param path - Absolute path to project directory
+ * @param description - Optional project description
+ * @param tags - Optional array of tags
+ * @returns A promise that resolves to the created Project object
+ *
+ * @example
+ * ```typescript
+ * const project = await invokeDbCreateProject(
+ *   'My Project',
+ *   '/path/to/project',
+ *   'A description',
+ *   ['tag1', 'tag2']
+ * );
+ * ```
+ */
+export async function invokeDbCreateProject(
+  name: string,
+  path: string,
+  description?: string,
+  tags?: string[]
+): Promise<Project> {
+  return await invokeWithTimeout<Project>('db_create_project', {
+    name,
+    path,
+    description,
+    tags,
+  });
+}
+
+/**
+ * Connects a project to git by detecting git metadata.
+ *
+ * This command automatically detects git remote URL, current branch,
+ * and latest commit SHA from the project directory.
+ *
+ * @param projectId - The project ID
+ * @returns A promise that resolves to the updated Project object
+ *
+ * @example
+ * ```typescript
+ * const project = await invokeConnectProjectGit('project-id-123');
+ * console.log(project.gitUrl, project.gitBranch, project.lastCommitSha);
+ * ```
+ */
+export async function invokeConnectProjectGit(projectId: string): Promise<Project> {
+  return await invokeWithTimeout<Project>('connect_project_git', { projectId });
+}
+
+/**
+ * Disconnects a project from git by clearing git metadata.
+ *
+ * @param projectId - The project ID
+ * @returns A promise that resolves to the updated Project object
+ *
+ * @example
+ * ```typescript
+ * const project = await invokeDisconnectProjectGit('project-id-123');
+ * console.log(project.gitConnected); // false
+ * ```
+ */
+export async function invokeDisconnectProjectGit(projectId: string): Promise<Project> {
+  return await invokeWithTimeout<Project>('disconnect_project_git', { projectId });
 }
 

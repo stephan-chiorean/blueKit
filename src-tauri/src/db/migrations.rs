@@ -18,6 +18,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_library_workspaces_table(db).await?;
     create_library_artifacts_table(db).await?;
 
+    // Create projects and checkpoints tables
+    create_projects_table(db).await?;
+    create_checkpoints_table(db).await?;
+
     Ok(())
 }
 
@@ -245,6 +249,96 @@ async fn create_library_artifacts_table(db: &DatabaseConnection) -> Result<(), D
     .await?;
 
     info!("Library artifacts table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_projects_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            description TEXT,
+            tags TEXT,
+            git_connected INTEGER NOT NULL DEFAULT 0,
+            git_url TEXT,
+            git_branch TEXT,
+            git_remote TEXT,
+            last_commit_sha TEXT,
+            last_synced_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            last_opened_at INTEGER
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_projects_git_connected ON projects(git_connected);
+        CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Projects table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_checkpoints_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS checkpoints (
+            id TEXT PRIMARY KEY NOT NULL,
+            project_id TEXT NOT NULL,
+            git_commit_sha TEXT NOT NULL,
+            git_branch TEXT,
+            git_url TEXT,
+            name TEXT NOT NULL,
+            description TEXT,
+            tags TEXT,
+            checkpoint_type TEXT NOT NULL,
+            parent_checkpoint_id TEXT,
+            created_from_project_id TEXT,
+            pinned_at INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (parent_checkpoint_id) REFERENCES checkpoints(id)
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes for performance
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_checkpoints_project_id ON checkpoints(project_id);
+        CREATE INDEX IF NOT EXISTS idx_checkpoints_commit_sha ON checkpoints(git_commit_sha);
+        CREATE INDEX IF NOT EXISTS idx_checkpoints_type ON checkpoints(checkpoint_type);
+        CREATE INDEX IF NOT EXISTS idx_checkpoints_parent_id ON checkpoints(parent_checkpoint_id);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Checkpoints table and indexes created or already exist");
 
     Ok(())
 }

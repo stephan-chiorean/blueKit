@@ -232,6 +232,43 @@ impl GitHubClient {
         let endpoint = format!("/repos/{}/{}/git/trees/{}", owner, repo, tree_sha);
         self.request("GET", endpoint, None).await
     }
+
+    /// Gets commits from a repository.
+    ///
+    /// # Arguments
+    /// * `owner` - Repository owner (username or org)
+    /// * `repo` - Repository name
+    /// * `branch` - Optional branch name (defaults to default branch)
+    /// * `per_page` - Number of commits per page (max 100, default 30)
+    /// * `page` - Page number (1-indexed)
+    pub async fn get_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: Option<&str>,
+        per_page: Option<u32>,
+        page: Option<u32>,
+    ) -> Result<Vec<GitHubCommit>, String> {
+        let mut endpoint = format!("/repos/{}/{}/commits", owner, repo);
+
+        let mut params = vec![];
+        if let Some(b) = branch {
+            params.push(format!("sha={}", b));
+        }
+        if let Some(pp) = per_page {
+            params.push(format!("per_page={}", pp.min(100)));
+        }
+        if let Some(p) = page {
+            params.push(format!("page={}", p));
+        }
+
+        if !params.is_empty() {
+            endpoint.push_str("?");
+            endpoint.push_str(&params.join("&"));
+        }
+
+        self.request::<Vec<GitHubCommit>>("GET", endpoint, None).await
+    }
 }
 
 /// GitHub content response (file or directory).
@@ -258,7 +295,34 @@ pub struct GitHubFileResponse {
     pub commit: GitHubCommitInfo,
 }
 
-/// GitHub commit information.
+/// Simplified GitHub user object from commit responses (not full profile).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubCommitUser {
+    pub login: String,
+    pub id: u64,
+    pub avatar_url: String,
+    pub html_url: String,
+}
+
+/// GitHub commit from commits list endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubCommit {
+    pub sha: String,
+    pub commit: GitHubCommitDetails,
+    pub author: Option<GitHubCommitUser>,
+    pub committer: Option<GitHubCommitUser>,
+    pub html_url: String,
+}
+
+/// GitHub commit details nested in commit object.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubCommitDetails {
+    pub message: String,
+    pub author: GitHubCommitAuthor,
+    pub committer: GitHubCommitAuthor,
+}
+
+/// GitHub commit information (used in file operations).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitHubCommitInfo {
     pub sha: String,
