@@ -3308,6 +3308,16 @@ pub async fn open_commit_in_github(
     Ok(())
 }
 
+/// Invalidate commit cache for a project (forces fresh fetch on next request).
+#[tauri::command]
+pub async fn invalidate_commit_cache(
+    commit_cache: State<'_, CommitCache>,
+    project_id: String,
+) -> Result<(), String> {
+    commit_cache.invalidate_project(&project_id);
+    Ok(())
+}
+
 // ============================================================================
 // CHECKPOINT COMMANDS (Phase 3)
 // ============================================================================

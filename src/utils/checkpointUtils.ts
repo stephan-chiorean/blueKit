@@ -2,6 +2,8 @@
  * Utility functions for checkpoint operations.
  */
 
+import { LuFlag, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
+
 /**
  * Get the color for a checkpoint type.
  * 
@@ -11,15 +13,51 @@
 export function getCheckpointTypeColor(type: string): string {
   switch (type) {
     case 'milestone':
-      return 'primary.500'; // Blue
+      return 'teal.500'; // Teal
     case 'experiment':
-      return 'purple.500'; // Purple
+      return '#F54927'; // Scarlet
     case 'template':
-      return 'green.500'; // Green
+      return 'purple.500'; // Purple
     case 'backup':
       return 'orange.500'; // Orange
     default:
       return 'gray.500';
+  }
+}
+
+/**
+ * Gets the checkpoint type icon component and color
+ */
+export function getCheckpointTypeIcon(type: string): { icon: React.ComponentType; color: string } | null {
+  switch (type) {
+    case 'milestone':
+      return { icon: LuFlag, color: 'teal.500' };
+    case 'experiment':
+      return { icon: LuFlaskConical, color: '#F54927' }; // Scarlet
+    case 'template':
+      return { icon: LuFileText, color: 'purple.500' };
+    case 'backup':
+      return { icon: LuArchive, color: 'orange.500' };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Gets the color palette name for Chakra UI components based on checkpoint type
+ */
+export function getCheckpointTypeColorPalette(type: string): string | undefined {
+  switch (type) {
+    case 'milestone':
+      return 'teal';
+    case 'experiment':
+      return 'red'; // Using red palette for scarlet
+    case 'template':
+      return 'purple';
+    case 'backup':
+      return 'orange';
+    default:
+      return undefined;
   }
 }
 

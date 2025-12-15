@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogBody,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogContent,
   VStack,
   HStack,
   Field,
   Input,
   Textarea,
-  Select,
   Button,
   Text,
   Box,
+  Portal,
+  CloseButton,
+  SegmentGroup,
+  TagsInput,
+  Icon,
 } from '@chakra-ui/react';
+import { LuFlag, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
 import { toaster } from '../ui/toaster';
 import { invokePinCheckpoint } from '../../ipc/checkpoints';
 import type { GitHubCommit } from '../../ipc/types';
@@ -42,19 +42,19 @@ export default function PinCheckpointModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [checkpointType, setCheckpointType] = useState<'milestone' | 'experiment' | 'template' | 'backup'>('milestone');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Pre-fill form when commit changes
+  // Pre-fill form when commit changes or dialog opens
   useEffect(() => {
-    if (commit) {
+    if (isOpen && commit) {
       const commitMessage = commit.commit.message.split('\n')[0];
       setName(commitMessage);
       setDescription('');
       setCheckpointType('milestone');
-      setTags('');
+      setTags([]);
     }
-  }, [commit]);
+  }, [isOpen, commit]);
 
   const handleSubmit = async () => {
     if (!commit || !name.trim()) {
@@ -70,12 +70,6 @@ export default function PinCheckpointModal({
     try {
       setLoading(true);
 
-      // Parse tags (comma-separated)
-      const tagsArray = tags
-        .split(',')
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-
       await invokePinCheckpoint(
         projectId,
         commit.sha,
@@ -84,24 +78,31 @@ export default function PinCheckpointModal({
         description.trim() || undefined,
         gitBranch,
         gitUrl,
-        tagsArray.length > 0 ? tagsArray : undefined
+        tags.length > 0 ? tags : undefined
       );
 
       toaster.create({
-        title: 'Checkpoint Pinned',
-        description: `Successfully pinned "${name}" as ${checkpointType}`,
         type: 'success',
-        duration: 3000,
+        title: 'Checkpoint created',
+        description: `Created checkpoint: ${name.trim()}`,
       });
 
       onCheckpointPinned();
+
+      // Reset form
+      setName('');
+      setDescription('');
+      setCheckpointType('milestone');
+      setTags([]);
+
       onClose();
-    } catch (err) {
+    } catch (error) {
+      console.error('Failed to create checkpoint:', error);
       toaster.create({
-        title: 'Failed to Pin Checkpoint',
-        description: err instanceof Error ? err.message : 'Unknown error',
         type: 'error',
-        duration: 5000,
+        title: 'Failed to create checkpoint',
+        description: String(error),
+        closable: true,
       });
     } finally {
       setLoading(false);
@@ -110,88 +111,142 @@ export default function PinCheckpointModal({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Pin Commit as Checkpoint</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <VStack align="stretch" gap={4}>
-            <Field.Root>
-              <Field.Label>Name *</Field.Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Checkpoint name"
-              />
-            </Field.Root>
-
-            <Field.Root>
-              <Field.Label>Type *</Field.Label>
-              <Select.Root
-                value={checkpointType}
-                onValueChange={(e) => setCheckpointType(e.value[0] as typeof checkpointType)}
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="milestone">Milestone</Select.Item>
-                  <Select.Item value="experiment">Experiment</Select.Item>
-                  <Select.Item value="template">Template</Select.Item>
-                  <Select.Item value="backup">Backup</Select.Item>
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
-                rows={3}
-              />
-            </Field.Root>
-
-            <Field.Root>
-              <Field.Label>Tags</Field.Label>
-              <Input
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="Comma-separated tags (e.g., release, stable)"
-              />
-              <Field.HelperText>
-                Separate multiple tags with commas
-              </Field.HelperText>
-            </Field.Root>
+      <Dialog.Backdrop />
+      <Portal>
+        <Dialog.Positioner>
+          <Dialog.Content maxW="4xl">
+            <Dialog.Header>
+              <Dialog.Title>Add Checkpoint</Dialog.Title>
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" />
+              </Dialog.CloseTrigger>
+            </Dialog.Header>
 
             {commit && (
-              <Box p={3} bg="bg.subtle" borderRadius="md">
-                <Text fontSize="xs" color="fg.muted" mb={1}>
-                  Commit SHA:
-                </Text>
-                <Text fontSize="xs" fontFamily="mono">
-                  {commit.sha.substring(0, 7)}
+              <Box px={6} pb={4}>
+                <Text fontSize="xs" color="primary.200" as="span">
+                  Commit SHA:{' '}
+                  <Text as="span" fontFamily="mono" color="primary.500">
+                    {commit.sha.substring(0, 7)}
+                  </Text>
                 </Text>
               </Box>
             )}
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={2}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              loading={loading}
-              loadingText="Pinning..."
-            >
-              Pin Checkpoint
-            </Button>
-          </HStack>
-        </DialogFooter>
-      </DialogContent>
+
+            <Dialog.Body>
+              <VStack gap={4} align="stretch">
+                <Field.Root required>
+                  <Field.Label>Name</Field.Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Checkpoint name"
+                    autoFocus
+                  />
+                </Field.Root>
+
+                <Field.Root required>
+                  <Field.Label>Type</Field.Label>
+                  <SegmentGroup.Root
+                    value={checkpointType}
+                    onValueChange={(e) => setCheckpointType(e.value as typeof checkpointType)}
+                  >
+                    <SegmentGroup.Indicator />
+                    <SegmentGroup.Items
+                      items={[
+                        {
+                          value: 'milestone',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="teal.500" size="sm">
+                                <LuFlag />
+                              </Icon>
+                              <Text>Milestone</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'experiment',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="#F54927" size="sm">
+                                <LuFlaskConical />
+                              </Icon>
+                              <Text>Experiment</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'template',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="purple.500" size="sm">
+                                <LuFileText />
+                              </Icon>
+                              <Text>Template</Text>
+                            </HStack>
+                          ),
+                        },
+                        {
+                          value: 'backup',
+                          label: (
+                            <HStack gap={1.5}>
+                              <Icon color="orange.500" size="sm">
+                                <LuArchive />
+                              </Icon>
+                              <Text>Backup</Text>
+                            </HStack>
+                          ),
+                        },
+                      ]}
+                    />
+                  </SegmentGroup.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Description</Field.Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Optional description"
+                    rows={3}
+                  />
+                </Field.Root>
+
+                <Field.Root>
+                  <TagsInput.Root
+                    value={tags}
+                    onValueChange={(details) => setTags(details.value)}
+                  >
+                    <TagsInput.Label>Tags</TagsInput.Label>
+                    <TagsInput.Control>
+                      <TagsInput.Items />
+                      <TagsInput.Input placeholder="Add tag..." />
+                    </TagsInput.Control>
+                    <TagsInput.HiddenInput />
+                  </TagsInput.Root>
+                </Field.Root>
+              </VStack>
+            </Dialog.Body>
+
+            <Dialog.Footer>
+              <HStack gap={2}>
+                <Button variant="outline" onClick={onClose} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="primary"
+                  onClick={handleSubmit}
+                  loading={loading}
+                  disabled={!name.trim()}
+                >
+                  Create
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+      </Dialog.Positioner>
+      </Portal>
     </Dialog.Root>
   );
 }

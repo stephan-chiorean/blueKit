@@ -13,14 +13,15 @@ import {
   Box,
   Icon,
   Flex,
+  Badge,
 } from '@chakra-ui/react';
 import { toaster } from '../ui/toaster';
-import { LuGitBranch, LuExternalLink, LuBookmark, LuTrash2, LuFolderPlus } from 'react-icons/lu';
+import { LuGitBranch, LuExternalLink, LuBookmark, LuTrash2, LuFolderPlus, LuRefreshCw } from 'react-icons/lu';
 import type { GitHubCommit, Checkpoint } from '../../ipc/types';
-import { invokeFetchProjectCommits, invokeOpenCommitInGitHub } from '../../ipc/commits';
+import { invokeFetchProjectCommits, invokeOpenCommitInGitHub, invokeInvalidateCommitCache } from '../../ipc/commits';
 import { invokeConnectProjectGit } from '../../ipc/projects';
 import { invokeGetProjectCheckpoints, invokeUnpinCheckpoint, invokeCreateProjectFromCheckpoint } from '../../ipc/checkpoints';
-import { getCheckpointTypeColor, getCheckpointTypeLabel } from '../../utils/checkpointUtils';
+import { getCheckpointTypeColor, getCheckpointTypeLabel, getCheckpointTypeIcon, getCheckpointTypeColorPalette } from '../../utils/checkpointUtils';
 import PinCheckpointModal from './PinCheckpointModal';
 import { open } from '@tauri-apps/api/dialog';
 
@@ -152,11 +153,37 @@ export default function CommitTimelineView({
     return checkpoints.some(cp => cp.gitCommitSha === commitSha);
   };
 
+  // Get checkpoint for a commit SHA
+  const getCheckpointForCommit = (commitSha: string): Checkpoint | undefined => {
+    return checkpoints.find(cp => cp.gitCommitSha === commitSha);
+  };
+
   // Handle load more
   const handleLoadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
     loadCommits(nextPage, true);
+  };
+
+  // Handle sync/refresh commits
+  const handleSync = async () => {
+    try {
+      // Invalidate cache to force fresh fetch
+      await invokeInvalidateCommitCache(projectId);
+      // Reset pagination state
+      setPage(1);
+      setHasMore(true);
+      // Reload commits from page 1
+      await loadCommits(1, false);
+    } catch (err) {
+      console.error('Error syncing commits:', err);
+      toaster.create({
+        title: 'Failed to sync commits',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        type: 'error',
+        duration: 5000,
+      });
+    }
   };
 
   // Handle connecting to git
@@ -314,13 +341,30 @@ export default function CommitTimelineView({
 
   // View mode switcher
   const renderViewModeSwitcher = () => (
-    <Flex justify="flex-end" mb={4}>
+    <Flex justify="space-between" align="center" mb={4}>
+      {viewMode === 'commits' && (
+        <Button
+          onClick={handleSync}
+          variant="outline"
+          size="sm"
+          loading={loading}
+          loadingText="Syncing..."
+        >
+          <HStack gap={2}>
+            <Icon>
+              <LuRefreshCw />
+            </Icon>
+            <Text>Sync</Text>
+          </HStack>
+        </Button>
+      )}
       <HStack 
         gap={0} 
         borderRadius="md" 
         overflow="hidden" 
         bg="bg.subtle" 
         shadow="sm"
+        ml="auto"
       >
         <Button
           onClick={() => setViewMode('commits')}
@@ -419,14 +463,23 @@ export default function CommitTimelineView({
         {commits.map((commit, index) => {
           const commitMessage = commit.commit.message.split('\n')[0]; // First line only
           const commitBody = commit.commit.message.split('\n').slice(1).join('\n').trim();
+          const pinnedCheckpoint = getCheckpointForCommit(commit.sha);
+          const isPinned = !!pinnedCheckpoint;
+          const checkpointTypeColor = pinnedCheckpoint ? getCheckpointTypeColor(pinnedCheckpoint.checkpointType) : undefined;
 
           return (
             <Timeline.Item key={commit.sha}>
-              <Timeline.Indicator>
-                <LuGitBranch />
+              <Timeline.Indicator
+                bg={checkpointTypeColor || undefined}
+                color={isPinned ? 'white' : undefined}
+              >
+                {isPinned ? <LuBookmark /> : <LuGitBranch />}
               </Timeline.Indicator>
               <Timeline.Content>
-                <Card.Root>
+                <Card.Root
+                  borderWidth={isPinned ? "1px" : undefined}
+                  borderColor={checkpointTypeColor || undefined}
+                >
                   <CardHeader pb={2}>
                     <HStack justify="space-between" align="start">
                       <VStack align="start" gap={1} flex={1}>
@@ -440,14 +493,10 @@ export default function CommitTimelineView({
                         </HStack>
                       </VStack>
                       <HStack gap={2}>
-                        {isCommitPinned(commit.sha) ? (
-                          <Text fontSize="xs" color="fg.muted">
-                            <LuBookmark /> Pinned
-                          </Text>
-                        ) : (
+                        {!isPinned && (
                           <Button
                             size="xs"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => handlePinCheckpoint(commit)}
                           >
                             <LuBookmark />
@@ -456,7 +505,7 @@ export default function CommitTimelineView({
                         )}
                         <Button
                           size="xs"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => handleViewDiff(commit)}
                         >
                           <LuExternalLink />
@@ -477,28 +526,6 @@ export default function CommitTimelineView({
                   </CardBody>
                 </Card.Root>
               </Timeline.Content>
-              {index < commits.length - 1 && (
-                <Timeline.Connector 
-                  style={{
-                    borderColor: '#4287f5',
-                    borderWidth: '2px',
-                    borderStyle: 'solid',
-                    opacity: 1,
-                    display: 'block',
-                    visibility: 'visible',
-                  }}
-                  css={{
-                    borderColor: '#4287f5 !important',
-                    borderWidth: '2px !important',
-                    borderStyle: 'solid !important',
-                    opacity: '1 !important',
-                    backgroundColor: 'transparent !important',
-                    display: 'block !important',
-                    visibility: 'visible !important',
-                    minHeight: '20px !important',
-                  }}
-                />
-              )}
             </Timeline.Item>
           );
         })}
@@ -668,9 +695,16 @@ function CheckpointsView({
       }}
     >
       <Timeline.Root variant="subtle" colorPalette="blue">
-        {checkpoints.map((checkpoint, index) => (
+        {checkpoints.map((checkpoint, index) => {
+          const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
+          const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
+          const typeColorPalette = getCheckpointTypeColorPalette(checkpoint.checkpointType);
+          return (
           <Timeline.Item key={checkpoint.id}>
-            <Timeline.Indicator>
+            <Timeline.Indicator
+              bg={`${typeColor}`}
+              color="white"
+            >
               <LuBookmark />
             </Timeline.Indicator>
             <Timeline.Content>
@@ -678,20 +712,25 @@ function CheckpointsView({
                 <CardHeader pb={2}>
                   <HStack justify="space-between" align="start">
                     <VStack align="start" gap={1} flex={1}>
-                      <HStack gap={2}>
+                      <HStack gap={2} flexWrap="wrap">
                         <Text fontWeight="semibold" fontSize="sm">
                           {checkpoint.name}
                         </Text>
-                        <Text
-                          fontSize="xs"
-                          px={2}
-                          py={0.5}
-                          borderRadius="sm"
-                          bg={`${getCheckpointTypeColor(checkpoint.checkpointType)}`}
-                          color="white"
-                        >
-                          {getCheckpointTypeLabel(checkpoint.checkpointType)}
-                        </Text>
+                        {(() => {
+                          const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
+                          const typeLabel = getCheckpointTypeLabel(checkpoint.checkpointType);
+                          const typeColorPalette = getCheckpointTypeColorPalette(checkpoint.checkpointType);
+                          return typeIcon && typeLabel && typeColorPalette ? (
+                            <Badge size="sm" variant="outline" colorPalette={typeColorPalette}>
+                              <HStack gap={1}>
+                                <Icon color={typeIcon.color} boxSize={3}>
+                                  <typeIcon.icon />
+                                </Icon>
+                                <Text>{typeLabel}</Text>
+                              </HStack>
+                            </Badge>
+                          ) : null;
+                        })()}
                       </HStack>
                       {checkpoint.description && (
                         <Text fontSize="xs" color="fg.muted">
@@ -703,32 +742,29 @@ function CheckpointsView({
                       {gitUrl && (
                         <Button
                           size="xs"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => {
                             invokeOpenCommitInGitHub(gitUrl, checkpoint.gitCommitSha).catch(console.error);
                           }}
                         >
                           <LuExternalLink />
-                          View Diff
                         </Button>
                       )}
                       <Button
                         size="xs"
-                        variant="outline"
+                        variant="ghost"
                         colorPalette="green"
                         onClick={() => handleCreateProject(checkpoint)}
                       >
                         <LuFolderPlus />
-                        Create Project
                       </Button>
                       <Button
                         size="xs"
-                        variant="outline"
+                        variant="ghost"
                         colorPalette="red"
                         onClick={() => handleUnpin(checkpoint.id)}
                       >
                         <LuTrash2 />
-                        Unpin
                       </Button>
                     </HStack>
                   </HStack>
@@ -740,20 +776,9 @@ function CheckpointsView({
                 </CardBody>
               </Card.Root>
             </Timeline.Content>
-            {index < checkpoints.length - 1 && (
-              <Timeline.Connector 
-                style={{
-                  borderColor: '#4287f5',
-                  borderWidth: '2px',
-                  borderStyle: 'solid',
-                  opacity: 1,
-                  display: 'block',
-                  visibility: 'visible',
-                }}
-              />
-            )}
           </Timeline.Item>
-        ))}
+          );
+        })}
       </Timeline.Root>
     </Box>
   );

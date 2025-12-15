@@ -94,3 +94,31 @@ export async function invokeOpenCommitInGitHub(
     5000 // 5 second timeout for opening browser
   );
 }
+
+/**
+ * Invalidates the commit cache for a project, forcing a fresh fetch on next request.
+ *
+ * This command clears all cached commits for the specified project, ensuring that
+ * the next call to `invokeFetchProjectCommits` will fetch fresh data from GitHub.
+ *
+ * @param projectId - The project ID (from database)
+ * @returns A promise that resolves when the cache is invalidated
+ *
+ * @example
+ * ```typescript
+ * // Force refresh commits by invalidating cache first
+ * await invokeInvalidateCommitCache('project-id-123');
+ * const freshCommits = await invokeFetchProjectCommits('project-id-123');
+ * ```
+ */
+export async function invokeInvalidateCommitCache(
+  projectId: string
+): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'invalidate_commit_cache',
+    {
+      projectId,
+    },
+    1000 // 1 second timeout for cache operation
+  );
+}
