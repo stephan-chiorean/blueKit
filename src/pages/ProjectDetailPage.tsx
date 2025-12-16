@@ -13,7 +13,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus, LuGitBranch } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -25,10 +25,12 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import CommitTimelineView from '../components/commits/CommitTimelineView';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
+import PlansTabContent from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
+import { Plan } from '../types/plan';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -47,6 +49,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
   // Database project (for git metadata)
   const [dbProject, setDbProject] = useState<Project | null>(null);
+
+  // Plans state
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
 
   // Use transition for non-urgent updates (file watching updates)
   const [isPending, startTransition] = useTransition();
@@ -90,6 +96,25 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     };
     loadDbProject();
   }, [project.path]);
+
+  // Load plans for this project
+  const loadPlans = async () => {
+    try {
+      setPlansLoading(true);
+      const projectPlans = await invokeGetProjectPlans(project.id);
+      setPlans(projectPlans);
+    } catch (err) {
+      console.error('Failed to load plans:', err);
+      setPlans([]);
+    } finally {
+      setPlansLoading(false);
+    }
+  };
+
+  // Load plans on mount and when project changes
+  useEffect(() => {
+    loadPlans();
+  }, [project.id]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -423,6 +448,27 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     }
   };
 
+  const handleViewPlan = async (plan: Plan) => {
+    // Create a ResourceFile object for the plan
+    const planResource: ResourceFile & { id?: string } = {
+      id: plan.id, // Add plan ID to resource
+      name: plan.name,
+      path: plan.folderPath,
+      frontMatter: {
+        id: plan.id, // Also add to frontMatter for fallback
+        alias: plan.name,
+        type: 'plan',
+        description: plan.description,
+      },
+      resourceType: 'plan',
+    };
+
+    // For now, set empty content - plan view will load its own data
+    setViewingResource(planResource);
+    setResourceContent(''); // Plan content is loaded separately
+    setResourceType('plan');
+  };
+
   // Handler to go back from resource view
   const handleBackFromResourceView = () => {
     setViewingResource(null);
@@ -449,15 +495,24 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   };
 
   // If viewing any resource, show the generic resource view page
-  if (viewingResource && resourceContent && resourceType) {
-    return (
-      <ResourceViewPage
-        resource={viewingResource}
-        resourceContent={resourceContent}
-        resourceType={resourceType}
-        onBack={handleBackFromResourceView}
-      />
-    );
+  // For plans, resourceContent can be empty (plans load their own data)
+  if (viewingResource && resourceType) {
+    // Determine view mode based on resource type
+    const viewMode = resourceType === 'plan' ? 'plan' : undefined;
+
+    // For plans, we allow empty content (they load their own data)
+    // For other resources, require content
+    if (resourceType === 'plan' || resourceContent) {
+      return (
+        <ResourceViewPage
+          resource={viewingResource}
+          resourceContent={resourceContent || ''}
+          resourceType={resourceType}
+          viewMode={viewMode}
+          onBack={handleBackFromResourceView}
+        />
+      );
+    }
   }
 
   return (
@@ -578,36 +633,20 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                   gap={0}
                   minW="fit-content"
                 >
-                  <Tabs.Trigger value="kits" flexShrink={0}>
+                  <Tabs.Trigger value="tasks" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
-                        <LuPackage />
+                        <LuListTodo />
                       </Icon>
-                      <Text>Kits</Text>
+                      <Text>Tasks</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="blueprints" flexShrink={0}>
+                  <Tabs.Trigger value="plans" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
-                        <BsStack />
+                        <LuMap />
                       </Icon>
-                      <Text>Blueprints</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="walkthroughs" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuBookOpen />
-                      </Icon>
-                      <Text>Walkthroughs</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="agents" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuBot />
-                      </Icon>
-                      <Text>Agents</Text>
+                      <Text>Plans</Text>
                     </HStack>
                   </Tabs.Trigger>
                   <Tabs.Trigger value="scrapbook" flexShrink={0}>
@@ -626,20 +665,44 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Diagrams</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="walkthroughs" flexShrink={0}>
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBookOpen />
+                      </Icon>
+                      <Text>Walkthroughs</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="kits" flexShrink={0}>
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPackage />
+                      </Icon>
+                      <Text>Kits</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="blueprints" flexShrink={0}>
+                    <HStack gap={2}>
+                      <Icon>
+                        <BsStack />
+                      </Icon>
+                      <Text>Blueprints</Text>
+                    </HStack>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="agents" flexShrink={0}>
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuBot />
+                      </Icon>
+                      <Text>Agents</Text>
+                    </HStack>
+                  </Tabs.Trigger>
                   <Tabs.Trigger value="timeline" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
                         <LuGitBranch />
                       </Icon>
                       <Text>Timeline</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="tasks" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuListTodo />
-                      </Icon>
-                      <Text>Tasks</Text>
                     </HStack>
                   </Tabs.Trigger>
                 </Tabs.List>
@@ -743,6 +806,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 ref={tasksTabRef}
                 context={project}
                 projects={allProjects}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="plans">
+              <PlansTabContent
+                plans={plans}
+                plansLoading={plansLoading}
+                onViewPlan={handleViewPlan}
+                projectId={project.id}
+                projectPath={project.path}
+                onPlansChanged={loadPlans}
               />
             </Tabs.Content>
           </Tabs.Root>

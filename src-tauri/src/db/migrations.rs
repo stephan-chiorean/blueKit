@@ -22,6 +22,12 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_projects_table(db).await?;
     create_checkpoints_table(db).await?;
 
+    // Create plans tables
+    create_plans_table(db).await?;
+    create_plan_phases_table(db).await?;
+    create_plan_milestones_table(db).await?;
+    create_plan_documents_table(db).await?;
+
     Ok(())
 }
 
@@ -339,6 +345,162 @@ async fn create_checkpoints_table(db: &DatabaseConnection) -> Result<(), DbErr> 
     .await?;
 
     info!("Checkpoints table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_plans_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS plans (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            folder_path TEXT NOT NULL,
+            description TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            brainstorm_link TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_plans_project_id ON plans(project_id);
+        CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(status);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Plans table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_plan_phases_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS plan_phases (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            order_index INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            started_at INTEGER,
+            completed_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_plan_phases_plan_id ON plan_phases(plan_id);
+        CREATE INDEX IF NOT EXISTS idx_plan_phases_order ON plan_phases(plan_id, order_index);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Plan phases table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_plan_milestones_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS plan_milestones (
+            id TEXT PRIMARY KEY NOT NULL,
+            phase_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            order_index INTEGER NOT NULL,
+            completed INTEGER NOT NULL DEFAULT 0,
+            completed_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (phase_id) REFERENCES plan_phases(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_plan_milestones_phase_id ON plan_milestones(phase_id);
+        CREATE INDEX IF NOT EXISTS idx_plan_milestones_order ON plan_milestones(phase_id, order_index);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Plan milestones table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_plan_documents_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS plan_documents (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_id TEXT NOT NULL,
+            phase_id TEXT,
+            file_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+            FOREIGN KEY (phase_id) REFERENCES plan_phases(id) ON DELETE SET NULL
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_plan_documents_plan_id ON plan_documents(plan_id);
+        CREATE INDEX IF NOT EXISTS idx_plan_documents_phase_id ON plan_documents(phase_id);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Plan documents table and indexes created or already exist");
 
     Ok(())
 }

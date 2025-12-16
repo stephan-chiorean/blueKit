@@ -3578,3 +3578,261 @@ pub async fn create_project_from_checkpoint(
     Ok(format!("Project created successfully at: {}", target.to_string_lossy()))
 }
 
+// ============================================================================
+// PLAN COMMANDS
+// ============================================================================
+
+/// Create a new plan with folder structure
+#[tauri::command]
+pub async fn create_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+    project_path: String,
+    name: String,
+    description: Option<String>,
+) -> Result<crate::db::plan_operations::PlanDto, String> {
+    crate::db::plan_operations::create_plan(
+        db.inner(),
+        project_id,
+        project_path,
+        name,
+        description,
+    )
+    .await
+    .map_err(|e| format!("Failed to create plan: {}", e))
+}
+
+/// Get all plans for a project
+#[tauri::command]
+pub async fn get_project_plans(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+) -> Result<Vec<crate::db::plan_operations::PlanDto>, String> {
+    crate::db::plan_operations::get_project_plans(db.inner(), project_id)
+        .await
+        .map_err(|e| format!("Failed to get project plans: {}", e))
+}
+
+/// Get plan details with phases, milestones, and documents
+#[tauri::command]
+pub async fn get_plan_details(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+) -> Result<crate::db::plan_operations::PlanDetailsDto, String> {
+    crate::db::plan_operations::get_plan_details(db.inner(), plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan details: {}", e))
+}
+
+/// Update a plan
+#[tauri::command]
+pub async fn update_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+    status: Option<String>,
+) -> Result<crate::db::plan_operations::PlanDto, String> {
+    crate::db::plan_operations::update_plan(db.inner(), plan_id, name, description, status)
+        .await
+        .map_err(|e| format!("Failed to update plan: {}", e))
+}
+
+/// Delete a plan (removes folder and database records)
+#[tauri::command]
+pub async fn delete_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::delete_plan(db.inner(), plan_id)
+        .await
+        .map_err(|e| format!("Failed to delete plan: {}", e))
+}
+
+/// Link brainstorm plan to a plan
+#[tauri::command]
+pub async fn link_brainstorm_to_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    brainstorm_path: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::link_brainstorm_to_plan(db.inner(), plan_id, brainstorm_path)
+        .await
+        .map_err(|e| format!("Failed to link brainstorm: {}", e))
+}
+
+/// Unlink brainstorm from plan
+#[tauri::command]
+pub async fn unlink_brainstorm_from_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::unlink_brainstorm_from_plan(db.inner(), plan_id)
+        .await
+        .map_err(|e| format!("Failed to unlink brainstorm: {}", e))
+}
+
+/// Create a plan phase
+#[tauri::command]
+pub async fn create_plan_phase(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    name: String,
+    description: Option<String>,
+    order_index: i32,
+) -> Result<crate::db::plan_operations::PlanPhaseDto, String> {
+    crate::db::plan_operations::create_plan_phase(
+        db.inner(),
+        plan_id,
+        name,
+        description,
+        order_index,
+    )
+    .await
+    .map_err(|e| format!("Failed to create phase: {}", e))
+}
+
+/// Update a plan phase
+#[tauri::command]
+pub async fn update_plan_phase(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    phase_id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+    status: Option<String>,
+    order_index: Option<i32>,
+) -> Result<crate::db::plan_operations::PlanPhaseDto, String> {
+    crate::db::plan_operations::update_plan_phase(
+        db.inner(),
+        phase_id,
+        name,
+        description,
+        status,
+        order_index,
+    )
+    .await
+    .map_err(|e| format!("Failed to update phase: {}", e))
+}
+
+/// Delete a plan phase
+#[tauri::command]
+pub async fn delete_plan_phase(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    phase_id: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::delete_plan_phase(db.inner(), phase_id)
+        .await
+        .map_err(|e| format!("Failed to delete phase: {}", e))
+}
+
+/// Reorder plan phases
+#[tauri::command]
+pub async fn reorder_plan_phases(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    phase_ids_in_order: Vec<String>,
+) -> Result<(), String> {
+    crate::db::plan_operations::reorder_plan_phases(db.inner(), plan_id, phase_ids_in_order)
+        .await
+        .map_err(|e| format!("Failed to reorder phases: {}", e))
+}
+
+/// Create a plan milestone
+#[tauri::command]
+pub async fn create_plan_milestone(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    phase_id: String,
+    name: String,
+    description: Option<String>,
+    order_index: i32,
+) -> Result<crate::db::plan_operations::PlanMilestoneDto, String> {
+    crate::db::plan_operations::create_plan_milestone(
+        db.inner(),
+        phase_id,
+        name,
+        description,
+        order_index,
+    )
+    .await
+    .map_err(|e| format!("Failed to create milestone: {}", e))
+}
+
+/// Update a plan milestone
+#[tauri::command]
+pub async fn update_plan_milestone(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    milestone_id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+    completed: Option<bool>,
+) -> Result<crate::db::plan_operations::PlanMilestoneDto, String> {
+    crate::db::plan_operations::update_plan_milestone(
+        db.inner(),
+        milestone_id,
+        name,
+        description,
+        completed,
+    )
+    .await
+    .map_err(|e| format!("Failed to update milestone: {}", e))
+}
+
+/// Delete a plan milestone
+#[tauri::command]
+pub async fn delete_plan_milestone(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    milestone_id: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::delete_plan_milestone(db.inner(), milestone_id)
+        .await
+        .map_err(|e| format!("Failed to delete milestone: {}", e))
+}
+
+/// Toggle milestone completion
+#[tauri::command]
+pub async fn toggle_milestone_completion(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    milestone_id: String,
+) -> Result<crate::db::plan_operations::PlanMilestoneDto, String> {
+    crate::db::plan_operations::toggle_milestone_completion(db.inner(), milestone_id)
+        .await
+        .map_err(|e| format!("Failed to toggle milestone: {}", e))
+}
+
+/// Get plan documents (scans folder and reconciles with DB)
+#[tauri::command]
+pub async fn get_plan_documents(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+) -> Result<Vec<crate::db::plan_operations::PlanDocumentDto>, String> {
+    crate::db::plan_operations::get_plan_documents(db.inner(), plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan documents: {}", e))
+}
+
+/// Link document to phase
+#[tauri::command]
+pub async fn link_document_to_phase(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    document_id: String,
+    phase_id: Option<String>,
+) -> Result<(), String> {
+    crate::db::plan_operations::link_document_to_phase(db.inner(), document_id, phase_id)
+        .await
+        .map_err(|e| format!("Failed to link document to phase: {}", e))
+}
+
+/// Watch plan folder for file changes
+#[tauri::command]
+pub async fn watch_plan_folder(
+    app: AppHandle,
+    plan_id: String,
+    folder_path: String,
+) -> Result<(), String> {
+    use std::path::PathBuf;
+    // Use the existing watcher infrastructure
+    let event_name = format!("plan-documents-changed-{}", plan_id);
+    let path = PathBuf::from(folder_path);
+    crate::core::watcher::watch_directory(app, path, event_name)
+}
+

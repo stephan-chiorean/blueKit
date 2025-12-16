@@ -11,18 +11,18 @@ import {
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
-import PlansContent from '../components/plans/PlansContent';
+import EditorPlansContent from '../components/plans/EditorPlansContent';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetPlansFiles, invokeReadFile, ArtifactFile } from '../ipc';
 import { parseFrontMatter, extractFirstHeading } from '../utils/parseFrontMatter';
 import { ResourceFile, ResourceType } from '../types/resource';
 
-interface PlansPageProps {
+interface EditorPlansPageProps {
   plansSource: 'claude' | 'cursor';
   onBack: () => void;
 }
 
-export default function PlansPage({ plansSource, onBack }: PlansPageProps) {
+export default function EditorPlansPage({ plansSource, onBack }: EditorPlansPageProps) {
   const [plans, setPlans] = useState<ArtifactFile[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +153,7 @@ export default function PlansPage({ plansSource, onBack }: PlansPageProps) {
           </Flex>
 
           {/* Plans Content */}
-          <PlansContent
+          <EditorPlansContent
             plans={plans}
             plansLoading={plansLoading}
             error={error}

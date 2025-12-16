@@ -126,6 +126,24 @@ async fn main() {
             commands::get_project_checkpoints, // Get project checkpoints (Phase 3)
             commands::unpin_checkpoint, // Unpin checkpoint (Phase 3)
             commands::create_project_from_checkpoint, // Create project from checkpoint (Phase 3)
+            commands::create_plan, // Create a new plan
+            commands::get_project_plans, // Get all plans for a project
+            commands::get_plan_details, // Get plan details with phases and milestones
+            commands::update_plan, // Update a plan
+            commands::delete_plan, // Delete a plan
+            commands::link_brainstorm_to_plan, // Link brainstorm file to plan
+            commands::unlink_brainstorm_from_plan, // Unlink brainstorm from plan
+            commands::create_plan_phase, // Create a plan phase
+            commands::update_plan_phase, // Update a plan phase
+            commands::delete_plan_phase, // Delete a plan phase
+            commands::reorder_plan_phases, // Reorder plan phases
+            commands::create_plan_milestone, // Create a plan milestone
+            commands::update_plan_milestone, // Update a plan milestone
+            commands::delete_plan_milestone, // Delete a plan milestone
+            commands::toggle_milestone_completion, // Toggle milestone completion
+            commands::get_plan_documents, // Get plan documents
+            commands::link_document_to_phase, // Link document to phase
+            commands::watch_plan_folder, // Watch plan folder for changes
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands

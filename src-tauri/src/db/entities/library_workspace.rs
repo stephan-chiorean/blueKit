@@ -26,3 +26,5 @@ impl Related<super::library_artifact::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+

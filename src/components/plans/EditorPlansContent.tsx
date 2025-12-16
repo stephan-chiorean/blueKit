@@ -21,7 +21,7 @@ import {
 import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
 
-interface PlansContentProps {
+interface EditorPlansContentProps {
   plans: ArtifactFile[];
   plansLoading: boolean;
   error: string | null;
@@ -31,13 +31,13 @@ interface PlansContentProps {
 
 type ViewMode = 'card' | 'table';
 
-export default function PlansContent({
+export default function EditorPlansContent({
   plans,
   plansLoading,
   error,
   onViewPlan,
   plansSource,
-}: PlansContentProps) {
+}: EditorPlansContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);

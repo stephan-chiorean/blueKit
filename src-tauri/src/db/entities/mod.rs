@@ -7,3 +7,7 @@ pub mod library_workspace;
 pub mod library_artifact;
 pub mod project;
 pub mod checkpoint;
+pub mod plan;
+pub mod plan_phase;
+pub mod plan_milestone;
+pub mod plan_document;

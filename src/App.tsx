@@ -3,7 +3,7 @@ import { Box, Spinner } from '@chakra-ui/react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
-import PlansPage from './pages/PlansPage';
+import EditorPlansPage from './pages/EditorPlansPage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
@@ -94,7 +94,7 @@ function AppContent() {
                 onProjectSelect={handleProjectSelect}
               />
             ) : currentView === 'plans' && plansSource ? (
-              <PlansPage
+              <EditorPlansPage
                 plansSource={plansSource}
                 onBack={handleBackFromPlans}
               />

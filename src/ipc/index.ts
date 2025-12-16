@@ -88,3 +88,6 @@ export * from './commits';
 // Re-export Checkpoint commands
 export * from './checkpoints';
 
+// Re-export Plan commands
+export * from './plans';
+
