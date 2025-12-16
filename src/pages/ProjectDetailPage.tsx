@@ -25,7 +25,7 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import ClonesTabContent from '../components/clones/ClonesTabContent';
 import CommitTimelineView from '../components/commits/CommitTimelineView';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
-import PlansTabContent from '../components/plans/PlansTabContent';
+import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
@@ -44,8 +44,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [artifactsLoading, setArtifactsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
-  const [currentTab, setCurrentTab] = useState<string>("kits");
+  const [currentTab, setCurrentTab] = useState<string>("tasks");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
+  const plansTabRef = useRef<PlansTabContentRef>(null);
 
   // Database project (for git metadata)
   const [dbProject, setDbProject] = useState<Project | null>(null);
@@ -722,6 +723,21 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                   </Button>
                 </Box>
               )}
+              {currentTab === 'plans' && (
+                <Box position="absolute" right={0}>
+                  <Button
+                    colorPalette="primary"
+                    onClick={() => plansTabRef.current?.openCreateDialog()}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPlus />
+                      </Icon>
+                      <Text>Add Plan</Text>
+                    </HStack>
+                  </Button>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="kits" key="kits">
@@ -810,6 +826,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             </Tabs.Content>
             <Tabs.Content value="plans">
               <PlansTabContent
+                ref={plansTabRef}
                 plans={plans}
                 plansLoading={plansLoading}
                 onViewPlan={handleViewPlan}

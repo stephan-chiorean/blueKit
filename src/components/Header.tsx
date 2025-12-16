@@ -98,8 +98,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             <Input
               placeholder="Search..."
               variant="subtle"
-              borderWidth="1px"
-              borderColor="primary.300"
+              bg="bg.emphasized"
             />
           </InputGroup>
         </Box>

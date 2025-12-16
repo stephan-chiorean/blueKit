@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   Box,
   Card,
@@ -40,16 +40,20 @@ interface PlansTabContentProps {
   onPlansChanged: () => void;
 }
 
+export interface PlansTabContentRef {
+  openCreateDialog: () => void;
+}
+
 type ViewMode = 'card' | 'table';
 
-export default function PlansTabContent({
+const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
   plans,
   plansLoading,
   onViewPlan,
   projectId,
   projectPath,
   onPlansChanged,
-}: PlansTabContentProps) {
+}, ref) => {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [filterText, setFilterText] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -72,6 +76,12 @@ export default function PlansTabContent({
   const handleOpenCreateDialog = () => {
     setIsCreateDialogOpen(true);
   };
+
+  useImperativeHandle(ref, () => ({
+    openCreateDialog: () => {
+      setIsCreateDialogOpen(true);
+    },
+  }));
 
   // Get status badge color palette
   const getStatusColorPalette = (status: string) => {
@@ -373,4 +383,8 @@ export default function PlansTabContent({
       )}
     </Box>
   );
-}
+});
+
+PlansTabContent.displayName = 'PlansTabContent';
+
+export default PlansTabContent;
