@@ -747,6 +747,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 error={error}
                 projectsCount={1}
                 projectPath={project.path}
+                projectId={project.id}
                 onViewKit={handleViewKit}
                 onReload={loadProjectArtifacts}
                 onOptimisticMove={handleOptimisticMove}
@@ -768,6 +769,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 error={error}
                 projectsCount={1}
                 projectPath={project.path}
+                projectId={project.id}
                 onViewKit={handleViewKit}
                 onReload={loadProjectArtifacts}
                 onOptimisticMove={handleOptimisticMove}
@@ -781,6 +783,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 kitsLoading={artifactsLoading}
                 error={error}
                 projectsCount={1}
+                projectPath={project.path}
+                projectId={project.id}
                 onViewKit={handleViewKit}
               />
             </Tabs.Content>
@@ -796,6 +800,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 diagramsLoading={artifactsLoading}
                 error={error}
                 projectPath={project.path}
+                projectId={project.id}
                 onViewDiagram={handleViewDiagram}
                 onReload={loadProjectArtifacts}
                 onOptimisticMove={handleOptimisticMove}

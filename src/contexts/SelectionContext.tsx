@@ -8,6 +8,8 @@ export interface SelectedItem {
   type: SelectionType;
   path?: string;
   artifactType?: 'kits' | 'walkthroughs' | 'diagrams'; // For folders: which artifact type directory
+  projectId?: string;
+  projectPath?: string;
 }
 
 interface SelectionContextType {

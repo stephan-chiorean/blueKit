@@ -6,6 +6,7 @@
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, Set};
 use serde::{Deserialize, Serialize};
 use crate::db::entities::{library_workspace, library_artifact};
+use crate::integrations::github::GitHubClient;
 use chrono::Utc;
 
 /// Library workspace structure.
@@ -31,13 +32,30 @@ pub struct LibraryArtifact {
     pub last_synced_at: i64,
 }
 
-/// Creates a new Library workspace.
+/// Creates a new Library workspace and the associated GitHub repository.
 pub async fn create_workspace(
     db: &DatabaseConnection,
     name: String,
     github_owner: String,
     github_repo: String,
 ) -> Result<LibraryWorkspace, String> {
+    // Get GitHub client
+    let github_client = GitHubClient::from_keychain()
+        .map_err(|e| format!("GitHub authentication required: {}", e))?;
+
+    // Create the GitHub repository
+    let description = format!("BlueKit library workspace: {}", name);
+    github_client.create_repo(&github_repo, Some(&description), false)
+        .await
+        .map_err(|e| {
+            // Check if repo already exists (422 error usually means name conflict)
+            if e.contains("422") || e.contains("already exists") || e.contains("name already exists") {
+                format!("Repository '{}' already exists. Use a different name or use the existing repository.", github_repo)
+            } else {
+                format!("Failed to create GitHub repository: {}", e)
+            }
+        })?;
+
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().timestamp();
 

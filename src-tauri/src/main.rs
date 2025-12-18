@@ -114,6 +114,16 @@ async fn main() {
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
             commands::library_get_artifacts, // Get Library artifacts
+            commands::scan_project_resources, // Scan project resources (Phase 1)
+            commands::get_project_resources, // Get project resources (Phase 1)
+            commands::get_resource_by_id, // Get resource by ID (Phase 1)
+            commands::check_publish_status, // Check publish status (Phase 3)
+            commands::publish_resource, // Publish resource to workspace (Phase 3)
+            commands::sync_workspace_catalog, // Sync workspace catalog from GitHub (Phase 4)
+            commands::list_workspace_catalogs, // List workspace catalogs (Phase 4)
+            commands::pull_variation, // Pull variation to local project (Phase 4)
+            commands::check_resource_status, // Check resource status for updates (Phase 5)
+            commands::check_project_for_updates, // Check all resources in project (Phase 5)
             commands::migrate_projects_to_database, // Migrate JSON to database (Phase 1)
             commands::db_get_projects, // Get all projects from database (Phase 1)
             commands::db_create_project, // Create new project in database (Phase 1)

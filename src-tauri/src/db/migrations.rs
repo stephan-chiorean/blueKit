@@ -17,6 +17,12 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Create library tables
     create_library_workspaces_table(db).await?;
     create_library_artifacts_table(db).await?;
+    create_library_resources_table(db).await?;
+
+    // Migrate library schema (Phase 2)
+    migrate_library_artifacts_to_catalogs(db).await?;
+    create_library_variations_table(db).await?;
+    create_library_subscriptions_table(db).await?;
 
     // Create projects and checkpoints tables
     create_projects_table(db).await?;
@@ -502,5 +508,241 @@ async fn create_plan_documents_table(db: &DatabaseConnection) -> Result<(), DbEr
 
     info!("Plan documents table and indexes created or already exist");
 
+    Ok(())
+}
+
+async fn create_library_resources_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_resources (
+            id TEXT PRIMARY KEY NOT NULL,
+            project_id TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            artifact_type TEXT NOT NULL,
+            content_hash TEXT,
+            yaml_metadata TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            last_modified_at INTEGER,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes for performance
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_resources_project_id ON library_resources(project_id);
+        CREATE INDEX IF NOT EXISTS idx_library_resources_type ON library_resources(artifact_type);
+        CREATE INDEX IF NOT EXISTS idx_library_resources_path ON library_resources(project_id, relative_path);
+        CREATE INDEX IF NOT EXISTS idx_library_resources_hash ON library_resources(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_library_resources_active ON library_resources(project_id, is_deleted);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Library resources table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn migrate_library_artifacts_to_catalogs(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if library_catalogs already exists
+    let check_catalogs_sql = r#"
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='library_catalogs'
+    "#;
+
+    let catalogs_exists = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_catalogs_sql.to_string(),
+    )).await?.is_some();
+
+    if catalogs_exists {
+        info!("Library catalogs table already exists, skipping migration");
+        return Ok(());
+    }
+
+    // Check if old library_artifacts table exists
+    let check_artifacts_sql = r#"
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='library_artifacts'
+    "#;
+
+    let artifacts_exists = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_artifacts_sql.to_string(),
+    )).await?.is_some();
+
+    if !artifacts_exists {
+        // Neither table exists, create catalogs table directly
+        info!("No existing library_artifacts table, creating library_catalogs directly");
+        return create_library_catalogs_table(db).await;
+    }
+
+    // Table exists - migrate data
+    info!("Migrating library_artifacts to library_catalogs...");
+
+    // Create new catalogs table
+    create_library_catalogs_table(db).await?;
+
+    // Migrate existing data
+    let migrate_data_sql = r#"
+        INSERT INTO library_catalogs (id, workspace_id, name, description, artifact_type, tags, remote_path, created_at, updated_at)
+        SELECT
+            id,
+            workspace_id,
+            COALESCE(
+                substr(library_path, instr(library_path, '/') + 1),
+                library_path
+            ) as name,
+            NULL as description,
+            artifact_type,
+            '[]' as tags,
+            library_path as remote_path,
+            published_at as created_at,
+            last_synced_at as updated_at
+        FROM library_artifacts
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        migrate_data_sql.to_string(),
+    )).await?;
+
+    // Drop old table
+    let drop_sql = "DROP TABLE IF EXISTS library_artifacts";
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        drop_sql.to_string(),
+    )).await?;
+
+    info!("Migration complete: library_artifacts → library_catalogs");
+
+    Ok(())
+}
+
+async fn create_library_catalogs_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_catalogs (
+            id TEXT PRIMARY KEY NOT NULL,
+            workspace_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            artifact_type TEXT NOT NULL,
+            tags TEXT,
+            remote_path TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (workspace_id) REFERENCES library_workspaces(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await?;
+
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_catalogs_workspace_id ON library_catalogs(workspace_id);
+        CREATE INDEX IF NOT EXISTS idx_library_catalogs_type ON library_catalogs(artifact_type);
+        CREATE INDEX IF NOT EXISTS idx_library_catalogs_remote_path ON library_catalogs(workspace_id, remote_path);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    )).await?;
+
+    info!("Library catalogs table created");
+    Ok(())
+}
+
+async fn create_library_variations_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_variations (
+            id TEXT PRIMARY KEY NOT NULL,
+            catalog_id TEXT NOT NULL,
+            workspace_id TEXT NOT NULL,
+            remote_path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            github_commit_sha TEXT,
+            published_at INTEGER NOT NULL,
+            publisher_name TEXT,
+            version_tag TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (catalog_id) REFERENCES library_catalogs(id) ON DELETE CASCADE,
+            FOREIGN KEY (workspace_id) REFERENCES library_workspaces(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await?;
+
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_variations_catalog_id ON library_variations(catalog_id);
+        CREATE INDEX IF NOT EXISTS idx_library_variations_workspace_id ON library_variations(workspace_id);
+        CREATE INDEX IF NOT EXISTS idx_library_variations_hash ON library_variations(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_library_variations_published_at ON library_variations(catalog_id, published_at DESC);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    )).await?;
+
+    info!("Library variations table created");
+    Ok(())
+}
+
+async fn create_library_subscriptions_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_subscriptions (
+            id TEXT PRIMARY KEY NOT NULL,
+            catalog_id TEXT NOT NULL,
+            variation_id TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            pulled_at INTEGER NOT NULL,
+            last_checked_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (catalog_id) REFERENCES library_catalogs(id) ON DELETE CASCADE,
+            FOREIGN KEY (variation_id) REFERENCES library_variations(id) ON DELETE CASCADE,
+            FOREIGN KEY (resource_id) REFERENCES library_resources(id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            UNIQUE(resource_id)
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await?;
+
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_subscriptions_catalog_id ON library_subscriptions(catalog_id);
+        CREATE INDEX IF NOT EXISTS idx_library_subscriptions_project_id ON library_subscriptions(project_id);
+        CREATE INDEX IF NOT EXISTS idx_library_subscriptions_variation_id ON library_subscriptions(variation_id);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    )).await?;
+
+    info!("Library subscriptions table created");
     Ok(())
 }

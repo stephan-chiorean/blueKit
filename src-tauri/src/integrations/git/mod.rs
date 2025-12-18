@@ -6,3 +6,4 @@ pub mod operations;
 pub use operations::{GitMetadata, detect_git_metadata};
 
 
+

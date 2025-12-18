@@ -35,6 +35,7 @@ interface WalkthroughsTabContentProps {
   error: string | null;
   projectsCount: number;
   projectPath: string;
+  projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
   onReload?: () => void;
   onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
@@ -50,6 +51,7 @@ function WalkthroughsTabContent({
   error,
   projectsCount,
   projectPath,
+  projectId,
   onViewKit,
   onReload,
   onOptimisticMove,
@@ -77,6 +79,8 @@ function WalkthroughsTabContent({
       name: walkthrough.frontMatter?.alias || walkthrough.name,
       type: 'Walkthrough',
       path: walkthrough.path,
+      projectId,
+      projectPath,
     });
   };
 

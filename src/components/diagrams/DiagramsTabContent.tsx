@@ -32,6 +32,7 @@ interface DiagramsTabContentProps {
   diagramsLoading: boolean;
   error: string | null;
   projectPath: string;
+  projectId?: string;
   onViewDiagram: (diagram: ArtifactFile) => void;
   onReload?: () => void;
   onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
@@ -44,6 +45,7 @@ function DiagramsTabContent({
   diagramsLoading,
   error,
   projectPath,
+  projectId,
   onViewDiagram,
   onReload,
   onOptimisticMove,
@@ -68,6 +70,8 @@ function DiagramsTabContent({
       name: diagram.frontMatter?.alias || diagram.name,
       type: 'Diagram',
       path: diagram.path,
+      projectId,
+      projectPath,
     });
   };
 

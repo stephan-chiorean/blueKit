@@ -82,7 +82,8 @@ export default function MilestoneManager({ phases, onUpdate }: MilestoneManagerP
 
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return null;
-    const date = new Date(timestamp);
+    // Note: Backend returns timestamp in seconds, but JavaScript Date expects milliseconds
+    const date = new Date(timestamp * 1000);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

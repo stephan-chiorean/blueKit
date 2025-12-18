@@ -35,6 +35,7 @@ interface KitsTabContentProps {
   error: string | null;
   projectsCount: number;
   projectPath: string;
+  projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
   onReload?: () => void;
   onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
@@ -50,6 +51,7 @@ function KitsTabContent({
   error,
   projectsCount,
   projectPath,
+  projectId,
   onViewKit,
   onReload,
   onOptimisticMove,
@@ -77,6 +79,8 @@ function KitsTabContent({
       name: kit.frontMatter?.alias || kit.name,
       type: 'Kit',
       path: kit.path,
+      projectId,
+      projectPath,
     });
   };
 

@@ -238,4 +238,140 @@ export interface GitHubTreeResponse {
   truncated: boolean;
 }
 
+// ============================================================================
+// LIBRARY SYSTEM TYPES
+// ============================================================================
+
+/**
+ * Library resource - a local file with stable UUID tracking.
+ */
+export interface LibraryResource {
+  id: string;
+  projectId: string;
+  relativePath: string;
+  fileName: string;
+  artifactType: string;
+  contentHash: string;
+  yamlMetadata: Record<string, unknown> | null;
+  createdAt: number;
+  updatedAt: number;
+  lastModifiedAt: number;
+  isDeleted: boolean;
+}
+
+/**
+ * Library catalog - metadata record in a workspace.
+ */
+export interface LibraryCatalog {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  artifact_type: string;
+  tags: string | null;
+  remote_path: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * Library variation - an actual instance with content hash.
+ */
+export interface LibraryVariation {
+  id: string;
+  catalog_id: string;
+  workspace_id: string;
+  remote_path: string;
+  content_hash: string;
+  github_commit_sha: string | null;
+  published_at: number;
+  publisher_name: string | null;
+  version_tag: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * Catalog with its variations.
+ */
+export interface CatalogWithVariations {
+  catalog: LibraryCatalog;
+  variations: LibraryVariation[];
+}
+
+/**
+ * Result of scanning project resources.
+ */
+export interface ScanResult {
+  resourcesCreated: number;
+  resourcesUpdated: number;
+  resourcesDeleted: number;
+}
+
+/**
+ * Result of syncing workspace catalog.
+ */
+export interface SyncResult {
+  catalogs_created: number;
+  catalogs_updated: number;
+  variations_created: number;
+  variations_updated: number;
+}
+
+/**
+ * Variation info for publish status.
+ */
+export interface VariationInfo {
+  id: string;
+  content_hash: string;
+  published_at: number;
+  publisher_name: string | null;
+  version_tag: string | null;
+  github_commit_sha: string | null;
+}
+
+/**
+ * Publish result - tagged union.
+ */
+export type PublishResult =
+  | { status: 'NoCatalogExists'; resource_id: string; suggested_catalog_name: string; suggested_remote_path: string }
+  | { status: 'CatalogExists'; catalog_id: string; catalog_name: string; variations: VariationInfo[] }
+  | { status: 'Published'; catalog_id: string; variation_id: string; github_commit_sha: string };
+
+/**
+ * Subscription status for a resource.
+ */
+export interface SubscriptionStatus {
+  subscription_id: string;
+  catalog_id: string;
+  catalog_name: string;
+  current_variation_id: string;
+  current_variation_hash: string;
+  latest_variation_id: string;
+  latest_variation_hash: string;
+  has_updates: boolean;
+}
+
+/**
+ * Resource status for update detection.
+ */
+export interface ResourceStatus {
+  resource_id: string;
+  resource_name: string;
+  artifact_type: string;
+  has_unpublished_changes: boolean;
+  current_hash: string;
+  published_hash: string | null;
+  subscription: SubscriptionStatus | null;
+}
+
+/**
+ * Pull result.
+ */
+export interface PullResult {
+  resource_id: string;
+  subscription_id: string;
+  file_path: string;
+}
+
 

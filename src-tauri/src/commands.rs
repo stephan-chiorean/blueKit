@@ -3061,6 +3061,208 @@ pub async fn library_get_artifacts(
 }
 
 // ============================================================================
+// LIBRARY RESOURCE COMMANDS (Phase 1)
+// ============================================================================
+
+/// Scans a project's .bluekit directory and syncs resources to database.
+///
+/// This command should be called:
+/// - When a project is first opened
+/// - When user manually triggers a rescan
+/// - After git operations that might have changed files
+#[tauri::command]
+pub async fn scan_project_resources(
+    project_id: String,
+    project_path: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    use crate::library::resource_scanner;
+    use std::path::Path;
+
+    let result = resource_scanner::scan_project_resources(
+        &db,
+        &project_id,
+        Path::new(&project_path),
+    ).await?;
+
+    Ok(serde_json::json!({
+        "resourcesCreated": result.resources_created,
+        "resourcesUpdated": result.resources_updated,
+        "resourcesDeleted": result.resources_deleted,
+    }))
+}
+
+/// Gets all resources for a project.
+#[tauri::command]
+pub async fn get_project_resources(
+    project_id: String,
+    include_deleted: Option<bool>,
+    db: State<'_, DatabaseConnection>,
+) -> Result<Vec<serde_json::Value>, String> {
+    use crate::db::entities::library_resource;
+    use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+
+    let mut query = library_resource::Entity::find()
+        .filter(library_resource::Column::ProjectId.eq(project_id));
+
+    if !include_deleted.unwrap_or(false) {
+        query = query.filter(library_resource::Column::IsDeleted.eq(0));
+    }
+
+    let resources = query
+        .all(db.inner())
+        .await
+        .map_err(|e| format!("Failed to get resources: {}", e))?;
+
+    let result: Vec<serde_json::Value> = resources
+        .into_iter()
+        .map(|r| serde_json::json!({
+            "id": r.id,
+            "projectId": r.project_id,
+            "relativePath": r.relative_path,
+            "fileName": r.file_name,
+            "artifactType": r.artifact_type,
+            "contentHash": r.content_hash,
+            "yamlMetadata": r.yaml_metadata.and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()),
+            "createdAt": r.created_at,
+            "updatedAt": r.updated_at,
+            "lastModifiedAt": r.last_modified_at,
+            "isDeleted": r.is_deleted == 1,
+        }))
+        .collect();
+
+    Ok(result)
+}
+
+/// Gets a single resource by ID.
+#[tauri::command]
+pub async fn get_resource_by_id(
+    resource_id: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    use crate::db::entities::library_resource;
+    use sea_orm::EntityTrait;
+
+    let resource = library_resource::Entity::find_by_id(resource_id.clone())
+        .one(db.inner())
+        .await
+        .map_err(|e| format!("Failed to get resource: {}", e))?
+        .ok_or_else(|| format!("Resource not found: {}", resource_id))?;
+
+    Ok(serde_json::json!({
+        "id": resource.id,
+        "projectId": resource.project_id,
+        "relativePath": resource.relative_path,
+        "fileName": resource.file_name,
+        "artifactType": resource.artifact_type,
+        "contentHash": resource.content_hash,
+        "yamlMetadata": resource.yaml_metadata.and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()),
+        "createdAt": resource.created_at,
+        "updatedAt": resource.updated_at,
+        "lastModifiedAt": resource.last_modified_at,
+        "isDeleted": resource.is_deleted == 1,
+    }))
+}
+
+/// Check publish status for a resource (doesn't publish, just checks)
+#[tauri::command]
+pub async fn check_publish_status(
+    resource_id: String,
+    workspace_id: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    let result = crate::library::publishing::check_publish_status(
+        db.inner(),
+        &resource_id,
+        &workspace_id,
+    )
+    .await?;
+
+    serde_json::to_value(&result).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// Publish a resource to a workspace
+#[tauri::command]
+pub async fn publish_resource(
+    resource_id: String,
+    workspace_id: String,
+    overwrite_variation_id: Option<String>,
+    version_tag: Option<String>,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    let options = crate::library::publishing::PublishOptions {
+        resource_id,
+        workspace_id,
+        overwrite_variation_id,
+        version_tag,
+    };
+
+    let result = crate::library::publishing::publish_resource(db.inner(), options).await?;
+
+    serde_json::to_value(&result).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// Sync workspace catalog from GitHub
+#[tauri::command]
+pub async fn sync_workspace_catalog(
+    workspace_id: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    let result = crate::library::sync::sync_workspace_catalog(db.inner(), &workspace_id).await?;
+    serde_json::to_value(&result).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// List workspace catalogs with variations
+#[tauri::command]
+pub async fn list_workspace_catalogs(
+    workspace_id: String,
+    artifact_type: Option<String>,
+    db: State<'_, DatabaseConnection>,
+) -> Result<Vec<crate::library::sync::CatalogWithVariations>, String> {
+    crate::library::sync::list_workspace_catalogs(db.inner(), &workspace_id, artifact_type).await
+}
+
+/// Pull a variation to a local project
+#[tauri::command]
+pub async fn pull_variation(
+    variation_id: String,
+    target_project_id: String,
+    target_project_path: String,
+    overwrite_if_exists: bool,
+    db: State<'_, DatabaseConnection>,
+) -> Result<serde_json::Value, String> {
+    let options = crate::library::pull::PullOptions {
+        variation_id,
+        target_project_id,
+        target_project_path,
+        overwrite_if_exists,
+    };
+
+    let result = crate::library::pull::pull_variation(db.inner(), options).await?;
+    serde_json::to_value(&result).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// Check resource status for unpublished changes and available updates
+#[tauri::command]
+pub async fn check_resource_status(
+    resource_id: String,
+    project_root: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<crate::library::updates::ResourceStatus, String> {
+    crate::library::updates::check_resource_status(db.inner(), &resource_id, &project_root).await
+}
+
+/// Check all resources in a project for updates
+#[tauri::command]
+pub async fn check_project_for_updates(
+    project_id: String,
+    project_root: String,
+    db: State<'_, DatabaseConnection>,
+) -> Result<Vec<crate::library::updates::ResourceStatus>, String> {
+    crate::library::updates::check_project_for_updates(db.inner(), &project_id, &project_root).await
+}
+
+// ============================================================================
 // PROJECT DATABASE COMMANDS (Phase 1)
 // ============================================================================
 

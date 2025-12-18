@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button, HStack, Text, ActionBar, Portal, Box, VStack, Icon } from "@chakra-ui/react";
-import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork, LuPencil } from "react-icons/lu";
+import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork, LuPencil, LuUpload } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { useSelection } from "../../contexts/SelectionContext";
 import { ProjectEntry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, deleteResources } from "../../ipc";
 import AddToProjectPopover from "./AddToProjectPopover";
 import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import EditResourceMetadataModal from "./EditResourceMetadataModal";
+import PublishToLibraryDialog from "../library/PublishToLibraryDialog";
 
 export default function GlobalActionBar() {
   const { selectedItems, hasArtifactSelection, hasTaskSelection, clearSelection, getItemsByType } = useSelection();
@@ -14,6 +15,7 @@ export default function GlobalActionBar() {
   const [isOpen, setIsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
 
   // Sync isOpen with hasArtifactSelection and force close when hasArtifactSelection becomes false
   // Hide when tasks are selected (TasksActionBar takes priority)
@@ -117,32 +119,12 @@ export default function GlobalActionBar() {
     // No need to manually refresh
   };
 
-  const handlePublishToLibrary = async () => {
-    try {
-      setLoading(true);
-      // TODO: Implement publish to library functionality for all artifact types
+  const handlePublishToLibrary = () => {
+    setPublishDialogOpen(true);
+  };
 
-      toaster.create({
-        type: "success",
-        title: "Artifacts published",
-        description: `Published ${totalCount} artifact${
-          totalCount !== 1 ? "s" : ""
-        } to library`,
-      });
-
-      clearSelection();
-    } catch (error) {
-      console.error("[GlobalActionBar] Error in Publish to Library:", error);
-      toaster.create({
-        type: "error",
-        title: "Error",
-        description: `Failed to publish artifacts: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handlePublishComplete = () => {
+    clearSelection();
   };
 
   const handleConfirmAddToProject = async (selectedProjects: ProjectEntry[]) => {
@@ -295,7 +277,7 @@ export default function GlobalActionBar() {
                   disabled={loading}
                 >
                   <HStack gap={2}>
-                    <LuBookOpen />
+                    <LuUpload />
                     <Text>Publish to Library</Text>
                   </HStack>
                 </Button>
@@ -338,6 +320,19 @@ export default function GlobalActionBar() {
         onClose={() => setEditModalOpen(false)}
         item={selectedItems.length === 1 ? selectedItems[0] : null}
         onUpdated={handleEditUpdated}
+      />
+
+      <PublishToLibraryDialog
+        isOpen={publishDialogOpen}
+        onClose={() => setPublishDialogOpen(false)}
+        items={selectedItems.map(item => ({
+          path: item.path,
+          name: item.name,
+          type: item.type,
+          projectId: item.projectId,
+          projectPath: item.projectPath,
+        }))}
+        onPublished={handlePublishComplete}
       />
     </ActionBar.Root>
   );

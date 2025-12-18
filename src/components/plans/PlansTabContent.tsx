@@ -98,8 +98,9 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
   };
 
   // Format date
+  // Note: Backend returns timestamp in seconds, but JavaScript Date expects milliseconds
   const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp * 1000);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -252,9 +253,8 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
           </Box>
         </Flex>
 
-        {/* View Mode Switcher and Add Plan Button */}
-        <HStack gap={2}>
-          <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
+        {/* View Mode Switcher */}
+        <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
           <Button
             onClick={() => setViewMode('card')}
             variant="ghost"
@@ -290,20 +290,6 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
             </HStack>
           </Button>
         </HStack>
-        
-        {/* Add Plan Button */}
-        <Button
-          colorPalette="primary"
-          onClick={handleOpenCreateDialog}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuPlus />
-            </Icon>
-            <Text>Add Plan</Text>
-          </HStack>
-        </Button>
-      </HStack>
       </Flex>
 
       {/* Plans list */}

@@ -22,7 +22,7 @@ import {
 import NavigationMenu from "../components/NavigationDrawer";
 import Header from "../components/Header";
 import ProjectsTabContent from "../components/projects/ProjectsTabContent";
-import CollectionsTabContent from "../components/collections/CollectionsTabContent";
+import LibraryTabContent from "../components/library/LibraryTabContent";
 import WorkflowsTabContent from "../components/workflows/WorkflowsTabContent";
 import TasksTabContent, {
   TasksTabContentRef,
@@ -39,7 +39,6 @@ import {
   TimeoutError,
 } from "../ipc";
 import { useSelection } from "../contexts/SelectionContext";
-import { Collection } from "../components/collections/AddCollectionDialog";
 
 interface HomePageProps {
   onProjectSelect: (project: ProjectEntry) => void;
@@ -59,11 +58,6 @@ export default function HomePage({
   const [activeTab, setActiveTab] = useState("projects");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
 
-  // Collections state - store selectedItemIds with each collection
-  interface CollectionWithItems extends Collection {
-    selectedItemIds: string[];
-  }
-  const [collections, setCollections] = useState<CollectionWithItems[]>([]);
   const [, setResizeKey] = useState(0);
 
   // Handle window resize to fix layout cutoff issues
@@ -92,24 +86,6 @@ export default function HomePage({
       }
     };
   }, []);
-
-  const handleCollectionCreated = (
-    collection: Collection,
-    selectedItemIds: string[]
-  ) => {
-    setCollections([...collections, { ...collection, selectedItemIds }]);
-  };
-
-  const handleCollectionUpdated = (
-    collection: Collection,
-    selectedItemIds: string[]
-  ) => {
-    setCollections(
-      collections.map((c) =>
-        c.id === collection.id ? { ...collection, selectedItemIds } : c
-      )
-    );
-  };
 
   // Load projects from registry
   const loadProjects = async () => {
@@ -441,13 +417,7 @@ export default function HomePage({
               />
             </Tabs.Content>
             <Tabs.Content value="library">
-              <CollectionsTabContent
-                collections={collections}
-                onAddCollection={handleCollectionCreated}
-                onUpdateCollection={handleCollectionUpdated}
-                kits={kits}
-                kitsLoading={kitsLoading}
-              />
+              <LibraryTabContent />
             </Tabs.Content>
             <Tabs.Content value="workflows">
               <WorkflowsTabContent />

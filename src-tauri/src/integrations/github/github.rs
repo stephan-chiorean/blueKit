@@ -28,6 +28,19 @@ impl GitHubClient {
         Ok(Self::new(token_data.access_token))
     }
 
+    /// Makes a raw authenticated request to the GitHub API (public wrapper).
+    pub async fn request_raw<T>(
+        &self,
+        method: &str,
+        endpoint: String,
+        body: Option<serde_json::Value>,
+    ) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        self.request(method, endpoint, body).await
+    }
+
     /// Makes an authenticated request to the GitHub API.
     async fn request<T>(
         &self,
@@ -132,6 +145,26 @@ impl GitHubClient {
             .await
     }
 
+    /// Creates a new repository for the authenticated user.
+    pub async fn create_repo(
+        &self,
+        name: &str,
+        description: Option<&str>,
+        private: bool,
+    ) -> Result<GitHubRepo, String> {
+        let mut body = serde_json::json!({
+            "name": name,
+            "private": private,
+            "auto_init": true, // Initialize with README so we can push files
+        });
+
+        if let Some(desc) = description {
+            body["description"] = serde_json::Value::String(desc.to_string());
+        }
+
+        self.request("POST", "/user/repos".to_string(), Some(body)).await
+    }
+
     /// Gets the contents of a file from a repository.
     pub async fn get_file_contents(
         &self,
@@ -146,8 +179,9 @@ impl GitHubClient {
 
         // Decode base64 content
         use base64::prelude::*;
+        let content_str = response.content.ok_or("File content not available")?;
         let content = BASE64_STANDARD
-            .decode(response.content.replace('\n', ""))
+            .decode(content_str.replace('\n', ""))
             .map_err(|e| format!("Failed to decode base64: {}", e))?;
         String::from_utf8(content)
             .map_err(|e| format!("Failed to convert to UTF-8: {}", e))
@@ -277,14 +311,14 @@ struct GitHubContentResponse {
     pub name: String,
     pub path: String,
     pub sha: String,
-    pub size: u64,
+    pub size: Option<u64>,
     pub url: String,
     pub html_url: String,
     pub git_url: String,
     pub download_url: Option<String>,
     #[serde(rename = "type")]
     pub content_type: String, // "file" or "dir"
-    pub content: String, // Base64 encoded for files
+    pub content: Option<String>, // Base64 encoded for files (not present in PUT/DELETE responses)
     pub encoding: Option<String>, // "base64" for files
 }
 

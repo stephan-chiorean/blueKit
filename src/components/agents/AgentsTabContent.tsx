@@ -24,6 +24,8 @@ interface AgentsTabContentProps {
   kitsLoading: boolean;
   error: string | null;
   projectsCount: number;
+  projectPath?: string;
+  projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
 }
 
@@ -32,6 +34,8 @@ function AgentsTabContent({
   kitsLoading,
   error,
   projectsCount,
+  projectPath,
+  projectId,
   onViewKit,
 }: AgentsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem } = useSelection();
@@ -50,6 +54,8 @@ function AgentsTabContent({
       name: agent.frontMatter?.alias || agent.name,
       type: 'Agent',
       path: agent.path,
+      projectId,
+      projectPath,
     });
   };
 
