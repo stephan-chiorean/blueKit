@@ -19,7 +19,7 @@ import { listen } from '@tauri-apps/api/event';
 import { LuArrowLeft, LuCopy, LuCheck, LuFileText, LuCode, LuTrash2 } from 'react-icons/lu';
 import { RiClaudeFill } from 'react-icons/ri';
 import { ResourceFile } from '../../types/resource';
-import { invokeGetPlanDetails, invokeGetPlanDocuments, invokeWatchPlanFolder, invokeStopWatcher, invokeLinkBrainstormToPlan, invokeUnlinkBrainstormFromPlan, invokeReadFile } from '../../ipc';
+import { invokeGetPlanDetails, invokeGetPlanDocuments, invokeWatchPlanFolder, invokeStopWatcher, invokeLinkBrainstormToPlan, invokeUnlinkBrainstormFromPlan, invokeLinkMultiplePlansToPlan, invokeUnlinkPlanFromPlan, invokeReadFile } from '../../ipc';
 import { invokeGetPlansFiles } from '../../ipc/artifacts';
 import { ArtifactFile } from '../../ipc/types';
 import { PlanDetails, PlanDocument } from '../../types/plan';
@@ -70,15 +70,10 @@ export default function PlanOverview({ plan, onBack }: PlanOverviewProps) {
       const details = await invokeGetPlanDetails(planId);
       setPlanDetails(details);
 
-      // Detect source from brainstorm link path
-      if (details.brainstormLink) {
-        if (details.brainstormLink.includes('.claude')) {
-          setLinkedPlanSource('claude');
-        } else if (details.brainstormLink.includes('.cursor')) {
-          setLinkedPlanSource('cursor');
-        } else {
-          setLinkedPlanSource(null);
-        }
+      // Detect source from linked plans (use first one if available)
+      if (details.linkedPlans && details.linkedPlans.length > 0) {
+        const firstSource = details.linkedPlans[0].source;
+        setLinkedPlanSource(firstSource === 'claude' || firstSource === 'cursor' ? firstSource : null);
       } else {
         setLinkedPlanSource(null);
       }
@@ -276,19 +271,20 @@ export default function PlanOverview({ plan, onBack }: PlanOverviewProps) {
 
     setLinking(true);
     try {
-      // Note: Currently only the last plan will be stored as the backend supports one brainstorm_link
-      for (const planPath of selectedPlanPaths) {
-        await invokeLinkBrainstormToPlan(planDetails.id, planPath);
-      }
+      await invokeLinkMultiplePlansToPlan(
+        planDetails.id,
+        selectedPlanPaths,
+        selectedSource
+      );
 
       const sourceName = selectedSource.charAt(0).toUpperCase() + selectedSource.slice(1);
       const message = selectedPlanPaths.length > 1
-        ? `Linked last of ${selectedPlanPaths.length} ${sourceName} plans (only one can be active)`
+        ? `Successfully linked ${selectedPlanPaths.length} ${sourceName} plans`
         : `Successfully linked ${sourceName} plan`;
 
       toaster.create({
         type: 'success',
-        title: `${sourceName} plan linked`,
+        title: `${sourceName} plan${selectedPlanPaths.length > 1 ? 's' : ''} linked`,
         description: message,
       });
       setSelectedSource(null);
@@ -307,55 +303,22 @@ export default function PlanOverview({ plan, onBack }: PlanOverviewProps) {
     }
   };
 
-  // Open linked brainstorm file - load into workstation
-  const handleOpenBrainstorm = async () => {
-    if (!planDetails?.brainstormLink) return;
 
-    try {
-      // Read file content
-      const content = await invokeReadFile(planDetails.brainstormLink);
-
-      // Create a ResourceFile from the brainstorm link
-      const fileName = planDetails.brainstormLink.split('/').pop() || 'plan';
-      const resourceFile: ResourceFile = {
-        path: planDetails.brainstormLink,
-        name: fileName,
-        frontMatter: {},
-        resourceType: 'plan',
-      };
-
-      // Set in ResourceContext to display in workstation
-      setSelectedResource(resourceFile, content, 'plan');
-    } catch (error) {
-      console.error('Failed to open brainstorm:', error);
-      toaster.create({
-        type: 'error',
-        title: 'Failed to open file',
-        description: String(error),
-        closable: true,
-      });
-    }
-  };
-
-  // Unlink brainstorm from plan
-  const handleUnlinkBrainstorm = async () => {
+  // Unlink a specific plan from plan
+  const handleUnlinkPlan = async (linkedPlanPath: string) => {
     if (!planDetails) return;
 
     try {
-      await invokeUnlinkBrainstormFromPlan(planDetails.id);
-
-      const sourceName = linkedPlanSource
-        ? linkedPlanSource.charAt(0).toUpperCase() + linkedPlanSource.slice(1)
-        : 'Plan';
+      await invokeUnlinkPlanFromPlan(planDetails.id, linkedPlanPath);
 
       toaster.create({
         type: 'success',
-        title: `${sourceName} plan deleted`,
-        description: `Successfully removed ${sourceName} plan`,
+        title: 'Plan unlinked',
+        description: 'Successfully removed linked plan',
       });
       loadPlanDetails();
     } catch (error) {
-      console.error('Failed to unlink brainstorm:', error);
+      console.error('Failed to unlink plan:', error);
       toaster.create({
         type: 'error',
         title: 'Failed to unlink',
@@ -611,72 +574,95 @@ export default function PlanOverview({ plan, onBack }: PlanOverviewProps) {
                     </>
                   )}
 
-                {/* Show linked plan if exists - styled like documents */}
-                {planDetails.brainstormLink && (
+                {/* Show linked plans if they exist - styled like documents */}
+                {planDetails.linkedPlans && planDetails.linkedPlans.length > 0 && (
                   <VStack align="stretch" gap={2} pt={3} borderTopWidth="1px" borderColor="border.subtle">
                     <Text fontSize="sm" fontWeight="medium" color="text.secondary">
-                      Linked Plans (1)
+                      Linked Plans ({planDetails.linkedPlans.length})
                     </Text>
-                    <Card.Root
-                      variant="subtle"
-                      borderWidth="1px"
-                      borderColor="border.subtle"
-                      cursor="pointer"
-                      onClick={handleOpenBrainstorm}
-                      transition="all 0.2s ease-in-out"
-                      _hover={{
-                        transform: 'translateY(-2px)',
-                        shadow: 'sm',
-                      }}
-                      role="group"
-                    >
-                      <CardBody>
-                        <HStack justify="space-between" align="start" gap={3}>
-                          <HStack gap={2} flex="1" minW={0}>
-                            <Icon color="primary.500">
-                              <LuFileText />
-                            </Icon>
-                            <VStack align="start" gap={0} flex="1" minW={0}>
-                              <Text
-                                fontSize="sm"
-                                fontWeight="medium"
-                                noOfLines={1}
-                                title={planDetails.brainstormLink}
-                              >
-                                {planDetails.brainstormLink.split('/').pop()}
-                              </Text>
-                              {linkedPlanSource && (
-                                <Badge size="sm" variant="subtle" colorPalette={linkedPlanSource === 'claude' ? 'orange' : 'blue'}>
-                                  {linkedPlanSource}
-                                </Badge>
-                              )}
-                            </VStack>
-                          </HStack>
+                    <VStack align="stretch" gap={2}>
+                      {planDetails.linkedPlans.map((linkedPlan) => (
+                        <Card.Root
+                          key={linkedPlan.id}
+                          variant="subtle"
+                          borderWidth="1px"
+                          borderColor="border.subtle"
+                          cursor="pointer"
+                          onClick={async () => {
+                            try {
+                              const content = await invokeReadFile(linkedPlan.linkedPlanPath);
+                              const fileName = linkedPlan.linkedPlanPath.split('/').pop() || 'plan';
+                              const resourceFile: ResourceFile = {
+                                path: linkedPlan.linkedPlanPath,
+                                name: fileName,
+                                frontMatter: {},
+                                resourceType: 'plan',
+                              };
+                              setSelectedResource(resourceFile, content, 'plan');
+                            } catch (error) {
+                              console.error('Failed to open linked plan:', error);
+                              toaster.create({
+                                type: 'error',
+                                title: 'Failed to open file',
+                                description: String(error),
+                                closable: true,
+                              });
+                            }
+                          }}
+                          transition="all 0.2s ease-in-out"
+                          _hover={{
+                            transform: 'translateY(-2px)',
+                            shadow: 'sm',
+                          }}
+                          role="group"
+                        >
+                          <CardBody>
+                            <HStack justify="space-between" align="start" gap={3}>
+                              <HStack gap={2} flex="1" minW={0}>
+                                <Icon color="primary.500">
+                                  <LuFileText />
+                                </Icon>
+                                <VStack align="start" gap={0} flex="1" minW={0}>
+                                  <Text
+                                    fontSize="sm"
+                                    fontWeight="medium"
+                                    noOfLines={1}
+                                    title={linkedPlan.linkedPlanPath}
+                                  >
+                                    {linkedPlan.linkedPlanPath.split('/').pop()}
+                                  </Text>
+                                  <Badge size="sm" variant="subtle" colorPalette={linkedPlan.source === 'claude' ? 'orange' : 'blue'}>
+                                    {linkedPlan.source}
+                                  </Badge>
+                                </VStack>
+                              </HStack>
 
-                          <IconButton
-                            aria-label="Delete plan"
-                            variant="ghost"
-                            size="xs"
-                            colorPalette="red"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnlinkBrainstorm();
-                            }}
-                            css={{
-                              opacity: 0,
-                              transition: 'opacity 0.2s ease-in-out',
-                              '[role="group"]:hover &': {
-                                opacity: 1,
-                              },
-                            }}
-                          >
-                            <Icon>
-                              <LuTrash2 />
-                            </Icon>
-                          </IconButton>
-                        </HStack>
-                      </CardBody>
-                    </Card.Root>
+                              <IconButton
+                                aria-label="Unlink plan"
+                                variant="ghost"
+                                size="xs"
+                                colorPalette="red"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnlinkPlan(linkedPlan.linkedPlanPath);
+                                }}
+                                css={{
+                                  opacity: 0,
+                                  transition: 'opacity 0.2s ease-in-out',
+                                  '[role="group"]:hover &': {
+                                    opacity: 1,
+                                  },
+                                }}
+                              >
+                                <Icon>
+                                  <LuTrash2 />
+                                </Icon>
+                              </IconButton>
+                            </HStack>
+                          </CardBody>
+                        </Card.Root>
+                      ))}
+                    </VStack>
                   </VStack>
                 )}
               </VStack>

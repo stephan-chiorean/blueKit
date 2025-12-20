@@ -33,6 +33,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_plan_phases_table(db).await?;
     create_plan_milestones_table(db).await?;
     create_plan_documents_table(db).await?;
+    create_plan_links_table(db).await?;
 
     Ok(())
 }
@@ -507,6 +508,43 @@ async fn create_plan_documents_table(db: &DatabaseConnection) -> Result<(), DbEr
     .await?;
 
     info!("Plan documents table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_plan_links_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS plan_links (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_id TEXT NOT NULL,
+            linked_plan_path TEXT NOT NULL,
+            source TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+            UNIQUE(plan_id, linked_plan_path)
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_plan_links_plan_id ON plan_links(plan_id);
+        CREATE INDEX IF NOT EXISTS idx_plan_links_path ON plan_links(linked_plan_path);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Plan links table and indexes created or already exist");
 
     Ok(())
 }

@@ -13,6 +13,7 @@ export interface Plan {
   brainstormLink?: string;
   createdAt: number;
   updatedAt: number;
+  progress: number; // 0-100 based on milestone completion
 }
 
 export interface PlanPhase {
@@ -50,6 +51,15 @@ export interface PlanDocument {
   updatedAt: number;
 }
 
+export interface PlanLink {
+  id: string;
+  planId: string;
+  linkedPlanPath: string;
+  source: 'claude' | 'cursor';
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PlanPhaseWithMilestones extends PlanPhase {
   milestones: PlanMilestone[];
 }
@@ -57,5 +67,6 @@ export interface PlanPhaseWithMilestones extends PlanPhase {
 export interface PlanDetails extends Plan {
   phases: PlanPhaseWithMilestones[];
   documents: PlanDocument[];
+  linkedPlans: PlanLink[];
   progress: number; // 0-100 based on milestone completion
 }

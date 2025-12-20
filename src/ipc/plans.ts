@@ -91,6 +91,34 @@ export async function invokeUnlinkBrainstormFromPlan(planId: string): Promise<vo
   return await invokeWithTimeout<void>('unlink_brainstorm_from_plan', { planId });
 }
 
+/**
+ * Link multiple plans to a plan
+ */
+export async function invokeLinkMultiplePlansToPlan(
+  planId: string,
+  planPaths: string[],
+  source: 'claude' | 'cursor'
+): Promise<void> {
+  return await invokeWithTimeout<void>('link_multiple_plans_to_plan', {
+    planId,
+    planPaths,
+    source,
+  });
+}
+
+/**
+ * Unlink a specific plan from a plan
+ */
+export async function invokeUnlinkPlanFromPlan(
+  planId: string,
+  linkedPlanPath: string
+): Promise<void> {
+  return await invokeWithTimeout<void>('unlink_plan_from_plan', {
+    planId,
+    linkedPlanPath,
+  });
+}
+
 // ============================================================================
 // PHASE CRUD OPERATIONS
 // ============================================================================

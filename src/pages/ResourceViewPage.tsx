@@ -30,11 +30,13 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   const hasInitialized = useRef(false);
   const resourcePathRef = useRef<string | null>(null);
   const viewModeRef = useRef(viewMode);
+  const clearSelectedResourceRef = useRef(clearSelectedResource);
 
-  // Keep viewMode ref in sync
+  // Keep refs in sync with latest values
   useEffect(() => {
     viewModeRef.current = viewMode;
-  }, [viewMode]);
+    clearSelectedResourceRef.current = clearSelectedResource;
+  }, [viewMode, clearSelectedResource]);
 
   // Set the selected resource when component mounts or when resource changes
   // For plan mode, don't set the resource - let documents be selectable
@@ -57,15 +59,17 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   }, [resource.path, resourceContent, resourceType, viewMode, setSelectedResource]);
 
   // Separate effect for cleanup on unmount only
+  // Use empty dependency array so this only runs on mount/unmount
+  // Access clearSelectedResource via ref to always use latest version
   useEffect(() => {
     return () => {
       // Only clear if we're not in plan mode (plan mode manages its own document selection)
       if (viewModeRef.current !== 'plan') {
-        clearSelectedResource();
+        clearSelectedResourceRef.current();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearSelectedResource]);
+  }, []);
 
   // Diagrams use a different layout (full-screen viewer without split view)
   if (resourceType === 'diagram') {

@@ -147,17 +147,17 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
         </CardHeader>
 
         <CardBody display="flex" flexDirection="column" gap={3}>
-          {/* Progress bar placeholder - will show actual progress later */}
+          {/* Progress bar */}
           <Box>
             <Flex justify="space-between" mb={1}>
               <Text fontSize="xs" color="text.tertiary">
                 Progress
               </Text>
               <Text fontSize="xs" color="text.tertiary">
-                0%
+                {Math.round(plan.progress)}%
               </Text>
             </Flex>
-            <Progress.Root value={0} size="sm" colorPalette="primary">
+            <Progress.Root value={plan.progress} size="sm" colorPalette="primary">
               <Progress.Track>
                 <Progress.Range />
               </Progress.Track>
@@ -354,7 +354,7 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
                 </Table.Cell>
                 <Table.Cell>
                   <Text fontSize="sm" color="text.tertiary">
-                    0%
+                    {Math.round(plan.progress)}%
                   </Text>
                 </Table.Cell>
                 <Table.Cell>

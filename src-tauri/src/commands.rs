@@ -3874,6 +3874,31 @@ pub async fn unlink_brainstorm_from_plan(
         .map_err(|e| format!("Failed to unlink brainstorm: {}", e))
 }
 
+/// Link multiple plans to a plan
+#[tauri::command]
+pub async fn link_multiple_plans_to_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    plan_paths: Vec<String>,
+    source: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::link_multiple_plans_to_plan(db.inner(), plan_id, plan_paths, source)
+        .await
+        .map_err(|e| format!("Failed to link plans: {}", e))
+}
+
+/// Unlink a specific plan from a plan
+#[tauri::command]
+pub async fn unlink_plan_from_plan(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    linked_plan_path: String,
+) -> Result<(), String> {
+    crate::db::plan_operations::unlink_plan_from_plan(db.inner(), plan_id, linked_plan_path)
+        .await
+        .map_err(|e| format!("Failed to unlink plan: {}", e))
+}
+
 /// Create a plan phase
 #[tauri::command]
 pub async fn create_plan_phase(

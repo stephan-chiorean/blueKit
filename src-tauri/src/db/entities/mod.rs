@@ -15,3 +15,4 @@ pub mod plan;
 pub mod plan_phase;
 pub mod plan_milestone;
 pub mod plan_document;
+pub mod plan_link;

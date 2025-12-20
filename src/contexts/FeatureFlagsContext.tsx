@@ -3,6 +3,8 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 interface FeatureFlags {
   // Add new feature flags here as needed
   // Example: newFeature: boolean;
+  blueprints: boolean;
+  scrapbook: boolean;
 }
 
 interface FeatureFlagsContextType {
@@ -24,6 +26,8 @@ export function FeatureFlagsProvider({
 }: FeatureFlagsProviderProps) {
   // Default feature flags - set to true to enable features
   const defaultFlags: FeatureFlags = {
+    blueprints: false, // Hide blueprints tab by default
+    scrapbook: false, // Hide scrapbook tab by default
     ...initialFlags,
   };
 

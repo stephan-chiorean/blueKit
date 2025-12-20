@@ -31,6 +31,7 @@ import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -39,6 +40,9 @@ interface ProjectDetailPageProps {
 }
 
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
+  // Feature flags
+  const { flags } = useFeatureFlags();
+  
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
   const [artifactsLoading, setArtifactsLoading] = useState(true);
@@ -116,6 +120,15 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   useEffect(() => {
     loadPlans();
   }, [project.id]);
+
+  // Switch to a default tab if current tab is disabled by feature flags
+  useEffect(() => {
+    if (currentTab === 'blueprints' && !flags.blueprints) {
+      setCurrentTab('tasks');
+    } else if (currentTab === 'scrapbook' && !flags.scrapbook) {
+      setCurrentTab('tasks');
+    }
+  }, [currentTab, flags.blueprints, flags.scrapbook]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -650,14 +663,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Plans</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="scrapbook" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuNotebook />
-                      </Icon>
-                      <Text>Scrapbook</Text>
-                    </HStack>
-                  </Tabs.Trigger>
+                  {flags.scrapbook && (
+                    <Tabs.Trigger value="scrapbook" flexShrink={0}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuNotebook />
+                        </Icon>
+                        <Text>Scrapbook</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="diagrams" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
@@ -682,14 +697,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Kits</Text>
                     </HStack>
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="blueprints" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <BsStack />
-                      </Icon>
-                      <Text>Blueprints</Text>
-                    </HStack>
-                  </Tabs.Trigger>
+                  {flags.blueprints && (
+                    <Tabs.Trigger value="blueprints" flexShrink={0}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <BsStack />
+                        </Icon>
+                        <Text>Blueprints</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="agents" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
@@ -755,13 +772,15 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
-            <Tabs.Content value="blueprints">
-              <BlueprintsTabContent
-                projectPath={project.path}
-                projectsCount={1}
-                onViewTask={handleViewTask}
-              />
-            </Tabs.Content>
+            {flags.blueprints && (
+              <Tabs.Content value="blueprints">
+                <BlueprintsTabContent
+                  projectPath={project.path}
+                  projectsCount={1}
+                  onViewTask={handleViewTask}
+                />
+              </Tabs.Content>
+            )}
             <Tabs.Content value="walkthroughs" key="walkthroughs">
               <WalkthroughsTabContent
                 kits={walkthroughs}
@@ -788,12 +807,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 onViewKit={handleViewKit}
               />
             </Tabs.Content>
-            <Tabs.Content value="scrapbook">
-              <ScrapbookTabContent
-                projectPath={project.path}
-                onViewKit={handleViewKit}
-              />
-            </Tabs.Content>
+            {flags.scrapbook && (
+              <Tabs.Content value="scrapbook">
+                <ScrapbookTabContent
+                  projectPath={project.path}
+                  onViewKit={handleViewKit}
+                />
+              </Tabs.Content>
+            )}
             <Tabs.Content value="diagrams" key="diagrams">
               <DiagramsTabContent
                 diagrams={diagrams}

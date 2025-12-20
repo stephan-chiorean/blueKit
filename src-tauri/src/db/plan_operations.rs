@@ -1,7 +1,7 @@
 use sea_orm::*;
 use sea_orm::sea_query::{Expr, Value};
 use serde::{Deserialize, Serialize};
-use crate::db::entities::{plan, plan_phase, plan_milestone, plan_document};
+use crate::db::entities::{plan, plan_phase, plan_milestone, plan_document, plan_link};
 use chrono::Utc;
 use uuid::Uuid;
 use std::path::{Path, PathBuf};
@@ -24,6 +24,7 @@ pub struct PlanDto {
     pub created_at: i64,
     #[serde(rename = "updatedAt")]
     pub updated_at: i64,
+    pub progress: f32, // 0-100 based on milestone completion
 }
 
 /// Plan Phase DTO
@@ -85,6 +86,21 @@ pub struct PlanDocumentDto {
     pub updated_at: i64,
 }
 
+/// Plan Link DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanLinkDto {
+    pub id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "linkedPlanPath")]
+    pub linked_plan_path: String,
+    pub source: String, // 'claude' or 'cursor'
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: i64,
+}
+
 /// Plan Details DTO (includes phases with milestones and documents)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanDetailsDto {
@@ -104,6 +120,8 @@ pub struct PlanDetailsDto {
     pub updated_at: i64,
     pub phases: Vec<PlanPhaseDto>,
     pub documents: Vec<PlanDocumentDto>,
+    #[serde(rename = "linkedPlans")]
+    pub linked_plans: Vec<PlanLinkDto>,
     pub progress: f32, // 0-100 based on milestone completion
 }
 
@@ -158,6 +176,7 @@ pub async fn create_plan(
 
     let plan_model = plan_active_model.insert(db).await?;
 
+    // New plan has 0 progress (no milestones yet)
     Ok(PlanDto {
         id: plan_model.id,
         name: plan_model.name,
@@ -168,6 +187,7 @@ pub async fn create_plan(
         brainstorm_link: plan_model.brainstorm_link,
         created_at: plan_model.created_at,
         updated_at: plan_model.updated_at,
+        progress: 0.0,
     })
 }
 
@@ -182,17 +202,24 @@ pub async fn get_project_plans(
         .all(db)
         .await?;
 
-    Ok(plans.into_iter().map(|p| PlanDto {
-        id: p.id,
-        name: p.name,
-        project_id: p.project_id,
-        folder_path: p.folder_path,
-        description: p.description,
-        status: p.status,
-        brainstorm_link: p.brainstorm_link,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-    }).collect())
+    let mut plan_dtos = Vec::new();
+    for p in plans {
+        let progress = calculate_plan_progress(db, &p.id).await?;
+        plan_dtos.push(PlanDto {
+            id: p.id,
+            name: p.name,
+            project_id: p.project_id,
+            folder_path: p.folder_path,
+            description: p.description,
+            status: p.status,
+            brainstorm_link: p.brainstorm_link,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            progress,
+        });
+    }
+
+    Ok(plan_dtos)
 }
 
 /// Get plan details with phases, milestones, and documents
@@ -211,6 +238,9 @@ pub async fn get_plan_details(
 
     // Get documents
     let documents = get_plan_documents_internal(db, &plan_id).await?;
+
+    // Get linked plans
+    let linked_plans = get_plan_links_internal(db, &plan_id).await?;
 
     // Calculate progress (completed milestones / total milestones)
     let mut total_milestones = 0;
@@ -238,8 +268,32 @@ pub async fn get_plan_details(
         updated_at: plan_model.updated_at,
         phases,
         documents,
+        linked_plans,
         progress,
     })
+}
+
+// Helper to calculate plan progress from milestones
+async fn calculate_plan_progress(
+    db: &DatabaseConnection,
+    plan_id: &str,
+) -> Result<f32, DbErr> {
+    let phases = get_plan_phases_with_milestones(db, plan_id).await?;
+    
+    let mut total_milestones = 0;
+    let mut completed_milestones = 0;
+    for phase in &phases {
+        total_milestones += phase.milestones.len();
+        completed_milestones += phase.milestones.iter().filter(|m| m.completed).count();
+    }
+
+    let progress = if total_milestones > 0 {
+        (completed_milestones as f32 / total_milestones as f32) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(progress)
 }
 
 // Helper to get phases with milestones
@@ -319,6 +373,27 @@ async fn get_plan_documents_internal(
     }).collect())
 }
 
+// Helper to get linked plans for a plan
+async fn get_plan_links_internal(
+    db: &DatabaseConnection,
+    plan_id: &str,
+) -> Result<Vec<PlanLinkDto>, DbErr> {
+    let links: Vec<plan_link::Model> = plan_link::Entity::find()
+        .filter(plan_link::Column::PlanId.eq(plan_id))
+        .order_by_asc(plan_link::Column::CreatedAt)
+        .all(db)
+        .await?;
+
+    Ok(links.into_iter().map(|l| PlanLinkDto {
+        id: l.id,
+        plan_id: l.plan_id,
+        linked_plan_path: l.linked_plan_path,
+        source: l.source,
+        created_at: l.created_at,
+        updated_at: l.updated_at,
+    }).collect())
+}
+
 /// Update a plan
 pub async fn update_plan(
     db: &DatabaseConnection,
@@ -367,6 +442,9 @@ pub async fn update_plan(
 
     let updated_plan = plan_active_model.update(db).await?;
 
+    // Calculate progress for updated plan
+    let progress = calculate_plan_progress(db, &plan_id).await?;
+
     Ok(PlanDto {
         id: updated_plan.id,
         name: updated_plan.name,
@@ -377,6 +455,7 @@ pub async fn update_plan(
         brainstorm_link: updated_plan.brainstorm_link,
         created_at: updated_plan.created_at,
         updated_at: updated_plan.updated_at,
+        progress,
     })
 }
 
@@ -403,53 +482,116 @@ pub async fn delete_plan(
     Ok(())
 }
 
-/// Link brainstorm plan to a plan
+/// Link brainstorm plan to a plan (legacy - maintains backward compatibility)
 pub async fn link_brainstorm_to_plan(
     db: &DatabaseConnection,
     plan_id: String,
     brainstorm_path: String,
 ) -> Result<(), DbErr> {
-    let now = Utc::now().timestamp();
+    // Detect source from path
+    let source = if brainstorm_path.contains(".claude") {
+        "claude"
+    } else if brainstorm_path.contains(".cursor") {
+        "cursor"
+    } else {
+        "unknown"
+    };
 
-    // Verify file exists
-    if !Path::new(&brainstorm_path).exists() {
-        return Err(DbErr::Custom("Brainstorm file does not exist".to_string()));
-    }
-
-    // Update plan
-    let plan_model = plan::Entity::find_by_id(&plan_id)
-        .one(db)
-        .await?
-        .ok_or_else(|| DbErr::RecordNotFound(format!("Plan not found: {}", plan_id)))?;
-
-    let mut plan_active_model: plan::ActiveModel = plan_model.into();
-    plan_active_model.brainstorm_link = Set(Some(brainstorm_path));
-    plan_active_model.updated_at = Set(now);
-
-    plan_active_model.update(db).await?;
-
-    Ok(())
+    // Use new multi-link function
+    link_plan_to_plan(db, plan_id, brainstorm_path, source.to_string()).await
 }
 
-/// Unlink brainstorm from plan
+/// Unlink brainstorm from plan (legacy - maintains backward compatibility)
 pub async fn unlink_brainstorm_from_plan(
     db: &DatabaseConnection,
     plan_id: String,
 ) -> Result<(), DbErr> {
+    // Get all linked plans and remove them
+    let links = get_plan_links_internal(db, &plan_id).await?;
+    for link in links {
+        unlink_plan_from_plan(db, plan_id.clone(), link.linked_plan_path).await?;
+    }
+    Ok(())
+}
+
+/// Link a plan (from cursor/claude) to a plan
+pub async fn link_plan_to_plan(
+    db: &DatabaseConnection,
+    plan_id: String,
+    linked_plan_path: String,
+    source: String,
+) -> Result<(), DbErr> {
     let now = Utc::now().timestamp();
 
-    // Update plan
-    let plan_model = plan::Entity::find_by_id(&plan_id)
+    // Verify file exists
+    if !Path::new(&linked_plan_path).exists() {
+        return Err(DbErr::Custom("Linked plan file does not exist".to_string()));
+    }
+
+    // Verify plan exists
+    plan::Entity::find_by_id(&plan_id)
         .one(db)
         .await?
         .ok_or_else(|| DbErr::RecordNotFound(format!("Plan not found: {}", plan_id)))?;
 
-    let mut plan_active_model: plan::ActiveModel = plan_model.into();
-    plan_active_model.brainstorm_link = Set(None);
-    plan_active_model.updated_at = Set(now);
+    // Check if link already exists
+    let existing_link = plan_link::Entity::find()
+        .filter(plan_link::Column::PlanId.eq(&plan_id))
+        .filter(plan_link::Column::LinkedPlanPath.eq(&linked_plan_path))
+        .one(db)
+        .await?;
 
-    plan_active_model.update(db).await?;
+    if existing_link.is_some() {
+        // Link already exists, just return success
+        return Ok(());
+    }
 
+    // Create new link
+    let link_id = Uuid::new_v4().to_string();
+    let link_active_model = plan_link::ActiveModel {
+        id: Set(link_id),
+        plan_id: Set(plan_id),
+        linked_plan_path: Set(linked_plan_path),
+        source: Set(source),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    link_active_model.insert(db).await?;
+
+    Ok(())
+}
+
+/// Unlink a plan from a plan
+pub async fn unlink_plan_from_plan(
+    db: &DatabaseConnection,
+    plan_id: String,
+    linked_plan_path: String,
+) -> Result<(), DbErr> {
+    // Find and delete the link
+    let link = plan_link::Entity::find()
+        .filter(plan_link::Column::PlanId.eq(&plan_id))
+        .filter(plan_link::Column::LinkedPlanPath.eq(&linked_plan_path))
+        .one(db)
+        .await?;
+
+    if let Some(link_model) = link {
+        plan_link::Entity::delete_by_id(link_model.id).exec(db).await?;
+    }
+
+    Ok(())
+}
+
+/// Link multiple plans to a plan
+pub async fn link_multiple_plans_to_plan(
+    db: &DatabaseConnection,
+    plan_id: String,
+    plan_paths: Vec<String>,
+    source: String,
+) -> Result<(), DbErr> {
+    for path in plan_paths {
+        link_plan_to_plan(db, plan_id.clone(), path, source.clone()).await?;
+    }
     Ok(())
 }
 

@@ -143,6 +143,8 @@ async fn main() {
             commands::delete_plan, // Delete a plan
             commands::link_brainstorm_to_plan, // Link brainstorm file to plan
             commands::unlink_brainstorm_from_plan, // Unlink brainstorm from plan
+            commands::link_multiple_plans_to_plan, // Link multiple plans to a plan
+            commands::unlink_plan_from_plan, // Unlink a specific plan from a plan
             commands::create_plan_phase, // Create a plan phase
             commands::update_plan_phase, // Update a plan phase
             commands::delete_plan_phase, // Delete a plan phase

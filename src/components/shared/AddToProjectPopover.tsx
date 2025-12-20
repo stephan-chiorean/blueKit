@@ -11,6 +11,7 @@ import {
   InputGroup,
   Icon,
   Flex,
+  Portal,
 } from '@chakra-ui/react';
 import { LuSearch, LuCheck, LuFolder, LuFolderOpen, LuPlus } from 'react-icons/lu';
 import { open } from '@tauri-apps/api/dialog';
@@ -255,8 +256,9 @@ export default function AddToProjectPopover({
       <Menu.Trigger asChild>
         {trigger}
       </Menu.Trigger>
-      <Menu.Positioner>
-        <Menu.Content width="400px" maxH="500px" position="relative">
+      <Portal>
+        <Menu.Positioner zIndex={2000}>
+          <Menu.Content width="400px" maxH="500px" position="relative" zIndex={2000}>
           {/* Header */}
           <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
             <Flex justify="space-between" align="center" gap={2}>
@@ -409,6 +411,7 @@ export default function AddToProjectPopover({
           </Box>
         </Menu.Content>
       </Menu.Positioner>
+      </Portal>
     </Menu.Root>
   );
 }
