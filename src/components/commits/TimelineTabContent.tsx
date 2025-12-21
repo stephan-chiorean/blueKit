@@ -45,7 +45,7 @@ import {
 import PinCheckpointModal from "./PinCheckpointModal";
 import { open } from "@tauri-apps/api/dialog";
 
-interface CommitTimelineViewProps {
+interface TimelineTabContentProps {
   projectId: string;
   gitUrl?: string;
   gitConnected: boolean;
@@ -54,12 +54,12 @@ interface CommitTimelineViewProps {
 
 type ViewMode = "commits" | "checkpoints";
 
-export default function CommitTimelineView({
+export default function TimelineTabContent({
   projectId,
   gitUrl,
   gitConnected,
   onGitConnected,
-}: CommitTimelineViewProps) {
+}: TimelineTabContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("commits");
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -149,12 +149,19 @@ export default function CommitTimelineView({
     }
   }, [projectId, gitConnected]);
 
-  // Load checkpoints when switching to checkpoints view or when project changes
+  // Load checkpoints when project changes (needed for commits view to show pinned commits)
   useEffect(() => {
-    if (viewMode === "checkpoints" && projectId) {
+    if (projectId && gitConnected) {
       loadCheckpoints();
     }
-  }, [viewMode, projectId]);
+  }, [projectId, gitConnected]);
+
+  // Reload checkpoints when switching to checkpoints view
+  useEffect(() => {
+    if (viewMode === "checkpoints" && projectId && gitConnected) {
+      loadCheckpoints();
+    }
+  }, [viewMode]);
 
   // Handle pin checkpoint
   const handlePinCheckpoint = (commit: GitHubCommit) => {

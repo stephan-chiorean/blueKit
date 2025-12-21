@@ -22,8 +22,7 @@ import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent'
 import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
-import ClonesTabContent from '../components/clones/ClonesTabContent';
-import CommitTimelineView from '../components/commits/CommitTimelineView';
+import TimelineTabContent from '../components/commits/TimelineTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
@@ -830,7 +829,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               />
             </Tabs.Content>
             <Tabs.Content value="timeline">
-              <CommitTimelineView
+              <TimelineTabContent
                 projectId={dbProject?.id || ''}
                 gitUrl={dbProject?.gitUrl}
                 gitConnected={dbProject?.gitConnected || false}
