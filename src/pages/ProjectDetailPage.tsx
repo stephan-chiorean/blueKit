@@ -27,7 +27,7 @@ import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTa
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, Project, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
