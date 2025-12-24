@@ -408,6 +408,7 @@ export default function HomePage({
                 projectsLoading={projectsLoading}
                 error={projectsError}
                 onProjectSelect={onProjectSelect}
+                onProjectsChanged={loadProjects}
               />
             </Tabs.Content>
             <Tabs.Content value="library">

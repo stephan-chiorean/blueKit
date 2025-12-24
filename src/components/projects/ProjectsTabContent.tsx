@@ -17,20 +17,21 @@ import {
   Flex,
   Button,
   Status,
+  Dialog,
+  Input,
 } from '@chakra-ui/react';
 import { Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
 import { LuFolder, LuChevronRight, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
 import { toaster } from '../ui/toaster';
-import { DialogRoot, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogActionTrigger } from '../ui/dialog';
-import { Field } from '../ui/field';
 
 interface ProjectsTabContentProps {
   projects: Project[];
   projectsLoading: boolean;
   error: string | null;
   onProjectSelect: (project: Project) => void;
+  onProjectsChanged?: () => void;
 }
 
 export default function ProjectsTabContent({
@@ -38,6 +39,7 @@ export default function ProjectsTabContent({
   projectsLoading,
   error,
   onProjectSelect,
+  onProjectsChanged,
 }: ProjectsTabContentProps) {
   const [connectingProjectId, setConnectingProjectId] = useState<string | null>(null);
   const [localProjects, setLocalProjects] = useState<Project[]>(projects);
@@ -45,6 +47,9 @@ export default function ProjectsTabContent({
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Update local projects when props change
   useEffect(() => {
@@ -67,6 +72,9 @@ export default function ProjectsTabContent({
 
       // Update local projects with the updated project
       setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+
+      // Notify parent to reload projects
+      onProjectsChanged?.();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect git';
       console.error('Failed to connect git:', err);
@@ -97,6 +105,9 @@ export default function ProjectsTabContent({
 
       // Update local projects with the updated project
       setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+
+      // Notify parent to reload projects
+      onProjectsChanged?.();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect git';
       toaster.create({
@@ -177,6 +188,9 @@ export default function ProjectsTabContent({
       setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
       setEditingProject(null);
 
+      // Notify parent to reload projects
+      onProjectsChanged?.();
+
       toaster.create({
         title: 'Project updated',
         description: `Successfully updated ${editName}`,
@@ -196,23 +210,31 @@ export default function ProjectsTabContent({
     }
   };
 
-  const handleDeleteProject = async (project: Project, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteProject = (project: Project) => {
+    setDeletingProject(project);
+    setDeleteConfirmText('');
+  };
 
-    if (!confirm(`Are you sure you want to remove "${project.name}" from the registry?\n\nThis will not delete the actual project files, only remove it from BlueKit.`)) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
+    if (!deletingProject) return;
 
     try {
-      await invokeDbDeleteProject(project.id);
-      setLocalProjects(prev => prev.filter(p => p.id !== project.id));
+      setIsDeleting(true);
+      await invokeDbDeleteProject(deletingProject.id);
+      setLocalProjects(prev => prev.filter(p => p.id !== deletingProject.id));
+
+      // Notify parent to reload projects
+      onProjectsChanged?.();
 
       toaster.create({
         title: 'Project removed',
-        description: `Successfully removed ${project.name} from registry`,
+        description: `Successfully removed ${deletingProject.name} from registry`,
         type: 'success',
         duration: 3000,
       });
+
+      setDeletingProject(null);
+      setDeleteConfirmText('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
       toaster.create({
@@ -221,6 +243,8 @@ export default function ProjectsTabContent({
         type: 'error',
         duration: 5000,
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -349,17 +373,14 @@ export default function ProjectsTabContent({
                             <Menu.Separator />
                             <Menu.Item
                               value="edit"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                                handleEditProject(project);
-                              }}
+                              onSelect={() => handleEditProject(project)}
                             >
                               <Icon><LuPencil /></Icon>
                               Edit Project
                             </Menu.Item>
                             <Menu.Item
                               value="delete"
-                              onSelect={(e) => handleDeleteProject(project, e)}
+                              onSelect={() => handleDeleteProject(project)}
                               color="fg.error"
                             >
                               <Icon><LuTrash2 /></Icon>
@@ -386,52 +407,132 @@ export default function ProjectsTabContent({
       </SimpleGrid>
 
       {/* Edit Project Dialog */}
-      <DialogRoot
+      <Dialog.Root
         open={editingProject !== null}
-        onOpenChange={(details) => {
-          if (!details.open) {
+        onOpenChange={(e) => {
+          if (!e.open) {
             setEditingProject(null);
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <VStack gap={4}>
-              <Field label="Project Name">
-                <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Enter project name"
-                />
-              </Field>
-              <Field label="Description">
-                <Input
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Enter project description (optional)"
-                />
-              </Field>
-            </VStack>
-          </DialogBody>
-          <DialogFooter>
-            <DialogActionTrigger asChild>
-              <Button variant="outline" disabled={isSaving}>
-                Cancel
-              </Button>
-            </DialogActionTrigger>
-            <Button
-              onClick={handleSaveEdit}
-              loading={isSaving}
-              disabled={!editName.trim()}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </DialogRoot>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>Edit Project</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <VStack gap={4} align="stretch">
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" mb={2}>
+                      Project Name
+                    </Text>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter project name"
+                    />
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" mb={2}>
+                      Description
+                    </Text>
+                    <Input
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Enter project description (optional)"
+                    />
+                  </Box>
+                </VStack>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.CloseTrigger asChild>
+                  <Button variant="outline" disabled={isSaving}>
+                    Cancel
+                  </Button>
+                </Dialog.CloseTrigger>
+                <Button
+                  onClick={handleSaveEdit}
+                  loading={isSaving}
+                  disabled={!editName.trim()}
+                >
+                  Save Changes
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog.Root
+        open={deletingProject !== null}
+        onOpenChange={(e) => {
+          if (!e.open) {
+            setDeletingProject(null);
+            setDeleteConfirmText('');
+          }
+        }}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title color="fg.error">Remove Project</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <VStack gap={4} align="stretch">
+                  <Box
+                    p={3}
+                    bg="red.50"
+                    borderWidth="1px"
+                    borderColor="red.200"
+                    borderRadius="md"
+                    _dark={{ bg: "red.950", borderColor: "red.800" }}
+                  >
+                    <Text fontSize="sm" color="red.700" _dark={{ color: "red.300" }}>
+                      This action cannot be undone. This will remove the project from BlueKit's registry.
+                    </Text>
+                  </Box>
+
+                  <Text fontSize="sm" color="fg.muted">
+                    The actual project files will not be deleted, only the registry entry will be removed.
+                  </Text>
+
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" mb={2}>
+                      Type <Text as="span" fontWeight="bold" fontFamily="mono">{deletingProject?.name}</Text> to confirm:
+                    </Text>
+                    <Input
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder={deletingProject?.name}
+                      autoFocus
+                    />
+                  </Box>
+                </VStack>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.CloseTrigger asChild>
+                  <Button variant="outline" disabled={isDeleting}>
+                    Cancel
+                  </Button>
+                </Dialog.CloseTrigger>
+                <Button
+                  onClick={handleConfirmDelete}
+                  loading={isDeleting}
+                  disabled={deleteConfirmText !== deletingProject?.name}
+                  colorPalette="red"
+                >
+                  Remove Project
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </VStack>
   );
 }
