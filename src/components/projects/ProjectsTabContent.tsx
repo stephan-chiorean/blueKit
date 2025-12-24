@@ -195,37 +195,35 @@ export default function ProjectsTabContent({
                       </HStack>
 
                       {/* Connect/Disconnect button */}
-                      {dbProject && (
-                        dbProject.gitConnected ? (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            colorPalette="red"
-                            onClick={(e) => handleDisconnectGit(project, e)}
-                            loading={isConnectingThis}
-                            loadingText="Disconnecting..."
-                          >
-                            Disconnect
-                          </Button>
-                        ) : (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            colorPalette="green"
-                            onClick={(e) => handleConnectGit(project, e)}
-                            loading={isConnectingThis}
-                            loadingText="Connecting..."
-                          >
-                            Connect
-                          </Button>
-                        )
+                      {project.gitConnected ? (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          colorPalette="red"
+                          onClick={(e) => handleDisconnectGit(project, e)}
+                          loading={isConnectingThis}
+                          loadingText="Disconnecting..."
+                        >
+                          Disconnect
+                        </Button>
+                      ) : (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          colorPalette="green"
+                          onClick={(e) => handleConnectGit(project, e)}
+                          loading={isConnectingThis}
+                          loadingText="Connecting..."
+                        >
+                          Connect
+                        </Button>
                       )}
                     </HStack>
 
                     {/* Show git URL if connected */}
-                    {project.gitConnected && dbProject.gitUrl && (
+                    {project.gitConnected && project.gitUrl && (
                       <Text fontSize="xs" color="fg.muted" fontFamily="mono" noOfLines={1}>
-                        {dbProject.gitUrl}
+                        {project.gitUrl}
                       </Text>
                     )}
                   </VStack>
