@@ -13,7 +13,7 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuCopy, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -27,7 +27,7 @@ import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTa
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -59,7 +59,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [plansLoading, setPlansLoading] = useState(true);
 
   // Use transition for non-urgent updates (file watching updates)
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   
   // Defer artifact updates to prevent blocking UI
   const deferredArtifacts = useDeferredValue(artifacts);
@@ -402,9 +402,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'walkthrough');
   }, [deferredArtifacts]);
 
-  const blueprints = useMemo(() => {
-    return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'blueprint');
-  }, [deferredArtifacts]);
+  // Blueprints are loaded separately by BlueprintsTabContent
+  // const blueprints = useMemo(() => {
+  //   return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'blueprint');
+  // }, [deferredArtifacts]);
 
   const agents = useMemo(() => {
     return deferredArtifacts.filter(artifact => artifact.frontMatter?.type === 'agent');
@@ -489,6 +490,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     setResourceType(null);
   };
 
+  // Find matching Project for Header (use dbProject if available, otherwise find from allProjects)
+  const currentProjectForHeader = useMemo(() => {
+    if (dbProject) {
+      return dbProject;
+    }
+    return allProjects.find(p => p.id === project.id || p.path === project.path);
+  }, [dbProject, allProjects, project.id, project.path]);
+
   // Create collection for Select component
   const projectsCollection = useMemo(() => {
     return createListCollection({
@@ -533,7 +542,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       {/* Header above everything */}
       <Box flexShrink={0}>
         <Header 
-          currentProject={project}
+          currentProject={currentProjectForHeader}
           onNavigateToTasks={() => setCurrentTab('tasks')}
         />
       </Box>
