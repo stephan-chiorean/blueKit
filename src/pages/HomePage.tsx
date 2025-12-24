@@ -22,7 +22,7 @@ import {
 import NavigationMenu from "../components/NavigationDrawer";
 import Header from "../components/Header";
 import ProjectsTabContent from "../components/projects/ProjectsTabContent";
-import LibraryTabContent from "../components/library/LibraryTabContent";
+import LibraryTabContent, { LibraryTabContentRef } from "../components/library/LibraryTabContent";
 import WorkflowsTabContent from "../components/workflows/WorkflowsTabContent";
 import TasksTabContent, {
   TasksTabContentRef,
@@ -57,6 +57,7 @@ export default function HomePage({
   const { selectedItems } = useSelection();
   const [activeTab, setActiveTab] = useState("projects");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
+  const libraryTabRef = useRef<LibraryTabContentRef>(null);
 
   const [, setResizeKey] = useState(0);
 
@@ -406,6 +407,21 @@ export default function HomePage({
                   </Button>
                 </Box>
               )}
+              {activeTab === "library" && (
+                <Box position="absolute" right={0}>
+                  <Button
+                    colorPalette="primary"
+                    onClick={() => libraryTabRef.current?.openAddWorkspaceDialog()}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuPlus />
+                      </Icon>
+                      <Text>Add Workspace</Text>
+                    </HStack>
+                  </Button>
+                </Box>
+              )}
             </Flex>
 
             <Tabs.Content value="projects">
@@ -417,7 +433,7 @@ export default function HomePage({
               />
             </Tabs.Content>
             <Tabs.Content value="library">
-              <LibraryTabContent />
+              <LibraryTabContent ref={libraryTabRef} />
             </Tabs.Content>
             <Tabs.Content value="workflows">
               <WorkflowsTabContent />

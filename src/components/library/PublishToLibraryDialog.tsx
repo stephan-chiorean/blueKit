@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react';
-import { LuUpload, LuPlus, LuCheck, LuX, LuGithub } from 'react-icons/lu';
+import { LuUpload, LuPlus, LuCheck, LuX, LuGithub, LuTag } from 'react-icons/lu';
 import { toaster } from '../ui/toaster';
 import {
   invokeLibraryListWorkspaces,
@@ -61,16 +61,23 @@ export default function PublishToLibraryDialog({
   const [newGithubRepo, setNewGithubRepo] = useState('');
   const [creating, setCreating] = useState(false);
 
+  // Variation label for publishing
+  const [variationLabel, setVariationLabel] = useState('');
+
   // Track publish results
   const [publishResults, setPublishResults] = useState<
     Array<{ name: string; success: boolean; error?: string }>
-  >([]);
+  >();
+
+  // Suggested labels for quick selection
+  const suggestedLabels = ['initial', 'updated', 'refactored', 'v2', 'stable', 'experimental'];
 
   useEffect(() => {
     if (isOpen) {
       checkGitHubAuth();
       loadWorkspaces();
       setPublishResults([]);
+      setVariationLabel('');
     }
   }, [isOpen]);
 
@@ -222,7 +229,9 @@ export default function PublishToLibraryDialog({
           if (resource) {
             console.log(`Found matching resource: ${resource.id}`);
             try {
-              const result = await invokePublishResource(resource.id, selectedWorkspace.id);
+              const result = await invokePublishResource(resource.id, selectedWorkspace.id, {
+                versionTag: variationLabel.trim() || undefined,
+              });
               console.log('Publish result:', result);
               results.push({ name: item.name, success: true });
             } catch (error) {
@@ -415,6 +424,40 @@ export default function PublishToLibraryDialog({
                         <LuPlus />
                         <Tag.Label>New</Tag.Label>
                       </Tag.Root>
+                    </HStack>
+                  </Box>
+
+                  {/* Variation Label */}
+                  <Box>
+                    <HStack gap={2} mb={2}>
+                      <Icon fontSize="sm" color="primary.500">
+                        <LuTag />
+                      </Icon>
+                      <Text fontSize="sm" fontWeight="medium">
+                        Variation Label
+                      </Text>
+                      <Text fontSize="xs" color="text.tertiary">(optional)</Text>
+                    </HStack>
+                    <Input
+                      value={variationLabel}
+                      onChange={(e) => setVariationLabel(e.target.value)}
+                      placeholder="e.g., initial, refactored, v2"
+                      size="sm"
+                      mb={2}
+                    />
+                    <HStack gap={1} wrap="wrap">
+                      {suggestedLabels.map((label) => (
+                        <Tag.Root
+                          key={label}
+                          size="sm"
+                          cursor="pointer"
+                          colorPalette={variationLabel === label ? 'primary' : 'gray'}
+                          variant={variationLabel === label ? 'solid' : 'outline'}
+                          onClick={() => setVariationLabel(variationLabel === label ? '' : label)}
+                        >
+                          <Tag.Label>{label}</Tag.Label>
+                        </Tag.Root>
+                      ))}
                     </HStack>
                   </Box>
 

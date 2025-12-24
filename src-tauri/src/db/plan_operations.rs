@@ -236,8 +236,8 @@ pub async fn get_plan_details(
     // Get phases with milestones
     let phases = get_plan_phases_with_milestones(db, &plan_id).await?;
 
-    // Get documents
-    let documents = get_plan_documents_internal(db, &plan_id).await?;
+    // Get documents (scans folder and creates DB records for new files)
+    let documents = get_plan_documents(db, plan_id.clone()).await?;
 
     // Get linked plans
     let linked_plans = get_plan_links_internal(db, &plan_id).await?;
