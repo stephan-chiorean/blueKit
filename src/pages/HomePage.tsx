@@ -33,6 +33,7 @@ import {
   invokeGetProjectArtifacts,
   invokeGetChangedArtifacts,
   invokeWatchProjectArtifacts,
+  invokeWatchProjectsDatabase,
   ArtifactFile,
   Project,
   TimeoutError,
@@ -174,6 +175,44 @@ export default function HomePage({
   useEffect(() => {
     // Load projects on mount
     loadProjects();
+  }, []);
+
+  // Set up database watcher to detect when projects are added/updated via CLI
+  useEffect(() => {
+    let isMounted = true;
+    let unlisten: (() => void) | null = null;
+
+    const setupDatabaseWatcher = async () => {
+      try {
+        // Start watching the database file
+        await invokeWatchProjectsDatabase();
+
+        // Listen for database change events
+        const unlistenFn = await listen('projects-database-changed', () => {
+          if (isMounted) {
+            console.log('Projects database changed, reloading projects...');
+            loadProjects();
+          }
+        });
+
+        unlisten = unlistenFn;
+      } catch (error) {
+        console.error('Failed to set up database watcher:', error);
+        if (error instanceof TimeoutError) {
+          console.warn('Database watcher setup timed out - projects may not auto-refresh');
+        }
+      }
+    };
+
+    setupDatabaseWatcher();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (unlisten) {
+        unlisten();
+      }
+    };
   }, []);
 
   // Reload kits when projects change

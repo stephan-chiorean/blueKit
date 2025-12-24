@@ -112,6 +112,26 @@ export async function invokeWatchProjectArtifacts(projectPath: string): Promise<
 }
 
 /**
+ * Starts watching the projects database file for changes.
+ *
+ * This command sets up a file watcher that monitors the BlueKit database file
+ * (`~/.bluekit/bluekit.db`). When the database file is modified (e.g., when a project
+ * is added via CLI), it emits a Tauri event `projects-database-changed` that the
+ * frontend can listen to.
+ *
+ * @returns A promise that resolves when the watcher is set up
+ *
+ * @example
+ * ```typescript
+ * await invokeWatchProjectsDatabase();
+ * // Then listen for 'projects-database-changed' events
+ * ```
+ */
+export async function invokeWatchProjectsDatabase(): Promise<void> {
+  return await invokeWithTimeout<void>('watch_projects_database', {}, 5000); // Shorter timeout for watcher setup
+}
+
+/**
  * Gets the health status of all active file watchers.
  *
  * @returns A promise that resolves to a map of watcher names to their health status

@@ -63,6 +63,7 @@ async fn main() {
             commands::get_project_artifacts,  // Get all artifacts from .bluekit directory
             commands::get_changed_artifacts, // Get only changed artifacts (incremental updates)
             commands::watch_project_artifacts, // Watch project .bluekit directory for artifact changes
+            commands::watch_projects_database, // Watch projects database for changes
             commands::read_file,        // Read file contents
             commands::write_file,       // Write file contents
             commands::copy_kit_to_project, // Copy kit file to project

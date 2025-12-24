@@ -620,6 +620,57 @@ pub async fn watch_project_artifacts(
     Ok(())
 }
 
+/// Starts watching the projects database file for changes.
+///
+/// This command sets up a file watcher that monitors the BlueKit database file
+/// (`~/.bluekit/bluekit.db`). When the database file is modified (e.g., when a project
+/// is added via CLI), it emits a Tauri event that the frontend can listen to.
+///
+/// # Arguments
+///
+/// * `app_handle` - Tauri application handle (automatically provided)
+///
+/// # Returns
+///
+/// A `Result<(), String>` containing either:
+/// - `Ok(())` - Success case
+/// - `Err(String)` - Error case with an error message
+///
+/// # Example Usage (from frontend)
+///
+/// ```typescript
+/// await invoke('watch_projects_database');
+/// ```
+#[tauri::command]
+pub async fn watch_projects_database(
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    use crate::core::watcher;
+    use crate::db;
+
+    // Get the database file path
+    let db_path = db::get_db_path()
+        .map_err(|e| format!("Failed to get database path: {}", e))?;
+
+    // Event name for database changes
+    let event_name = "projects-database-changed".to_string();
+
+    // Check if watcher already exists - prevent duplicates
+    if watcher::watcher_exists(&event_name).await {
+        tracing::info!("Database watcher already exists");
+        return Ok(());
+    }
+
+    // Start watching the database file
+    watcher::watch_file(
+        app_handle,
+        db_path,
+        event_name,
+    )?;
+
+    Ok(())
+}
+
 /// Reads the contents of a file.
 /// 
 /// # Arguments
