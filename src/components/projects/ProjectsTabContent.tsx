@@ -510,6 +510,9 @@ export default function ProjectsTabContent({
                       onChange={(e) => setDeleteConfirmText(e.target.value)}
                       placeholder={deletingProject?.name}
                       autoFocus
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                     />
                   </Box>
                 </VStack>
