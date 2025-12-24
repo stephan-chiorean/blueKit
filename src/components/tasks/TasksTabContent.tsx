@@ -24,7 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
 import { Task, TaskPriority, TaskType } from '../../types/task';
-import { ProjectEntry, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
+import { ProjectEntry, Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
 import TaskCreateDialog from './TaskCreateDialog';
@@ -465,7 +465,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                     <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
                       <HStack gap={1}>
                         <LuFolder size={10} />
-                        <Text>{project.title}</Text>
+                        <Text>{project.name}</Text>
                       </HStack>
                     </Badge>
                   ) : null;
@@ -857,7 +857,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                               <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
                                 <HStack gap={1}>
                                   <LuFolder size={10} />
-                                  <Text>{project.title}</Text>
+                                  <Text>{project.name}</Text>
                                 </HStack>
                               </Badge>
                             ) : null;
@@ -1013,7 +1013,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
                               <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
                                 <HStack gap={1}>
                                   <LuFolder size={10} />
-                                  <Text>{project.title}</Text>
+                                  <Text>{project.name}</Text>
                                 </HStack>
                               </Badge>
                             ) : null;

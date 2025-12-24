@@ -493,7 +493,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const projectsCollection = useMemo(() => {
     return createListCollection({
       items: allProjects,
-      itemToString: (item) => item.title,
+      itemToString: (item) => item.name,
       itemToValue: (item) => item.id,
     });
   }, [allProjects]);
@@ -601,7 +601,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                               <Icon boxSize={4} color="primary.500">
                                 <LuFolder />
                               </Icon>
-                              <Select.ItemText>{item.title}</Select.ItemText>
+                              <Select.ItemText>{item.name}</Select.ItemText>
                             </HStack>
                             <Select.ItemIndicator />
                           </Select.Item>
