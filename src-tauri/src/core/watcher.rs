@@ -71,7 +71,7 @@ fn is_watched_file(path: &PathBuf) -> bool {
 /// Checks if a JSON file is one we specifically care about
 fn is_watched_json(path: &PathBuf) -> bool {
     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        matches!(name, "blueprint.json" | "clones.json" | "projectRegistry.json" | "config.json")
+        matches!(name, "blueprint.json" | "clones.json" | "config.json")
     } else {
         false
     }
@@ -506,13 +506,3 @@ pub async fn get_watcher_health() -> HashMap<String, bool> {
         .collect()
 }
 
-/// Gets the path to the project registry file
-pub fn get_registry_path() -> Result<PathBuf, String> {
-    let home_dir = env::var("HOME")
-        .or_else(|_| env::var("USERPROFILE"))
-        .map_err(|_| "Could not determine home directory".to_string())?;
-
-    Ok(PathBuf::from(&home_dir)
-        .join(".bluekit")
-        .join("projectRegistry.json"))
-}

@@ -15,13 +15,13 @@ import {
 } from '@chakra-ui/react';
 import { LuSearch, LuCheck, LuFolder, LuFolderOpen, LuPlus } from 'react-icons/lu';
 import { open } from '@tauri-apps/api/dialog';
-import { ProjectEntry, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, invokeCreateNewProject } from '../../ipc';
+import { Project, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, invokeCreateNewProject } from '../../ipc';
 import { toaster } from '../ui/toaster';
 
 export type ArtifactType = 'kit' | 'walkthrough' | 'diagram' | 'agent';
 
 interface AddToProjectPopoverProps {
-  onConfirm: (selectedProjects: ProjectEntry[]) => Promise<void>;
+  onConfirm: (selectedProjects: Project[]) => Promise<void>;
   itemCount: number;
   trigger: React.ReactNode;
   sourceFiles: Array<{ path: string; name: string; type: ArtifactType }>;
@@ -33,7 +33,7 @@ export default function AddToProjectPopover({
   trigger,
   sourceFiles,
 }: AddToProjectPopoverProps) {
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());

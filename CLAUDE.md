@@ -76,7 +76,7 @@ Production-grade file watcher (`src-tauri/src/watcher.rs`) monitors `.bluekit` d
 
 **Watched Files:**
 - `.md`, `.mmd`, `.mermaid` (all instances)
-- `.json` (only `blueprint.json`, `clones.json`, `projectRegistry.json`)
+- `.json` (only `blueprint.json`, `clones.json`, `config.json`)
 
 **Watcher Lifecycle:**
 - File watcher: `watch_file()` - monitors single file in parent directory
@@ -122,11 +122,11 @@ src/
 
 ### Data Flow Patterns
 
-**Project Registry:**
-- Stored at `~/.bluekit/projectRegistry.json`
-- Watched by file watcher (setup in `main.rs:65-76`)
-- Emits `project-registry-changed` event on changes
-- Loaded via `get_project_registry` command
+**Project Management:**
+- Projects stored in SQLite database (`~/.bluekit/bluekit.db`)
+- Loaded via `db_get_projects` command
+- Legacy `projectRegistry.json` auto-migrated on first run
+- No file watching needed (database queries are fast)
 
 **Kit Discovery:**
 1. User selects project

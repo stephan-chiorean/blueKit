@@ -3,7 +3,7 @@ import { Button, HStack, Text, ActionBar, Portal, Box, VStack, Icon } from "@cha
 import { LuTrash2, LuFolderPlus, LuBookOpen, LuPackage, LuBot, LuNetwork, LuPencil, LuUpload } from "react-icons/lu";
 import { toaster } from "../ui/toaster";
 import { useSelection } from "../../contexts/SelectionContext";
-import { ProjectEntry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, deleteResources } from "../../ipc";
+import { Project, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, deleteResources } from "../../ipc";
 import AddToProjectPopover from "./AddToProjectPopover";
 import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import EditResourceMetadataModal from "./EditResourceMetadataModal";
@@ -127,7 +127,7 @@ export default function GlobalActionBar() {
     clearSelection();
   };
 
-  const handleConfirmAddToProject = async (selectedProjects: ProjectEntry[]) => {
+  const handleConfirmAddToProject = async (selectedProjects: Project[]) => {
     try {
       setLoading(true);
 

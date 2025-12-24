@@ -14,12 +14,12 @@ import {
 } from '@chakra-ui/react';
 import { LuPlus, LuListTodo } from 'react-icons/lu';
 import { Task } from '../../types/task';
-import { ProjectEntry, invokeDbGetTasks, invokeGetProjectRegistry } from '../../ipc';
+import { Project, invokeDbGetTasks, invokeGetProjectRegistry } from '../../ipc';
 
 interface TaskManagerPopoverProps {
   onOpenTaskDialog: (task: Task) => void;
-  onOpenCreateDialog: (projects: ProjectEntry[]) => void;
-  currentProject?: ProjectEntry;
+  onOpenCreateDialog: (projects: Project[]) => void;
+  currentProject?: Project;
   onNavigateToTasks?: () => void;
 }
 
@@ -30,7 +30,7 @@ export default function TaskManagerPopover({
   onNavigateToTasks,
 }: TaskManagerPopoverProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
 

@@ -25,7 +25,7 @@ import {
   LuNetwork,
 } from 'react-icons/lu';
 import { LibraryVariation, LibraryCatalog } from '../../types/github';
-import { ProjectEntry, invokeGetProjectRegistry } from '../../ipc';
+import { Project, invokeGetProjectRegistry } from '../../ipc';
 import { invokePullVariation } from '../../ipc/library';
 import { toaster } from '../ui/toaster';
 
@@ -59,7 +59,7 @@ export default function PullResourceDialog({
   onPulled,
 }: PullResourceDialogProps) {
   // State
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [pulling, setPulling] = useState(false);
@@ -103,7 +103,7 @@ export default function PullResourceDialog({
   const projectsCollection = useMemo(() => {
     return createListCollection({
       items: projects,
-      itemToString: (item) => item.title,
+      itemToString: (item) => item.name,
       itemToValue: (item) => item.id,
     });
   }, [projects]);
@@ -137,7 +137,7 @@ export default function PullResourceDialog({
       toaster.create({
         type: 'success',
         title: 'Resource pulled',
-        description: `Added to ${selectedProject.title}`,
+        description: `Added to ${selectedProject.name}`,
       });
 
       onPulled?.();
@@ -286,7 +286,7 @@ export default function PullResourceDialog({
                                   <Icon fontSize="sm" color="primary.500">
                                     <LuFolder />
                                   </Icon>
-                                  <Select.ItemText>{project.title}</Select.ItemText>
+                                  <Select.ItemText>{project.name}</Select.ItemText>
                                 </HStack>
                                 <Select.ItemIndicator />
                               </Select.Item>

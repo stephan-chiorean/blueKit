@@ -6,74 +6,34 @@ import { invokeWithTimeout } from '../utils/ipcTimeout';
 import type { ProjectEntry, ArtifactFile, Project } from './types';
 
 // ============================================================================
-// PROJECT REGISTRY CACHE
+// PROJECT REGISTRY (Now uses database backend)
 // ============================================================================
-// Cache for project registry to prevent redundant IPC calls
-// Multiple components call invokeGetProjectRegistry on mount, this deduplicates them
-let projectRegistryCache: ProjectEntry[] | null = null;
-let projectRegistryPromise: Promise<ProjectEntry[]> | null = null;
 
 /**
- * Gets the project registry from ~/.bluekit/projectRegistry.json.
+ * Gets all projects from the database.
  *
- * This command reads the project registry file from the user's home directory
- * and returns a list of all registered projects.
- *
- * @returns A promise that resolves to an array of ProjectEntry objects
+ * @deprecated Use invokeDbGetProjects() directly instead. This function is kept for backwards compatibility.
+ * @returns A promise that resolves to an array of Project objects
  *
  * @example
  * ```typescript
  * const projects = await invokeGetProjectRegistry();
  * projects.forEach(project => {
- *   console.log(project.title); // "project-name"
+ *   console.log(project.name); // "project-name"
  *   console.log(project.path); // "/absolute/path/to/project"
  * });
  * ```
  */
-export async function invokeGetProjectRegistry(): Promise<ProjectEntry[]> {
-  // Return cached data if available
-  if (projectRegistryCache) {
-    return projectRegistryCache;
-  }
-
-  // If a request is already in flight, return that promise (deduplication)
-  if (projectRegistryPromise) {
-    return projectRegistryPromise;
-  }
-
-  // Make the request
-  projectRegistryPromise = invokeWithTimeout<ProjectEntry[]>('get_project_registry')
-    .then(result => {
-      projectRegistryCache = result;
-      projectRegistryPromise = null;
-      return result;
-    })
-    .catch(error => {
-      projectRegistryPromise = null; // Clear promise on error so retry is possible
-      throw error;
-    });
-
-  return projectRegistryPromise;
+export async function invokeGetProjectRegistry(): Promise<Project[]> {
+  return await invokeDbGetProjects();
 }
 
 /**
- * Invalidates the project registry cache.
- *
- * Call this when the project registry file changes to force a reload
- * on the next call to invokeGetProjectRegistry.
- *
- * @example
- * ```typescript
- * // In your file watcher listener:
- * listen('project-registry-changed', () => {
- *   invalidateProjectRegistryCache();
- *   loadProjects(); // This will now fetch fresh data
- * });
- * ```
+ * @deprecated This function is no longer needed as projects are now stored in the database.
+ * Database queries don't need cache invalidation - just refetch the data.
  */
 export function invalidateProjectRegistryCache(): void {
-  projectRegistryCache = null;
-  projectRegistryPromise = null;
+  // No-op: Database-backed, no cache to invalidate
 }
 
 /**

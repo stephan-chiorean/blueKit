@@ -560,60 +560,6 @@ pub struct CloneMetadata {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// Reads the project registry from ~/.bluekit/projectRegistry.json.
-/// 
-/// # Returns
-/// 
-/// A `Result<Vec<ProjectEntry>, String>` containing either:
-/// - `Ok(Vec<ProjectEntry>)` - Success case with list of projects
-/// - `Err(String)` - Error case with an error message
-#[tauri::command]
-pub async fn get_project_registry() -> Result<Vec<ProjectEntry>, String> {
-    use std::fs;
-
-    // Get home directory
-    let home_dir = env::var("HOME")
-        .or_else(|_| env::var("USERPROFILE")) // Windows fallback
-        .map_err(|e| {
-            let error_msg = format!("Could not determine home directory: {:?}", e);
-            tracing::error!("Failed to get home directory: {}", error_msg);
-            error_msg
-        })?;
-
-    // Construct path to project registry
-    let registry_path = PathBuf::from(&home_dir)
-        .join(".bluekit")
-        .join("projectRegistry.json");
-
-    // Check if registry file exists
-    if !registry_path.exists() {
-        return Ok(Vec::new()); // Return empty vector if file doesn't exist
-    }
-
-    // Read the file
-    let contents = fs::read_to_string(&registry_path)
-        .map_err(|e| {
-            let error_msg = format!("Failed to read project registry at {:?}: {}", registry_path, e);
-            tracing::error!("{}", error_msg);
-            error_msg
-        })?;
-
-    // Handle empty file
-    if contents.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Parse JSON
-    let projects: Vec<ProjectEntry> = serde_json::from_str(&contents)
-        .map_err(|e| {
-            let error_msg = format!("Failed to parse project registry JSON: {}", e);
-            tracing::error!("{}", error_msg);
-            error_msg
-        })?;
-
-    Ok(projects)
-}
-
 /// Starts watching a project's .bluekit directory for artifact file changes.
 ///
 /// This command sets up a file watcher that monitors the .bluekit directory
@@ -1730,6 +1676,7 @@ fn copy_directory_excluding(
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
 pub async fn create_project_from_clone(
+    db: State<'_, DatabaseConnection>,
     clone_id: String,
     target_path: String,
     project_title: Option<String>,
@@ -1824,8 +1771,12 @@ pub async fn create_project_from_clone(
     // 8. Clean up temp directory
     cleanup_temp();
 
-    // 9. Register project (optional)
+    // 9. Register project in database (optional)
     if register_project {
+        use sea_orm::*;
+        use chrono::Utc;
+        use uuid::Uuid;
+
         let title = project_title.unwrap_or_else(|| {
             target
                 .file_name()
@@ -1834,49 +1785,28 @@ pub async fn create_project_from_clone(
                 .unwrap_or_else(|| "New Project".to_string())
         });
 
-        let project_entry = ProjectEntry {
-            id: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                .to_string(),
-            title,
-            description: format!("Created from clone: {}", clone.name),
-            path: target_path.clone(),
+        let now = Utc::now().timestamp_millis();
+        let id = Uuid::new_v4().to_string();
+
+        let project = crate::db::entities::project::ActiveModel {
+            id: Set(id),
+            name: Set(title),
+            path: Set(target_path.clone()),
+            description: Set(Some(format!("Created from clone: {}", clone.name))),
+            tags: Set(None),
+            git_connected: Set(false),
+            git_url: Set(None),
+            git_branch: Set(None),
+            git_remote: Set(None),
+            last_commit_sha: Set(None),
+            last_synced_at: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            last_opened_at: Set(None),
         };
 
-        // Read existing registry
-        let home_dir = env::var("HOME")
-            .or_else(|_| env::var("USERPROFILE"))
-            .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
-
-        let registry_path = PathBuf::from(&home_dir)
-            .join(".bluekit")
-            .join("projectRegistry.json");
-
-        let mut projects = if registry_path.exists() {
-            let content = fs::read_to_string(&registry_path)
-                .map_err(|e| format!("Failed to read registry: {}", e))?;
-            serde_json::from_str::<Vec<ProjectEntry>>(&content)
-                .unwrap_or_else(|_| Vec::new())
-        } else {
-            Vec::new()
-        };
-
-        // Add new project
-        projects.push(project_entry);
-
-        // Ensure .bluekit directory exists
-        if let Some(parent) = registry_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
-        }
-
-        // Write back to registry
-        let json = serde_json::to_string_pretty(&projects)
-            .map_err(|e| format!("Failed to serialize registry: {}", e))?;
-        fs::write(&registry_path, json)
-            .map_err(|e| format!("Failed to write registry: {}", e))?;
+        project.insert(&*db).await
+            .map_err(|e| format!("Failed to register project in database: {}", e))?;
     }
 
     Ok(format!("Project created successfully at: {}", target_path))
@@ -1904,6 +1834,7 @@ pub async fn create_project_from_clone(
 /// - `Err(String)` - Error case with an error message
 #[tauri::command]
 pub async fn create_new_project(
+    db: State<'_, DatabaseConnection>,
     target_path: String,
     project_title: String,
     source_files: Vec<(String, String)>, // (file_path, file_type) where file_type is "kit", "walkthrough", or "diagram"
@@ -1984,51 +1915,34 @@ pub async fn create_new_project(
             .map_err(|e| format!("Failed to write target file {}: {}", target_file_path.display(), e))?;
     }
     
-    // Register project (optional)
+    // Register project in database (optional)
     if register_project {
-        let project_entry = ProjectEntry {
-            id: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                .to_string(),
-            title: project_title,
-            description: format!("Created with {} file{}", file_count, if file_count != 1 { "s" } else { "" }),
-            path: target_path.clone(),
+        use sea_orm::*;
+        use chrono::Utc;
+        use uuid::Uuid;
+
+        let now = Utc::now().timestamp_millis();
+        let id = Uuid::new_v4().to_string();
+
+        let project = crate::db::entities::project::ActiveModel {
+            id: Set(id),
+            name: Set(project_title),
+            path: Set(target_path.clone()),
+            description: Set(Some(format!("Created with {} file{}", file_count, if file_count != 1 { "s" } else { "" }))),
+            tags: Set(None),
+            git_connected: Set(false),
+            git_url: Set(None),
+            git_branch: Set(None),
+            git_remote: Set(None),
+            last_commit_sha: Set(None),
+            last_synced_at: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            last_opened_at: Set(None),
         };
-        
-        // Read existing registry
-        let home_dir = env::var("HOME")
-            .or_else(|_| env::var("USERPROFILE"))
-            .map_err(|e| format!("Could not determine home directory: {:?}", e))?;
-        
-        let registry_path = PathBuf::from(&home_dir)
-            .join(".bluekit")
-            .join("projectRegistry.json");
-        
-        let mut projects = if registry_path.exists() {
-            let content = fs::read_to_string(&registry_path)
-                .map_err(|e| format!("Failed to read registry: {}", e))?;
-            serde_json::from_str::<Vec<ProjectEntry>>(&content)
-                .unwrap_or_else(|_| Vec::new())
-        } else {
-            Vec::new()
-        };
-        
-        // Add new project
-        projects.push(project_entry);
-        
-        // Ensure .bluekit directory exists
-        if let Some(parent) = registry_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
-        }
-        
-        // Write back to registry
-        let json = serde_json::to_string_pretty(&projects)
-            .map_err(|e| format!("Failed to serialize registry: {}", e))?;
-        fs::write(&registry_path, json)
-            .map_err(|e| format!("Failed to write registry: {}", e))?;
+
+        project.insert(&*db).await
+            .map_err(|e| format!("Failed to register project in database: {}", e))?;
     }
     
     Ok(target_path)

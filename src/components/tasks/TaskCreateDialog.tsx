@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus, LuBug, LuSearch, LuStar, LuBrush, LuZap, LuSquareCheck } from 'react-icons/lu';
 import { Task, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '../../types/task';
-import { ProjectEntry, invokeDbCreateTask } from '../../ipc';
+import { Project, invokeDbCreateTask } from '../../ipc';
 import ProjectMultiSelect from './ProjectMultiSelect';
 import { toaster } from '../ui/toaster';
 
@@ -24,7 +24,7 @@ interface TaskCreateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onTaskCreated: (task: Task) => void;
-  projects: ProjectEntry[];
+  projects: Project[];
   defaultProjectId?: string;  // If opened from project view
 }
 

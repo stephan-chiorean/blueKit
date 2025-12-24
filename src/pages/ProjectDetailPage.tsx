@@ -27,7 +27,7 @@ import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTa
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, ProjectEntry, Project, TimeoutError } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, Project, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -35,7 +35,7 @@ import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 interface ProjectDetailPageProps {
   project: ProjectEntry;
   onBack: () => void;
-  onProjectSelect?: (project: ProjectEntry) => void;
+  onProjectSelect?: (project: Project) => void;
 }
 
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
@@ -46,7 +46,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
   const [artifactsLoading, setArtifactsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [allProjects, setAllProjects] = useState<ProjectEntry[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [currentTab, setCurrentTab] = useState<string>("tasks");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
   const plansTabRef = useRef<PlansTabContentRef>(null);

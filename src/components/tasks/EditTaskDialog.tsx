@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { LuPin, LuArrowUp, LuClock, LuSparkles, LuMinus, LuBug, LuSearch, LuStar, LuBrush, LuZap, LuSquareCheck } from 'react-icons/lu';
 import { Task, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '../../types/task';
-import { ProjectEntry, invokeDbUpdateTask, invokeGetProjectRegistry } from '../../ipc';
+import { Project, invokeDbUpdateTask, invokeGetProjectRegistry } from '../../ipc';
 import { toaster } from '../ui/toaster';
 import ProjectMultiSelect from './ProjectMultiSelect';
 
@@ -36,7 +36,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
   const [type, setType] = useState<TaskType | ''>('');
   const [tags, setTags] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Load projects on mount

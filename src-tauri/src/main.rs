@@ -62,7 +62,6 @@ async fn main() {
             commands::example_error,      // Demonstrates error handling
             commands::get_project_artifacts,  // Get all artifacts from .bluekit directory
             commands::get_changed_artifacts, // Get only changed artifacts (incremental updates)
-            commands::get_project_registry, // Get projects from registry
             commands::watch_project_artifacts, // Watch project .bluekit directory for artifact changes
             commands::read_file,        // Read file contents
             commands::write_file,       // Write file contents
@@ -203,18 +202,6 @@ async fn main() {
             // Initialize and register commit cache (Phase 2)
             use crate::integrations::github::CommitCache;
             app.manage(CommitCache::new());
-
-            // Set up file watcher for project registry
-            let app_handle = app.handle();
-            if let Ok(registry_path) = core::watcher::get_registry_path() {
-                if let Err(e) = core::watcher::watch_file(
-                    app_handle.clone(),
-                    registry_path,
-                    "project-registry-changed".to_string(),
-                ) {
-                    eprintln!("Failed to start file watcher: {}", e);
-                }
-            }
 
             // Register cleanup handler for app shutdown
             let window = app.get_window("main").expect("Failed to get main window");

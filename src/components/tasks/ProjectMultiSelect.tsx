@@ -1,9 +1,9 @@
 import { Menu, Button, HStack, Text, Field, Icon, Badge } from '@chakra-ui/react';
-import { ProjectEntry } from '../../ipc';
+
 import { LuFolder, LuCheck } from 'react-icons/lu';
 
 interface ProjectMultiSelectProps {
-  projects: ProjectEntry[];
+  projects: Project[];
   selectedProjectIds: string[];
   onChange: (selectedIds: string[]) => void;
 }

@@ -33,7 +33,7 @@ import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityC
 
 interface TasksTabContentProps {
   context: 'workspace' | ProjectEntry;  // workspace view or specific project
-  projects: ProjectEntry[];  // All projects for multi-select
+  projects: Project[];  // All projects for multi-select
 }
 
 export interface TasksTabContentRef {

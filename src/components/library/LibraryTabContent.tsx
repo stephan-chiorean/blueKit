@@ -66,7 +66,7 @@ import {
   LibraryCatalog,
   GitHubUser,
 } from '../../types/github';
-import { ProjectEntry, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from '../../ipc';
+import { Project, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from '../../ipc';
 import { invokeGitHubGetUser } from '../../ipc/github';
 import AddWorkspaceDialog from './AddWorkspaceDialog';
 
@@ -172,7 +172,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogWithVariations[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   // GitHub auth state
   const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
@@ -432,7 +432,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   };
 
   // Handle bulk pull to multiple projects
-  const handleBulkPull = async (selectedProjects: ProjectEntry[]) => {
+  const handleBulkPull = async (selectedProjects: Project[]) => {
     if (selectedVariationsArray.length === 0 || selectedProjects.length === 0) return;
 
     setBulkPulling(true);
@@ -451,7 +451,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
             );
             successCount++;
           } catch (err) {
-            console.error(`Failed to pull variation ${variation.id} to ${project.title}:`, err);
+            console.error(`Failed to pull variation ${variation.id} to ${project.name}:`, err);
             errorCount++;
           }
         }
@@ -1200,8 +1200,8 @@ interface LibraryVariationActionBarProps {
   selectedVariations: SelectedVariation[];
   hasSelection: boolean;
   clearSelection: () => void;
-  projects: ProjectEntry[];
-  onBulkPull: (projects: ProjectEntry[]) => void;
+  projects: Project[];
+  onBulkPull: (projects: Project[]) => void;
   loading: boolean;
 }
 
@@ -1256,7 +1256,7 @@ function LibraryVariationActionBar({
   };
 
   const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.path.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -1365,7 +1365,7 @@ function LibraryVariationActionBar({
                                       </Icon>
                                       <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
                                         <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
-                                          {project.title}
+                                          {project.name}
                                         </Text>
                                         <Text fontSize="xs" color="text.secondary" title={project.path}>
                                           {truncatePath(project.path, 35)}

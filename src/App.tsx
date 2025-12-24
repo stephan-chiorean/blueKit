@@ -11,7 +11,7 @@ import { ResourceProvider } from './contexts/ResourceContext';
 import { NotepadProvider } from './contexts/NotepadContext';
 import { TimerProvider } from './contexts/TimerContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
-import { ProjectEntry } from './ipc';
+import { Project } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
 import DraggableNotepad from './components/workstation/DraggableNotepad';
 import { useNotepad } from './contexts/NotepadContext';
@@ -22,7 +22,7 @@ function AppContent() {
   const { isAuthenticated, isLoading } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const [currentView, setCurrentView] = useState<View>('welcome');
-  const [selectedProject, setSelectedProject] = useState<ProjectEntry | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [plansSource, setPlansSource] = useState<'claude' | 'cursor' | null>(null);
 
   const handleGetStarted = () => {
@@ -41,7 +41,7 @@ function AppContent() {
     setCurrentView('home');
   };
 
-  const handleProjectSelect = (project: ProjectEntry) => {
+  const handleProjectSelect = (project: Project) => {
     setSelectedProject(project);
     setCurrentView('project-detail');
   };

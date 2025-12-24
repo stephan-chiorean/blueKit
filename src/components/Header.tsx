@@ -17,7 +17,7 @@ import {
 import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen, LuLogIn } from 'react-icons/lu';
 import { FaMoon, FaSun } from "react-icons/fa";
 import { Task } from '../types/task';
-import { ProjectEntry, invokeGetProjectRegistry } from '../ipc';
+import { Project, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
 import EditTaskDialog from './tasks/EditTaskDialog';
 import TaskCreateDialog from './tasks/TaskCreateDialog';
@@ -29,7 +29,7 @@ import TimerPopover from './shared/TimerPopover';
 import SignInPopover from './shared/SignInPopover';
 
 interface HeaderProps {
-  currentProject?: ProjectEntry;
+  currentProject?: Project;
   onNavigateToTasks?: () => void;
 }
 
@@ -37,7 +37,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
@@ -62,7 +62,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
     setIsTaskDialogOpen(true);
   };
 
-  const handleOpenCreateDialog = (projectsToPass: ProjectEntry[]) => {
+  const handleOpenCreateDialog = (projectsToPass: Project[]) => {
     setProjects(projectsToPass);
     setIsCreateDialogOpen(true);
   };

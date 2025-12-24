@@ -30,18 +30,17 @@ import TasksTabContent, {
 import NotebookBackground from "../components/shared/NotebookBackground";
 import {
   invokeGetProjectRegistry,
-  invalidateProjectRegistryCache,
   invokeGetProjectArtifacts,
   invokeGetChangedArtifacts,
   invokeWatchProjectArtifacts,
   ArtifactFile,
-  ProjectEntry,
+  Project,
   TimeoutError,
 } from "../ipc";
 import { useSelection } from "../contexts/SelectionContext";
 
 interface HomePageProps {
-  onProjectSelect: (project: ProjectEntry) => void;
+  onProjectSelect: (project: Project) => void;
   onNavigateToPlans?: (source: "claude" | "cursor") => void;
 }
 
@@ -49,7 +48,7 @@ export default function HomePage({
   onProjectSelect,
   onNavigateToPlans,
 }: HomePageProps) {
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [kits, setKits] = useState<ArtifactFile[]>([]);
@@ -175,27 +174,6 @@ export default function HomePage({
   useEffect(() => {
     // Load projects on mount
     loadProjects();
-
-    // Set up file watcher event listener for registry changes
-    let unlistenFn: (() => void) | null = null;
-
-    const setupFileWatcher = async () => {
-      const unlisten = await listen("project-registry-changed", () => {
-        // Invalidate cache and reload projects when registry file changes
-        invalidateProjectRegistryCache();
-        loadProjects();
-      });
-      unlistenFn = unlisten;
-    };
-
-    setupFileWatcher();
-
-    // Cleanup: unlisten when component unmounts
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
   }, []);
 
   // Reload kits when projects change

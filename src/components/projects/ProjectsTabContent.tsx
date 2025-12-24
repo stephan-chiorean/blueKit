@@ -18,17 +18,17 @@ import {
   Button,
   Status,
 } from '@chakra-ui/react';
-import { ProjectEntry, Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit } from '../../ipc';
+import { Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit } from '../../ipc';
 import { LuFolder, LuChevronRight } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
 import { toaster } from '../ui/toaster';
 
 interface ProjectsTabContentProps {
-  projects: ProjectEntry[];
+  projects: Project[];
   projectsLoading: boolean;
   error: string | null;
-  onProjectSelect: (project: ProjectEntry) => void;
+  onProjectSelect: (project: Project) => void;
 }
 
 export default function ProjectsTabContent({
@@ -37,43 +37,30 @@ export default function ProjectsTabContent({
   error,
   onProjectSelect,
 }: ProjectsTabContentProps) {
-  const [dbProjects, setDbProjects] = useState<Project[]>([]);
-  const [dbProjectsLoading, setDbProjectsLoading] = useState(true);
   const [connectingProjectId, setConnectingProjectId] = useState<string | null>(null);
+  const [localProjects, setLocalProjects] = useState<Project[]>(projects);
 
-  // Load database projects to get git metadata
+  // Update local projects when props change
   useEffect(() => {
-    const loadDbProjects = async () => {
-      try {
-        setDbProjectsLoading(true);
-        const projects = await invokeDbGetProjects();
-        setDbProjects(projects);
-      } catch (err) {
-        console.error('Failed to load database projects:', err);
-      } finally {
-        setDbProjectsLoading(false);
-      }
-    };
-    loadDbProjects();
-  }, []);
+    setLocalProjects(projects);
+  }, [projects]);
 
-  const handleConnectGit = async (project: ProjectEntry, dbProjectId: string, e: React.MouseEvent) => {
+  const handleConnectGit = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
 
     try {
-      setConnectingProjectId(dbProjectId);
-      await invokeConnectProjectGit(dbProjectId);
+      setConnectingProjectId(project.id);
+      const updatedProject = await invokeConnectProjectGit(project.id);
 
       toaster.create({
         title: 'Git connected',
-        description: `Successfully connected ${project.title} to git`,
+        description: `Successfully connected ${project.name} to git`,
         type: 'success',
         duration: 3000,
       });
 
-      // Reload database projects
-      const updatedProjects = await invokeDbGetProjects();
-      setDbProjects(updatedProjects);
+      // Update local projects with the updated project
+      setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect git';
       console.error('Failed to connect git:', err);
@@ -88,23 +75,22 @@ export default function ProjectsTabContent({
     }
   };
 
-  const handleDisconnectGit = async (project: ProjectEntry, dbProjectId: string, e: React.MouseEvent) => {
+  const handleDisconnectGit = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
 
     try {
-      setConnectingProjectId(dbProjectId);
-      await invokeDisconnectProjectGit(dbProjectId);
+      setConnectingProjectId(project.id);
+      const updatedProject = await invokeDisconnectProjectGit(project.id);
 
       toaster.create({
         title: 'Git disconnected',
-        description: `Disconnected ${project.title} from git`,
+        description: `Disconnected ${project.name} from git`,
         type: 'info',
         duration: 3000,
       });
 
-      // Reload database projects
-      const updatedProjects = await invokeDbGetProjects();
-      setDbProjects(updatedProjects);
+      // Update local projects with the updated project
+      setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect git';
       toaster.create({
@@ -118,7 +104,7 @@ export default function ProjectsTabContent({
     }
   };
 
-  if (projectsLoading || dbProjectsLoading) {
+  if (projectsLoading) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
         Loading projects...
@@ -155,7 +141,7 @@ export default function ProjectsTabContent({
   }
 
   const handleOpenInEditor = async (
-    project: ProjectEntry,
+    project: Project,
     editor: 'cursor' | 'vscode'
   ) => {
     try {
@@ -168,10 +154,8 @@ export default function ProjectsTabContent({
   return (
     <VStack align="stretch" gap={4}>
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6}>
-        {projects.map((project) => {
-          // Find matching database project
-          const dbProject = dbProjects.find(p => p.path === project.path);
-          const isConnectingThis = connectingProjectId === dbProject?.id;
+        {localProjects.map((project) => {
+          const isConnectingThis = connectingProjectId === project.id;
 
           return (
             <Card.Root
@@ -193,19 +177,19 @@ export default function ProjectsTabContent({
                       <Icon boxSize={5} color="primary.500">
                         <LuFolder />
                       </Icon>
-                      <Heading size="lg">{project.title}</Heading>
+                      <Heading size="lg">{project.name}</Heading>
                     </HStack>
 
                     {/* GitHub connection status */}
                     <HStack gap={3}>
                       <HStack gap={2}>
-                        <Icon boxSize={4} color={dbProject?.gitConnected ? "green.500" : "gray.400"}>
+                        <Icon boxSize={4} color={project.gitConnected ? "green.500" : "gray.400"}>
                           <FaGithub />
                         </Icon>
                         <Status.Root size="sm">
-                          <Status.Indicator colorPalette={dbProject?.gitConnected ? "green" : "gray"} />
+                          <Status.Indicator colorPalette={project.gitConnected ? "green" : "gray"} />
                           <Text fontSize="sm" color="fg.muted">
-                            {dbProject?.gitConnected ? 'Connected' : 'Not connected'}
+                            {project.gitConnected ? 'Connected' : 'Not connected'}
                           </Text>
                         </Status.Root>
                       </HStack>
@@ -217,7 +201,7 @@ export default function ProjectsTabContent({
                             size="xs"
                             variant="ghost"
                             colorPalette="red"
-                            onClick={(e) => handleDisconnectGit(project, dbProject.id, e)}
+                            onClick={(e) => handleDisconnectGit(project, e)}
                             loading={isConnectingThis}
                             loadingText="Disconnecting..."
                           >
@@ -228,7 +212,7 @@ export default function ProjectsTabContent({
                             size="xs"
                             variant="ghost"
                             colorPalette="green"
-                            onClick={(e) => handleConnectGit(project, dbProject.id, e)}
+                            onClick={(e) => handleConnectGit(project, e)}
                             loading={isConnectingThis}
                             loadingText="Connecting..."
                           >
@@ -239,7 +223,7 @@ export default function ProjectsTabContent({
                     </HStack>
 
                     {/* Show git URL if connected */}
-                    {dbProject?.gitConnected && dbProject.gitUrl && (
+                    {project.gitConnected && dbProject.gitUrl && (
                       <Text fontSize="xs" color="fg.muted" fontFamily="mono" noOfLines={1}>
                         {dbProject.gitUrl}
                       </Text>
