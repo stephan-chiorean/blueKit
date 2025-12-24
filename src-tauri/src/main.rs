@@ -126,6 +126,8 @@ async fn main() {
             commands::migrate_projects_to_database, // Migrate JSON to database (Phase 1)
             commands::db_get_projects, // Get all projects from database (Phase 1)
             commands::db_create_project, // Create new project in database (Phase 1)
+            commands::db_update_project, // Update project in database (Phase 1)
+            commands::db_delete_project, // Delete project from database (Phase 1)
             commands::connect_project_git, // Connect project to git (Phase 1)
             commands::disconnect_project_git, // Disconnect project from git (Phase 1)
             commands::fetch_project_commits, // Fetch commits from GitHub API (Phase 2)

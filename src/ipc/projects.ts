@@ -313,6 +313,48 @@ export async function invokeDbCreateProject(
 }
 
 /**
+ * Updates a project's name and/or description in the database.
+ *
+ * @param projectId - The project ID
+ * @param name - Optional new name for the project
+ * @param description - Optional new description for the project
+ * @returns A promise that resolves to the updated Project object
+ *
+ * @example
+ * ```typescript
+ * const project = await invokeDbUpdateProject('project-id-123', 'New Name', 'New description');
+ * console.log(project.name, project.description);
+ * ```
+ */
+export async function invokeDbUpdateProject(
+  projectId: string,
+  name?: string,
+  description?: string
+): Promise<Project> {
+  return await invokeWithTimeout<Project>('db_update_project', {
+    projectId,
+    name,
+    description,
+  });
+}
+
+/**
+ * Deletes a project from the database.
+ *
+ * @param projectId - The project ID to delete
+ * @returns A promise that resolves when the project is deleted
+ *
+ * @example
+ * ```typescript
+ * await invokeDbDeleteProject('project-id-123');
+ * console.log('Project deleted');
+ * ```
+ */
+export async function invokeDbDeleteProject(projectId: string): Promise<void> {
+  return await invokeWithTimeout<void>('db_delete_project', { projectId });
+}
+
+/**
  * Connects a project to git by detecting git metadata.
  *
  * This command automatically detects git remote URL, current branch,

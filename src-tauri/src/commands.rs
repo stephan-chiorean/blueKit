@@ -3241,6 +3241,62 @@ pub async fn db_create_project(
         .map_err(|e| format!("Failed to create project: {}", e))
 }
 
+/// Updates a project's name and/or description in the database
+#[tauri::command]
+pub async fn db_update_project(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+    name: Option<String>,
+    description: Option<String>,
+) -> Result<crate::db::entities::project::Model, String> {
+    use sea_orm::*;
+    use chrono::Utc;
+
+    // Fetch existing project
+    let project = crate::db::entities::project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Failed to fetch project: {}", e))?
+        .ok_or_else(|| format!("Project not found: {}", project_id))?;
+
+    let now = Utc::now().timestamp_millis();
+
+    let mut active_model: crate::db::entities::project::ActiveModel = project.into();
+
+    if let Some(new_name) = name {
+        active_model.name = Set(new_name);
+    }
+
+    if let Some(new_description) = description {
+        active_model.description = Set(if new_description.is_empty() {
+            None
+        } else {
+            Some(new_description)
+        });
+    }
+
+    active_model.updated_at = Set(now);
+
+    active_model.update(&*db).await
+        .map_err(|e| format!("Failed to update project: {}", e))
+}
+
+/// Deletes a project from the database
+#[tauri::command]
+pub async fn db_delete_project(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+) -> Result<(), String> {
+    use sea_orm::*;
+
+    crate::db::entities::project::Entity::delete_by_id(&project_id)
+        .exec(&*db)
+        .await
+        .map_err(|e| format!("Failed to delete project: {}", e))?;
+
+    Ok(())
+}
+
 /// Connects a project to its git repository
 #[tauri::command]
 pub async fn connect_project_git(

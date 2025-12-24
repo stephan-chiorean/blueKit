@@ -18,11 +18,13 @@ import {
   Button,
   Status,
 } from '@chakra-ui/react';
-import { Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit } from '../../ipc';
-import { LuFolder, LuChevronRight } from 'react-icons/lu';
+import { Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
+import { LuFolder, LuChevronRight, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
 import { toaster } from '../ui/toaster';
+import { DialogRoot, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogActionTrigger } from '../ui/dialog';
+import { Field } from '../ui/field';
 
 interface ProjectsTabContentProps {
   projects: Project[];
@@ -39,6 +41,10 @@ export default function ProjectsTabContent({
 }: ProjectsTabContentProps) {
   const [connectingProjectId, setConnectingProjectId] = useState<string | null>(null);
   const [localProjects, setLocalProjects] = useState<Project[]>(projects);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update local projects when props change
   useEffect(() => {
@@ -148,6 +154,73 @@ export default function ProjectsTabContent({
       await invokeOpenProjectInEditor(project.path, editor);
     } catch (error) {
       console.error(`Failed to open project in ${editor}:`, error);
+    }
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setEditName(project.name);
+    setEditDescription(project.description || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProject) return;
+
+    try {
+      setIsSaving(true);
+      const updatedProject = await invokeDbUpdateProject(
+        editingProject.id,
+        editName,
+        editDescription
+      );
+
+      setLocalProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+      setEditingProject(null);
+
+      toaster.create({
+        title: 'Project updated',
+        description: `Successfully updated ${editName}`,
+        type: 'success',
+        duration: 3000,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update project';
+      toaster.create({
+        title: 'Failed to update project',
+        description: errorMessage,
+        type: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProject = async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!confirm(`Are you sure you want to remove "${project.name}" from the registry?\n\nThis will not delete the actual project files, only remove it from BlueKit.`)) {
+      return;
+    }
+
+    try {
+      await invokeDbDeleteProject(project.id);
+      setLocalProjects(prev => prev.filter(p => p.id !== project.id));
+
+      toaster.create({
+        title: 'Project removed',
+        description: `Successfully removed ${project.name} from registry`,
+        type: 'success',
+        duration: 3000,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
+      toaster.create({
+        title: 'Failed to remove project',
+        description: errorMessage,
+        type: 'error',
+        duration: 5000,
+      });
     }
   };
 
@@ -273,6 +346,25 @@ export default function ProjectsTabContent({
                                 </Menu.Positioner>
                               </Portal>
                             </Menu.Root>
+                            <Menu.Separator />
+                            <Menu.Item
+                              value="edit"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                handleEditProject(project);
+                              }}
+                            >
+                              <Icon><LuPencil /></Icon>
+                              Edit Project
+                            </Menu.Item>
+                            <Menu.Item
+                              value="delete"
+                              onSelect={(e) => handleDeleteProject(project, e)}
+                              color="fg.error"
+                            >
+                              <Icon><LuTrash2 /></Icon>
+                              Remove Project
+                            </Menu.Item>
                           </Menu.Content>
                         </Menu.Positioner>
                       </Portal>
@@ -292,6 +384,54 @@ export default function ProjectsTabContent({
           );
         })}
       </SimpleGrid>
+
+      {/* Edit Project Dialog */}
+      <DialogRoot
+        open={editingProject !== null}
+        onOpenChange={(details) => {
+          if (!details.open) {
+            setEditingProject(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <VStack gap={4}>
+              <Field label="Project Name">
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter project name"
+                />
+              </Field>
+              <Field label="Description">
+                <Input
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Enter project description (optional)"
+                />
+              </Field>
+            </VStack>
+          </DialogBody>
+          <DialogFooter>
+            <DialogActionTrigger asChild>
+              <Button variant="outline" disabled={isSaving}>
+                Cancel
+              </Button>
+            </DialogActionTrigger>
+            <Button
+              onClick={handleSaveEdit}
+              loading={isSaving}
+              disabled={!editName.trim()}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
     </VStack>
   );
 }
