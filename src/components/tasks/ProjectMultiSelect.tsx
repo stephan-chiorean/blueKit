@@ -1,6 +1,7 @@
 import { Menu, Button, HStack, Text, Field, Icon, Badge } from '@chakra-ui/react';
 
 import { LuFolder, LuCheck } from 'react-icons/lu';
+import { Project } from '../../ipc';
 
 interface ProjectMultiSelectProps {
   projects: Project[];
@@ -25,7 +26,7 @@ export default function ProjectMultiSelect({
   const displayText = selectedCount === 0
     ? 'Select projects...'
     : selectedCount === 1
-    ? projects.find(p => p.id === selectedProjectIds[0])?.title || '1 project'
+    ? projects.find(p => p.id === selectedProjectIds[0])?.name || '1 project'
     : `${selectedCount} projects`;
 
   return (
@@ -59,7 +60,7 @@ export default function ProjectMultiSelect({
                         <Icon>
                           <LuFolder />
                         </Icon>
-                        <Text>{project.title}</Text>
+                        <Text>{project.name}</Text>
                       </HStack>
                       {isChecked && (
                         <Icon color="blue.500">
@@ -81,7 +82,7 @@ export default function ProjectMultiSelect({
             const project = projects.find(p => p.id === id);
             return project ? (
               <Badge key={id} size="sm" colorPalette="primary">
-                {project.title}
+                {project.name}
               </Badge>
             ) : null;
           })}

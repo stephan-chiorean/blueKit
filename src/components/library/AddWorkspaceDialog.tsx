@@ -12,12 +12,9 @@ import {
   Spinner,
   Text,
   VStack,
-  Select,
-  createListCollection,
 } from '@chakra-ui/react';
-import { LuGithub, LuCheck, LuTriangleAlert, LuFolder } from 'react-icons/lu';
-import { GitHubUser, GitHubRepo, LibraryWorkspace } from '../../types/github';
-import { invokeGitHubGetRepos } from '../../ipc/github';
+import { LuGithub, LuCheck, LuTriangleAlert, LuFolder, LuUserPlus, LuX } from 'react-icons/lu';
+import { GitHubUser, LibraryWorkspace } from '../../types/github';
 import { invokeLibraryCreateWorkspace } from '../../ipc/library';
 import { toaster } from '../ui/toaster';
 
@@ -30,6 +27,25 @@ interface AddWorkspaceDialogProps {
 
 type ValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 
+interface Collaborator {
+  login: string;
+  avatar_url: string;
+}
+
+/**
+ * Generates a valid GitHub repository name from a workspace name.
+ * Converts to lowercase, replaces spaces with hyphens, and removes invalid characters.
+ */
+function generateRepoName(workspaceName: string): string {
+  return workspaceName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/[^a-z0-9-]/g, '') // Remove invalid characters
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+}
+
 export default function AddWorkspaceDialog({
   isOpen,
   onClose,
@@ -38,94 +54,52 @@ export default function AddWorkspaceDialog({
 }: AddWorkspaceDialogProps) {
   // Form state
   const [workspaceName, setWorkspaceName] = useState('');
-  const [selectedRepo, setSelectedRepo] = useState<string>('');
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   
   // Loading states
-  const [repos, setRepos] = useState<GitHubRepo[]>([]);
-  const [loadingRepos, setLoadingRepos] = useState(false);
   const [creating, setCreating] = useState(false);
   
   // Validation
   const [validationState, setValidationState] = useState<ValidationState>('idle');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Load repos when dialog opens
-  useEffect(() => {
-    if (isOpen && githubUser) {
-      loadRepos();
-    }
-  }, [isOpen, githubUser]);
+  // Generate repo name from workspace name
+  const generatedRepoName = useMemo(() => {
+    if (!workspaceName.trim()) return '';
+    return generateRepoName(workspaceName);
+  }, [workspaceName]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setWorkspaceName('');
-      setSelectedRepo('');
+      setCollaborators([]);
       setValidationState('idle');
       setValidationError(null);
     }
   }, [isOpen]);
 
-  // Auto-generate workspace name from repo
-  useEffect(() => {
-    if (selectedRepo && !workspaceName) {
-      const repo = repos.find(r => r.full_name === selectedRepo);
-      if (repo) {
-        // Convert repo name to title case with spaces
-        const name = repo.name
-          .replace(/-/g, ' ')
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, c => c.toUpperCase());
-        setWorkspaceName(name);
-      }
-    }
-  }, [selectedRepo, repos]);
-
-  const loadRepos = async () => {
-    setLoadingRepos(true);
-    try {
-      const userRepos = await invokeGitHubGetRepos();
-      // Sort by recently pushed
-      const sorted = userRepos.sort((a, b) => 
-        new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime()
-      );
-      setRepos(sorted);
-    } catch (error) {
-      console.error('Failed to load repos:', error);
-      toaster.create({
-        type: 'error',
-        title: 'Failed to load repositories',
-        description: error instanceof Error ? error.message : 'Unknown error',
-      });
-    } finally {
-      setLoadingRepos(false);
-    }
+  const handleAddCollaborator = () => {
+    // TODO: Implement collaborator search and selection
+    // For now, this is a placeholder
+    toaster.create({
+      type: 'info',
+      title: 'Coming soon',
+      description: 'Collaborator management will be available soon',
+    });
   };
 
-  // Create collection for Select component
-  const reposCollection = useMemo(() => {
-    return createListCollection({
-      items: repos,
-      itemToString: (item) => item.full_name,
-      itemToValue: (item) => item.full_name,
-    });
-  }, [repos]);
-
-  const handleRepoChange = (details: { value: string[] }) => {
-    const value = details.value[0] || '';
-    setSelectedRepo(value);
-    setValidationState('idle');
-    setValidationError(null);
+  const handleRemoveCollaborator = (login: string) => {
+    setCollaborators(prev => prev.filter(c => c.login !== login));
   };
 
   const validateAndCreate = async () => {
-    if (!githubUser || !workspaceName.trim() || !selectedRepo) {
+    if (!githubUser || !workspaceName.trim()) {
       return;
     }
 
-    const repo = repos.find(r => r.full_name === selectedRepo);
-    if (!repo) {
-      setValidationError('Please select a repository');
+    if (!generatedRepoName) {
+      setValidationError('Please enter a valid workspace name');
       return;
     }
 
@@ -135,8 +109,8 @@ export default function AddWorkspaceDialog({
     try {
       const workspace = await invokeLibraryCreateWorkspace(
         workspaceName.trim(),
-        repo.owner.login,
-        repo.name
+        githubUser.login,
+        generatedRepoName
       );
 
       setValidationState('valid');
@@ -144,7 +118,7 @@ export default function AddWorkspaceDialog({
       toaster.create({
         type: 'success',
         title: 'Workspace created',
-        description: `Created workspace "${workspace.name}"`,
+        description: `Created workspace "${workspace.name}" and repository "${generatedRepoName}"`,
       });
 
       onWorkspaceCreated(workspace);
@@ -170,7 +144,7 @@ export default function AddWorkspaceDialog({
     }
   };
 
-  const isFormValid = workspaceName.trim().length > 0 && selectedRepo.length > 0;
+  const isFormValid = workspaceName.trim().length > 0 && generatedRepoName.length > 0;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(e) => !creating && !e.open && onClose()}>
@@ -222,7 +196,7 @@ export default function AddWorkspaceDialog({
                         {githubUser?.login || 'Not connected'}
                       </Text>
                       <Text fontSize="xs" color="text.tertiary">
-                        GitHub Account
+                        Repository will be created in this account
                       </Text>
                     </Box>
                     <Icon fontSize="sm" color="green.500">
@@ -231,56 +205,6 @@ export default function AddWorkspaceDialog({
                   </HStack>
                 </Box>
 
-                {/* Repository Selection */}
-                <Field.Root>
-                  <Field.Label fontWeight="medium">
-                    Repository
-                  </Field.Label>
-                  <Select.Root
-                    collection={reposCollection}
-                    value={selectedRepo ? [selectedRepo] : []}
-                    onValueChange={handleRepoChange}
-                    disabled={loadingRepos || creating}
-                  >
-                    <Select.HiddenSelect />
-                    <Select.Control>
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="Select a repository" />
-                      </Select.Trigger>
-                      <Select.IndicatorGroup>
-                        {loadingRepos ? (
-                          <Spinner size="sm" />
-                        ) : (
-                          <Select.Indicator />
-                        )}
-                      </Select.IndicatorGroup>
-                    </Select.Control>
-                    <Portal>
-                      <Select.Positioner>
-                        <Select.Content maxH="300px" overflowY="auto">
-                          {reposCollection.items.map((repo) => (
-                            <Select.Item item={repo} key={repo.id}>
-                              <VStack align="start" gap={0} py={1}>
-                                <Select.ItemText fontWeight="medium">
-                                  {repo.name}
-                                </Select.ItemText>
-                                <Text fontSize="xs" color="text.tertiary">
-                                  {repo.owner.login}/{repo.name}
-                                  {repo.private && ' • Private'}
-                                </Text>
-                              </VStack>
-                              <Select.ItemIndicator />
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Positioner>
-                    </Portal>
-                  </Select.Root>
-                  <Field.HelperText>
-                    Resources will be stored in this repository
-                  </Field.HelperText>
-                </Field.Root>
-
                 {/* Workspace Name */}
                 <Field.Root>
                   <Field.Label fontWeight="medium">
@@ -288,12 +212,92 @@ export default function AddWorkspaceDialog({
                   </Field.Label>
                   <Input
                     value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    onChange={(e) => {
+                      setWorkspaceName(e.target.value);
+                      setValidationError(null);
+                    }}
                     placeholder="My Library"
                     disabled={creating}
                   />
                   <Field.HelperText>
                     A friendly name for this workspace
+                  </Field.HelperText>
+                </Field.Root>
+
+                {/* Generated Repository Name */}
+                <Field.Root>
+                  <Field.Label fontWeight="medium">
+                    Repository Name
+                  </Field.Label>
+                  <Input
+                    value={generatedRepoName ? `${githubUser?.login || ''}/${generatedRepoName}` : ''}
+                    placeholder="username/repository-name"
+                    disabled
+                    bg="bg.subtle"
+                    color="text.secondary"
+                  />
+                  <Field.HelperText>
+                    This repository will be created automatically
+                  </Field.HelperText>
+                </Field.Root>
+
+                {/* Collaborators Section */}
+                <Field.Root>
+                  <Field.Label fontWeight="medium">
+                    Collaborators
+                  </Field.Label>
+                  <VStack align="stretch" gap={3}>
+                    {collaborators.length > 0 && (
+                      <VStack align="stretch" gap={2}>
+                        {collaborators.map((collab) => (
+                          <Box
+                            key={collab.login}
+                            p={2}
+                            bg="bg.subtle"
+                            borderRadius="md"
+                            borderWidth="1px"
+                            borderColor="border.subtle"
+                          >
+                            <HStack gap={2} justify="space-between">
+                              <HStack gap={2}>
+                                <Box
+                                  as="img"
+                                  src={collab.avatar_url}
+                                  alt={collab.login}
+                                  w={6}
+                                  h={6}
+                                  borderRadius="full"
+                                />
+                                <Text fontSize="sm" fontWeight="medium">
+                                  {collab.login}
+                                </Text>
+                              </HStack>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => handleRemoveCollaborator(collab.login)}
+                                disabled={creating}
+                              >
+                                <Icon>
+                                  <LuX />
+                                </Icon>
+                              </Button>
+                            </HStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={handleAddCollaborator}
+                      disabled={creating}
+                      leftIcon={<LuUserPlus />}
+                    >
+                      Add Collaborator
+                    </Button>
+                  </VStack>
+                  <Field.HelperText>
+                    Add team members who can access this workspace
                   </Field.HelperText>
                 </Field.Root>
 

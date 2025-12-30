@@ -662,10 +662,11 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
             value={selectedWorkspaceId ? [selectedWorkspaceId] : []}
             onValueChange={(details) => setSelectedWorkspaceId(details.value[0] || null)}
             size="sm"
+            variant="subtle"
             width="180px"
           >
             <Select.HiddenSelect />
-            <Select.Control>
+            <Select.Control cursor="pointer">
               <Select.Trigger>
                 <HStack gap={2}>
                   <Icon fontSize="sm" color="primary.500">

@@ -215,7 +215,7 @@ export default function GlobalActionBar() {
   return (
     <ActionBar.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} closeOnInteractOutside={false}>
       <Portal>
-        <ActionBar.Positioner>
+        <ActionBar.Positioner zIndex={1000}>
           <ActionBar.Content>
             <VStack align="stretch" gap={0}>
               <Box pb={1} mt={-0.5}>

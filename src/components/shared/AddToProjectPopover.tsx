@@ -237,8 +237,8 @@ export default function AddToProjectPopover({
   };
 
   const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.path.toLowerCase().includes(searchQuery.toLowerCase())
+    (project.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (project.path?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   // Helper function to truncate path from the beginning, showing the end
@@ -351,7 +351,7 @@ export default function AddToProjectPopover({
                         </Icon>
                         <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
                           <Text fontSize="sm" fontWeight="medium" lineClamp={1} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" width="100%">
-                            {project.title}
+                            {project.name}
                           </Text>
                           <Text fontSize="xs" color="text.secondary" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" width="100%" title={project.path}>
                             {truncatePath(project.path, 35)}
