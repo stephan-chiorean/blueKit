@@ -3319,6 +3319,146 @@ pub async fn library_get_artifacts(
     crate::library::library::list_artifacts(&*db, workspace_id).await
 }
 
+/// Creates a folder in a library workspace GitHub repository.
+/// 
+/// Creates a `.bluekitws` file at `{folder_name}/.bluekitws` in the GitHub repo
+/// to establish the folder structure. Git doesn't support empty directories,
+/// so this marker file is necessary for the folder to exist in GitHub.
+/// The `.bluekitws` marker also allows us to identify BlueKit workspace folders
+/// when scanning the repository.
+#[tauri::command]
+pub async fn library_create_folder(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+    folder_name: String,
+) -> Result<String, String> {
+    use crate::db::entities::library_workspace;
+    use crate::integrations::github::GitHubClient;
+    use sea_orm::EntityTrait;
+
+    // Get the workspace
+    let workspace = library_workspace::Entity::find_by_id(&workspace_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+
+    // Get GitHub client
+    let github_client = GitHubClient::from_keychain()
+        .map_err(|e| format!("Failed to get GitHub client: {}", e))?;
+
+    // Get authenticated user info for commit message
+    let user_info = github_client
+        .get_user()
+        .await
+        .map_err(|e| format!("Failed to get GitHub user: {}", e))?;
+
+    // Sanitize folder name (replace spaces with hyphens, remove invalid characters)
+    let sanitized_name = folder_name
+        .trim()
+        .replace(' ', "-")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect::<String>();
+
+    if sanitized_name.is_empty() {
+        return Err("Folder name cannot be empty after sanitization".to_string());
+    }
+
+    // Create folder path: {folder_name}/.bluekitws
+    // .bluekitws marks this as a BlueKit workspace folder
+    let folder_path = format!("{}/.bluekitws", sanitized_name);
+
+    // Check if folder already exists
+    let file_sha = github_client
+        .get_file_sha(&workspace.github_owner, &workspace.github_repo, &folder_path)
+        .await
+        .map_err(|e| format!("Failed to check if folder exists: {}", e))?;
+
+    if file_sha.is_some() {
+        return Err(format!("Folder '{}' already exists in the repository", sanitized_name));
+    }
+
+    // Create commit message
+    let commit_message = format!(
+        "[BlueKit] Create folder: {} by {}",
+        sanitized_name,
+        user_info.login
+    );
+
+    // Create .gitkeep file (empty file to create the folder structure)
+    let gitkeep_content = "";
+
+    // Create the folder in GitHub
+    let github_response = github_client
+        .create_or_update_file(
+            &workspace.github_owner,
+            &workspace.github_repo,
+            &folder_path,
+            gitkeep_content,
+            &commit_message,
+            None, // No SHA for new file
+        )
+        .await
+        .map_err(|e| format!("Failed to create folder in GitHub: {}", e))?;
+
+    Ok(format!("Folder '{}' created successfully", sanitized_name))
+}
+
+/// Lists folders in a library workspace by scanning GitHub for directories containing .bluekitws files.
+#[tauri::command]
+pub async fn library_list_folders(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+) -> Result<Vec<String>, String> {
+    use crate::db::entities::library_workspace;
+    use crate::integrations::github::GitHubClient;
+    use sea_orm::EntityTrait;
+
+    // Get the workspace
+    let workspace = library_workspace::Entity::find_by_id(&workspace_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+
+    // Get GitHub client
+    let github_client = GitHubClient::from_keychain()
+        .map_err(|e| format!("Failed to get GitHub client: {}", e))?;
+
+    // Get root directory contents
+    let root_contents = github_client
+        .get_directory_contents(&workspace.github_owner, &workspace.github_repo, "")
+        .await
+        .map_err(|e| format!("Failed to get repository contents: {}", e))?;
+
+    // Filter for directories and check if they contain .bluekitws
+    let mut folders = Vec::new();
+    for item in root_contents {
+        if item.content_type == "dir" {
+            // Check if this directory contains .bluekitws
+            let bluekitws_path = format!("{}/.bluekitws", item.path);
+            match github_client
+                .get_file_sha(&workspace.github_owner, &workspace.github_repo, &bluekitws_path)
+                .await
+            {
+                Ok(Some(_)) => {
+                    // This folder has .bluekitws marker, add it to the list
+                    folders.push(item.name);
+                }
+                Ok(None) => {
+                    // No .bluekitws file, skip this directory
+                }
+                Err(_) => {
+                    // Error checking, skip this directory
+                }
+            }
+        }
+    }
+
+    Ok(folders)
+}
+
 // ============================================================================
 // LIBRARY RESOURCE COMMANDS (Phase 1)
 // ============================================================================

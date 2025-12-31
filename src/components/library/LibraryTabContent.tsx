@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -58,6 +58,8 @@ import {
   invokeSyncWorkspaceCatalog,
   invokeListWorkspaceCatalogs,
   invokePullVariation,
+  invokeLibraryCreateFolder,
+  invokeLibraryListFolders,
 } from '../../ipc/library';
 import {
   LibraryWorkspace,
@@ -223,13 +225,31 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     return Array.from(selectedCatalogs.values());
   }, [selectedCatalogs]);
 
-  // Load custom folders from localStorage
-  useEffect(() => {
-    if (selectedWorkspaceId) {
-      const stored = localStorage.getItem(`library-folders-${selectedWorkspaceId}`);
+  // Load folders from GitHub (scan for .bluekitws markers)
+  const loadFoldersFromGitHub = useCallback(async (workspaceId: string) => {
+    try {
+      const folderNames = await invokeLibraryListFolders(workspaceId);
+      console.log('Loaded folders from GitHub:', folderNames);
+      
+      // Convert folder names to LibraryFolder objects
+      const folders: LibraryFolder[] = folderNames.map((name, index) => ({
+        id: `folder-${workspaceId}-${name}-${index}`,
+        name,
+        catalogIds: [],
+      }));
+      
+      setCustomFolders(folders);
+      
+      // Also save to localStorage for quick access
+      localStorage.setItem(`library-folders-${workspaceId}`, JSON.stringify(folders));
+    } catch (error) {
+      console.error('Failed to load folders from GitHub:', error);
+      // Fallback to localStorage if GitHub load fails
+      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
       if (stored) {
         try {
-          setCustomFolders(JSON.parse(stored));
+          const folders = JSON.parse(stored);
+          setCustomFolders(folders);
         } catch {
           setCustomFolders([]);
         }
@@ -237,7 +257,15 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         setCustomFolders([]);
       }
     }
-  }, [selectedWorkspaceId]);
+  }, []);
+
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      loadFoldersFromGitHub(selectedWorkspaceId);
+    } else {
+      setCustomFolders([]);
+    }
+  }, [selectedWorkspaceId, loadFoldersFromGitHub]);
 
   // Save custom folders to localStorage
   const saveFolders = (folders: LibraryFolder[]) => {
@@ -326,6 +354,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         description: `Created ${result.catalogs_created} catalogs, ${result.variations_created} variations`,
       });
       await loadCatalogs(selectedWorkspace.id);
+      // Also reload folders in case new ones were created in GitHub
+      await loadFoldersFromGitHub(selectedWorkspace.id);
     } catch (error) {
       console.error('Sync failed:', error);
       toaster.create({
@@ -478,19 +508,38 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   };
 
   // Handle creating a new folder
-  const handleCreateFolder = (name: string) => {
-    const newFolder: LibraryFolder = {
-      id: `folder-${Date.now()}`,
-      name,
-      catalogIds: [],
-    };
-    saveFolders([...customFolders, newFolder]);
-    setShowCreateFolderDialog(false);
-    toaster.create({
-      type: 'success',
-      title: 'Folder created',
-      description: `Created folder "${name}"`,
-    });
+  const handleCreateFolder = async (name: string) => {
+    if (!selectedWorkspaceId) {
+      toaster.create({
+        type: 'error',
+        title: 'Error',
+        description: 'No workspace selected',
+      });
+      return;
+    }
+
+    try {
+      // Create folder in GitHub repository
+      await invokeLibraryCreateFolder(selectedWorkspaceId, name);
+
+      // Reload folders from GitHub to get the newly created folder
+      await loadFoldersFromGitHub(selectedWorkspaceId);
+      
+      setShowCreateFolderDialog(false);
+      toaster.create({
+        type: 'success',
+        title: 'Folder created',
+        description: `Created folder "${name}" in GitHub`,
+      });
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to create folder',
+        description: errorMessage,
+      });
+    }
   };
 
   // Handle moving catalogs to folder
@@ -811,8 +860,41 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       />
 
       <VStack align="stretch" gap={4}>
+        {/* Custom Folders - show even if no catalogs */}
+        {customFolders.length > 0 && (
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+            {customFolders.map((folder) => {
+              const folderCats = organizedCatalogs.folderCatalogs.get(folder.id) || [];
+              const isExpanded = expandedFolders.has(folder.id);
+
+              return (
+                <LibraryFolderCard
+                  key={folder.id}
+                  folder={folder}
+                  catalogs={folderCats}
+                  isExpanded={isExpanded}
+                  onToggleExpand={() => {
+                    setExpandedFolders(prev => {
+                      const next = new Set(prev);
+                      if (next.has(folder.id)) {
+                        next.delete(folder.id);
+                      } else {
+                        next.add(folder.id);
+                      }
+                      return next;
+                    });
+                  }}
+                  onDeleteFolder={() => handleDeleteFolder(folder.id)}
+                  selectedCatalogIds={selectedCatalogs}
+                  onCatalogToggle={handleCatalogToggle}
+                />
+              );
+            })}
+          </SimpleGrid>
+        )}
+
         {/* Catalogs organized by folder */}
-        {catalogs.length === 0 ? (
+        {catalogs.length === 0 && customFolders.length === 0 ? (
           <EmptyState.Root>
             <EmptyState.Content>
               <EmptyState.Indicator>
@@ -827,56 +909,20 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
             </EmptyState.Content>
           </EmptyState.Root>
         ) : (
-          <VStack align="stretch" gap={6}>
-            {/* Custom Folders */}
-            {customFolders.length > 0 && (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                {customFolders.map((folder) => {
-                  const folderCats = organizedCatalogs.folderCatalogs.get(folder.id) || [];
-                  const isExpanded = expandedFolders.has(folder.id);
-
-                    return (
-                      <LibraryFolderCard
-                        key={folder.id}
-                        folder={folder}
-                        catalogs={folderCats}
-                        isExpanded={isExpanded}
-                        onToggleExpand={() => {
-                          setExpandedFolders(prev => {
-                            const next = new Set(prev);
-                            if (next.has(folder.id)) {
-                              next.delete(folder.id);
-                            } else {
-                              next.add(folder.id);
-                            }
-                            return next;
-                          });
-                        }}
-                        onDeleteFolder={() => handleDeleteFolder(folder.id)}
-                        selectedCatalogIds={selectedCatalogs}
-                        onCatalogToggle={handleCatalogToggle}
-                      />
-                    );
-                })}
-              </SimpleGrid>
-            )}
-
-            {/* Ungrouped Catalogs (not in folders) */}
-            {organizedCatalogs.ungrouped.length > 0 && (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-                {organizedCatalogs.ungrouped.map((catWithVars) => (
-                  <CatalogCard
-                    key={catWithVars.catalog.id}
-                    catalogWithVariations={catWithVars}
-                    selectedVariationIds={selectedVariations}
-                    onVariationToggle={handleVariationToggle}
-                    isSelected={selectedCatalogs.has(catWithVars.catalog.id)}
-                    onCatalogToggle={() => handleCatalogToggle(catWithVars)}
-                  />
-                ))}
-              </SimpleGrid>
-            )}
-          </VStack>
+          organizedCatalogs.ungrouped.length > 0 && (
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              {organizedCatalogs.ungrouped.map((catWithVars) => (
+                <CatalogCard
+                  key={catWithVars.catalog.id}
+                  catalogWithVariations={catWithVars}
+                  selectedVariationIds={selectedVariations}
+                  onVariationToggle={handleVariationToggle}
+                  isSelected={selectedCatalogs.has(catWithVars.catalog.id)}
+                  onCatalogToggle={() => handleCatalogToggle(catWithVars)}
+                />
+              ))}
+            </SimpleGrid>
+          )
         )}
       </VStack>
 
@@ -1556,26 +1602,36 @@ function LibraryCatalogActionBar({
 interface CreateLibraryFolderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string) => Promise<void>;
 }
 
 function CreateLibraryFolderDialog({ isOpen, onClose, onCreate }: CreateLibraryFolderDialogProps) {
   const [name, setName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName('');
+      setIsCreating(false);
       setTimeout(() => {
         nameInputRef.current?.focus();
       }, 100);
     }
   }, [isOpen]);
 
-  const handleSubmit = () => {
-    if (!name.trim()) return;
-    onCreate(name.trim());
-    onClose();
+  const handleSubmit = async () => {
+    if (!name.trim() || isCreating) return;
+    setIsCreating(true);
+    try {
+      await onCreate(name.trim());
+      onClose();
+    } catch (error) {
+      // Error is already handled in onCreate
+      console.error('Failed to create folder:', error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1610,19 +1666,21 @@ function CreateLibraryFolderDialog({ isOpen, onClose, onCreate }: CreateLibraryF
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Folder name"
+            disabled={isCreating}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSubmit();
+              if (e.key === 'Enter' && !isCreating) handleSubmit();
             }}
           />
 
           <HStack gap={2} justify="flex-end">
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={onClose} disabled={isCreating}>
               Cancel
             </Button>
             <Button
               colorPalette="primary"
               onClick={handleSubmit}
-              disabled={!name.trim()}
+              disabled={!name.trim() || isCreating}
+              loading={isCreating}
             >
               Create
             </Button>

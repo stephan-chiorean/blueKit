@@ -100,6 +100,50 @@ export async function invokeLibraryDeleteWorkspace(workspaceId: string): Promise
 }
 
 /**
+ * Creates a folder in a library workspace GitHub repository.
+ *
+ * @param workspaceId - Workspace ID
+ * @param folderName - Name of the folder to create
+ * @returns Promise that resolves to a success message
+ *
+ * @example
+ * ```typescript
+ * await invokeLibraryCreateFolder('workspace-id', 'ui-components');
+ * ```
+ */
+export async function invokeLibraryCreateFolder(
+  workspaceId: string,
+  folderName: string
+): Promise<string> {
+  return await invokeWithTimeout<string>(
+    'library_create_folder',
+    { workspaceId, folderName },
+    15000
+  );
+}
+
+/**
+ * Lists folders in a library workspace by scanning GitHub for directories containing .bluekitws files.
+ *
+ * @param workspaceId - Workspace ID
+ * @returns Promise that resolves to an array of folder names
+ *
+ * @example
+ * ```typescript
+ * const folders = await invokeLibraryListFolders('workspace-id');
+ * ```
+ */
+export async function invokeLibraryListFolders(
+  workspaceId: string
+): Promise<string[]> {
+  return await invokeWithTimeout<string[]>(
+    'library_list_folders',
+    { workspaceId },
+    15000
+  );
+}
+
+/**
  * Lists all artifacts in a workspace (or all workspaces if None).
  *
  * @param workspaceId - Optional workspace ID (if not provided, returns all artifacts)

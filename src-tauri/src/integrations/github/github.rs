@@ -267,6 +267,21 @@ impl GitHubClient {
         self.request("GET", endpoint, None).await
     }
 
+    /// Gets the contents of a directory from a repository.
+    /// Returns a list of files and subdirectories.
+    pub async fn get_directory_contents(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+    ) -> Result<Vec<GitHubContentResponse>, String> {
+        let endpoint = format!("/repos/{}/{}/contents/{}", owner, repo, path);
+        let response: Vec<GitHubContentResponse> = self
+            .request("GET", endpoint, None)
+            .await?;
+        Ok(response)
+    }
+
     /// Gets commits from a repository.
     ///
     /// # Arguments
@@ -307,7 +322,7 @@ impl GitHubClient {
 
 /// GitHub content response (file or directory).
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct GitHubContentResponse {
+pub struct GitHubContentResponse {
     pub name: String,
     pub path: String,
     pub sha: String,

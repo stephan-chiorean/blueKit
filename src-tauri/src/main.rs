@@ -118,6 +118,8 @@ async fn main() {
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
             commands::library_get_artifacts, // Get Library artifacts
+            commands::library_create_folder, // Create folder in Library workspace
+            commands::library_list_folders, // List folders in Library workspace
             commands::scan_project_resources, // Scan project resources (Phase 1)
             commands::get_project_resources, // Get project resources (Phase 1)
             commands::get_resource_by_id, // Get resource by ID (Phase 1)
