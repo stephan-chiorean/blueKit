@@ -25,6 +25,7 @@ import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
 import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
+import { KitContextMenu } from './KitContextMenu';
 import { FilterPanel } from '../shared/FilterPanel';
 import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
@@ -70,6 +71,12 @@ function KitsTabContent({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    kit: ArtifactFile | null;
+  }>({ isOpen: false, x: 0, y: 0, kit: null });
 
   const isSelected = (kitId: string) => isSelectedInContext(kitId);
 
@@ -152,6 +159,29 @@ function KitsTabContent({
 
   const handleViewKit = (kit: ArtifactFile) => {
     onViewKit(kit);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, kit: ArtifactFile) => {
+    e.preventDefault();
+
+    // Boundary detection to prevent off-screen menu
+    const menuWidth = 250;
+    const menuHeight = 200;
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 10;
+    }
+
+    setContextMenu({ isOpen: true, x, y, kit });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ isOpen: false, x: 0, y: 0, kit: null });
   };
 
   // Handle adding selected items to folder
@@ -435,6 +465,7 @@ function KitsTabContent({
               key={kit.path}
               cursor="pointer"
               onClick={() => handleViewKit(kit)}
+              onContextMenu={(e) => handleContextMenu(e, kit)}
               bg="bg.surface"
               _hover={{ bg: "bg.subtle" }}
               data-selected={kitSelected ? "" : undefined}
@@ -709,10 +740,13 @@ function KitsTabContent({
                             <Table.Row
                               key={artifact.path}
                               cursor="pointer"
-                              bg="bg.surface"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewKit(artifact);
+                              }}
+                              onContextMenu={(e) => {
+                                e.stopPropagation();
+                                handleContextMenu(e, artifact);
                               }}
                               _hover={{ bg: "bg.subtle" }}
                               bg="bg.subtle"
@@ -870,6 +904,7 @@ function KitsTabContent({
                   position="relative"
                   cursor="pointer"
                   onClick={() => handleViewKit(kit)}
+                  onContextMenu={(e) => handleContextMenu(e, kit)}
                   _hover={{ borderColor: "primary.400" }}
                   height="100%"
                   display="flex"
@@ -943,6 +978,14 @@ function KitsTabContent({
         onClose={() => setDeletingFolder(null)}
         folder={deletingFolder}
         onConfirm={handleConfirmDeleteFolder}
+      />
+
+      <KitContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        kit={contextMenu.kit}
+        onClose={closeContextMenu}
       />
     </Box>
   );

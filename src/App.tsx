@@ -4,6 +4,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import EditorPlansPage from './pages/EditorPlansPage';
+import PreviewWindowPage from './pages/PreviewWindowPage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
@@ -24,6 +25,9 @@ function AppContent() {
   const [currentView, setCurrentView] = useState<View>('welcome');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [plansSource, setPlansSource] = useState<'claude' | 'cursor' | null>(null);
+
+  // Check if this is a preview window
+  const isPreviewWindow = window.location.pathname === '/preview';
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -60,6 +64,19 @@ function AppContent() {
     setCurrentView('home');
     setPlansSource(null);
   };
+
+  // If this is a preview window, render only the preview page
+  if (isPreviewWindow) {
+    return (
+      <ColorModeProvider>
+        <FeatureFlagsProvider>
+          <ResourceProvider>
+            <PreviewWindowPage />
+          </ResourceProvider>
+        </FeatureFlagsProvider>
+      </ColorModeProvider>
+    );
+  }
 
   // Show loading state while checking authentication
   if (isLoading) {

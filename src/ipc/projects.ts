@@ -278,6 +278,33 @@ export async function invokeOpenProjectInEditor(
   );
 }
 
+/**
+ * Opens a file in the specified editor (Cursor, Claude, or VSCode).
+ *
+ * @param filePath - Absolute path to the file to open
+ * @param editor - The editor to use: 'cursor', 'claude', or 'vscode'
+ * @returns Promise that resolves when the editor is opened
+ *
+ * @example
+ * ```typescript
+ * await invokeOpenFileInEditor('/path/to/kit.md', 'cursor');
+ * await invokeOpenFileInEditor('/path/to/walkthrough.md', 'claude');
+ * ```
+ */
+export async function invokeOpenFileInEditor(
+  filePath: string,
+  editor: 'cursor' | 'claude' | 'vscode'
+): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'open_file_in_editor',
+    {
+      filePath,
+      editor,
+    },
+    10000 // 10 second timeout for opening editor
+  );
+}
+
 // ============================================================================
 // DATABASE-BACKED PROJECT MANAGEMENT (Phase 1)
 // ============================================================================

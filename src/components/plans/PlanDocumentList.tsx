@@ -17,6 +17,7 @@ import { deleteResources } from '../../ipc/artifacts';
 import { useResource } from '../../contexts/ResourceContext';
 import { ResourceFile } from '../../types/resource';
 import { toaster } from '../ui/toaster';
+import { PlanDocumentContextMenu } from './PlanDocumentContextMenu';
 
 interface PlanDocumentListProps {
   documents: PlanDocument[];
@@ -35,6 +36,17 @@ const PlanDocumentList = memo(function PlanDocumentList({
 }: PlanDocumentListProps) {
   const { setSelectedResource } = useResource();
   const [deletingDocument, setDeletingDocument] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    document: PlanDocument | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    document: null,
+  });
 
   // Get phase name for a document
   const getPhaseName = (phaseId?: string) => {
@@ -103,6 +115,17 @@ const PlanDocumentList = memo(function PlanDocumentList({
     }
   };
 
+  // Handle context menu
+  const handleContextMenu = (e: React.MouseEvent, document: PlanDocument) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      document,
+    });
+  };
+
   if (documents.length === 0) {
     return (
       <Card.Root variant="subtle">
@@ -140,6 +163,7 @@ const PlanDocumentList = memo(function PlanDocumentList({
             opacity={isDeleting ? 0.5 : 1}
             cursor="pointer"
             onClick={() => handleDocumentClick(document)}
+            onContextMenu={(e) => handleContextMenu(e, document)}
             transition="all 0.2s ease-in-out"
             _hover={{
               transform: 'translateY(-2px)',
@@ -198,6 +222,13 @@ const PlanDocumentList = memo(function PlanDocumentList({
         );
       })}
 
+      <PlanDocumentContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        document={contextMenu.document}
+        onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+      />
     </VStack>
   );
 }, (prevProps, nextProps) => {

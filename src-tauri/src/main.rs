@@ -96,6 +96,10 @@ async fn main() {
             commands::move_artifact_to_folder, // Move artifact into folder
             commands::move_folder_to_folder, // Move folder into folder (nesting)
             commands::open_project_in_editor, // Open project in Cursor or VSCode
+            commands::open_file_in_editor, // Open file in Cursor or VSCode
+            commands::open_html_in_browser, // Open HTML content in browser
+            commands::open_resource_in_window, // Open resource in new Tauri window
+            commands::close_preview_window, // Close preview window
             commands::keychain_store_token, // Store GitHub token in keychain
             commands::keychain_retrieve_token, // Retrieve GitHub token from keychain
             commands::keychain_delete_token, // Delete GitHub token from keychain

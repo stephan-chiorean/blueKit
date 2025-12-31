@@ -2782,6 +2782,300 @@ pub async fn open_project_in_editor(
     Ok(())
 }
 
+/// Opens a file in the specified editor (Cursor or VSCode).
+///
+/// Similar to `open_project_in_editor`, but opens a specific file instead of a directory.
+///
+/// # Arguments
+/// * `file_path` - Absolute path to the file to open
+/// * `editor` - The editor to use: 'cursor' or 'vscode'
+///
+/// # Returns
+/// * `Ok(())` if the file was opened successfully
+/// * `Err(String)` if the file doesn't exist, is not a file, or the editor failed to open
+///
+/// # Examples
+/// ```typescript
+/// await invoke('open_file_in_editor', {
+///   filePath: '/path/to/file.md',
+///   editor: 'cursor'
+/// });
+/// ```
+#[tauri::command]
+pub async fn open_file_in_editor(
+    file_path: String,
+    editor: String,
+) -> Result<(), String> {
+    use std::process::Command;
+
+    let path = PathBuf::from(&file_path);
+
+    // Verify the file path exists
+    if !path.exists() {
+        return Err(format!("File path does not exist: {}", file_path));
+    }
+
+    if !path.is_file() {
+        return Err(format!("Path is not a file: {}", file_path));
+    }
+
+    // Determine the command based on the editor
+    let (cmd, args) = match editor.as_str() {
+        "cursor" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Cursor", &file_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("cursor", vec![&file_path])
+            }
+        }
+        "claude" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Claude", &file_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("claude", vec![&file_path])
+            }
+        }
+        "vscode" | "code" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Visual Studio Code", &file_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("code", vec![&file_path])
+            }
+        }
+        _ => {
+            return Err(format!("Unknown editor: {}. Supported editors: 'cursor', 'claude', 'vscode'", editor));
+        }
+    };
+
+    // Execute the command
+    let output = Command::new(cmd)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to open file in {}: {}", editor, stderr));
+    }
+
+    Ok(())
+}
+
+/// Opens HTML content in the default browser.
+///
+/// Creates a temporary HTML file and opens it in the system's default browser.
+/// The temporary file is created in the system temp directory with a unique name.
+///
+/// # Arguments
+/// * `html_content` - The HTML content to display
+/// * `title` - Optional title for the browser tab (defaults to "BlueKit")
+///
+/// # Returns
+/// * `Ok(())` if the browser was opened successfully
+/// * `Err(String)` if the file creation or browser launch failed
+///
+/// # Examples
+/// ```typescript
+/// await invoke('open_html_in_browser', {
+///   htmlContent: '<html><body><h1>Hello</h1></body></html>',
+///   title: 'My Document'
+/// });
+/// ```
+#[tauri::command]
+pub async fn open_html_in_browser(
+    html_content: String,
+    title: Option<String>,
+) -> Result<(), String> {
+    use std::fs::File;
+    use std::io::Write;
+    use std::process::Command;
+
+    // Create a unique filename in the temp directory
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let filename = format!("bluekit_{}_{}.html",
+        title.as_deref().unwrap_or("document"),
+        timestamp
+    );
+
+    let mut temp_path = std::env::temp_dir();
+    temp_path.push(filename);
+
+    // Write HTML content to temp file
+    let mut file = File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+    file.write_all(html_content.as_bytes())
+        .map_err(|e| format!("Failed to write HTML content: {}", e))?;
+
+    // Open the file in the default browser
+    #[cfg(target_os = "macos")]
+    let status = Command::new("open")
+        .arg(&temp_path)
+        .status()
+        .map_err(|e| format!("Failed to open browser: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("cmd")
+        .args(&["/C", "start", "", temp_path.to_str().unwrap()])
+        .status()
+        .map_err(|e| format!("Failed to open browser: {}", e))?;
+
+    #[cfg(target_os = "linux")]
+    let status = Command::new("xdg-open")
+        .arg(&temp_path)
+        .status()
+        .map_err(|e| format!("Failed to open browser: {}", e))?;
+
+    if !status.success() {
+        return Err("Failed to open browser".to_string());
+    }
+
+    Ok(())
+}
+
+/// Configuration for opening a resource in a preview window.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewWindowConfig {
+    /// Unique identifier for the window (used as window label)
+    pub window_id: String,
+    /// Resource ID or path to display
+    pub resource_id: String,
+    /// Resource type (kit, plan, walkthrough, etc.)
+    pub resource_type: String,
+    /// Window title
+    pub title: String,
+    /// Optional window width (default: 1200)
+    pub width: Option<f64>,
+    /// Optional window height (default: 900)
+    pub height: Option<f64>,
+}
+
+/// Opens a resource in a new Tauri window.
+///
+/// Creates a new OS-level window that loads a route for displaying the resource.
+/// The window is independently moveable and can span multiple monitors.
+///
+/// # Arguments
+///
+/// * `app_handle` - Tauri app handle for creating windows
+/// * `config` - Window configuration including resource details
+///
+/// # Returns
+///
+/// * `Ok(())` if the window was created successfully
+/// * `Err(String)` if window already exists or creation fails
+///
+/// # Examples
+///
+/// ```typescript
+/// await invoke('open_resource_in_window', {
+///   windowId: 'preview-kit-123',
+///   resourceId: '/path/to/kit.md',
+///   resourceType: 'kit',
+///   title: 'My Kit',
+///   width: 1200,
+///   height: 900,
+/// });
+/// ```
+#[tauri::command]
+pub async fn open_resource_in_window(
+    app_handle: AppHandle,
+    config: PreviewWindowConfig,
+) -> Result<(), String> {
+    use tauri::{WindowBuilder, WindowUrl, Manager};
+
+    // Generate unique window label (must be unique across all windows)
+    let window_label = format!("preview-{}", config.window_id);
+
+    // Check if window already exists
+    if app_handle.get_window(&window_label).is_some() {
+        return Err(format!("Window '{}' already exists", window_label));
+    }
+
+    // Build URL with query parameters for the preview route
+    // Frontend route will be: /preview?resourceId=...&resourceType=...
+    let url = format!(
+        "/preview?resourceId={}&resourceType={}",
+        urlencoding::encode(&config.resource_id),
+        urlencoding::encode(&config.resource_type)
+    );
+
+    // Create new window
+    let _window = WindowBuilder::new(
+        &app_handle,
+        window_label.clone(),
+        WindowUrl::App(url.into())
+    )
+    .title(&config.title)
+    .inner_size(
+        config.width.unwrap_or(1200.0),
+        config.height.unwrap_or(900.0)
+    )
+    .resizable(true)
+    .decorations(true) // Standard OS window decorations
+    .center() // Center on screen initially
+    .build()
+    .map_err(|e| format!("Failed to create window: {}", e))?;
+
+    tracing::info!("Created preview window: {}", window_label);
+
+    Ok(())
+}
+
+/// Closes a preview window by ID.
+///
+/// Useful for programmatic window management from frontend.
+///
+/// # Arguments
+///
+/// * `app_handle` - Tauri app handle for accessing windows
+/// * `window_id` - The window ID (without 'preview-' prefix)
+///
+/// # Returns
+///
+/// * `Ok(())` if the window was closed successfully
+/// * `Err(String)` if window not found or close fails
+///
+/// # Examples
+///
+/// ```typescript
+/// await invoke('close_preview_window', {
+///   windowId: 'kit-123',
+/// });
+/// ```
+#[tauri::command]
+pub async fn close_preview_window(
+    app_handle: AppHandle,
+    window_id: String,
+) -> Result<(), String> {
+    use tauri::Manager;
+
+    let window_label = format!("preview-{}", window_id);
+
+    if let Some(window) = app_handle.get_window(&window_label) {
+        window.close()
+            .map_err(|e| format!("Failed to close window: {}", e))?;
+        tracing::info!("Closed preview window: {}", window_label);
+        Ok(())
+    } else {
+        Err(format!("Window '{}' not found", window_label))
+    }
+}
+
 // ============================================================================
 // KEYCHAIN COMMANDS
 // ============================================================================
