@@ -3349,6 +3349,8 @@ pub async fn library_create_collection(
     db: State<'_, DatabaseConnection>,
     workspace_id: String,
     name: String,
+    description: Option<String>,
+    tags: Option<String>,
     color: Option<String>,
 ) -> Result<String, String> {
     use crate::db::entities::library_collection;
@@ -3367,10 +3369,21 @@ pub async fn library_create_collection(
     let now = Utc::now().timestamp();
 
     // Create collection in database
+    let description_opt = description.and_then(|s| {
+        let trimmed = s.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    
     let collection = library_collection::ActiveModel {
         id: Set(collection_id.clone()),
         workspace_id: Set(workspace_id),
         name: Set(trimmed_name.to_string()),
+        description: Set(description_opt),
+        tags: Set(tags),
         color: Set(color),
         order_index: Set(0),
         created_at: Set(now),
@@ -3411,6 +3424,8 @@ pub async fn library_update_collection(
     db: State<'_, DatabaseConnection>,
     collection_id: String,
     name: Option<String>,
+    description: Option<String>,
+    tags: Option<String>,
     color: Option<String>,
 ) -> Result<(), String> {
     use crate::db::entities::library_collection;
@@ -3429,6 +3444,13 @@ pub async fn library_update_collection(
 
     if let Some(n) = name {
         active_collection.name = Set(n);
+    }
+    if let Some(d) = description {
+        let trimmed = d.trim().to_string();
+        active_collection.description = Set(if trimmed.is_empty() { None } else { Some(trimmed) });
+    }
+    if tags.is_some() {
+        active_collection.tags = Set(tags);
     }
     if let Some(c) = color {
         active_collection.color = Set(Some(c));

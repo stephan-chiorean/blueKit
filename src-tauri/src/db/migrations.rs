@@ -27,6 +27,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Library collections (Phase 3)
     create_library_collections_table(db).await?;
     create_library_collection_catalogs_table(db).await?;
+    add_collection_description_and_tags(db).await?;
 
     // Add pinned field to library_workspaces
     add_library_workspaces_pinned_field(db).await?;
@@ -908,5 +909,77 @@ async fn add_library_workspaces_pinned_field(db: &DatabaseConnection) -> Result<
     )).await?;
 
     info!("Created index on library_workspaces.pinned");
+    Ok(())
+}
+
+async fn add_collection_description_and_tags(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if description column exists
+    let check_description_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('library_collections')
+        WHERE name='description'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_description_sql.to_string(),
+    )).await?;
+
+    let description_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    // Add description column if it doesn't exist
+    if !description_exists {
+        let add_description_sql = r#"
+            ALTER TABLE library_collections ADD COLUMN description TEXT
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_description_sql.to_string(),
+        )).await?;
+
+        info!("Added description column to library_collections table");
+    } else {
+        info!("Description column already exists in library_collections table");
+    }
+
+    // Check if tags column exists
+    let check_tags_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('library_collections')
+        WHERE name='tags'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_tags_sql.to_string(),
+    )).await?;
+
+    let tags_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    // Add tags column if it doesn't exist
+    if !tags_exists {
+        let add_tags_sql = r#"
+            ALTER TABLE library_collections ADD COLUMN tags TEXT
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_tags_sql.to_string(),
+        )).await?;
+
+        info!("Added tags column to library_collections table");
+    } else {
+        info!("Tags column already exists in library_collections table");
+    }
+
     Ok(())
 }

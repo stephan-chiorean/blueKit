@@ -8,6 +8,8 @@ pub struct Model {
     pub id: String,
     pub workspace_id: String,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Option<String>, // JSON array
     pub color: Option<String>,
     pub order_index: i32,
     pub created_at: i64,

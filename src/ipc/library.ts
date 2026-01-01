@@ -154,6 +154,8 @@ export interface LibraryCollection {
   id: string;
   workspace_id: string;
   name: string;
+  description?: string;
+  tags?: string; // JSON array string
   color?: string;
   order_index: number;
   created_at: number;
@@ -165,22 +167,26 @@ export interface LibraryCollection {
  *
  * @param workspaceId - Workspace ID
  * @param name - Name of the collection to create
+ * @param description - Optional description for the collection
+ * @param tags - Optional tags (JSON array string) for the collection
  * @param color - Optional hex color for the collection
  * @returns Promise that resolves to the collection ID
  *
  * @example
  * ```typescript
- * const collectionId = await invokeLibraryCreateCollection('workspace-id', 'UI Components', '#3B82F6');
+ * const collectionId = await invokeLibraryCreateCollection('workspace-id', 'UI Components', 'A collection of UI components', '["ui", "components"]', '#3B82F6');
  * ```
  */
 export async function invokeLibraryCreateCollection(
   workspaceId: string,
   name: string,
+  description?: string,
+  tags?: string,
   color?: string
 ): Promise<string> {
   return await invokeWithTimeout<string>(
     'library_create_collection',
-    { workspaceId, name, color },
+    { workspaceId, name, description, tags, color },
     5000
   );
 }
@@ -217,11 +223,13 @@ export async function invokeLibraryGetCollections(
 export async function invokeLibraryUpdateCollection(
   collectionId: string,
   name?: string,
+  description?: string,
+  tags?: string,
   color?: string
 ): Promise<void> {
   return await invokeWithTimeout<void>(
     'library_update_collection',
-    { collectionId, name, color },
+    { collectionId, name, description, tags, color },
     5000
   );
 }

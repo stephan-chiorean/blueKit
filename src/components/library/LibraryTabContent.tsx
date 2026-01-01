@@ -26,8 +26,10 @@ import {
   ActionBar,
   Input,
   InputGroup,
+  Textarea,
   Dialog,
   CloseButton,
+  Field,
 } from '@chakra-ui/react';
 import {
   LuLibrary,
@@ -44,7 +46,6 @@ import {
   LuFolder,
   LuX,
   LuFolderPlus,
-  LuChevronRight,
   LuSearch,
   LuCheck,
   LuLayers,
@@ -56,6 +57,7 @@ import {
   LuPencil,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
+import { FaBook } from 'react-icons/fa';
 import { open as openShell } from '@tauri-apps/api/shell';
 import { toaster } from '../ui/toaster';
 import {
@@ -73,6 +75,7 @@ import {
   invokeLibraryAddCatalogsToCollection,
   invokeLibraryRemoveCatalogsFromCollection,
   invokeLibraryGetCollectionCatalogIds,
+  invokeLibraryUpdateCollection,
   type LibraryCollection,
 } from '../../ipc/library';
 import {
@@ -83,10 +86,13 @@ import {
   GitHubUser,
 } from '../../types/github';
 import { Project, invokeGetProjectRegistry } from '../../ipc';
-import { invokeGitHubGetUser } from '../../ipc/github';
+import { invokeGitHubGetUser, invokeGitHubGetFile } from '../../ipc/github';
 import AddWorkspaceDialog from './AddWorkspaceDialog';
 import { FilterPanel } from '../shared/FilterPanel';
 import { useLibraryCache } from '../../contexts/LibraryCacheContext';
+import { ResourceFile, ResourceType } from '../../types/resource';
+import CollectionViewModal from './CollectionViewModal';
+import EditLibraryCollectionModal from './EditLibraryCollectionModal';
 
 // Selected variation with its catalog info for pulling
 interface SelectedVariation {
@@ -105,6 +111,11 @@ type ViewMode = 'loading' | 'no-auth' | 'no-workspaces' | 'browse';
 // Ref type for external control
 export interface LibraryTabContentRef {
   openAddWorkspaceDialog: () => void;
+}
+
+// Props for LibraryTabContent
+interface LibraryTabContentProps {
+  onViewVariation?: (resource: ResourceFile, content: string, resourceType: ResourceType) => void;
 }
 
 const artifactTypeIcon: Record<string, React.ReactNode> = {
@@ -134,7 +145,7 @@ function formatTimeAgo(date: Date): string {
 
 // Library collection is now imported from IPC - no local interface needed
 
-const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabContent(_, ref) {
+const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewVariation }, ref) {
   const { getCachedCatalogs, setCachedCatalogs, getCachedCollections, setCachedCollections, invalidateCatalogs, invalidateCollections } = useLibraryCache();
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [workspaces, setWorkspaces] = useState<LibraryWorkspace[]>([]);
@@ -159,8 +170,15 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     openAddWorkspaceDialog: () => setShowAddWorkspaceDialog(true),
   }));
 
-  // Collection expansion state
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  // Collection modal state
+  const [viewingCollection, setViewingCollection] = useState<string | null>(null);
+  
+  // Edit collection modal state
+  const [editingCollection, setEditingCollection] = useState<LibraryCollection | null>(null);
+  const [showEditCollectionModal, setShowEditCollectionModal] = useState(false);
+  
+  // Catalog expansion state (for modal: Set<catalogId>)
+  const [expandedCatalogs, setExpandedCatalogs] = useState<Set<string>>(new Set());
 
   // Custom collections state (stored per workspace)
   const [customCollections, setCustomCollections] = useState<LibraryCollection[]>([]);
@@ -484,6 +502,100 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     });
   };
 
+  // Parse front matter from content
+  const parseFrontMatter = (content: string): any => {
+    let frontMatter: any = {};
+    if (content.trim().startsWith('---')) {
+      const endIndex = content.indexOf('\n---', 4);
+      if (endIndex !== -1) {
+        const frontMatterText = content.substring(4, endIndex);
+        const lines = frontMatterText.split('\n');
+        lines.forEach((line) => {
+          const colonIndex = line.indexOf(':');
+          if (colonIndex > 0) {
+            const key = line.substring(0, colonIndex).trim();
+            let value = line.substring(colonIndex + 1).trim();
+            // Handle arrays (tags)
+            if (key === 'tags' && value.startsWith('[')) {
+              frontMatter[key] = value
+                .slice(1, -1)
+                .split(',')
+                .map((t) => t.trim().replace(/['"]/g, ''));
+            } else {
+              // Remove quotes from value
+              frontMatter[key] = value.replace(/^["']|["']$/g, '');
+            }
+          }
+        });
+      }
+    }
+    return frontMatter;
+  };
+
+  // Handle variation click to navigate to ResourceViewPage
+  const handleVariationClick = async (variation: LibraryVariation, catalog: LibraryCatalog) => {
+    if (!selectedWorkspace || !onViewVariation) {
+      toaster.create({
+        type: 'error',
+        title: 'No workspace selected',
+        description: 'Please select a workspace first',
+      });
+      return;
+    }
+
+    try {
+      const content = await invokeGitHubGetFile(
+        selectedWorkspace.github_owner,
+        selectedWorkspace.github_repo,
+        variation.remote_path
+      );
+
+      // Convert to ResourceFile
+      const fileName = variation.remote_path.split('/').pop() || 'Unknown';
+      const name = fileName.replace(/\.(md|markdown)$/, '');
+      const frontMatter = parseFrontMatter(content);
+      
+      // Determine resource type from catalog artifact_type
+      const resourceTypeMap: Record<string, ResourceType> = {
+        kit: 'kit',
+        walkthrough: 'walkthrough',
+        agent: 'agent',
+        diagram: 'diagram',
+      };
+      const resourceType = resourceTypeMap[catalog.artifact_type] || 'kit';
+
+      const resourceFile: ResourceFile = {
+        path: variation.remote_path,
+        name,
+        frontMatter,
+        resourceType,
+      };
+
+      // Call callback to navigate
+      onViewVariation(resourceFile, content, resourceType);
+    } catch (error) {
+      console.error('Failed to fetch variation content:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to load variation',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
+  // Handle catalog expansion toggle in modal
+  const handleCatalogExpandToggle = (catalogId: string) => {
+    setExpandedCatalogs(prev => {
+      const next = new Set(prev);
+      if (next.has(catalogId)) {
+        next.delete(catalogId);
+      } else {
+        next.add(catalogId);
+      }
+      return next;
+    });
+  };
+
   // Handle catalog selection toggle - also selects/deselects all variations
   const handleCatalogToggle = (catalogWithVariations: CatalogWithVariations) => {
     const isCurrentlySelected = selectedCatalogs.has(catalogWithVariations.catalog.id);
@@ -664,7 +776,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   };
 
   // Handle creating a new collection
-  const handleCreateCollection = async (name: string) => {
+  const handleCreateCollection = async (name: string, description?: string, tags?: string) => {
     if (!selectedWorkspaceId) {
       toaster.create({
         type: 'error',
@@ -679,7 +791,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
 
     try {
       // Create collection in database
-      const collectionId = await invokeLibraryCreateCollection(selectedWorkspaceId, name);
+      const collectionId = await invokeLibraryCreateCollection(selectedWorkspaceId, name, description, tags);
       console.log('Created collection:', collectionId);
 
       // Optimistically create collection object
@@ -691,6 +803,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         id: collectionId,
         workspace_id: selectedWorkspaceId,
         name: name.trim(),
+        description,
+        tags,
         order_index: maxOrderIndex,
         created_at: now,
         updated_at: now,
@@ -953,6 +1067,74 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         title: 'Failed to remove catalogs',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  };
+
+  // Handle updating a collection
+  const handleUpdateCollection = async (updatedCollection: LibraryCollection) => {
+    if (!selectedWorkspaceId) return;
+
+    try {
+      await invokeLibraryUpdateCollection(
+        updatedCollection.id,
+        updatedCollection.name,
+        updatedCollection.description,
+        updatedCollection.tags,
+        updatedCollection.color
+      );
+
+      // Optimistically update collection in state
+      setCustomCollections(prev => {
+        const updated = prev.map(c => 
+          c.id === updatedCollection.id ? updatedCollection : c
+        );
+        // Sort by order_index, then created_at
+        return updated.sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+      });
+
+      // Silently refresh in background to ensure consistency
+      try {
+        const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
+        const sorted = [...freshCollections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+        setCustomCollections(sorted);
+      } catch (refreshError) {
+        console.error('Failed to refresh collections after update:', refreshError);
+      }
+
+      toaster.create({
+        type: 'success',
+        title: 'Collection updated',
+        description: 'Collection has been updated successfully',
+      });
+
+      invalidateCollections(selectedWorkspaceId);
+    } catch (error) {
+      console.error('Failed to update collection:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to update collection',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  };
+
+  // Handle editing a collection (opens modal)
+  const handleEditCollection = (collectionId: string) => {
+    const collection = customCollections.find(c => c.id === collectionId);
+    if (collection) {
+      setEditingCollection(collection);
+      setShowEditCollectionModal(true);
     }
   };
 
@@ -1493,6 +1675,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
+                <Icon>
+                  <LuBookmark />
+                </Icon>
                 <Heading size="md">Collections</Heading>
                 <Text fontSize="sm" color="text.muted">
                   {sortedCollections.length}
@@ -1500,31 +1685,21 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
               </Flex>
             </Flex>
 
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+            <SimpleGrid 
+              columns={{ base: 3, md: 4, lg: 5, xl: 6 }} 
+              gap={2}
+            >
               {sortedCollections.map((collection) => {
                 const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
-                const isExpanded = expandedCollections.has(collection.id);
-
+                
                 return (
                   <LibraryCollectionCard
                     key={collection.id}
                     collection={collection}
                     catalogs={collectionCats}
-                    isExpanded={isExpanded}
-                    onToggleExpand={() => {
-                      setExpandedCollections(prev => {
-                        const next = new Set(prev);
-                        if (next.has(collection.id)) {
-                          next.delete(collection.id);
-                        } else {
-                          next.add(collection.id);
-                        }
-                        return next;
-                      });
-                    }}
+                    onOpenModal={() => setViewingCollection(collection.id)}
                     onDeleteCollection={() => handleDeleteCollection(collection.id)}
-                    selectedCatalogIds={selectedCatalogs}
-                    onCatalogToggle={handleCatalogToggle}
+                    onEditCollection={() => handleEditCollection(collection.id)}
                   />
                 );
               })}
@@ -1536,6 +1711,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         {!collectionsLoading && !catalogsLoading && (
           <Box mb={8} position="relative" width="100%" maxW="100%">
             <Flex align="center" gap={2} mb={4}>
+              <Icon>
+                <FaBook />
+              </Icon>
               <Heading size="md">Catalog</Heading>
               <Text fontSize="sm" color="text.muted">
                 {organizedCatalogs.ungrouped.length}
@@ -1648,6 +1826,55 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         workspace={selectedWorkspace}
         onUpdate={handleUpdateWorkspaceName}
       />
+
+      {/* Collection View Modal */}
+      {viewingCollection && (() => {
+        const collection = sortedCollections.find(c => c.id === viewingCollection);
+        if (!collection) return null;
+        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+        return (
+          <CollectionViewModal
+            isOpen={true}
+            onClose={() => setViewingCollection(null)}
+            collection={collection}
+            catalogs={collectionCats}
+            selectedVariations={selectedVariations}
+            selectedCatalogs={selectedCatalogs}
+            expandedCatalogs={expandedCatalogs}
+            onCatalogExpandToggle={handleCatalogExpandToggle}
+            onCatalogToggle={handleCatalogToggle}
+            onVariationClick={handleVariationClick}
+            onVariationToggle={handleVariationToggle}
+            onDeleteCollection={() => {
+              handleDeleteCollection(collection.id);
+              setViewingCollection(null);
+            }}
+            onMoveToCollection={handleMoveCatalogsToCollection}
+            onRemoveFromCollection={handleRemoveCatalogsFromCollection}
+            onCreateCollection={() => {
+              setShowCreateCollectionDialog(true);
+              setViewingCollection(null);
+            }}
+            onBulkPull={handleBulkPull}
+            clearVariationSelection={clearVariationSelection}
+            clearCatalogSelection={handleDeleteCatalogsClick}
+            projects={projects}
+            bulkPulling={bulkPulling}
+            allCollections={sortedCollections}
+          />
+        );
+      })()}
+
+      {/* Edit Collection Modal */}
+      <EditLibraryCollectionModal
+        isOpen={showEditCollectionModal}
+        onClose={() => {
+          setShowEditCollectionModal(false);
+          setEditingCollection(null);
+        }}
+        onSave={handleUpdateCollection}
+        collection={editingCollection}
+      />
     </>
   );
 });
@@ -1718,8 +1945,8 @@ function CatalogCard({
         )}
         {tags.length > 0 && (
           <HStack gap={1} mb={2} wrap="wrap">
-            {tags.map((tag: string) => (
-              <Tag.Root key={tag} size="sm" colorPalette="gray" variant="subtle">
+            {tags.map((tag: string, index: number) => (
+              <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" colorPalette="gray" variant="subtle">
                 <Tag.Label>{tag}</Tag.Label>
               </Tag.Root>
             ))}
@@ -1800,69 +2027,196 @@ function CatalogCard({
   );
 }
 
-// Library Collection Card (similar to CollectionCard)
+
+// Library Collection Card - simplified to open modal
 interface LibraryCollectionCardProps {
   collection: LibraryCollection;
   catalogs: CatalogWithVariations[];
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  onOpenModal: () => void;
   onDeleteCollection: () => void;
-  selectedCatalogIds: Map<string, SelectedCatalog>;
-  onCatalogToggle: (catalogWithVariations: CatalogWithVariations) => void;
+  onEditCollection: () => void;
 }
 
 function LibraryCollectionCard({
   collection,
   catalogs,
-  isExpanded,
-  onToggleExpand,
+  onOpenModal,
   onDeleteCollection,
-  selectedCatalogIds,
-  onCatalogToggle,
+  onEditCollection,
 }: LibraryCollectionCardProps) {
+  // Helper function to infer artifact type from remote_path or variations
+  const inferArtifactType = (catalogWithVariations: CatalogWithVariations): string => {
+    const catalog = catalogWithVariations.catalog;
+    let type = catalog.artifact_type;
+    
+    // If type is "unknown", try to infer from remote_path or variations
+    if (type === 'unknown' || !type) {
+      // First, check variations' remote_path
+      for (const variation of catalogWithVariations.variations) {
+        const remotePath = variation.remote_path || '';
+        const pathParts = remotePath.split('/');
+        
+        // Look for artifact type directories in the path
+        const artifactTypeMap: Record<string, string> = {
+          'kits': 'kit',
+          'walkthroughs': 'walkthrough',
+          'agents': 'agent',
+          'diagrams': 'diagram',
+        };
+        
+        for (const part of pathParts) {
+          if (artifactTypeMap[part]) {
+            type = artifactTypeMap[part];
+            return type;
+          }
+        }
+        
+        // Check file extension for diagrams
+        if (remotePath.endsWith('.mmd') || remotePath.endsWith('.mermaid')) {
+          type = 'diagram';
+          return type;
+        }
+      }
+      
+      // Fallback: check catalog's remote_path
+      const remotePath = catalog.remote_path || '';
+      const pathParts = remotePath.split('/');
+      
+      const artifactTypeMap: Record<string, string> = {
+        'kits': 'kit',
+        'walkthroughs': 'walkthrough',
+        'agents': 'agent',
+        'diagrams': 'diagram',
+      };
+      
+      for (const part of pathParts) {
+        if (artifactTypeMap[part]) {
+          type = artifactTypeMap[part];
+          return type;
+        }
+      }
+      
+      // Check file extension for diagrams
+      if (remotePath.endsWith('.mmd') || remotePath.endsWith('.mermaid')) {
+        type = 'diagram';
+        return type;
+      }
+    }
+    
+    return type || 'unknown';
+  };
+  
+  // Count catalogs by artifact type
+  const typeCounts = catalogs.reduce((acc, cat) => {
+    const type = inferArtifactType(cat);
+    if (type && type !== 'unknown') {
+      acc[type] = (acc[type] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Build summary similar to GlobalActionBar
+  const resourceSummary: Array<{ count: number; icon: React.ReactNode }> = [];
+  if (typeCounts.kit) {
+    resourceSummary.push({ count: typeCounts.kit, icon: <LuPackage /> });
+  }
+  if (typeCounts.walkthrough) {
+    resourceSummary.push({ count: typeCounts.walkthrough, icon: <LuBookOpen /> });
+  }
+  if (typeCounts.agent) {
+    resourceSummary.push({ count: typeCounts.agent, icon: <LuBot /> });
+  }
+  if (typeCounts.diagram) {
+    resourceSummary.push({ count: typeCounts.diagram, icon: <LuNetwork /> });
+  }
+  
+  // If we have catalogs but couldn't determine types, show total count
+  // This handles cases where artifact_type is "unknown" and paths don't contain type info
+  if (resourceSummary.length === 0 && catalogs.length > 0) {
+    resourceSummary.push({ count: catalogs.length, icon: <LuPackage /> });
+  }
+
   return (
     <Card.Root
       variant="subtle"
       borderWidth="1px"
-      borderColor="border.subtle"
+      borderColor={collection.color || "border.subtle"}
       cursor="pointer"
-      onClick={onToggleExpand}
-      _hover={{ borderColor: 'blue.400' }}
+      onClick={onOpenModal}
+      _hover={{ 
+        borderColor: collection.color || "border.emphasized",
+        transform: "translateY(-1px)",
+        boxShadow: "sm"
+      }}
+      transition="all 0.2s"
       position="relative"
       overflow="hidden"
-      width="100%"
-      height="fit-content"
-      alignSelf="start"
+      borderRadius="md"
+      p={2.5}
+      bg="bg.subtle"
+      display="flex"
+      flexDirection="column"
     >
-      <CardHeader pb={2}>
-        <Flex align="center" justify="space-between" gap={4}>
-          <HStack gap={2} align="center" flex={1}>
-            <Icon
-              transform={isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}
-              transition="transform 0.2s"
+      <VStack align="stretch" gap={0}>
+        <Flex align="start" justify="space-between" gap={1.5} mb={1.5}>
+          <VStack align="start" gap={1} flex={1} minW={0}>
+            <Heading 
+              size="sm" 
+              fontWeight="medium"
+              css={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+                lineHeight: '1.2',
+              }}
             >
-              <LuChevronRight />
-            </Icon>
-            <Icon boxSize={5} color={collection.color || 'blue.500'}>
-              <LuBookmark />
-            </Icon>
-            <Heading size="md">{collection.name}</Heading>
-            <Badge size="sm" colorPalette="gray">
-              {catalogs.length}
-            </Badge>
-          </HStack>
-          <Box flexShrink={0}>
+              {collection.name}
+            </Heading>
+            {resourceSummary.length > 0 && (
+              <Box
+                px={2}
+                py={1}
+                borderRadius="sm"
+                bg="blue.50"
+                _dark={{ bg: "blue.900/30" }}
+              >
+                <HStack gap={1.5} justify="flex-start" wrap="wrap">
+                  {resourceSummary.map((part, index) => (
+                    <HStack key={index} gap={1}>
+                      {index > 0 && (
+                        <Text fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                          •
+                        </Text>
+                      )}
+                      <Text fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                        {part.count}
+                      </Text>
+                      <Icon fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                        {part.icon}
+                      </Icon>
+                    </HStack>
+                  ))}
+                </HStack>
+              </Box>
+            )}
+          </VStack>
+          <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
             <Menu.Root>
               <Menu.Trigger asChild>
                 <IconButton
                   variant="ghost"
-                  size="sm"
+                  size="xs"
                   aria-label="Collection options"
                   onClick={(e) => e.stopPropagation()}
                   bg="transparent"
-                  _hover={{ bg: "transparent" }}
+                  _hover={{ bg: "bg.subtle" }}
+                  _active={{ bg: "bg.subtle" }}
+                  _focus={{ bg: "bg.subtle" }}
+                  _focusVisible={{ bg: "bg.subtle" }}
                 >
-                  <Icon>
+                  <Icon fontSize="xs">
                     <IoIosMore />
                   </Icon>
                 </IconButton>
@@ -1870,13 +2224,13 @@ function LibraryCollectionCard({
               <Portal>
                 <Menu.Positioner>
                   <Menu.Content>
+                    <Menu.Item value="edit" onSelect={onEditCollection}>
+                      <Icon><LuPencil /></Icon>
+                      Edit Collection
+                    </Menu.Item>
                     <Menu.Item value="delete" onSelect={onDeleteCollection}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuTrash2 />
-                        </Icon>
-                        <Text fontSize="md">Delete</Text>
-                      </HStack>
+                      <Icon><LuTrash2 /></Icon>
+                      Remove Collection
                     </Menu.Item>
                   </Menu.Content>
                 </Menu.Positioner>
@@ -1884,69 +2238,7 @@ function LibraryCollectionCard({
             </Menu.Root>
           </Box>
         </Flex>
-      </CardHeader>
-      <CardBody pt={0}>
-        <Box
-          display="grid"
-          css={{
-            gridTemplateRows: isExpanded ? '1fr' : '0fr',
-            transition: 'grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out',
-          }}
-          opacity={isExpanded ? 1 : 0}
-          overflow="hidden"
-        >
-          <Box minHeight={0}>
-            {catalogs.length > 0 ? (
-              <Box pt={2} borderTopWidth="1px" borderColor="border.subtle">
-                <VStack align="stretch" gap={2}>
-                  {catalogs.map((catWithVars) => {
-                    const icon = artifactTypeIcon[catWithVars.catalog.artifact_type] || <LuPackage />;
-                    const isCatalogSelected = selectedCatalogIds.has(catWithVars.catalog.id);
-                    
-                    return (
-                      <HStack
-                        key={catWithVars.catalog.id}
-                        fontSize="sm"
-                        color="text.secondary"
-                        cursor="pointer"
-                        _hover={{ color: 'blue.500' }}
-                        gap={2}
-                        justify="space-between"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <HStack gap={2} flex={1}>
-                          <Icon boxSize={4}>{icon}</Icon>
-                          <Text fontSize="sm">{catWithVars.catalog.name}</Text>
-                          <Text fontSize="xs" color="text.tertiary">
-                            ({catWithVars.variations.length})
-                          </Text>
-                        </HStack>
-                        <Checkbox.Root
-                          checked={isCatalogSelected}
-                          colorPalette="blue"
-                          onCheckedChange={() => onCatalogToggle(catWithVars)}
-                          cursor="pointer"
-                        >
-                          <Checkbox.HiddenInput />
-                          <Checkbox.Control cursor="pointer">
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Root>
-                      </HStack>
-                    );
-                  })}
-                </VStack>
-              </Box>
-            ) : (
-              <Box pt={2} borderTopWidth="1px" borderColor="border.subtle">
-                <Text fontSize="sm" color="text.tertiary" textAlign="center">
-                  Empty collection
-                </Text>
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </CardBody>
+      </VStack>
     </Card.Root>
   );
 }
@@ -2307,21 +2599,26 @@ function LibraryCatalogActionBar({
   );
 }
 
+
 // Create collection dialog
 interface CreateLibraryCollectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string) => Promise<void>;
+  onCreate: (name: string, description?: string, tags?: string) => Promise<void>;
 }
 
 function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibraryCollectionDialogProps) {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [tags, setTags] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName('');
+      setDescription('');
+      setTags('');
       setIsCreating(false);
       setTimeout(() => {
         nameInputRef.current?.focus();
@@ -2333,7 +2630,15 @@ function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibr
     if (!name.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      await onCreate(name.trim());
+      // Parse tags: split by comma, trim, filter empty
+      const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      const tagsJson = tagsArray.length > 0 ? JSON.stringify(tagsArray) : undefined;
+      
+      await onCreate(
+        name.trim(),
+        description.trim() || undefined,
+        tagsJson
+      );
       onClose();
     } catch (error) {
       // Error is already handled in onCreate
@@ -2363,23 +2668,53 @@ function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibr
         borderRadius="lg"
         boxShadow="xl"
         p={6}
-        w="350px"
+        w="450px"
+        maxW="90vw"
+        maxH="90vh"
+        overflowY="auto"
         zIndex={1001}
         onClick={(e) => e.stopPropagation()}
       >
         <VStack align="stretch" gap={4}>
           <Heading size="md">Create Collection</Heading>
 
-          <Input
-            ref={nameInputRef}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Collection name"
-            disabled={isCreating}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isCreating) handleSubmit();
-            }}
-          />
+          <Field.Root>
+            <Field.Label>Name</Field.Label>
+            <Input
+              ref={nameInputRef}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Collection name"
+              disabled={isCreating}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isCreating && e.ctrlKey) {
+                  handleSubmit();
+                }
+              }}
+            />
+          </Field.Root>
+
+          <Field.Root>
+            <Field.Label>Description (optional)</Field.Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe what this collection contains..."
+              disabled={isCreating}
+              rows={3}
+            />
+          </Field.Root>
+
+          <Field.Root>
+            <Field.Label>Tags (optional)</Field.Label>
+            <Input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="comma, separated, tags"
+              disabled={isCreating}
+            />
+            <Field.HelperText>Separate tags with commas</Field.HelperText>
+          </Field.Root>
 
           <HStack gap={2} justify="flex-end">
             <Button variant="ghost" onClick={onClose} disabled={isCreating}>

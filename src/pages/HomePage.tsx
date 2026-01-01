@@ -28,6 +28,7 @@ import TasksTabContent, {
   TasksTabContentRef,
 } from "../components/tasks/TasksTabContent";
 import NotebookBackground from "../components/shared/NotebookBackground";
+import ResourceViewPage from "./ResourceViewPage";
 import {
   invokeGetProjectRegistry,
   invokeGetProjectArtifacts,
@@ -39,6 +40,7 @@ import {
   TimeoutError,
 } from "../ipc";
 import { useSelection } from "../contexts/SelectionContext";
+import { ResourceFile, ResourceType } from "../types/resource";
 
 interface HomePageProps {
   onProjectSelect: (project: Project) => void;
@@ -58,6 +60,11 @@ export default function HomePage({
   const [activeTab, setActiveTab] = useState("projects");
   const tasksTabRef = useRef<TasksTabContentRef>(null);
   const libraryTabRef = useRef<LibraryTabContentRef>(null);
+
+  // Library resource viewing state
+  const [viewingLibraryResource, setViewingLibraryResource] = useState<ResourceFile | null>(null);
+  const [libraryResourceContent, setLibraryResourceContent] = useState<string>("");
+  const [libraryResourceType, setLibraryResourceType] = useState<ResourceType | null>(null);
 
   const [, setResizeKey] = useState(0);
 
@@ -324,6 +331,32 @@ export default function HomePage({
 
   const selectedCount = selectedItems.length;
 
+  // Handler for viewing a library variation
+  const handleViewLibraryVariation = (resource: ResourceFile, content: string, resourceType: ResourceType) => {
+    setViewingLibraryResource(resource);
+    setLibraryResourceContent(content);
+    setLibraryResourceType(resourceType);
+  };
+
+  // Handler for going back from resource view
+  const handleBackFromLibraryResource = () => {
+    setViewingLibraryResource(null);
+    setLibraryResourceContent("");
+    setLibraryResourceType(null);
+  };
+
+  // If viewing a library resource, show ResourceViewPage
+  if (viewingLibraryResource && libraryResourceType && libraryResourceContent) {
+    return (
+      <ResourceViewPage
+        resource={viewingLibraryResource}
+        resourceContent={libraryResourceContent}
+        resourceType={libraryResourceType}
+        onBack={handleBackFromLibraryResource}
+      />
+    );
+  }
+
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden" style={{ height: '100vh', maxHeight: '100vh' }}>
       {/* Header above everything */}
@@ -451,7 +484,7 @@ export default function HomePage({
               />
             </Tabs.Content>
             <Tabs.Content value="library">
-              <LibraryTabContent ref={libraryTabRef} />
+              <LibraryTabContent ref={libraryTabRef} onViewVariation={handleViewLibraryVariation} />
             </Tabs.Content>
             <Tabs.Content value="workflows">
               <WorkflowsTabContent />

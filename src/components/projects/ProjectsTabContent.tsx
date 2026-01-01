@@ -20,7 +20,7 @@ import {
   Dialog,
   Input,
 } from '@chakra-ui/react';
-import { Project, invokeOpenProjectInEditor, invokeDbGetProjects, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
+import { Project, invokeOpenProjectInEditor, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
 import { LuFolder, LuChevronRight, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
@@ -250,7 +250,15 @@ export default function ProjectsTabContent({
 
   return (
     <VStack align="stretch" gap={4}>
-      <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6}>
+      <SimpleGrid 
+        columns={{ base: 1, lg: 2 }} 
+        gap={6}
+        css={{
+          '@media (min-width: 1920px)': {
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          },
+        }}
+      >
         {localProjects.map((project) => {
           const isConnectingThis = connectingProjectId === project.id;
 
@@ -319,7 +327,7 @@ export default function ProjectsTabContent({
 
                     {/* Show git URL if connected */}
                     {project.gitConnected && project.gitUrl && (
-                      <Text fontSize="xs" color="fg.muted" fontFamily="mono" noOfLines={1}>
+                      <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
                         {project.gitUrl}
                       </Text>
                     )}
@@ -397,7 +405,7 @@ export default function ProjectsTabContent({
                 <Text fontSize="sm" color="text.secondary" mb={3}>
                   {project.description || 'No description'}
                 </Text>
-                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" noOfLines={1}>
+                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" lineClamp={1}>
                   {project.path}
                 </Text>
               </CardBody>
