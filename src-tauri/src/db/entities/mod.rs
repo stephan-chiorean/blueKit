@@ -9,6 +9,7 @@ pub mod library_catalog;
 pub mod library_variation;
 pub mod library_subscription;
 pub mod library_resource;
+pub mod library_folder;
 pub mod project;
 pub mod checkpoint;
 pub mod plan;

@@ -118,8 +118,13 @@ async fn main() {
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
             commands::library_get_artifacts, // Get Library artifacts
-            commands::library_create_folder, // Create folder in Library workspace
-            commands::library_list_folders, // List folders in Library workspace
+            commands::library_create_folder, // Create folder in SQLite
+            commands::library_get_folders, // Get folders from SQLite
+            commands::library_update_folder, // Update folder metadata
+            commands::library_delete_folder, // Delete folder from SQLite
+            commands::library_add_catalogs_to_folder, // Add catalogs to folder
+            commands::library_remove_catalogs_from_folder, // Remove catalogs from folder
+            commands::library_get_folder_catalog_ids, // Get catalog IDs in folder
             commands::scan_project_resources, // Scan project resources (Phase 1)
             commands::get_project_resources, // Get project resources (Phase 1)
             commands::get_resource_by_id, // Get resource by ID (Phase 1)
@@ -127,6 +132,7 @@ async fn main() {
             commands::publish_resource, // Publish resource to workspace (Phase 3)
             commands::sync_workspace_catalog, // Sync workspace catalog from GitHub (Phase 4)
             commands::list_workspace_catalogs, // List workspace catalogs (Phase 4)
+            commands::delete_catalogs, // Delete catalogs from workspace (Phase 4)
             commands::pull_variation, // Pull variation to local project (Phase 4)
             commands::check_resource_status, // Check resource status for updates (Phase 5)
             commands::check_project_for_updates, // Check all resources in project (Phase 5)

@@ -3330,133 +3330,209 @@ pub async fn library_get_artifacts(
 pub async fn library_create_folder(
     db: State<'_, DatabaseConnection>,
     workspace_id: String,
-    folder_name: String,
+    name: String,
+    color: Option<String>,
 ) -> Result<String, String> {
-    use crate::db::entities::library_workspace;
-    use crate::integrations::github::GitHubClient;
-    use sea_orm::EntityTrait;
+    use crate::db::entities::library_folder;
+    use sea_orm::{ActiveModelTrait, Set};
+    use chrono::Utc;
+    use uuid::Uuid;
 
-    // Get the workspace
-    let workspace = library_workspace::Entity::find_by_id(&workspace_id)
-        .one(&*db)
-        .await
-        .map_err(|e| format!("Database error: {}", e))?
-        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
-
-    // Get GitHub client
-    let github_client = GitHubClient::from_keychain()
-        .map_err(|e| format!("Failed to get GitHub client: {}", e))?;
-
-    // Get authenticated user info for commit message
-    let user_info = github_client
-        .get_user()
-        .await
-        .map_err(|e| format!("Failed to get GitHub user: {}", e))?;
-
-    // Sanitize folder name (replace spaces with hyphens, remove invalid characters)
-    let sanitized_name = folder_name
-        .trim()
-        .replace(' ', "-")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
-        .collect::<String>();
-
-    if sanitized_name.is_empty() {
-        return Err("Folder name cannot be empty after sanitization".to_string());
+    // Validate folder name
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() {
+        return Err("Folder name cannot be empty".to_string());
     }
 
-    // Create folder path: {folder_name}/.bluekitws
-    // .bluekitws marks this as a BlueKit workspace folder
-    let folder_path = format!("{}/.bluekitws", sanitized_name);
+    // Generate unique ID
+    let folder_id = format!("folder_{}", Uuid::new_v4());
+    let now = Utc::now().timestamp();
 
-    // Check if folder already exists
-    let file_sha = github_client
-        .get_file_sha(&workspace.github_owner, &workspace.github_repo, &folder_path)
+    // Create folder in database
+    let folder = library_folder::ActiveModel {
+        id: Set(folder_id.clone()),
+        workspace_id: Set(workspace_id),
+        name: Set(trimmed_name.to_string()),
+        color: Set(color),
+        order_index: Set(0),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    folder
+        .insert(&*db)
         .await
-        .map_err(|e| format!("Failed to check if folder exists: {}", e))?;
+        .map_err(|e| format!("Failed to create folder: {}", e))?;
 
-    if file_sha.is_some() {
-        return Err(format!("Folder '{}' already exists in the repository", sanitized_name));
-    }
-
-    // Create commit message
-    let commit_message = format!(
-        "[BlueKit] Create folder: {} by {}",
-        sanitized_name,
-        user_info.login
-    );
-
-    // Create .gitkeep file (empty file to create the folder structure)
-    let gitkeep_content = "";
-
-    // Create the folder in GitHub
-    let github_response = github_client
-        .create_or_update_file(
-            &workspace.github_owner,
-            &workspace.github_repo,
-            &folder_path,
-            gitkeep_content,
-            &commit_message,
-            None, // No SHA for new file
-        )
-        .await
-        .map_err(|e| format!("Failed to create folder in GitHub: {}", e))?;
-
-    Ok(format!("Folder '{}' created successfully", sanitized_name))
+    Ok(folder_id)
 }
 
-/// Lists folders in a library workspace by scanning GitHub for directories containing .bluekitws files.
+/// Gets all folders for a workspace
 #[tauri::command]
-pub async fn library_list_folders(
+pub async fn library_get_folders(
     db: State<'_, DatabaseConnection>,
     workspace_id: String,
-) -> Result<Vec<String>, String> {
-    use crate::db::entities::library_workspace;
-    use crate::integrations::github::GitHubClient;
-    use sea_orm::EntityTrait;
+) -> Result<Vec<crate::db::entities::library_folder::Model>, String> {
+    use crate::db::entities::library_folder;
+    use sea_orm::{EntityTrait, ColumnTrait, QueryFilter, QueryOrder};
 
-    // Get the workspace
-    let workspace = library_workspace::Entity::find_by_id(&workspace_id)
+    let folders = library_folder::Entity::find()
+        .filter(library_folder::Column::WorkspaceId.eq(workspace_id))
+        .order_by_asc(library_folder::Column::OrderIndex)
+        .order_by_asc(library_folder::Column::Name)
+        .all(&*db)
+        .await
+        .map_err(|e| format!("Failed to get folders: {}", e))?;
+
+    Ok(folders)
+}
+
+/// Updates a folder's metadata
+#[tauri::command]
+pub async fn library_update_folder(
+    db: State<'_, DatabaseConnection>,
+    folder_id: String,
+    name: Option<String>,
+    color: Option<String>,
+) -> Result<(), String> {
+    use crate::db::entities::library_folder;
+    use sea_orm::{EntityTrait, ActiveModelTrait, Set};
+    use chrono::Utc;
+
+    // Find existing folder
+    let folder = library_folder::Entity::find_by_id(&folder_id)
         .one(&*db)
         .await
         .map_err(|e| format!("Database error: {}", e))?
-        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+        .ok_or_else(|| format!("Folder not found: {}", folder_id))?;
 
-    // Get GitHub client
-    let github_client = GitHubClient::from_keychain()
-        .map_err(|e| format!("Failed to get GitHub client: {}", e))?;
+    // Create active model for update
+    let mut active_folder: library_folder::ActiveModel = folder.into();
 
-    // Get root directory contents
-    let root_contents = github_client
-        .get_directory_contents(&workspace.github_owner, &workspace.github_repo, "")
+    if let Some(n) = name {
+        active_folder.name = Set(n);
+    }
+    if let Some(c) = color {
+        active_folder.color = Set(Some(c));
+    }
+    active_folder.updated_at = Set(Utc::now().timestamp());
+
+    active_folder
+        .update(&*db)
         .await
-        .map_err(|e| format!("Failed to get repository contents: {}", e))?;
+        .map_err(|e| format!("Failed to update folder: {}", e))?;
 
-    // Filter for directories and check if they contain .bluekitws
-    let mut folders = Vec::new();
-    for item in root_contents {
-        if item.content_type == "dir" {
-            // Check if this directory contains .bluekitws
-            let bluekitws_path = format!("{}/.bluekitws", item.path);
-            match github_client
-                .get_file_sha(&workspace.github_owner, &workspace.github_repo, &bluekitws_path)
-                .await
-            {
-                Ok(Some(_)) => {
-                    // This folder has .bluekitws marker, add it to the list
-                    folders.push(item.name);
-                }
-                Ok(None) => {
-                    // No .bluekitws file, skip this directory
-                }
-                Err(_) => {
-                    // Error checking, skip this directory
-                }
-            }
-        }
+    Ok(())
+}
+
+/// Deletes a folder
+#[tauri::command]
+pub async fn library_delete_folder(
+    db: State<'_, DatabaseConnection>,
+    folder_id: String,
+) -> Result<(), String> {
+    use crate::db::entities::library_folder;
+    use sea_orm::{EntityTrait, ModelTrait};
+
+    // Find and delete the folder
+    let folder = library_folder::Entity::find_by_id(&folder_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| format!("Folder not found: {}", folder_id))?;
+
+    folder
+        .delete(&*db)
+        .await
+        .map_err(|e| format!("Failed to delete folder: {}", e))?;
+
+    Ok(())
+}
+
+/// Adds catalogs to a folder
+#[tauri::command]
+pub async fn library_add_catalogs_to_folder(
+    db: State<'_, DatabaseConnection>,
+    folder_id: String,
+    catalog_ids: Vec<String>,
+) -> Result<(), String> {
+    use sea_orm::{Statement, ConnectionTrait};
+    use chrono::Utc;
+
+    let now = Utc::now().timestamp();
+
+    for catalog_id in catalog_ids {
+        // Use INSERT OR IGNORE to avoid errors if already exists
+        let sql = format!(
+            "INSERT OR IGNORE INTO library_folder_catalogs (folder_id, catalog_id, created_at) VALUES ('{}', '{}', {})",
+            folder_id, catalog_id, now
+        );
+
+        db.inner().execute(Statement::from_string(
+            db.inner().get_database_backend(),
+            sql,
+        ))
+        .await
+        .map_err(|e| format!("Failed to add catalog to folder: {}", e))?;
     }
 
-    Ok(folders)
+    Ok(())
+}
+
+/// Removes catalogs from a folder
+#[tauri::command]
+pub async fn library_remove_catalogs_from_folder(
+    db: State<'_, DatabaseConnection>,
+    folder_id: String,
+    catalog_ids: Vec<String>,
+) -> Result<(), String> {
+    use sea_orm::{Statement, ConnectionTrait};
+
+    for catalog_id in catalog_ids {
+        let sql = format!(
+            "DELETE FROM library_folder_catalogs WHERE folder_id = '{}' AND catalog_id = '{}'",
+            folder_id, catalog_id
+        );
+
+        db.inner().execute(Statement::from_string(
+            db.inner().get_database_backend(),
+            sql,
+        ))
+        .await
+        .map_err(|e| format!("Failed to remove catalog from folder: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Gets all catalog IDs in a folder
+#[tauri::command]
+pub async fn library_get_folder_catalog_ids(
+    db: State<'_, DatabaseConnection>,
+    folder_id: String,
+) -> Result<Vec<String>, String> {
+    use sea_orm::{Statement, ConnectionTrait};
+
+    // Get catalog IDs for this folder
+    let query = format!(
+        "SELECT catalog_id FROM library_folder_catalogs WHERE folder_id = '{}'",
+        folder_id
+    );
+
+    let catalog_ids_result = db.inner()
+        .query_all(Statement::from_string(
+            db.inner().get_database_backend(),
+            query,
+        ))
+        .await
+        .map_err(|e| format!("Failed to get folder catalog IDs: {}", e))?;
+
+    let catalog_ids: Vec<String> = catalog_ids_result
+        .iter()
+        .filter_map(|row| row.try_get::<String>("", "catalog_id").ok())
+        .collect();
+
+    Ok(catalog_ids)
 }
 
 // ============================================================================
@@ -3619,6 +3695,15 @@ pub async fn list_workspace_catalogs(
     db: State<'_, DatabaseConnection>,
 ) -> Result<Vec<crate::library::sync::CatalogWithVariations>, String> {
     crate::library::sync::list_workspace_catalogs(db.inner(), &workspace_id, artifact_type).await
+}
+
+/// Delete catalogs and their variations from workspace
+#[tauri::command]
+pub async fn delete_catalogs(
+    catalog_ids: Vec<String>,
+    db: State<'_, DatabaseConnection>,
+) -> Result<u32, String> {
+    crate::library::sync::delete_catalogs(db.inner(), catalog_ids).await
 }
 
 /// Pull a variation to a local project

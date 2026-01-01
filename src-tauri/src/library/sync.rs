@@ -49,15 +49,15 @@ pub async fn sync_workspace_catalog(
         variations_updated: 0,
     };
 
-    // Artifact type directories to scan
+    // Artifact type directories to scan (optimization - type comes from YAML)
     let artifact_dirs = vec![
-        ("kits", "kit"),
-        ("walkthroughs", "walkthrough"),
-        ("agents", "agent"),
-        ("diagrams", "diagram"),
+        ".bluekit/kits",
+        ".bluekit/walkthroughs",
+        ".bluekit/agents",
+        ".bluekit/diagrams",
     ];
 
-    for (dir_path, artifact_type) in artifact_dirs {
+    for dir_path in artifact_dirs {
         // For each directory, we'll need to list files
         // Using get_tree with main branch would work, but we need a simpler approach
         // For now, we'll use a recursive listing approach based on get_file_contents
@@ -67,7 +67,6 @@ pub async fn sync_workspace_catalog(
             &github_client,
             &workspace,
             dir_path,
-            artifact_type,
             now,
             &mut stats,
         )
@@ -85,12 +84,12 @@ pub async fn sync_workspace_catalog(
 }
 
 /// Sync a single directory by attempting to get its contents.
+/// Artifact type is determined from YAML front matter, not directory location.
 async fn sync_directory(
     db: &DatabaseConnection,
     github_client: &GitHubClient,
     workspace: &library_workspace::Model,
     dir_path: &str,
-    artifact_type: &str,
     now: i64,
     stats: &mut SyncResult,
 ) -> Result<(), String> {
@@ -129,7 +128,15 @@ async fn sync_directory(
         let content_hash = compute_content_hash(&content);
 
         // Extract metadata from YAML front matter
-        let (name, description, tags) = extract_metadata_from_content(&content);
+        let (name, description, tags, artifact_type) = extract_metadata_from_content(&content);
+
+        // YAML type field is required
+        let artifact_type = artifact_type.ok_or_else(|| {
+            format!(
+                "Missing 'type' field in YAML front matter for file: {}. All library artifacts must have a 'type' field (e.g., kit, walkthrough, agent, diagram).",
+                item.path
+            )
+        })?;
 
         // Check if catalog exists for this remote path
         let remote_path = item.path.clone();
@@ -153,7 +160,7 @@ async fn sync_directory(
                     workspace_id: Set(workspace.id.clone()),
                     name: Set(name.clone()),
                     description: Set(description.clone()),
-                    artifact_type: Set(artifact_type.to_string()),
+                    artifact_type: Set(artifact_type),
                     tags: Set(tags.clone()),
                     remote_path: Set(remote_path.clone()),
                     created_at: Set(now),
@@ -255,12 +262,152 @@ struct DirectoryItem {
     item_type: String,
 }
 
+/// Delete catalogs and their variations from both database and GitHub.
+/// This removes the catalog files from the repository and deletes all associated variations.
+pub async fn delete_catalogs(
+    db: &DatabaseConnection,
+    catalog_ids: Vec<String>,
+) -> Result<u32, String> {
+    if catalog_ids.is_empty() {
+        return Ok(0);
+    }
+
+    // Get GitHub client
+    let github_client = GitHubClient::from_keychain()
+        .map_err(|e| format!("Failed to get GitHub client: {}", e))?;
+
+    // Get authenticated user info for commit message
+    let user_info = github_client
+        .get_user()
+        .await
+        .map_err(|e| format!("Failed to get GitHub user: {}", e))?;
+
+    let mut deleted_count = 0;
+
+    // Process each catalog
+    for catalog_id in catalog_ids {
+        // Get the catalog with its workspace
+        let catalog = library_catalog::Entity::find_by_id(&catalog_id)
+            .one(db)
+            .await
+            .map_err(|e| format!("Database error: {}", e))?
+            .ok_or_else(|| format!("Catalog not found: {}", catalog_id))?;
+
+        let workspace = library_workspace::Entity::find_by_id(&catalog.workspace_id)
+            .one(db)
+            .await
+            .map_err(|e| format!("Database error: {}", e))?
+            .ok_or_else(|| format!("Workspace not found: {}", catalog.workspace_id))?;
+
+        // Get all variations for this catalog to get their file SHAs
+        let variations = library_variation::Entity::find()
+            .filter(library_variation::Column::CatalogId.eq(&catalog_id))
+            .all(db)
+            .await
+            .map_err(|e| format!("Database error: {}", e))?;
+
+        // Delete the file from GitHub (use the latest variation's SHA if available)
+        // If multiple variations exist, we'll delete using the most recent one's SHA
+        let mut github_deletion_attempted = false;
+        if let Some(latest_variation) = variations.iter().max_by_key(|v| v.published_at) {
+            if let Some(sha) = &latest_variation.github_commit_sha {
+                github_deletion_attempted = true;
+                // Try to get current file SHA (in case it was updated)
+                let current_sha = match github_client
+                    .get_file_sha(&workspace.github_owner, &workspace.github_repo, &catalog.remote_path)
+                    .await
+                {
+                    Ok(Some(sha)) => sha,
+                    Ok(None) => {
+                        // File doesn't exist in GitHub, that's fine
+                        sha.clone()
+                    }
+                    Err(_) => {
+                        // Error getting SHA, use the one from variation
+                        sha.clone()
+                    }
+                };
+
+                // Delete the file from GitHub
+                let commit_message = format!(
+                    "[BlueKit] Delete catalog: {} by {}",
+                    catalog.name,
+                    user_info.login
+                );
+
+                // Try to delete from GitHub (ignore errors if file doesn't exist)
+                if let Err(e) = github_client
+                    .delete_file(
+                        &workspace.github_owner,
+                        &workspace.github_repo,
+                        &catalog.remote_path,
+                        &commit_message,
+                        &current_sha,
+                    )
+                    .await
+                {
+                    // Log error but continue - file might already be deleted or SHA might be outdated
+                    // Database deletion will still proceed
+                    eprintln!("Warning: Failed to delete file from GitHub (continuing with DB deletion): {}", e);
+                }
+            }
+        }
+        
+        if !github_deletion_attempted {
+            // No variations with SHA, but still try to delete the file if it exists
+            match github_client
+                .get_file_sha(&workspace.github_owner, &workspace.github_repo, &catalog.remote_path)
+                .await
+            {
+                Ok(Some(sha)) => {
+                    let commit_message = format!(
+                        "[BlueKit] Delete catalog: {} by {}",
+                        catalog.name,
+                        user_info.login
+                    );
+
+                    if let Err(e) = github_client
+                        .delete_file(
+                            &workspace.github_owner,
+                            &workspace.github_repo,
+                            &catalog.remote_path,
+                            &commit_message,
+                            &sha,
+                        )
+                        .await
+                    {
+                        eprintln!("Warning: Failed to delete file from GitHub (continuing with DB deletion): {}", e);
+                    }
+                }
+                Ok(None) => {
+                    // File doesn't exist, that's fine
+                }
+                Err(e) => {
+                    // Error checking file, log but continue
+                    eprintln!("Warning: Failed to check if file exists in GitHub (continuing with DB deletion): {}", e);
+                }
+            }
+        }
+
+        // Delete the catalog from database (variations will be cascade deleted)
+        library_catalog::Entity::delete_by_id(&catalog_id)
+            .exec(db)
+            .await
+            .map_err(|e| format!("Failed to delete catalog: {}", e))?;
+
+        deleted_count += 1;
+    }
+
+    Ok(deleted_count)
+}
+
 /// Extract metadata from markdown content (YAML front matter).
-fn extract_metadata_from_content(content: &str) -> (String, Option<String>, Option<String>) {
+/// Returns: (name, description, tags, artifact_type)
+fn extract_metadata_from_content(content: &str) -> (String, Option<String>, Option<String>, Option<String>) {
     // Parse YAML front matter
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() || lines[0] != "---" {
-        return ("Untitled".to_string(), None, None);
+        return ("Untitled".to_string(), None, None, None);
     }
 
     // Find the closing ---
@@ -273,7 +420,7 @@ fn extract_metadata_from_content(content: &str) -> (String, Option<String>, Opti
     }
 
     if yaml_end == 0 {
-        return ("Untitled".to_string(), None, None);
+        return ("Untitled".to_string(), None, None, None);
     }
 
     // Extract YAML content
@@ -294,8 +441,12 @@ fn extract_metadata_from_content(content: &str) -> (String, Option<String>, Opti
         let tags = yaml_value.get("tags")
             .and_then(|v| serde_json::to_string(v).ok());
 
-        (name, description, tags)
+        let artifact_type = yaml_value.get("type")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        (name, description, tags, artifact_type)
     } else {
-        ("Untitled".to_string(), None, None)
+        ("Untitled".to_string(), None, None, None)
     }
 }

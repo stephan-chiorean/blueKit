@@ -26,6 +26,8 @@ import {
   ActionBar,
   Input,
   InputGroup,
+  Dialog,
+  CloseButton,
 } from '@chakra-ui/react';
 import {
   LuLibrary,
@@ -45,22 +47,26 @@ import {
   LuChevronRight,
   LuSearch,
   LuCheck,
-  LuFolderOpen,
   LuLayers,
   LuFilter,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { open as openShell } from '@tauri-apps/api/shell';
-import { open as openDialog } from '@tauri-apps/api/dialog';
 import { toaster } from '../ui/toaster';
 import {
   invokeLibraryListWorkspaces,
   invokeLibraryDeleteWorkspace,
   invokeSyncWorkspaceCatalog,
   invokeListWorkspaceCatalogs,
+  invokeDeleteCatalogs,
   invokePullVariation,
   invokeLibraryCreateFolder,
-  invokeLibraryListFolders,
+  invokeLibraryGetFolders,
+  invokeLibraryDeleteFolder,
+  invokeLibraryAddCatalogsToFolder,
+  invokeLibraryRemoveCatalogsFromFolder,
+  invokeLibraryGetFolderCatalogIds,
+  type LibraryFolder,
 } from '../../ipc/library';
 import {
   LibraryWorkspace,
@@ -69,7 +75,7 @@ import {
   LibraryCatalog,
   GitHubUser,
 } from '../../types/github';
-import { Project, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from '../../ipc';
+import { Project, invokeGetProjectRegistry } from '../../ipc';
 import { invokeGitHubGetUser } from '../../ipc/github';
 import AddWorkspaceDialog from './AddWorkspaceDialog';
 import { FilterPanel } from '../shared/FilterPanel';
@@ -126,50 +132,10 @@ function getFolderPath(remotePath: string): string {
   return parts.slice(0, -1).join('/');
 }
 
-// Library folder structure (persisted in localStorage for now)
-interface LibraryFolder {
-  id: string;
-  name: string;
-  color?: string;
-  catalogIds: string[]; // Catalog IDs in this folder
-}
+// Library folder is now imported from IPC - no local interface needed
 
-// Group catalogs by folder path
-interface FolderGroup {
-  path: string;
-  name: string;
-  catalogs: CatalogWithVariations[];
-}
-
-function groupCatalogsByFolder(catalogs: CatalogWithVariations[]): {
-  folders: FolderGroup[];
-  ungrouped: CatalogWithVariations[];
-} {
-  const folderMap = new Map<string, CatalogWithVariations[]>();
-  const ungrouped: CatalogWithVariations[] = [];
-
-  for (const catWithVars of catalogs) {
-    const folderPath = getFolderPath(catWithVars.catalog.remote_path);
-    if (folderPath) {
-      if (!folderMap.has(folderPath)) {
-        folderMap.set(folderPath, []);
-      }
-      folderMap.get(folderPath)!.push(catWithVars);
-    } else {
-      ungrouped.push(catWithVars);
-    }
-  }
-
-  const folders: FolderGroup[] = Array.from(folderMap.entries())
-    .map(([path, cats]) => ({
-      path,
-      name: path.split('/').pop() || path,
-      catalogs: cats,
-    }))
-    .sort((a, b) => a.path.localeCompare(b.path));
-
-  return { folders, ungrouped };
-}
+// Group catalogs by folder path - DEPRECATED (now using SQLite folders)
+// Keeping for reference
 
 const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabContent(_, ref) {
   const { getCachedCatalogs, setCachedCatalogs, getCachedFolders, setCachedFolders, invalidateCatalogs, invalidateFolders } = useLibraryCache();
@@ -188,6 +154,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   // Dialog states
   const [showAddWorkspaceDialog, setShowAddWorkspaceDialog] = useState(false);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [showDeleteCatalogsDialog, setShowDeleteCatalogsDialog] = useState(false);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -199,6 +166,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
 
   // Custom folders state (stored per workspace)
   const [customFolders, setCustomFolders] = useState<LibraryFolder[]>([]);
+
+  // Catalog assignments per folder (folder_id -> catalog_id[])
+  const [folderCatalogMap, setFolderCatalogMap] = useState<Map<string, string[]>>(new Map());
 
   // Multi-select state for variations
   const [selectedVariations, setSelectedVariations] = useState<Map<string, SelectedVariation>>(new Map());
@@ -237,35 +207,46 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     return Array.from(selectedCatalogs.values());
   }, [selectedCatalogs]);
 
-  // Get all unique tags from catalogs
+  // Get all unique tags from ungrouped catalogs (since filter only applies to ungrouped)
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
-    catalogs.forEach(catWithVars => {
-      const tags = catWithVars.catalog.tags ? JSON.parse(catWithVars.catalog.tags) : [];
-      tags.forEach((tag: string) => tagSet.add(tag));
-    });
-    return Array.from(tagSet).sort();
-  }, [catalogs]);
+    const catalogInFolder = new Set<string>();
 
-  // Filter catalogs based on name and selected tags
-  const filteredCatalogs = useMemo(() => {
-    return catalogs.filter(catWithVars => {
-      const catalog = catWithVars.catalog;
-      const displayName = catalog.name;
-      const matchesName = !nameFilter || 
-        displayName.toLowerCase().includes(nameFilter.toLowerCase());
-      
-      const catalogTags = catalog.tags ? JSON.parse(catalog.tags) : [];
-      const matchesTags = selectedTags.length === 0 || 
-        selectedTags.some(selectedTag =>
-          catalogTags.some((tag: string) => 
-            tag.toLowerCase() === selectedTag.toLowerCase()
-          )
-        );
-      
-      return matchesName && matchesTags;
-    });
-  }, [catalogs, nameFilter, selectedTags]);
+    // Mark catalogs that are in folders
+    for (const folder of customFolders) {
+      const catalogIds = folderCatalogMap.get(folder.id) || [];
+      for (const catalogId of catalogIds) {
+        catalogInFolder.add(catalogId);
+      }
+    }
+    
+    // Only collect tags from ungrouped catalogs
+    catalogs
+      .filter(c => !catalogInFolder.has(c.catalog.id))
+      .forEach(catWithVars => {
+        const tags = catWithVars.catalog.tags ? JSON.parse(catWithVars.catalog.tags) : [];
+        tags.forEach((tag: string) => tagSet.add(tag));
+      });
+    return Array.from(tagSet).sort();
+  }, [catalogs, customFolders]);
+
+  // Filter function for catalogs (used only for ungrouped catalogs)
+  const matchesFilter = useCallback((catWithVars: CatalogWithVariations): boolean => {
+    const catalog = catWithVars.catalog;
+    const displayName = catalog.name;
+    const matchesName = !nameFilter || 
+      displayName.toLowerCase().includes(nameFilter.toLowerCase());
+    
+    const catalogTags = catalog.tags ? JSON.parse(catalog.tags) : [];
+    const matchesTags = selectedTags.length === 0 || 
+      selectedTags.some(selectedTag =>
+        catalogTags.some((tag: string) => 
+          tag.toLowerCase() === selectedTag.toLowerCase()
+        )
+      );
+    
+    return matchesName && matchesTags;
+  }, [nameFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => {
@@ -277,132 +258,59 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     });
   };
 
-  // Load folders from GitHub (scan for .bluekitws markers)
-  const loadFoldersFromGitHub = useCallback(async (workspaceId: string) => {
-    // Check cache first
-    const cachedFolderNames = getCachedFolders(workspaceId);
-    if (cachedFolderNames) {
-      // Use cached folder names, but still merge with localStorage data for catalogIds
-      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
-      const existingFolders: LibraryFolder[] = stored ? (() => {
-        try {
-          return JSON.parse(stored);
-        } catch {
-          return [];
-        }
-      })() : [];
-      
-      // Create a map of existing folders by name for quick lookup
-      const existingFoldersMap = new Map<string, LibraryFolder>();
-      existingFolders.forEach(folder => {
-        // Match by name since folder names are unique identifiers
-        existingFoldersMap.set(folder.name, folder);
-      });
-      
-      // Convert folder names to LibraryFolder objects, preserving catalogIds from localStorage
-      const folders: LibraryFolder[] = cachedFolderNames.map((name) => {
-        const existing = existingFoldersMap.get(name);
-        if (existing) {
-          // Preserve existing folder with its catalogIds and ID
-          return existing;
-        }
-        // New folder, create with stable ID based on name (not index)
-        return {
-          id: `folder-${workspaceId}-${name}`,
-          name,
-          catalogIds: [],
-        };
-      });
-      
-      // Remove folders that no longer exist in GitHub
-      const folderNamesSet = new Set(cachedFolderNames);
-      const validFolders = folders.filter(f => folderNamesSet.has(f.name));
-      
-      setCustomFolders(validFolders);
-      return;
-    }
+  // Load folders from database
+  const loadFoldersFromDatabase = useCallback(async (workspaceId: string) => {
+    // For now, skip cache since the type changed - TODO: Update cache context
+    // const cachedFolders = getCachedFolders(workspaceId);
+    // if (cachedFolders) {
+    //   setCustomFolders(cachedFolders);
+    //   return;
+    // }
 
     setFoldersLoading(true);
     try {
-      const folderNames = await invokeLibraryListFolders(workspaceId);
-      console.log('Loaded folders from GitHub:', folderNames);
-      
-      // Cache the folder names
-      setCachedFolders(workspaceId, folderNames);
-      
-      // Load existing folder assignments from localStorage to preserve catalogIds
-      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
-      const existingFolders: LibraryFolder[] = stored ? (() => {
-        try {
-          return JSON.parse(stored);
-        } catch {
-          return [];
+      const folders = await invokeLibraryGetFolders(workspaceId);
+      console.log('Loaded folders from database:', folders);
+
+      // TODO: Cache the folders (need to update cache type first)
+      // setCachedFolders(workspaceId, folders);
+      setCustomFolders(folders);
+
+      // Load folder-catalog mappings
+      const map = new Map<string, string[]>();
+      try {
+        for (const folder of folders) {
+          const catalogIds = await invokeLibraryGetFolderCatalogIds(folder.id);
+          map.set(folder.id, catalogIds);
         }
-      })() : [];
-      
-      // Create a map of existing folders by name for quick lookup
-      const existingFoldersMap = new Map<string, LibraryFolder>();
-      existingFolders.forEach(folder => {
-        // Match by name since folder names are unique identifiers
-        existingFoldersMap.set(folder.name, folder);
-      });
-      
-      // Convert folder names to LibraryFolder objects, preserving catalogIds from localStorage
-      const folders: LibraryFolder[] = folderNames.map((name) => {
-        const existing = existingFoldersMap.get(name);
-        if (existing) {
-          // Preserve existing folder with its catalogIds and ID
-          return existing;
-        }
-        // New folder, create with stable ID based on name (not index)
-        return {
-          id: `folder-${workspaceId}-${name}`,
-          name,
-          catalogIds: [],
-        };
-      });
-      
-      // Remove folders that no longer exist in GitHub
-      const folderNamesSet = new Set(folderNames);
-      const validFolders = folders.filter(f => folderNamesSet.has(f.name));
-      
-      setCustomFolders(validFolders);
-      
-      // Save to localStorage
-      localStorage.setItem(`library-folders-${workspaceId}`, JSON.stringify(validFolders));
-    } catch (error) {
-      console.error('Failed to load folders from GitHub:', error);
-      // Fallback to localStorage if GitHub load fails
-      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
-      if (stored) {
-        try {
-          const folders = JSON.parse(stored);
-          setCustomFolders(folders);
-        } catch {
-          setCustomFolders([]);
-        }
-      } else {
-        setCustomFolders([]);
+        setFolderCatalogMap(map);
+        console.log('Loaded folder-catalog mappings:', map);
+      } catch (mapError) {
+        console.error('Failed to load folder-catalog mappings:', mapError);
+        setFolderCatalogMap(new Map());
       }
+    } catch (error) {
+      console.error('Failed to load folders from database:', error);
+      setCustomFolders([]);
+      setFolderCatalogMap(new Map());
     } finally {
       setFoldersLoading(false);
     }
-  }, [getCachedFolders, setCachedFolders]);
+  }, []); // Removed getCachedFolders, setCachedFolders dependencies until cache is updated
 
   useEffect(() => {
     if (selectedWorkspaceId) {
-      loadFoldersFromGitHub(selectedWorkspaceId);
+      loadFoldersFromDatabase(selectedWorkspaceId);
     } else {
       setCustomFolders([]);
     }
-  }, [selectedWorkspaceId, loadFoldersFromGitHub]);
+  }, [selectedWorkspaceId, loadFoldersFromDatabase]);
 
-  // Save custom folders to localStorage
-  const saveFolders = (folders: LibraryFolder[]) => {
-    if (selectedWorkspaceId) {
-      localStorage.setItem(`library-folders-${selectedWorkspaceId}`, JSON.stringify(folders));
-      setCustomFolders(folders);
-    }
+  // No longer needed - folders are saved directly to database via IPC commands
+  // Keeping this for reference during migration
+  const oldSaveFolders = (folders: LibraryFolder[]) => {
+    // DEPRECATED: Now using database
+    console.warn('oldSaveFolders called - should use database IPC commands instead');
   };
 
   // Load workspaces on mount
@@ -503,7 +411,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       // Load both catalogs and folders in parallel
       await Promise.all([
         loadCatalogs(selectedWorkspace.id),
-        loadFoldersFromGitHub(selectedWorkspace.id),
+        loadFoldersFromDatabase(selectedWorkspace.id),
       ]);
     } catch (error) {
       console.error('Sync failed:', error);
@@ -610,6 +518,98 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     setSelectedCatalogs(new Map());
   };
 
+  // Handle opening delete confirmation dialog
+  const handleDeleteCatalogsClick = () => {
+    if (selectedCatalogsArray.length === 0) return;
+    setShowDeleteCatalogsDialog(true);
+  };
+
+  // Handle deleting catalogs from workspace (called after confirmation)
+  const handleDeleteCatalogs = async () => {
+    const catalogIds = selectedCatalogsArray.map(c => c.catalog.id);
+    if (catalogIds.length === 0) return;
+
+    if (!selectedWorkspaceId) {
+      toaster.create({
+        type: 'error',
+        title: 'No workspace selected',
+        description: 'Please select a workspace first',
+      });
+      return;
+    }
+
+    setShowDeleteCatalogsDialog(false);
+
+    try {
+      console.log('Deleting catalogs:', catalogIds);
+      const deletedCount = await invokeDeleteCatalogs(catalogIds);
+      console.log('Delete completed, deleted count:', deletedCount);
+      
+      if (deletedCount === 0) {
+        toaster.create({
+          type: 'warning',
+          title: 'No catalogs deleted',
+          description: 'No catalogs were found to delete',
+        });
+        return;
+      }
+      
+      // Clear selections immediately
+      setSelectedCatalogs(new Map());
+      setSelectedVariations(prev => {
+        const next = new Map(prev);
+        catalogIds.forEach(catalogId => {
+          // Remove all variations that belong to these catalogs
+          for (const [variationId, selectedVariation] of prev.entries()) {
+            if (selectedVariation.catalog.id === catalogId) {
+              next.delete(variationId);
+            }
+          }
+        });
+        return next;
+      });
+
+      // Immediately update the UI by filtering out deleted catalogs
+      setCatalogs(prev => prev.filter(c => !catalogIds.includes(c.catalog.id)));
+
+      // Invalidate cache to ensure fresh data on next load
+      try {
+        invalidateCatalogs(selectedWorkspaceId);
+      } catch (cacheError) {
+        console.error('Failed to invalidate cache:', cacheError);
+        // Continue anyway
+      }
+
+      // Force reload from API (bypass cache) to ensure consistency
+      setCatalogsLoading(true);
+      try {
+        const freshCatalogs = await invokeListWorkspaceCatalogs(selectedWorkspaceId);
+        setCatalogs(freshCatalogs);
+        setCachedCatalogs(selectedWorkspaceId, freshCatalogs);
+      } catch (reloadError) {
+        console.error('Failed to reload catalogs after deletion:', reloadError);
+        // Don't show error to user since deletion succeeded - UI already updated
+      } finally {
+        setCatalogsLoading(false);
+      }
+
+      toaster.create({
+        type: 'success',
+        title: 'Catalogs deleted',
+        description: `Deleted ${deletedCount} catalog${deletedCount !== 1 ? 's' : ''} and all variations from the workspace`,
+      });
+    } catch (err) {
+      console.error('Failed to delete catalogs:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Error details:', errorMessage);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete catalogs',
+        description: errorMessage || 'An error occurred while deleting catalogs',
+      });
+    }
+  };
+
   // Handle bulk pull to multiple projects
   const handleBulkPull = async (selectedProjects: Project[]) => {
     if (selectedVariationsArray.length === 0 || selectedProjects.length === 0) return;
@@ -668,17 +668,19 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     }
 
     try {
-      // Create folder in GitHub repository
-      await invokeLibraryCreateFolder(selectedWorkspaceId, name);
+      // Create folder in database
+      const folderId = await invokeLibraryCreateFolder(selectedWorkspaceId, name);
+      console.log('Created folder:', folderId);
 
-      // Reload folders from GitHub to get the newly created folder
-      await loadFoldersFromGitHub(selectedWorkspaceId);
-      
+      // Invalidate cache and reload folders
+      invalidateFolders(selectedWorkspaceId);
+      await loadFoldersFromDatabase(selectedWorkspaceId);
+
       setShowCreateFolderDialog(false);
       toaster.create({
         type: 'success',
         title: 'Folder created',
-        description: `Created folder "${name}" in GitHub`,
+        description: `Created folder "${name}"`,
       });
     } catch (error) {
       console.error('Failed to create folder:', error);
@@ -692,103 +694,138 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   };
 
   // Handle moving catalogs to folder
-  const handleMoveCatalogsToFolder = (folderId: string) => {
+  const handleMoveCatalogsToFolder = async (folderId: string) => {
     const catalogIds = selectedCatalogsArray.map(c => c.catalog.id);
-    const updatedFolders = customFolders.map(folder => {
-      if (folder.id === folderId) {
-        // Add to this folder
-        const existingIds = new Set(folder.catalogIds);
-        catalogIds.forEach(id => existingIds.add(id));
-        return { ...folder, catalogIds: Array.from(existingIds) };
-      } else {
-        // Remove from other folders
-        return { ...folder, catalogIds: folder.catalogIds.filter(id => !catalogIds.includes(id)) };
-      }
-    });
-    saveFolders(updatedFolders);
-    
-    // Clear both catalog and variation selections immediately
-    setSelectedCatalogs(new Map());
-    // Also clear variations for the moved catalogs
-    setSelectedVariations(prev => {
-      const next = new Map(prev);
-      catalogIds.forEach(catalogId => {
-        // Remove all variations that belong to these catalogs
-        for (const [variationId, selectedVariation] of prev.entries()) {
-          if (selectedVariation.catalog.id === catalogId) {
-            next.delete(variationId);
+    if (catalogIds.length === 0 || !selectedWorkspaceId) return;
+
+    try {
+      // Add catalogs to the new folder in database
+      await invokeLibraryAddCatalogsToFolder(folderId, catalogIds);
+
+      // Invalidate cache and reload
+      invalidateFolders(selectedWorkspaceId);
+      await loadFoldersFromDatabase(selectedWorkspaceId);
+
+      // Clear both catalog and variation selections immediately
+      setSelectedCatalogs(new Map());
+      // Also clear variations for the moved catalogs
+      setSelectedVariations(prev => {
+        const next = new Map(prev);
+        catalogIds.forEach(catalogId => {
+          // Remove all variations that belong to these catalogs
+          for (const [variationId, selectedVariation] of prev.entries()) {
+            if (selectedVariation.catalog.id === catalogId) {
+              next.delete(variationId);
+            }
           }
-        }
+        });
+        return next;
       });
-      return next;
-    });
-    
-    toaster.create({
-      type: 'success',
-      title: 'Moved to folder',
-      description: `Moved ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} to folder`,
-    });
+
+      toaster.create({
+        type: 'success',
+        title: 'Moved to folder',
+        description: `Moved ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} to folder`,
+      });
+    } catch (error) {
+      console.error('Failed to move catalogs to folder:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to move catalogs',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   };
 
   // Handle removing catalogs from folder
-  const handleRemoveCatalogsFromFolder = () => {
+  const handleRemoveCatalogsFromFolder = async () => {
     const catalogIds = selectedCatalogsArray.map(c => c.catalog.id);
-    const updatedFolders = customFolders.map(folder => ({
-      ...folder,
-      catalogIds: folder.catalogIds.filter(id => !catalogIds.includes(id)),
-    }));
-    saveFolders(updatedFolders);
-    
-    // Clear both catalog and variation selections immediately
-    setSelectedCatalogs(new Map());
-    // Also clear variations for the removed catalogs
-    setSelectedVariations(prev => {
-      const next = new Map(prev);
-      catalogIds.forEach(catalogId => {
-        // Remove all variations that belong to these catalogs
-        for (const [variationId, selectedVariation] of prev.entries()) {
-          if (selectedVariation.catalog.id === catalogId) {
-            next.delete(variationId);
+    if (catalogIds.length === 0 || !selectedWorkspaceId) return;
+
+    try {
+      // Get all folders and remove catalogs from each
+      for (const folder of customFolders) {
+        await invokeLibraryRemoveCatalogsFromFolder(folder.id, catalogIds);
+      }
+
+      // Invalidate cache and reload
+      invalidateFolders(selectedWorkspaceId);
+      await loadFoldersFromDatabase(selectedWorkspaceId);
+
+      // Clear both catalog and variation selections immediately
+      setSelectedCatalogs(new Map());
+      // Also clear variations for the removed catalogs
+      setSelectedVariations(prev => {
+        const next = new Map(prev);
+        catalogIds.forEach(catalogId => {
+          // Remove all variations that belong to these catalogs
+          for (const [variationId, selectedVariation] of prev.entries()) {
+            if (selectedVariation.catalog.id === catalogId) {
+              next.delete(variationId);
+            }
           }
-        }
+        });
+        return next;
       });
-      return next;
-    });
-    
-    toaster.create({
-      type: 'success',
-      title: 'Removed from folder',
-      description: `Removed ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} from folder`,
-    });
+
+      toaster.create({
+        type: 'success',
+        title: 'Removed from folder',
+        description: `Removed ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} from folder`,
+      });
+    } catch (error) {
+      console.error('Failed to remove catalogs from folder:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to remove catalogs',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   };
 
   // Handle deleting a folder
-  const handleDeleteFolder = (folderId: string) => {
+  const handleDeleteFolder = async (folderId: string) => {
     const folder = customFolders.find(f => f.id === folderId);
-    if (!folder) return;
-    
-    saveFolders(customFolders.filter(f => f.id !== folderId));
-    toaster.create({
-      type: 'success',
-      title: 'Folder deleted',
-      description: `Deleted folder "${folder.name}"`,
-    });
+    if (!folder || !selectedWorkspaceId) return;
+
+    try {
+      await invokeLibraryDeleteFolder(folderId);
+
+      // Invalidate cache and reload
+      invalidateFolders(selectedWorkspaceId);
+      await loadFoldersFromDatabase(selectedWorkspaceId);
+
+      toaster.create({
+        type: 'success',
+        title: 'Folder deleted',
+        description: `Deleted folder "${folder.name}"`,
+      });
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete folder',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   };
 
   const openGitHubRepo = async (workspace: LibraryWorkspace) => {
     await openShell(`https://github.com/${workspace.github_owner}/${workspace.github_repo}`);
   };
 
-  // Organize catalogs by custom folders (using filtered catalogs)
+  // Organize catalogs by custom folders (using unfiltered catalogs)
+  // Filter is only applied to ungrouped catalogs
   const organizedCatalogs = useMemo(() => {
     const folderCatalogs = new Map<string, CatalogWithVariations[]>();
     const catalogInFolder = new Set<string>();
 
-    // First, assign catalogs to folders
+    // First, assign catalogs to folders (using unfiltered catalogs)
     for (const folder of customFolders) {
       const folderCats: CatalogWithVariations[] = [];
-      for (const catalogId of folder.catalogIds) {
-        const catWithVars = filteredCatalogs.find(c => c.catalog.id === catalogId);
+      const catalogIds = folderCatalogMap.get(folder.id) || [];
+      for (const catalogId of catalogIds) {
+        const catWithVars = catalogs.find(c => c.catalog.id === catalogId);
         if (catWithVars) {
           folderCats.push(catWithVars);
           catalogInFolder.add(catalogId);
@@ -797,11 +834,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       folderCatalogs.set(folder.id, folderCats);
     }
 
-    // Get ungrouped catalogs (not in any custom folder)
-    const ungrouped = filteredCatalogs.filter(c => !catalogInFolder.has(c.catalog.id));
+    // Get ungrouped catalogs (not in any custom folder) and apply filter
+    const ungrouped = catalogs
+      .filter(c => !catalogInFolder.has(c.catalog.id))
+      .filter(matchesFilter);
 
     return { folderCatalogs, ungrouped };
-  }, [filteredCatalogs, customFolders]);
+  }, [catalogs, customFolders, folderCatalogMap, matchesFilter]);
 
   // Loading state
   if (viewMode === 'loading') {
@@ -1033,12 +1072,101 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       <LibraryCatalogActionBar
         selectedCatalogs={selectedCatalogsArray}
         hasSelection={selectedCatalogs.size > 0}
-        clearSelection={clearCatalogSelection}
+        clearSelection={handleDeleteCatalogsClick}
         folders={customFolders}
         onMoveToFolder={handleMoveCatalogsToFolder}
         onRemoveFromFolder={handleRemoveCatalogsFromFolder}
         onCreateFolder={() => setShowCreateFolderDialog(true)}
       />
+
+      {/* Delete Catalogs Confirmation Dialog */}
+      <Dialog.Root
+        open={showDeleteCatalogsDialog}
+        onOpenChange={(e) => {
+          if (!e.open) {
+            setShowDeleteCatalogsDialog(false);
+          }
+        }}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="md">
+              <Dialog.Header>
+                <Dialog.Title>Delete Catalogs</Dialog.Title>
+                <Dialog.CloseTrigger asChild>
+                  <CloseButton size="sm" />
+                </Dialog.CloseTrigger>
+              </Dialog.Header>
+
+              <Dialog.Body>
+                <VStack gap={4} align="stretch">
+                  <Text>
+                    Are you sure you want to delete <strong>{selectedCatalogsArray.length}</strong> catalog{selectedCatalogsArray.length !== 1 ? 's' : ''}?
+                  </Text>
+                  
+                  <Box p={3} bg="red.50" borderRadius="md" borderWidth="1px" borderColor="red.200" _dark={{ bg: "red.950", borderColor: "red.800" }}>
+                    <VStack gap={2} align="stretch">
+                      <HStack gap={2}>
+                        <Icon color="red.600" _dark={{ color: "red.400" }}>
+                          <LuTrash2 />
+                        </Icon>
+                        <Text fontSize="sm" fontWeight="medium" color="red.800" _dark={{ color: "red.300" }}>
+                          This will permanently delete:
+                        </Text>
+                      </HStack>
+                      <Text fontSize="sm" color="red.700" _dark={{ color: "red.300" }} pl={6}>
+                        • The catalog{selectedCatalogsArray.length !== 1 ? 's' : ''} from the workspace
+                      </Text>
+                      <Text fontSize="sm" color="red.700" _dark={{ color: "red.300" }} pl={6}>
+                        • All variations associated with {selectedCatalogsArray.length === 1 ? 'this catalog' : 'these catalogs'}
+                      </Text>
+                      <Text fontSize="sm" color="red.700" _dark={{ color: "red.300" }} pl={6}>
+                        • The file{selectedCatalogsArray.length !== 1 ? 's' : ''} from the GitHub repository
+                      </Text>
+                      <Text fontSize="sm" color="red.700" _dark={{ color: "red.300" }} pl={6} fontWeight="medium">
+                        • This action cannot be undone
+                      </Text>
+                    </VStack>
+                  </Box>
+
+                  {selectedCatalogsArray.length <= 5 && (
+                    <Box>
+                      <Text fontSize="sm" fontWeight="medium" mb={2}>
+                        Catalog{selectedCatalogsArray.length !== 1 ? 's' : ''} to be deleted:
+                      </Text>
+                      <VStack gap={1} align="stretch" pl={2}>
+                        {selectedCatalogsArray.map(({ catalog }) => (
+                          <Text key={catalog.id} fontSize="sm" color="fg.muted">
+                            • {catalog.name}
+                          </Text>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </VStack>
+              </Dialog.Body>
+
+              <Dialog.Footer>
+                <HStack gap={2}>
+                  <Button variant="outline" onClick={() => setShowDeleteCatalogsDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    colorPalette="red"
+                    onClick={handleDeleteCatalogs}
+                  >
+                    <HStack gap={2}>
+                      <LuTrash2 />
+                      <Text>Delete {selectedCatalogsArray.length} Catalog{selectedCatalogsArray.length !== 1 ? 's' : ''}</Text>
+                    </HStack>
+                  </Button>
+                </HStack>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
 
       <VStack align="stretch" gap={6} width="100%">
         {/* Loading state - show when folders or catalogs are loading */}

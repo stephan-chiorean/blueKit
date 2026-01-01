@@ -24,6 +24,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_library_variations_table(db).await?;
     create_library_subscriptions_table(db).await?;
 
+    // Library folders (Phase 3)
+    create_library_folders_table(db).await?;
+    create_library_folder_catalogs_table(db).await?;
+
     // Create projects and checkpoints tables
     create_projects_table(db).await?;
     create_checkpoints_table(db).await?;
@@ -782,5 +786,82 @@ async fn create_library_subscriptions_table(db: &DatabaseConnection) -> Result<(
     )).await?;
 
     info!("Library subscriptions table created");
+    Ok(())
+}
+
+async fn create_library_folders_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_folders (
+            id TEXT PRIMARY KEY NOT NULL,
+            workspace_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            color TEXT,
+            order_index INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (workspace_id) REFERENCES library_workspaces(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await?;
+
+    // Create index on workspace_id for faster lookups
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_folders_workspace_id
+        ON library_folders(workspace_id)
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    )).await?;
+
+    info!("Library folders table created");
+    Ok(())
+}
+
+async fn create_library_folder_catalogs_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS library_folder_catalogs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_id TEXT NOT NULL,
+            catalog_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (folder_id) REFERENCES library_folders(id) ON DELETE CASCADE,
+            FOREIGN KEY (catalog_id) REFERENCES library_catalogs(id) ON DELETE CASCADE,
+            UNIQUE(folder_id, catalog_id)
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await?;
+
+    // Create indexes for efficient lookups
+    let index_folder_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_folder_catalogs_folder_id
+        ON library_folder_catalogs(folder_id)
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_folder_sql.to_string(),
+    )).await?;
+
+    let index_catalog_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_folder_catalogs_catalog_id
+        ON library_folder_catalogs(catalog_id)
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_catalog_sql.to_string(),
+    )).await?;
+
+    info!("Library folder catalogs junction table created");
     Ok(())
 }

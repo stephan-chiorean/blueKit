@@ -16,7 +16,10 @@ format: architecture
 
 This walkthrough explores the fundamental architectural differences between **Skills** (AI-invoked automation scripts) and **Kits/Blueprints** (composable generation instructions). While both extend AI coding assistants, they operate at different phases of the development lifecycle and solve fundamentally different problems.
 
-**Key Insight**: Skills are tactical runtime automation. Kits are strategic architectural scaffolding.
+**Key Insights**:
+- Skills are **tactical runtime automation**. Kits are **strategic architectural scaffolding**.
+- Skills excel at **deterministic template bundling** (templates, configs, scripts). Kits excel at **contextual pattern generation** (multi-file orchestration with reasoning).
+- These tools are **complementary, not competitive** - use both for complete coverage.
 
 ---
 
@@ -54,6 +57,55 @@ aws ecs update-service --cluster prod --service api --force-new-deployment
 2. **Environment commands**: Deploy, restart services, check logs
 3. **Quick utilities**: Search documentation, open URLs
 4. **Development workflow**: CI/CD integration, git operations
+
+### Skills' Unique Capability: Asset Bundling
+
+**Skills can bundle external assets and templates:**
+
+```
+~/.claude/skills/
+  component-generator/
+    SKILL.md                    # Main skill definition
+    templates/
+      component.tsx.template    # React component template
+      test.tsx.template         # Test file template
+      stories.tsx.template      # Storybook template
+
+  deploy-to-aws/
+    SKILL.md
+    templates/
+      cloudformation.yml        # Infrastructure as code
+      deploy.sh                 # Deployment script
+    config/
+      prod.env                  # Environment configs
+      staging.env
+```
+
+**Key Advantage:**
+- Skills reference actual template files
+- AI can copy/transform templates directly
+- Deterministic output (template + variable substitution)
+- Bundle related assets together (scripts, configs, templates)
+
+**Use Cases:**
+- Boilerplate generation with complex templates
+- Configuration file management (multiple env files)
+- Script bundling (deploy + rollback + health check)
+- Asset-heavy workflows (Dockerfiles, K8s manifests, Terraform)
+
+**Example:**
+```markdown
+# ~/.claude/skills/react-component/SKILL.md
+
+When user requests "create component", use templates:
+- templates/component.tsx.template
+- templates/test.tsx.template
+- templates/stories.tsx.template
+
+Substitute {{ComponentName}} in templates.
+```
+
+This is **deterministic and reliable** - the AI copies templates exactly, replacing variables.
 
 ### The Skills Marketplace Model
 
@@ -256,6 +308,69 @@ Subscription state sync is idempotent and can be retried...
 AI: Read this kit and generate the complete subscription system
 with all files coordinated and integrated.
 ```
+
+### Kits' Key Limitation: Single-File Constraint
+
+**Kits are single markdown files** - everything must be embedded inline:
+
+```
+.bluekit/
+  kits/
+    stripe-integration.md    # ❌ Just markdown (no linked assets)
+    auth-pattern.md          # ❌ Just markdown (no templates)
+    component-pattern.md     # ❌ Just markdown (no template files)
+```
+
+**What Kits Cannot Do:**
+- ❌ Link external template files
+- ❌ Bundle reference scripts
+- ❌ Include configuration file assets
+- ❌ Attach schema files or migrations
+- ❌ Reference example implementations
+
+**The Workaround:**
+Kits work around this by:
+- **Describing** patterns in prose
+- Relying on AI to **interpret** and generate from instructions
+- Embedding code **examples** inline (not templates)
+- Providing **guidance** rather than deterministic templates
+
+**Example Comparison:**
+
+**Skills Approach (Deterministic):**
+```
+~/.claude/skills/react-component/
+  SKILL.md
+  templates/
+    component.tsx.template    # Actual file AI copies
+    test.tsx.template         # Actual file AI copies
+```
+
+**Kits Approach (Interpretive):**
+```markdown
+# .bluekit/kits/component-pattern.md
+
+Generate a React component following this pattern:
+
+\`\`\`tsx
+// Component structure:
+export const ComponentName = ({ prop1, prop2 }) => {
+  // Follow this pattern...
+}
+\`\`\`
+
+AI interprets this description and generates accordingly.
+```
+
+**Impact:**
+- Skills: **Template + substitution** = deterministic output
+- Kits: **Prose + AI interpretation** = flexible but variable output
+
+**Trade-off:**
+- Skills win for: Boilerplate with exact templates, config management
+- Kits win for: Architectural guidance, pattern explanations, multi-file orchestration
+
+This is a **genuine advantage of skills**: deterministic asset bundling vs. kits' interpretive generation from prose.
 
 ### What Are Blueprints?
 
@@ -843,6 +958,60 @@ Quantity ≠ Value. The curse of choice.
 - 38,000 random bash scripts
 - 500 architectural patterns that compose into complete systems
 
+### Objection 5: "Skills can bundle templates, kits can't"
+
+**Response:**
+
+**This is a genuine limitation of kits.** Skills win on deterministic template bundling.
+
+**Skills' Advantage:**
+```
+~/.claude/skills/component-generator/
+  SKILL.md
+  templates/component.tsx.template
+  templates/test.tsx.template
+```
+AI copies exact templates. Deterministic, reliable.
+
+**Kits' Limitation:**
+```
+.bluekit/kits/component-pattern.md    # Single file only
+```
+AI interprets prose and generates. Flexible, but variable.
+
+**When Skills Are Better:**
+- Complex boilerplate with exact templates
+- Configuration file management (multiple env files)
+- Asset-heavy workflows (Dockerfiles, K8s manifests)
+
+**When Kits Are Better:**
+- Architectural guidance with reasoning
+- Multi-file orchestration across layers
+- Context-aware generation for your project
+- Pattern evolution with your codebase
+
+**The Trade-off:**
+- Skills: **Deterministic** but **generic** (one template for all projects)
+- Kits: **Interpretive** but **contextual** (adapts to your project)
+
+**Future BlueKit Enhancement?**
+Potential multi-file kit structure:
+```
+.bluekit/
+  kits/
+    stripe-integration/
+      kit.md              # Main instructions
+      templates/
+        webhook.ts.tmpl
+        checkout.tsx.tmpl
+```
+
+But this breaks the "single markdown file" simplicity that makes kits version-control friendly.
+
+**Recommendation:** Use both!
+- Skills for deterministic boilerplate generation
+- Kits for architectural patterns and project-specific context
+
 ---
 
 ## Part 8: The Strategic Difference
@@ -1119,6 +1288,8 @@ AI is a collaborative builder that:
 | **Context** | Global, generic | Project-specific, contextual |
 | **Location** | `~/.claude/skills/` | `.bluekit/` (in repo) |
 | **Versioning** | Global, not in git | Version-controlled with code |
+| **Asset Bundling** | ✅ Templates, configs, scripts | ❌ Single markdown file only |
+| **Generation Style** | Deterministic (template substitution) | Interpretive (AI from prose) |
 | **Composition** | No orchestration | Layered blueprints |
 | **Dependencies** | None | Explicit layer dependencies |
 | **Knowledge** | Imperative commands | Architectural patterns + reasoning |
@@ -1156,9 +1327,20 @@ AI is a collaborative builder that:
 
 **Skills and Kits aren't competing—they're complementary tools at different abstraction levels.**
 
+**What Skills Do Better:**
+- ✅ Deterministic template bundling (exact files, configs, scripts)
+- ✅ Runtime automation (tests, deployment, operations)
+- ✅ Global utilities (available everywhere)
+
+**What Kits Do Better:**
+- ✅ Architectural scaffolding (multi-file orchestration)
+- ✅ Contextual generation (adapts to your project)
+- ✅ Knowledge capture (reasoning + patterns)
+- ✅ Team consistency (version-controlled patterns)
+
 But if you had to choose one paradigm to invest in for long-term value:
 
-**Skills** = Better workflow (tactical win)  
+**Skills** = Better workflow + deterministic templates (tactical win)
 **BlueKit** = Better architecture + knowledge + consistency (strategic win)
 
 The future of AI-assisted development isn't just about automating tasks. It's about **capturing and composing architectural wisdom at scale**.
