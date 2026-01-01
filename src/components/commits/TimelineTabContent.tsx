@@ -19,11 +19,11 @@ import { toaster } from "../ui/toaster";
 import {
   LuGitBranch,
   LuExternalLink,
-  LuBookmark,
   LuTrash2,
   LuFolderPlus,
   LuRefreshCw,
 } from "react-icons/lu";
+import { RiFlag2Fill } from "react-icons/ri";
 import type { GitHubCommit, Checkpoint } from "../../ipc/types";
 import {
   invokeFetchProjectCommits,
@@ -429,7 +429,7 @@ export default function TimelineTabContent({
         >
           <HStack gap={2}>
             <Icon>
-              <LuBookmark />
+              <RiFlag2Fill />
             </Icon>
             <Text>Checkpoints</Text>
           </HStack>
@@ -513,7 +513,7 @@ export default function TimelineTabContent({
                       bg={checkpointTypeColor || undefined}
                       color={isPinned ? "white" : undefined}
                     >
-                      {isPinned ? <LuBookmark /> : <LuGitBranch />}
+                      {isPinned ? <RiFlag2Fill /> : <LuGitBranch />}
                     </Timeline.Indicator>
                     <Timeline.Content>
                       <Card.Root
@@ -546,7 +546,7 @@ export default function TimelineTabContent({
                                   variant="ghost"
                                   onClick={() => handlePinCheckpoint(commit)}
                                 >
-                                  <LuBookmark />
+                                  <RiFlag2Fill />
                                   Pin
                                 </Button>
                               )}
@@ -761,7 +761,7 @@ function CheckpointsView({
           return (
             <Timeline.Item key={checkpoint.id}>
               <Timeline.Indicator bg={`${typeColor}`} color="white">
-                <LuBookmark />
+                <RiFlag2Fill />
               </Timeline.Indicator>
               <Timeline.Content>
                 <Card.Root>

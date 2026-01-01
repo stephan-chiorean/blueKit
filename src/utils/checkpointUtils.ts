@@ -2,7 +2,7 @@
  * Utility functions for checkpoint operations.
  */
 
-import { LuFlag, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
+import { LuMilestone, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
 
 /**
  * Get the color for a checkpoint type.
@@ -31,7 +31,7 @@ export function getCheckpointTypeColor(type: string): string {
 export function getCheckpointTypeIcon(type: string): { icon: React.ComponentType; color: string } | null {
   switch (type) {
     case 'milestone':
-      return { icon: LuFlag, color: 'teal.500' };
+      return { icon: LuMilestone, color: 'teal.500' };
     case 'experiment':
       return { icon: LuFlaskConical, color: '#F54927' }; // Scarlet
     case 'template':

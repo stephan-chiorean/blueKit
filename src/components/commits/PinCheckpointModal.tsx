@@ -15,7 +15,7 @@ import {
   TagsInput,
   Icon,
 } from '@chakra-ui/react';
-import { LuFlag, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
+import { LuMilestone, LuFlaskConical, LuFileText, LuArchive } from 'react-icons/lu';
 import { toaster } from '../ui/toaster';
 import { invokePinCheckpoint } from '../../ipc/checkpoints';
 import type { GitHubCommit } from '../../ipc/types';
@@ -159,7 +159,7 @@ export default function PinCheckpointModal({
                           label: (
                             <HStack gap={1.5}>
                               <Icon color="teal.500" size="sm">
-                                <LuFlag />
+                                <LuMilestone />
                               </Icon>
                               <Text>Milestone</Text>
                             </HStack>
