@@ -75,7 +75,7 @@ export function FilterPanel({
       position="absolute"
       top="100%"
       left={0}
-      zIndex={10}
+      zIndex={1000}
       w="300px"
       mt={2}
       borderWidth="1px"

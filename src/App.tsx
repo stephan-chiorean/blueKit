@@ -11,6 +11,7 @@ import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ResourceProvider } from './contexts/ResourceContext';
 import { NotepadProvider } from './contexts/NotepadContext';
 import { TimerProvider } from './contexts/TimerContext';
+import { LibraryCacheProvider } from './contexts/LibraryCacheContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { Project } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
@@ -70,9 +71,11 @@ function AppContent() {
     return (
       <ColorModeProvider>
         <FeatureFlagsProvider>
-          <ResourceProvider>
-            <PreviewWindowPage />
-          </ResourceProvider>
+          <LibraryCacheProvider>
+            <ResourceProvider>
+              <PreviewWindowPage />
+            </ResourceProvider>
+          </LibraryCacheProvider>
         </FeatureFlagsProvider>
       </ColorModeProvider>
     );
@@ -83,13 +86,15 @@ function AppContent() {
     return (
       <ColorModeProvider>
         <FeatureFlagsProvider>
-          <ResourceProvider>
-            <SelectionProvider>
-              <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
-                <Spinner size="xl" />
-              </Box>
-            </SelectionProvider>
-          </ResourceProvider>
+          <LibraryCacheProvider>
+            <ResourceProvider>
+              <SelectionProvider>
+                <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
+                  <Spinner size="xl" />
+                </Box>
+              </SelectionProvider>
+            </ResourceProvider>
+          </LibraryCacheProvider>
         </FeatureFlagsProvider>
       </ColorModeProvider>
     );
@@ -98,8 +103,9 @@ function AppContent() {
   return (
     <ColorModeProvider>
       <FeatureFlagsProvider>
-        <ResourceProvider>
-          <SelectionProvider>
+        <LibraryCacheProvider>
+          <ResourceProvider>
+            <SelectionProvider>
             {currentView === 'welcome' ? (
               <WelcomeScreen onGetStarted={handleGetStarted} />
             ) : currentView === 'github-auth' ? (
@@ -125,8 +131,9 @@ function AppContent() {
             />
           </SelectionProvider>
         </ResourceProvider>
-      </FeatureFlagsProvider>
-    </ColorModeProvider>
+      </LibraryCacheProvider>
+    </FeatureFlagsProvider>
+  </ColorModeProvider>
   );
 }
 

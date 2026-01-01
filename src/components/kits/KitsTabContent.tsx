@@ -18,7 +18,7 @@ import {
   SimpleGrid,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
-import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder, LuCheck, LuSquare } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
@@ -59,7 +59,7 @@ function KitsTabContent({
   onConfirmMove,
   movingArtifacts = new Set(),
 }: KitsTabContentProps) {
-  const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
+  const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection, addItem } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -390,6 +390,45 @@ function KitsTabContent({
     return getRootArtifacts(filteredKits, folders, 'kits', projectPath);
   }, [filteredKits, folders, projectPath]);
 
+  // Check if all filtered kits are selected
+  const allFilteredKitsSelected = useMemo(() => {
+    if (filteredKits.length === 0) return false;
+    return filteredKits.every(kit => isSelected(kit.path));
+  }, [filteredKits, selectedItems]);
+
+  // Handle select all / deselect all
+  const handleSelectAll = () => {
+    if (allFilteredKitsSelected) {
+      // Deselect all filtered kits
+      filteredKits.forEach(kit => {
+        if (isSelected(kit.path)) {
+          toggleItem({
+            id: kit.path,
+            name: kit.frontMatter?.alias || kit.name,
+            type: 'Kit',
+            path: kit.path,
+            projectId,
+            projectPath,
+          });
+        }
+      });
+    } else {
+      // Select all filtered kits
+      filteredKits.forEach(kit => {
+        if (!isSelected(kit.path)) {
+          addItem({
+            id: kit.path,
+            name: kit.frontMatter?.alias || kit.name,
+            type: 'Kit',
+            path: kit.path,
+            projectId,
+            projectPath,
+          });
+        }
+      });
+    }
+  };
+
   if (kitsLoading) {
     return (
       <Box textAlign="center" py={12} color="text.secondary">
@@ -570,6 +609,22 @@ function KitsTabContent({
                           .reduce((a, b) => (a || 0) + (b || 0), 0)}
                       </Badge>
                     )}
+                  </HStack>
+                </Button>
+                {/* Select All Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  _hover={{ bg: "bg.subtle" }}
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      {allFilteredKitsSelected ? <LuCheck /> : <LuSquare />}
+                    </Icon>
+                    <Text>{allFilteredKitsSelected ? 'Deselect All' : 'Select All'}</Text>
                   </HStack>
                 </Button>
                 {/* New Folder Button - subtle blue style */}
@@ -853,6 +908,22 @@ function KitsTabContent({
                     filterButtonRef={filterButtonRef}
                   />
                 </Box>
+                {/* Select All Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  _hover={{ bg: "bg.subtle" }}
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      {allFilteredKitsSelected ? <LuCheck /> : <LuSquare />}
+                    </Icon>
+                    <Text>{allFilteredKitsSelected ? 'Deselect All' : 'Select All'}</Text>
+                  </HStack>
+                </Button>
                 <Button
                   size="sm"
                   onClick={() => setIsCreateFolderOpen(true)}

@@ -47,6 +47,7 @@ import {
   LuCheck,
   LuFolderOpen,
   LuLayers,
+  LuFilter,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { open as openShell } from '@tauri-apps/api/shell';
@@ -71,6 +72,8 @@ import {
 import { Project, invokeGetProjectRegistry, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject } from '../../ipc';
 import { invokeGitHubGetUser } from '../../ipc/github';
 import AddWorkspaceDialog from './AddWorkspaceDialog';
+import { FilterPanel } from '../shared/FilterPanel';
+import { useLibraryCache } from '../../contexts/LibraryCacheContext';
 
 // Selected variation with its catalog info for pulling
 interface SelectedVariation {
@@ -169,12 +172,15 @@ function groupCatalogsByFolder(catalogs: CatalogWithVariations[]): {
 }
 
 const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabContent(_, ref) {
+  const { getCachedCatalogs, setCachedCatalogs, getCachedFolders, setCachedFolders, invalidateCatalogs, invalidateFolders } = useLibraryCache();
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [workspaces, setWorkspaces] = useState<LibraryWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogWithVariations[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [catalogsLoading, setCatalogsLoading] = useState(false);
 
   // GitHub auth state
   const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
@@ -201,6 +207,12 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   // Multi-select state for catalogs (for folder operations)
   const [selectedCatalogs, setSelectedCatalogs] = useState<Map<string, SelectedCatalog>>(new Map());
 
+  // Filter state
+  const [nameFilter, setNameFilter] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+
   // Get selected workspace from ID
   const selectedWorkspace = useMemo(() => {
     return workspaces.find(w => w.id === selectedWorkspaceId) || null;
@@ -225,23 +237,139 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     return Array.from(selectedCatalogs.values());
   }, [selectedCatalogs]);
 
+  // Get all unique tags from catalogs
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    catalogs.forEach(catWithVars => {
+      const tags = catWithVars.catalog.tags ? JSON.parse(catWithVars.catalog.tags) : [];
+      tags.forEach((tag: string) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [catalogs]);
+
+  // Filter catalogs based on name and selected tags
+  const filteredCatalogs = useMemo(() => {
+    return catalogs.filter(catWithVars => {
+      const catalog = catWithVars.catalog;
+      const displayName = catalog.name;
+      const matchesName = !nameFilter || 
+        displayName.toLowerCase().includes(nameFilter.toLowerCase());
+      
+      const catalogTags = catalog.tags ? JSON.parse(catalog.tags) : [];
+      const matchesTags = selectedTags.length === 0 || 
+        selectedTags.some(selectedTag =>
+          catalogTags.some((tag: string) => 
+            tag.toLowerCase() === selectedTag.toLowerCase()
+          )
+        );
+      
+      return matchesName && matchesTags;
+    });
+  }, [catalogs, nameFilter, selectedTags]);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  };
+
   // Load folders from GitHub (scan for .bluekitws markers)
   const loadFoldersFromGitHub = useCallback(async (workspaceId: string) => {
+    // Check cache first
+    const cachedFolderNames = getCachedFolders(workspaceId);
+    if (cachedFolderNames) {
+      // Use cached folder names, but still merge with localStorage data for catalogIds
+      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
+      const existingFolders: LibraryFolder[] = stored ? (() => {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return [];
+        }
+      })() : [];
+      
+      // Create a map of existing folders by name for quick lookup
+      const existingFoldersMap = new Map<string, LibraryFolder>();
+      existingFolders.forEach(folder => {
+        // Match by name since folder names are unique identifiers
+        existingFoldersMap.set(folder.name, folder);
+      });
+      
+      // Convert folder names to LibraryFolder objects, preserving catalogIds from localStorage
+      const folders: LibraryFolder[] = cachedFolderNames.map((name) => {
+        const existing = existingFoldersMap.get(name);
+        if (existing) {
+          // Preserve existing folder with its catalogIds and ID
+          return existing;
+        }
+        // New folder, create with stable ID based on name (not index)
+        return {
+          id: `folder-${workspaceId}-${name}`,
+          name,
+          catalogIds: [],
+        };
+      });
+      
+      // Remove folders that no longer exist in GitHub
+      const folderNamesSet = new Set(cachedFolderNames);
+      const validFolders = folders.filter(f => folderNamesSet.has(f.name));
+      
+      setCustomFolders(validFolders);
+      return;
+    }
+
+    setFoldersLoading(true);
     try {
       const folderNames = await invokeLibraryListFolders(workspaceId);
       console.log('Loaded folders from GitHub:', folderNames);
       
-      // Convert folder names to LibraryFolder objects
-      const folders: LibraryFolder[] = folderNames.map((name, index) => ({
-        id: `folder-${workspaceId}-${name}-${index}`,
-        name,
-        catalogIds: [],
-      }));
+      // Cache the folder names
+      setCachedFolders(workspaceId, folderNames);
       
-      setCustomFolders(folders);
+      // Load existing folder assignments from localStorage to preserve catalogIds
+      const stored = localStorage.getItem(`library-folders-${workspaceId}`);
+      const existingFolders: LibraryFolder[] = stored ? (() => {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return [];
+        }
+      })() : [];
       
-      // Also save to localStorage for quick access
-      localStorage.setItem(`library-folders-${workspaceId}`, JSON.stringify(folders));
+      // Create a map of existing folders by name for quick lookup
+      const existingFoldersMap = new Map<string, LibraryFolder>();
+      existingFolders.forEach(folder => {
+        // Match by name since folder names are unique identifiers
+        existingFoldersMap.set(folder.name, folder);
+      });
+      
+      // Convert folder names to LibraryFolder objects, preserving catalogIds from localStorage
+      const folders: LibraryFolder[] = folderNames.map((name) => {
+        const existing = existingFoldersMap.get(name);
+        if (existing) {
+          // Preserve existing folder with its catalogIds and ID
+          return existing;
+        }
+        // New folder, create with stable ID based on name (not index)
+        return {
+          id: `folder-${workspaceId}-${name}`,
+          name,
+          catalogIds: [],
+        };
+      });
+      
+      // Remove folders that no longer exist in GitHub
+      const folderNamesSet = new Set(folderNames);
+      const validFolders = folders.filter(f => folderNamesSet.has(f.name));
+      
+      setCustomFolders(validFolders);
+      
+      // Save to localStorage
+      localStorage.setItem(`library-folders-${workspaceId}`, JSON.stringify(validFolders));
     } catch (error) {
       console.error('Failed to load folders from GitHub:', error);
       // Fallback to localStorage if GitHub load fails
@@ -256,8 +384,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       } else {
         setCustomFolders([]);
       }
+    } finally {
+      setFoldersLoading(false);
     }
-  }, []);
+  }, [getCachedFolders, setCachedFolders]);
 
   useEffect(() => {
     if (selectedWorkspaceId) {
@@ -330,16 +460,30 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       // Clear selection when switching workspaces
       setSelectedVariations(new Map());
       setSelectedCatalogs(new Map());
+      // Reset filters when switching workspaces
+      setNameFilter('');
+      setSelectedTags([]);
     }
   }, [selectedWorkspaceId]);
 
   const loadCatalogs = async (workspaceId: string) => {
+    // Check cache first
+    const cached = getCachedCatalogs(workspaceId);
+    if (cached) {
+      setCatalogs(cached);
+      return;
+    }
+
+    setCatalogsLoading(true);
     try {
       const cats = await invokeListWorkspaceCatalogs(workspaceId);
       setCatalogs(cats);
+      setCachedCatalogs(workspaceId, cats);
     } catch (error) {
       console.error('Failed to load catalogs:', error);
       setCatalogs([]);
+    } finally {
+      setCatalogsLoading(false);
     }
   };
 
@@ -353,9 +497,14 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         title: 'Sync complete',
         description: `Created ${result.catalogs_created} catalogs, ${result.variations_created} variations`,
       });
-      await loadCatalogs(selectedWorkspace.id);
-      // Also reload folders in case new ones were created in GitHub
-      await loadFoldersFromGitHub(selectedWorkspace.id);
+      // Invalidate cache before reloading
+      invalidateCatalogs(selectedWorkspace.id);
+      invalidateFolders(selectedWorkspace.id);
+      // Load both catalogs and folders in parallel
+      await Promise.all([
+        loadCatalogs(selectedWorkspace.id),
+        loadFoldersFromGitHub(selectedWorkspace.id),
+      ]);
     } catch (error) {
       console.error('Sync failed:', error);
       toaster.create({
@@ -557,7 +706,23 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       }
     });
     saveFolders(updatedFolders);
-    clearCatalogSelection();
+    
+    // Clear both catalog and variation selections immediately
+    setSelectedCatalogs(new Map());
+    // Also clear variations for the moved catalogs
+    setSelectedVariations(prev => {
+      const next = new Map(prev);
+      catalogIds.forEach(catalogId => {
+        // Remove all variations that belong to these catalogs
+        for (const [variationId, selectedVariation] of prev.entries()) {
+          if (selectedVariation.catalog.id === catalogId) {
+            next.delete(variationId);
+          }
+        }
+      });
+      return next;
+    });
+    
     toaster.create({
       type: 'success',
       title: 'Moved to folder',
@@ -573,7 +738,23 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       catalogIds: folder.catalogIds.filter(id => !catalogIds.includes(id)),
     }));
     saveFolders(updatedFolders);
-    clearCatalogSelection();
+    
+    // Clear both catalog and variation selections immediately
+    setSelectedCatalogs(new Map());
+    // Also clear variations for the removed catalogs
+    setSelectedVariations(prev => {
+      const next = new Map(prev);
+      catalogIds.forEach(catalogId => {
+        // Remove all variations that belong to these catalogs
+        for (const [variationId, selectedVariation] of prev.entries()) {
+          if (selectedVariation.catalog.id === catalogId) {
+            next.delete(variationId);
+          }
+        }
+      });
+      return next;
+    });
+    
     toaster.create({
       type: 'success',
       title: 'Removed from folder',
@@ -598,7 +779,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     await openShell(`https://github.com/${workspace.github_owner}/${workspace.github_repo}`);
   };
 
-  // Organize catalogs by custom folders
+  // Organize catalogs by custom folders (using filtered catalogs)
   const organizedCatalogs = useMemo(() => {
     const folderCatalogs = new Map<string, CatalogWithVariations[]>();
     const catalogInFolder = new Set<string>();
@@ -607,7 +788,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     for (const folder of customFolders) {
       const folderCats: CatalogWithVariations[] = [];
       for (const catalogId of folder.catalogIds) {
-        const catWithVars = catalogs.find(c => c.catalog.id === catalogId);
+        const catWithVars = filteredCatalogs.find(c => c.catalog.id === catalogId);
         if (catWithVars) {
           folderCats.push(catWithVars);
           catalogInFolder.add(catalogId);
@@ -617,10 +798,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     }
 
     // Get ungrouped catalogs (not in any custom folder)
-    const ungrouped = catalogs.filter(c => !catalogInFolder.has(c.catalog.id));
+    const ungrouped = filteredCatalogs.filter(c => !catalogInFolder.has(c.catalog.id));
 
     return { folderCatalogs, ungrouped };
-  }, [catalogs, customFolders]);
+  }, [filteredCatalogs, customFolders]);
 
   // Loading state
   if (viewMode === 'loading') {
@@ -859,57 +1040,155 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         onCreateFolder={() => setShowCreateFolderDialog(true)}
       />
 
-      <VStack align="stretch" gap={4}>
-        {/* Custom Folders - show even if no catalogs */}
-        {customFolders.length > 0 && (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-            {customFolders.map((folder) => {
-              const folderCats = organizedCatalogs.folderCatalogs.get(folder.id) || [];
-              const isExpanded = expandedFolders.has(folder.id);
-
-              return (
-                <LibraryFolderCard
-                  key={folder.id}
-                  folder={folder}
-                  catalogs={folderCats}
-                  isExpanded={isExpanded}
-                  onToggleExpand={() => {
-                    setExpandedFolders(prev => {
-                      const next = new Set(prev);
-                      if (next.has(folder.id)) {
-                        next.delete(folder.id);
-                      } else {
-                        next.add(folder.id);
-                      }
-                      return next;
-                    });
-                  }}
-                  onDeleteFolder={() => handleDeleteFolder(folder.id)}
-                  selectedCatalogIds={selectedCatalogs}
-                  onCatalogToggle={handleCatalogToggle}
-                />
-              );
-            })}
-          </SimpleGrid>
+      <VStack align="stretch" gap={6} width="100%">
+        {/* Loading state - show when folders or catalogs are loading */}
+        {(foldersLoading || catalogsLoading) && (
+          <Box position="relative">
+            <Flex align="center" justify="space-between" gap={2} mb={4}>
+              <Flex align="center" gap={2}>
+                <Heading size="md">
+                  {foldersLoading ? 'Loading Folders...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
+                </Heading>
+              </Flex>
+            </Flex>
+            <Flex justify="center" align="center" py={12}>
+              <VStack gap={4}>
+                <Spinner size="lg" />
+                <Text fontSize="sm" color="text.secondary">
+                  {foldersLoading && catalogsLoading 
+                    ? 'Loading folders and catalogs...'
+                    : foldersLoading 
+                    ? 'Scanning GitHub for folders...'
+                    : 'Loading catalogs...'}
+                </Text>
+              </VStack>
+            </Flex>
+          </Box>
         )}
 
-        {/* Catalogs organized by folder */}
-        {catalogs.length === 0 && customFolders.length === 0 ? (
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Icon size="lg" color="gray.400">
-                  <LuLibrary />
-                </Icon>
-              </EmptyState.Indicator>
-              <EmptyState.Title>No catalogs yet</EmptyState.Title>
-              <EmptyState.Description>
-                Sync to fetch catalogs from GitHub, or publish resources to this workspace.
-              </EmptyState.Description>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        ) : (
-          organizedCatalogs.ungrouped.length > 0 && (
+        {/* Folders Section - only show if folders exist and not loading */}
+        {!foldersLoading && !catalogsLoading && customFolders.length > 0 && (
+          <Box position="relative">
+            <Flex align="center" justify="space-between" gap={2} mb={4}>
+              <Flex align="center" gap={2}>
+                <Heading size="md">Folders</Heading>
+                <Text fontSize="sm" color="text.muted">
+                  {customFolders.length}
+                </Text>
+              </Flex>
+            </Flex>
+
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              {customFolders.map((folder) => {
+                const folderCats = organizedCatalogs.folderCatalogs.get(folder.id) || [];
+                const isExpanded = expandedFolders.has(folder.id);
+
+                return (
+                  <LibraryFolderCard
+                    key={folder.id}
+                    folder={folder}
+                    catalogs={folderCats}
+                    isExpanded={isExpanded}
+                    onToggleExpand={() => {
+                      setExpandedFolders(prev => {
+                        const next = new Set(prev);
+                        if (next.has(folder.id)) {
+                          next.delete(folder.id);
+                        } else {
+                          next.add(folder.id);
+                        }
+                        return next;
+                      });
+                    }}
+                    onDeleteFolder={() => handleDeleteFolder(folder.id)}
+                    selectedCatalogIds={selectedCatalogs}
+                    onCatalogToggle={handleCatalogToggle}
+                  />
+                );
+              })}
+            </SimpleGrid>
+          </Box>
+        )}
+
+        {/* Catalogs Section - only show if not loading */}
+        {!foldersLoading && !catalogsLoading && (
+          <Box mb={8} position="relative" width="100%" maxW="100%">
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Catalogs</Heading>
+              <Text fontSize="sm" color="text.muted">
+                {organizedCatalogs.ungrouped.length}
+              </Text>
+              {/* Filter Button - only show if there are catalogs or folders */}
+              {(catalogs.length > 0 || customFolders.length > 0) && (
+              <Box position="relative">
+                <Button
+                  ref={filterButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  _hover={{ bg: "bg.subtle" }}
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuFilter />
+                    </Icon>
+                    <Text>Filter</Text>
+                    {(nameFilter || selectedTags.length > 0) && (
+                      <Badge size="sm" colorPalette="primary" variant="solid">
+                        {[nameFilter && 1, selectedTags.length]
+                          .filter(Boolean)
+                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                      </Badge>
+                    )}
+                  </HStack>
+                </Button>
+                <FilterPanel
+                  isOpen={isFilterOpen}
+                  onClose={() => setIsFilterOpen(false)}
+                  nameFilter={nameFilter}
+                  onNameFilterChange={setNameFilter}
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  onToggleTag={toggleTag}
+                  filterButtonRef={filterButtonRef}
+                />
+              </Box>
+            )}
+          </Flex>
+
+          {catalogs.length === 0 && customFolders.length === 0 ? (
+            <EmptyState.Root>
+              <EmptyState.Content>
+                <EmptyState.Indicator>
+                  <Icon size="lg" color="gray.400">
+                    <LuLibrary />
+                  </Icon>
+                </EmptyState.Indicator>
+                <EmptyState.Title>No catalogs yet</EmptyState.Title>
+                <EmptyState.Description>
+                  Sync to fetch catalogs from GitHub, or publish resources to this workspace.
+                </EmptyState.Description>
+              </EmptyState.Content>
+            </EmptyState.Root>
+          ) : organizedCatalogs.ungrouped.length === 0 ? (
+            <Box
+              p={6}
+              bg="bg.subtle"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <Text color="text.muted" fontSize="sm">
+                {(nameFilter || selectedTags.length > 0)
+                  ? 'No catalogs match the current filters'
+                  : 'All catalogs are organized in folders.'}
+              </Text>
+            </Box>
+          ) : (
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {organizedCatalogs.ungrouped.map((catWithVars) => (
                 <CatalogCard
@@ -922,7 +1201,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
                 />
               ))}
             </SimpleGrid>
-          )
+          )}
+          </Box>
         )}
       </VStack>
 
