@@ -126,8 +126,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setCurrentTab('tasks');
     } else if (currentTab === 'scrapbook' && !flags.scrapbook) {
       setCurrentTab('tasks');
+    } else if (currentTab === 'diagrams' && !flags.diagrams) {
+      setCurrentTab('tasks');
+    } else if (currentTab === 'agents' && !flags.agents) {
+      setCurrentTab('tasks');
     }
-  }, [currentTab, flags.blueprints, flags.scrapbook]);
+  }, [currentTab, flags.blueprints, flags.scrapbook, flags.diagrams, flags.agents]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -681,14 +685,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       </HStack>
                     </Tabs.Trigger>
                   )}
-                  <Tabs.Trigger value="diagrams" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuNetwork />
-                      </Icon>
-                      <Text>Diagrams</Text>
-                    </HStack>
-                  </Tabs.Trigger>
+                  {flags.diagrams && (
+                    <Tabs.Trigger value="diagrams" flexShrink={0}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuNetwork />
+                        </Icon>
+                        <Text>Diagrams</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="walkthroughs" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
@@ -715,14 +721,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       </HStack>
                     </Tabs.Trigger>
                   )}
-                  <Tabs.Trigger value="agents" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuBot />
-                      </Icon>
-                      <Text>Agents</Text>
-                    </HStack>
-                  </Tabs.Trigger>
+                  {flags.agents && (
+                    <Tabs.Trigger value="agents" flexShrink={0}>
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuBot />
+                        </Icon>
+                        <Text>Agents</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="timeline" flexShrink={0}>
                     <HStack gap={2}>
                       <Icon>
@@ -804,17 +812,19 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 movingArtifacts={movingArtifacts}
               />
             </Tabs.Content>
-            <Tabs.Content value="agents" key="agents">
-              <AgentsTabContent
-                kits={agents}
-                kitsLoading={artifactsLoading}
-                error={error}
-                projectsCount={1}
-                projectPath={project.path}
-                projectId={project.id}
-                onViewKit={handleViewKit}
-              />
-            </Tabs.Content>
+            {flags.agents && (
+              <Tabs.Content value="agents" key="agents">
+                <AgentsTabContent
+                  kits={agents}
+                  kitsLoading={artifactsLoading}
+                  error={error}
+                  projectsCount={1}
+                  projectPath={project.path}
+                  projectId={project.id}
+                  onViewKit={handleViewKit}
+                />
+              </Tabs.Content>
+            )}
             {flags.scrapbook && (
               <Tabs.Content value="scrapbook">
                 <ScrapbookTabContent
@@ -823,20 +833,22 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 />
               </Tabs.Content>
             )}
-            <Tabs.Content value="diagrams" key="diagrams">
-              <DiagramsTabContent
-                diagrams={diagrams}
-                diagramsLoading={artifactsLoading}
-                error={error}
-                projectPath={project.path}
-                projectId={project.id}
-                onViewDiagram={handleViewDiagram}
-                onReload={loadProjectArtifacts}
-                onOptimisticMove={handleOptimisticMove}
-                onConfirmMove={handleConfirmMove}
-                movingArtifacts={movingArtifacts}
-              />
-            </Tabs.Content>
+            {flags.diagrams && (
+              <Tabs.Content value="diagrams" key="diagrams">
+                <DiagramsTabContent
+                  diagrams={diagrams}
+                  diagramsLoading={artifactsLoading}
+                  error={error}
+                  projectPath={project.path}
+                  projectId={project.id}
+                  onViewDiagram={handleViewDiagram}
+                  onReload={loadProjectArtifacts}
+                  onOptimisticMove={handleOptimisticMove}
+                  onConfirmMove={handleConfirmMove}
+                  movingArtifacts={movingArtifacts}
+                />
+              </Tabs.Content>
+            )}
             <Tabs.Content value="timeline">
               <TimelineTabContent
                 projectId={dbProject?.id || ''}

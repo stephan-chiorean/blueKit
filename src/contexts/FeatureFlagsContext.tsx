@@ -5,6 +5,8 @@ interface FeatureFlags {
   // Example: newFeature: boolean;
   blueprints: boolean;
   scrapbook: boolean;
+  diagrams: boolean;
+  agents: boolean;
 }
 
 interface FeatureFlagsContextType {
@@ -28,6 +30,8 @@ export function FeatureFlagsProvider({
   const defaultFlags: FeatureFlags = {
     blueprints: false, // Hide blueprints tab by default
     scrapbook: false, // Hide scrapbook tab by default
+    diagrams: false, // Hide diagrams tab by default
+    agents: false, // Hide agents tab by default
     ...initialFlags,
   };
 
