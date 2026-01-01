@@ -28,6 +28,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_library_collections_table(db).await?;
     create_library_collection_catalogs_table(db).await?;
 
+    // Add pinned field to library_workspaces
+    add_library_workspaces_pinned_field(db).await?;
+
     // Create projects and checkpoints tables
     create_projects_table(db).await?;
     create_checkpoints_table(db).await?;
@@ -863,5 +866,47 @@ async fn create_library_collection_catalogs_table(db: &DatabaseConnection) -> Re
     )).await?;
 
     info!("Library collection catalogs junction table created");
+    Ok(())
+}
+
+async fn add_library_workspaces_pinned_field(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if the column already exists by trying to add it (SQLite will error if it exists)
+    // We'll use a more robust approach: try to alter the table
+    let sql = r#"
+        ALTER TABLE library_workspaces 
+        ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0
+    "#;
+
+    // SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN
+    // So we'll catch the error if the column already exists
+    match db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    )).await {
+        Ok(_) => {
+            info!("Added pinned field to library_workspaces table");
+        }
+        Err(e) => {
+            // If the error is about the column already existing, that's fine
+            if e.to_string().contains("duplicate column") || e.to_string().contains("already exists") {
+                info!("pinned field already exists in library_workspaces table");
+            } else {
+                return Err(e);
+            }
+        }
+    }
+
+    // Create index on pinned for efficient querying
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_workspaces_pinned
+        ON library_workspaces(pinned)
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    )).await?;
+
+    info!("Created index on library_workspaces.pinned");
     Ok(())
 }

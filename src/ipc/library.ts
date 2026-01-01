@@ -99,6 +99,53 @@ export async function invokeLibraryDeleteWorkspace(workspaceId: string): Promise
   );
 }
 
+/**
+ * Updates a Library workspace name.
+ *
+ * @param workspaceId - Workspace ID
+ * @param name - New workspace name
+ * @returns Promise that resolves to the updated workspace
+ *
+ * @example
+ * ```typescript
+ * const workspace = await invokeLibraryUpdateWorkspaceName('workspace-id', 'New Name');
+ * ```
+ */
+export async function invokeLibraryUpdateWorkspaceName(
+  workspaceId: string,
+  name: string
+): Promise<LibraryWorkspace> {
+  return await invokeWithTimeout<LibraryWorkspace>(
+    'library_update_workspace_name',
+    { workspaceId, name },
+    10000
+  );
+}
+
+/**
+ * Sets the pinned state of a Library workspace.
+ * When pinning a workspace, any previously pinned workspace will be unpinned.
+ *
+ * @param workspaceId - Workspace ID
+ * @param pinned - Whether to pin the workspace
+ * @returns Promise that resolves to the updated workspace
+ *
+ * @example
+ * ```typescript
+ * const workspace = await invokeLibrarySetWorkspacePinned('workspace-id', true);
+ * ```
+ */
+export async function invokeLibrarySetWorkspacePinned(
+  workspaceId: string,
+  pinned: boolean
+): Promise<LibraryWorkspace> {
+  return await invokeWithTimeout<LibraryWorkspace>(
+    'library_set_workspace_pinned',
+    { workspaceId, pinned },
+    10000
+  );
+}
+
 // ============================================================================
 // COLLECTION COMMANDS (SQLite-backed virtual collections)
 // ============================================================================

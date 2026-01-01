@@ -9,6 +9,7 @@ pub struct Model {
     pub name: String,
     pub github_owner: String,
     pub github_repo: String,
+    pub pinned: i32, // SQLite uses INTEGER for booleans (0 = false, 1 = true)
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -26,6 +27,7 @@ impl Related<super::library_artifact::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
 
 
 

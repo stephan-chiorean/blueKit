@@ -117,6 +117,8 @@ async fn main() {
             commands::library_list_workspaces, // List Library workspaces
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
+            commands::library_update_workspace_name, // Update Library workspace name
+            commands::library_set_workspace_pinned, // Pin/unpin Library workspace
             commands::library_get_artifacts, // Get Library artifacts
             commands::library_create_collection, // Create collection in SQLite
             commands::library_get_collections, // Get collections from SQLite

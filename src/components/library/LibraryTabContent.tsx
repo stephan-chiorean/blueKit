@@ -49,6 +49,11 @@ import {
   LuCheck,
   LuLayers,
   LuFilter,
+  LuBookmark,
+  LuBookmarkPlus,
+  LuPin,
+  LuPinOff,
+  LuPencil,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { open as openShell } from '@tauri-apps/api/shell';
@@ -56,6 +61,8 @@ import { toaster } from '../ui/toaster';
 import {
   invokeLibraryListWorkspaces,
   invokeLibraryDeleteWorkspace,
+  invokeLibraryUpdateWorkspaceName,
+  invokeLibrarySetWorkspacePinned,
   invokeSyncWorkspaceCatalog,
   invokeListWorkspaceCatalogs,
   invokeDeleteCatalogs,
@@ -145,6 +152,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   const [showAddWorkspaceDialog, setShowAddWorkspaceDialog] = useState(false);
   const [showCreateCollectionDialog, setShowCreateCollectionDialog] = useState(false);
   const [showDeleteCatalogsDialog, setShowDeleteCatalogsDialog] = useState(false);
+  const [showEditWorkspaceDialog, setShowEditWorkspaceDialog] = useState(false);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -339,7 +347,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       if (ws.length === 0) {
         setViewMode('no-workspaces');
       } else {
-        setSelectedWorkspaceId(ws[0].id);
+        // Prefer pinned workspace, otherwise first one
+        const pinnedWorkspace = ws.find(w => w.pinned);
+        setSelectedWorkspaceId(pinnedWorkspace ? pinnedWorkspace.id : ws[0].id);
         setViewMode('browse');
       }
     } catch (error) {
@@ -1020,6 +1030,65 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     await openShell(`https://github.com/${workspace.github_owner}/${workspace.github_repo}`);
   };
 
+  // Handle editing workspace name
+  const handleEditWorkspace = () => {
+    if (selectedWorkspace) {
+      setShowEditWorkspaceDialog(true);
+    }
+  };
+
+  // Handle updating workspace name
+  const handleUpdateWorkspaceName = async (name: string) => {
+    if (!selectedWorkspaceId) return;
+
+    try {
+      const updated = await invokeLibraryUpdateWorkspaceName(selectedWorkspaceId, name);
+      setWorkspaces(prev => prev.map(w => w.id === updated.id ? updated : w));
+      toaster.create({
+        type: 'success',
+        title: 'Workspace updated',
+        description: `Renamed workspace to "${name}"`,
+      });
+      setShowEditWorkspaceDialog(false);
+    } catch (error) {
+      console.error('Failed to update workspace name:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update workspace name',
+      });
+    }
+  };
+
+  // Handle pinning/unpinning workspace
+  const handlePinWorkspace = async () => {
+    if (!selectedWorkspace) return;
+
+    const newPinnedState = !selectedWorkspace.pinned;
+    try {
+      const updated = await invokeLibrarySetWorkspacePinned(selectedWorkspace.id, newPinnedState);
+      // Reload workspaces to get updated list with correct sorting
+      const ws = await invokeLibraryListWorkspaces();
+      setWorkspaces(ws);
+      // Keep the same workspace selected
+      setSelectedWorkspaceId(updated.id);
+      toaster.create({
+        type: 'success',
+        title: newPinnedState ? 'Workspace pinned' : 'Workspace unpinned',
+        description: newPinnedState 
+          ? `"${updated.name}" is now your default workspace`
+          : `"${updated.name}" is no longer pinned`,
+      });
+    } catch (error) {
+      console.error('Failed to pin/unpin workspace:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update workspace pin state',
+      });
+    }
+  };
+
   // Organize catalogs by custom collections (using unfiltered catalogs)
   // Filter is only applied to ungrouped catalogs
   const organizedCatalogs = useMemo(() => {
@@ -1182,7 +1251,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
           >
             <HStack gap={2}>
               <Icon>
-                <LuFolderPlus />
+                <LuBookmarkPlus />
               </Icon>
               <Text>New Collection</Text>
             </HStack>
@@ -1246,6 +1315,25 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
               <Portal>
                 <Menu.Positioner>
                   <Menu.Content>
+                    <Menu.Item
+                      value="edit"
+                      onSelect={handleEditWorkspace}
+                    >
+                      <HStack gap={2}>
+                        <LuPencil />
+                        <Text>Edit Workspace</Text>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item
+                      value="pin"
+                      onSelect={handlePinWorkspace}
+                    >
+                      <HStack gap={2}>
+                        {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
+                        <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Separator />
                     <Menu.Item
                       value="delete"
                       color="red.500"
@@ -1448,7 +1536,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         {!collectionsLoading && !catalogsLoading && (
           <Box mb={8} position="relative" width="100%" maxW="100%">
             <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Catalogs</Heading>
+              <Heading size="md">Catalog</Heading>
               <Text fontSize="sm" color="text.muted">
                 {organizedCatalogs.ungrouped.length}
               </Text>
@@ -1552,6 +1640,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         isOpen={showCreateCollectionDialog}
         onClose={() => setShowCreateCollectionDialog(false)}
         onCreate={handleCreateCollection}
+      />
+
+      <EditWorkspaceDialog
+        isOpen={showEditWorkspaceDialog}
+        onClose={() => setShowEditWorkspaceDialog(false)}
+        workspace={selectedWorkspace}
+        onUpdate={handleUpdateWorkspaceName}
       />
     </>
   );
@@ -1749,7 +1844,7 @@ function LibraryCollectionCard({
               <LuChevronRight />
             </Icon>
             <Icon boxSize={5} color={collection.color || 'blue.500'}>
-              <LuFolder />
+              <LuBookmark />
             </Icon>
             <Heading size="md">{collection.name}</Heading>
             <Badge size="sm" colorPalette="gray">
@@ -2161,7 +2256,7 @@ function LibraryCatalogActionBar({
                       size="sm"
                     >
                       <HStack gap={2}>
-                        <LuFolder />
+                        <LuBookmark />
                         <Text>Move to Collection</Text>
                         <LuChevronDown />
                       </HStack>
@@ -2183,7 +2278,7 @@ function LibraryCatalogActionBar({
                             >
                               <HStack gap={2}>
                                 <Icon color={collection.color || 'blue.500'}>
-                                  <LuFolder />
+                                  <LuBookmark />
                                 </Icon>
                                 <Text>{collection.name}</Text>
                               </HStack>
@@ -2194,7 +2289,7 @@ function LibraryCatalogActionBar({
                         <Menu.Item value="new" onSelect={onCreateCollection}>
                           <HStack gap={2}>
                             <Icon color="primary.500">
-                              <LuFolderPlus />
+                              <LuBookmarkPlus />
                             </Icon>
                             <Text>Create New Collection</Text>
                           </HStack>
@@ -2297,6 +2392,102 @@ function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibr
               loading={isCreating}
             >
               Create
+            </Button>
+          </HStack>
+        </VStack>
+      </Box>
+    </Portal>
+  );
+}
+
+// Edit workspace dialog
+interface EditWorkspaceDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  workspace: LibraryWorkspace | null;
+  onUpdate: (name: string) => Promise<void>;
+}
+
+function EditWorkspaceDialog({ isOpen, onClose, workspace, onUpdate }: EditWorkspaceDialogProps) {
+  const [name, setName] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && workspace) {
+      setName(workspace.name);
+      setIsUpdating(false);
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.select();
+      }, 100);
+    }
+  }, [isOpen, workspace]);
+
+  const handleSubmit = async () => {
+    if (!name.trim() || isUpdating || !workspace) return;
+    setIsUpdating(true);
+    try {
+      await onUpdate(name.trim());
+      onClose();
+    } catch (error) {
+      // Error is already handled in onUpdate
+      console.error('Failed to update workspace:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (!isOpen || !workspace) return null;
+
+  return (
+    <Portal>
+      <Box
+        position="fixed"
+        inset={0}
+        bg="blackAlpha.600"
+        zIndex={1000}
+        onClick={onClose}
+      />
+      <Box
+        position="fixed"
+        top="50%"
+        left="50%"
+        transform="translate(-50%, -50%)"
+        bg="bg.panel"
+        borderRadius="lg"
+        boxShadow="xl"
+        p={6}
+        w="350px"
+        zIndex={1001}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <VStack align="stretch" gap={4}>
+          <Heading size="md">Edit Workspace</Heading>
+
+          <Input
+            ref={nameInputRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Workspace name"
+            disabled={isUpdating}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isUpdating) handleSubmit();
+              if (e.key === 'Escape') onClose();
+            }}
+          />
+
+          <HStack gap={2} justify="flex-end">
+            <Button variant="ghost" onClick={onClose} disabled={isUpdating}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="primary"
+              onClick={handleSubmit}
+              disabled={!name.trim() || isUpdating || name === workspace.name}
+              loading={isUpdating}
+            >
+              Save
             </Button>
           </HStack>
         </VStack>

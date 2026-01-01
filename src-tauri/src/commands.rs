@@ -3310,6 +3310,26 @@ pub async fn library_delete_workspace(
     crate::library::library::delete_workspace(&*db, workspace_id).await
 }
 
+/// Updates a Library workspace name.
+#[tauri::command]
+pub async fn library_update_workspace_name(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+    name: String,
+) -> Result<LibraryWorkspace, String> {
+    crate::library::library::update_workspace_name(&*db, workspace_id, name).await
+}
+
+/// Sets the pinned state of a Library workspace.
+#[tauri::command]
+pub async fn library_set_workspace_pinned(
+    db: State<'_, DatabaseConnection>,
+    workspace_id: String,
+    pinned: bool,
+) -> Result<LibraryWorkspace, String> {
+    crate::library::library::set_workspace_pinned(&*db, workspace_id, pinned).await
+}
+
 /// Lists all artifacts in a workspace (or all workspaces if None).
 #[tauri::command]
 pub async fn library_get_artifacts(

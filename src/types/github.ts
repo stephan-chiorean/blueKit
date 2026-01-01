@@ -154,6 +154,8 @@ export interface LibraryWorkspace {
   github_owner: string;
   /** GitHub repository name */
   github_repo: string;
+  /** Whether this workspace is pinned (default workspace) */
+  pinned: boolean;
   /** Creation timestamp (Unix timestamp) */
   created_at: number;
   /** Last update timestamp (Unix timestamp) */
