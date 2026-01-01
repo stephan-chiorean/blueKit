@@ -100,10 +100,10 @@ export async function invokeLibraryDeleteWorkspace(workspaceId: string): Promise
 }
 
 // ============================================================================
-// FOLDER COMMANDS (SQLite-backed virtual folders)
+// COLLECTION COMMANDS (SQLite-backed virtual collections)
 // ============================================================================
 
-export interface LibraryFolder {
+export interface LibraryCollection {
   id: string;
   workspace_id: string;
   name: string;
@@ -114,135 +114,135 @@ export interface LibraryFolder {
 }
 
 /**
- * Creates a folder in a library workspace (SQLite only, not in GitHub).
+ * Creates a collection in a library workspace (SQLite only, not in GitHub).
  *
  * @param workspaceId - Workspace ID
- * @param name - Name of the folder to create
- * @param color - Optional hex color for the folder
- * @returns Promise that resolves to the folder ID
+ * @param name - Name of the collection to create
+ * @param color - Optional hex color for the collection
+ * @returns Promise that resolves to the collection ID
  *
  * @example
  * ```typescript
- * const folderId = await invokeLibraryCreateFolder('workspace-id', 'UI Components', '#3B82F6');
+ * const collectionId = await invokeLibraryCreateCollection('workspace-id', 'UI Components', '#3B82F6');
  * ```
  */
-export async function invokeLibraryCreateFolder(
+export async function invokeLibraryCreateCollection(
   workspaceId: string,
   name: string,
   color?: string
 ): Promise<string> {
   return await invokeWithTimeout<string>(
-    'library_create_folder',
+    'library_create_collection',
     { workspaceId, name, color },
     5000
   );
 }
 
 /**
- * Gets all folders for a workspace from SQLite.
+ * Gets all collections for a workspace from SQLite.
  *
  * @param workspaceId - Workspace ID
- * @returns Promise that resolves to an array of folders
+ * @returns Promise that resolves to an array of collections
  *
  * @example
  * ```typescript
- * const folders = await invokeLibraryGetFolders('workspace-id');
+ * const collections = await invokeLibraryGetCollections('workspace-id');
  * ```
  */
-export async function invokeLibraryGetFolders(
+export async function invokeLibraryGetCollections(
   workspaceId: string
-): Promise<LibraryFolder[]> {
-  return await invokeWithTimeout<LibraryFolder[]>(
-    'library_get_folders',
+): Promise<LibraryCollection[]> {
+  return await invokeWithTimeout<LibraryCollection[]>(
+    'library_get_collections',
     { workspaceId },
     5000
   );
 }
 
 /**
- * Updates a folder's metadata.
+ * Updates a collection's metadata.
  *
- * @param folderId - Folder ID
+ * @param collectionId - Collection ID
  * @param name - Optional new name
  * @param color - Optional new color
  * @returns Promise that resolves when update is complete
  */
-export async function invokeLibraryUpdateFolder(
-  folderId: string,
+export async function invokeLibraryUpdateCollection(
+  collectionId: string,
   name?: string,
   color?: string
 ): Promise<void> {
   return await invokeWithTimeout<void>(
-    'library_update_folder',
-    { folderId, name, color },
+    'library_update_collection',
+    { collectionId, name, color },
     5000
   );
 }
 
 /**
- * Deletes a folder from SQLite.
+ * Deletes a collection from SQLite.
  *
- * @param folderId - Folder ID
+ * @param collectionId - Collection ID
  * @returns Promise that resolves when deletion is complete
  */
-export async function invokeLibraryDeleteFolder(
-  folderId: string
+export async function invokeLibraryDeleteCollection(
+  collectionId: string
 ): Promise<void> {
   return await invokeWithTimeout<void>(
-    'library_delete_folder',
-    { folderId },
+    'library_delete_collection',
+    { collectionId },
     5000
   );
 }
 
 /**
- * Adds catalogs to a folder.
+ * Adds catalogs to a collection.
  *
- * @param folderId - Folder ID
+ * @param collectionId - Collection ID
  * @param catalogIds - Array of catalog IDs to add
  * @returns Promise that resolves when catalogs are added
  */
-export async function invokeLibraryAddCatalogsToFolder(
-  folderId: string,
+export async function invokeLibraryAddCatalogsToCollection(
+  collectionId: string,
   catalogIds: string[]
 ): Promise<void> {
   return await invokeWithTimeout<void>(
-    'library_add_catalogs_to_folder',
-    { folderId, catalogIds },
+    'library_add_catalogs_to_collection',
+    { collectionId, catalogIds },
     5000
   );
 }
 
 /**
- * Removes catalogs from a folder.
+ * Removes catalogs from a collection.
  *
- * @param folderId - Folder ID
+ * @param collectionId - Collection ID
  * @param catalogIds - Array of catalog IDs to remove
  * @returns Promise that resolves when catalogs are removed
  */
-export async function invokeLibraryRemoveCatalogsFromFolder(
-  folderId: string,
+export async function invokeLibraryRemoveCatalogsFromCollection(
+  collectionId: string,
   catalogIds: string[]
 ): Promise<void> {
   return await invokeWithTimeout<void>(
-    'library_remove_catalogs_from_folder',
-    { folderId, catalogIds },
+    'library_remove_catalogs_from_collection',
+    { collectionId, catalogIds },
     5000
   );
 }
 
 /**
- * Gets all catalog IDs in a folder.
+ * Gets all catalog IDs in a collection.
  *
- * @param folderId - Folder ID
+ * @param collectionId - Collection ID
  * @returns Promise that resolves to array of catalog IDs
  */
-export async function invokeLibraryGetFolderCatalogIds(
-  folderId: string
+export async function invokeLibraryGetCollectionCatalogIds(
+  collectionId: string
 ): Promise<string[]> {
   return await invokeWithTimeout<string[]>(
-    'library_get_folder_catalog_ids',
-    { folderId },
+    'library_get_collection_catalog_ids',
+    { collectionId },
     5000
   );
 }

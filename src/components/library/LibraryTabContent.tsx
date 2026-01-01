@@ -60,13 +60,13 @@ import {
   invokeListWorkspaceCatalogs,
   invokeDeleteCatalogs,
   invokePullVariation,
-  invokeLibraryCreateFolder,
-  invokeLibraryGetFolders,
-  invokeLibraryDeleteFolder,
-  invokeLibraryAddCatalogsToFolder,
-  invokeLibraryRemoveCatalogsFromFolder,
-  invokeLibraryGetFolderCatalogIds,
-  type LibraryFolder,
+  invokeLibraryCreateCollection,
+  invokeLibraryGetCollections,
+  invokeLibraryDeleteCollection,
+  invokeLibraryAddCatalogsToCollection,
+  invokeLibraryRemoveCatalogsFromCollection,
+  invokeLibraryGetCollectionCatalogIds,
+  type LibraryCollection,
 } from '../../ipc/library';
 import {
   LibraryWorkspace,
@@ -87,7 +87,7 @@ interface SelectedVariation {
   catalog: LibraryCatalog;
 }
 
-// Selected catalog for folder operations
+// Selected catalog for collection operations
 interface SelectedCatalog {
   catalog: LibraryCatalog;
   variations: LibraryVariation[];
@@ -125,27 +125,17 @@ function formatTimeAgo(date: Date): string {
   return `${years}y ago`;
 }
 
-// Extract folder path from remote_path (e.g., "kits/auth/login.md" -> "kits/auth")
-function getFolderPath(remotePath: string): string {
-  const parts = remotePath.split('/');
-  if (parts.length <= 1) return '';
-  return parts.slice(0, -1).join('/');
-}
-
-// Library folder is now imported from IPC - no local interface needed
-
-// Group catalogs by folder path - DEPRECATED (now using SQLite folders)
-// Keeping for reference
+// Library collection is now imported from IPC - no local interface needed
 
 const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabContent(_, ref) {
-  const { getCachedCatalogs, setCachedCatalogs, getCachedFolders, setCachedFolders, invalidateCatalogs, invalidateFolders } = useLibraryCache();
+  const { getCachedCatalogs, setCachedCatalogs, getCachedCollections, setCachedCollections, invalidateCatalogs, invalidateCollections } = useLibraryCache();
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [workspaces, setWorkspaces] = useState<LibraryWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogWithVariations[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
 
   // GitHub auth state
@@ -153,7 +143,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
 
   // Dialog states
   const [showAddWorkspaceDialog, setShowAddWorkspaceDialog] = useState(false);
-  const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [showCreateCollectionDialog, setShowCreateCollectionDialog] = useState(false);
   const [showDeleteCatalogsDialog, setShowDeleteCatalogsDialog] = useState(false);
 
   // Expose methods via ref
@@ -161,14 +151,24 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     openAddWorkspaceDialog: () => setShowAddWorkspaceDialog(true),
   }));
 
-  // Folder expansion state
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  // Collection expansion state
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
 
-  // Custom folders state (stored per workspace)
-  const [customFolders, setCustomFolders] = useState<LibraryFolder[]>([]);
+  // Custom collections state (stored per workspace)
+  const [customCollections, setCustomCollections] = useState<LibraryCollection[]>([]);
 
-  // Catalog assignments per folder (folder_id -> catalog_id[])
-  const [folderCatalogMap, setFolderCatalogMap] = useState<Map<string, string[]>>(new Map());
+  // Sort collections consistently by order_index, then created_at
+  const sortedCollections = useMemo(() => {
+    return [...customCollections].sort((a, b) => {
+      if (a.order_index !== b.order_index) {
+        return a.order_index - b.order_index;
+      }
+      return a.created_at - b.created_at;
+    });
+  }, [customCollections]);
+
+  // Catalog assignments per collection (collection_id -> catalog_id[])
+  const [collectionCatalogMap, setCollectionCatalogMap] = useState<Map<string, string[]>>(new Map());
 
   // Multi-select state for variations
   const [selectedVariations, setSelectedVariations] = useState<Map<string, SelectedVariation>>(new Map());
@@ -210,25 +210,25 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   // Get all unique tags from ungrouped catalogs (since filter only applies to ungrouped)
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
-    const catalogInFolder = new Set<string>();
+    const catalogInCollection = new Set<string>();
 
-    // Mark catalogs that are in folders
-    for (const folder of customFolders) {
-      const catalogIds = folderCatalogMap.get(folder.id) || [];
+    // Mark catalogs that are in collections
+    for (const collection of sortedCollections) {
+      const catalogIds = collectionCatalogMap.get(collection.id) || [];
       for (const catalogId of catalogIds) {
-        catalogInFolder.add(catalogId);
+        catalogInCollection.add(catalogId);
       }
     }
-    
+
     // Only collect tags from ungrouped catalogs
     catalogs
-      .filter(c => !catalogInFolder.has(c.catalog.id))
+      .filter(c => !catalogInCollection.has(c.catalog.id))
       .forEach(catWithVars => {
         const tags = catWithVars.catalog.tags ? JSON.parse(catWithVars.catalog.tags) : [];
         tags.forEach((tag: string) => tagSet.add(tag));
       });
     return Array.from(tagSet).sort();
-  }, [catalogs, customFolders]);
+  }, [catalogs, sortedCollections, collectionCatalogMap]);
 
   // Filter function for catalogs (used only for ungrouped catalogs)
   const matchesFilter = useCallback((catWithVars: CatalogWithVariations): boolean => {
@@ -258,60 +258,61 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     });
   };
 
-  // Load folders from database
-  const loadFoldersFromDatabase = useCallback(async (workspaceId: string) => {
-    // For now, skip cache since the type changed - TODO: Update cache context
-    // const cachedFolders = getCachedFolders(workspaceId);
-    // if (cachedFolders) {
-    //   setCustomFolders(cachedFolders);
-    //   return;
-    // }
+  // Load collections from database
+  const loadCollectionsFromDatabase = useCallback(async (workspaceId: string) => {
+    // Check cache first
+    const cachedCollections = getCachedCollections(workspaceId);
+    if (cachedCollections) {
+      setCustomCollections(cachedCollections);
+      return;
+    }
 
-    setFoldersLoading(true);
+    setCollectionsLoading(true);
     try {
-      const folders = await invokeLibraryGetFolders(workspaceId);
-      console.log('Loaded folders from database:', folders);
+      const collections = await invokeLibraryGetCollections(workspaceId);
+      console.log('Loaded collections from database:', collections);
 
-      // TODO: Cache the folders (need to update cache type first)
-      // setCachedFolders(workspaceId, folders);
-      setCustomFolders(folders);
+      // Sort collections by order_index, then created_at for consistent ordering
+      const sorted = [...collections].sort((a, b) => {
+        if (a.order_index !== b.order_index) {
+          return a.order_index - b.order_index;
+        }
+        return a.created_at - b.created_at;
+      });
 
-      // Load folder-catalog mappings
+      // Cache the collections
+      setCachedCollections(workspaceId, sorted);
+      setCustomCollections(sorted);
+
+      // Load collection-catalog mappings
       const map = new Map<string, string[]>();
       try {
-        for (const folder of folders) {
-          const catalogIds = await invokeLibraryGetFolderCatalogIds(folder.id);
-          map.set(folder.id, catalogIds);
+        for (const collection of collections) {
+          const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+          map.set(collection.id, catalogIds);
         }
-        setFolderCatalogMap(map);
-        console.log('Loaded folder-catalog mappings:', map);
+        setCollectionCatalogMap(map);
+        console.log('Loaded collection-catalog mappings:', map);
       } catch (mapError) {
-        console.error('Failed to load folder-catalog mappings:', mapError);
-        setFolderCatalogMap(new Map());
+        console.error('Failed to load collection-catalog mappings:', mapError);
+        setCollectionCatalogMap(new Map());
       }
     } catch (error) {
-      console.error('Failed to load folders from database:', error);
-      setCustomFolders([]);
-      setFolderCatalogMap(new Map());
+      console.error('Failed to load collections from database:', error);
+      setCustomCollections([]);
+      setCollectionCatalogMap(new Map());
     } finally {
-      setFoldersLoading(false);
+      setCollectionsLoading(false);
     }
-  }, []); // Removed getCachedFolders, setCachedFolders dependencies until cache is updated
+  }, [getCachedCollections, setCachedCollections]);
 
   useEffect(() => {
     if (selectedWorkspaceId) {
-      loadFoldersFromDatabase(selectedWorkspaceId);
+      loadCollectionsFromDatabase(selectedWorkspaceId);
     } else {
-      setCustomFolders([]);
+      setCustomCollections([]);
     }
-  }, [selectedWorkspaceId, loadFoldersFromDatabase]);
-
-  // No longer needed - folders are saved directly to database via IPC commands
-  // Keeping this for reference during migration
-  const oldSaveFolders = (folders: LibraryFolder[]) => {
-    // DEPRECATED: Now using database
-    console.warn('oldSaveFolders called - should use database IPC commands instead');
-  };
+  }, [selectedWorkspaceId, loadCollectionsFromDatabase]);
 
   // Load workspaces on mount
   useEffect(() => {
@@ -407,11 +408,11 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       });
       // Invalidate cache before reloading
       invalidateCatalogs(selectedWorkspace.id);
-      invalidateFolders(selectedWorkspace.id);
-      // Load both catalogs and folders in parallel
+      invalidateCollections(selectedWorkspace.id);
+      // Load both catalogs and collections in parallel
       await Promise.all([
         loadCatalogs(selectedWorkspace.id),
-        loadFoldersFromDatabase(selectedWorkspace.id),
+        loadCollectionsFromDatabase(selectedWorkspace.id),
       ]);
     } catch (error) {
       console.error('Sync failed:', error);
@@ -512,10 +513,6 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
   // Clear all selections
   const clearVariationSelection = () => {
     setSelectedVariations(new Map());
-  };
-
-  const clearCatalogSelection = () => {
-    setSelectedCatalogs(new Map());
   };
 
   // Handle opening delete confirmation dialog
@@ -656,8 +653,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     }
   };
 
-  // Handle creating a new folder
-  const handleCreateFolder = async (name: string) => {
+  // Handle creating a new collection
+  const handleCreateCollection = async (name: string) => {
     if (!selectedWorkspaceId) {
       toaster.create({
         type: 'error',
@@ -667,68 +664,189 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       return;
     }
 
+    // Close dialog immediately for fluid UX
+    setShowCreateCollectionDialog(false);
+
     try {
-      // Create folder in database
-      const folderId = await invokeLibraryCreateFolder(selectedWorkspaceId, name);
-      console.log('Created folder:', folderId);
+      // Create collection in database
+      const collectionId = await invokeLibraryCreateCollection(selectedWorkspaceId, name);
+      console.log('Created collection:', collectionId);
 
-      // Invalidate cache and reload folders
-      invalidateFolders(selectedWorkspaceId);
-      await loadFoldersFromDatabase(selectedWorkspaceId);
+      // Optimistically create collection object
+      const now = Math.floor(Date.now() / 1000);
+      const maxOrderIndex = customCollections.length > 0 
+        ? Math.max(...customCollections.map(c => c.order_index)) + 1
+        : 0;
+      const optimisticCollection: LibraryCollection = {
+        id: collectionId,
+        workspace_id: selectedWorkspaceId,
+        name: name.trim(),
+        order_index: maxOrderIndex,
+        created_at: now,
+        updated_at: now,
+      };
 
-      setShowCreateFolderDialog(false);
+      // Optimistically update state immediately (no loading state)
+      // Insert in sorted position to maintain order
+      setCustomCollections(prev => {
+        const updated = [...prev, optimisticCollection];
+        return updated.sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+      });
+      setCollectionCatalogMap(prev => {
+        const next = new Map(prev);
+        next.set(collectionId, []); // Empty catalog list for new collection
+        return next;
+      });
+
+      // Update cache optimistically (sorted)
+      const updatedCollections = [...customCollections, optimisticCollection].sort((a, b) => {
+        if (a.order_index !== b.order_index) {
+          return a.order_index - b.order_index;
+        }
+        return a.created_at - b.created_at;
+      });
+      setCachedCollections(selectedWorkspaceId, updatedCollections);
+
+      // Silently refresh in background to get accurate data (without loading state)
+      // This ensures we have the correct order_index and timestamps from the database
+      try {
+        const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
+        
+        // Sort collections by order_index, then created_at for consistent ordering
+        const sorted = [...freshCollections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+        
+        const freshMap = new Map<string, string[]>();
+        for (const collection of sorted) {
+          try {
+            const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+            freshMap.set(collection.id, catalogIds);
+          } catch (mapError) {
+            console.error('Failed to load catalog IDs for collection:', mapError);
+            freshMap.set(collection.id, []);
+          }
+        }
+        
+        // Update with fresh data silently (preserving order)
+        setCustomCollections(sorted);
+        setCollectionCatalogMap(freshMap);
+        setCachedCollections(selectedWorkspaceId, sorted);
+      } catch (refreshError) {
+        console.error('Background refresh failed (using optimistic data):', refreshError);
+        // Keep optimistic data - it's good enough
+      }
+
       toaster.create({
         type: 'success',
-        title: 'Folder created',
-        description: `Created folder "${name}"`,
+        title: 'Collection created',
+        description: `Created collection "${name}"`,
       });
     } catch (error) {
-      console.error('Failed to create folder:', error);
+      console.error('Failed to create collection:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Rollback optimistic update on error
+      invalidateCollections(selectedWorkspaceId);
+      loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
+        console.error('Failed to reload after error:', err);
+      });
+      
       toaster.create({
         type: 'error',
-        title: 'Failed to create folder',
+        title: 'Failed to create collection',
         description: errorMessage,
       });
     }
   };
 
-  // Handle moving catalogs to folder
-  const handleMoveCatalogsToFolder = async (folderId: string) => {
+  // Handle moving catalogs to collection
+  const handleMoveCatalogsToCollection = async (collectionId: string) => {
     const catalogIds = selectedCatalogsArray.map(c => c.catalog.id);
     if (catalogIds.length === 0 || !selectedWorkspaceId) return;
 
-    try {
-      // Add catalogs to the new folder in database
-      await invokeLibraryAddCatalogsToFolder(folderId, catalogIds);
-
-      // Invalidate cache and reload
-      invalidateFolders(selectedWorkspaceId);
-      await loadFoldersFromDatabase(selectedWorkspaceId);
-
-      // Clear both catalog and variation selections immediately
-      setSelectedCatalogs(new Map());
-      // Also clear variations for the moved catalogs
-      setSelectedVariations(prev => {
-        const next = new Map(prev);
-        catalogIds.forEach(catalogId => {
-          // Remove all variations that belong to these catalogs
-          for (const [variationId, selectedVariation] of prev.entries()) {
-            if (selectedVariation.catalog.id === catalogId) {
-              next.delete(variationId);
-            }
+    // Clear selections immediately for fluid UX
+    setSelectedCatalogs(new Map());
+    setSelectedVariations(prev => {
+      const next = new Map(prev);
+      catalogIds.forEach(catalogId => {
+        // Remove all variations that belong to these catalogs
+        for (const [variationId, selectedVariation] of prev.entries()) {
+          if (selectedVariation.catalog.id === catalogId) {
+            next.delete(variationId);
           }
-        });
-        return next;
+        }
       });
+      return next;
+    });
+
+    // Optimistically update collection-catalog mapping
+    setCollectionCatalogMap(prev => {
+      const next = new Map(prev);
+      const existingIds = next.get(collectionId) || [];
+      const newIds = [...new Set([...existingIds, ...catalogIds])];
+      next.set(collectionId, newIds);
+      return next;
+    });
+
+    try {
+      // Add catalogs to the new collection in database
+      await invokeLibraryAddCatalogsToCollection(collectionId, catalogIds);
+
+      // Silently refresh in background to ensure consistency (without loading state)
+      try {
+        const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
+        
+        // Sort collections by order_index, then created_at for consistent ordering
+        const sorted = [...freshCollections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+        
+        const freshMap = new Map<string, string[]>();
+        for (const collection of sorted) {
+          try {
+            const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+            freshMap.set(collection.id, catalogIds);
+          } catch (mapError) {
+            console.error('Failed to load catalog IDs for collection:', mapError);
+            freshMap.set(collection.id, []);
+          }
+        }
+        
+        // Update with fresh data silently (preserving order)
+        setCustomCollections(sorted);
+        setCollectionCatalogMap(freshMap);
+        setCachedCollections(selectedWorkspaceId, sorted);
+      } catch (refreshError) {
+        console.error('Background refresh failed (using optimistic data):', refreshError);
+        // Keep optimistic data - it's good enough
+      }
 
       toaster.create({
         type: 'success',
-        title: 'Moved to folder',
-        description: `Moved ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} to folder`,
+        title: 'Moved to collection',
+        description: `Moved ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} to collection`,
       });
     } catch (error) {
-      console.error('Failed to move catalogs to folder:', error);
+      console.error('Failed to move catalogs to collection:', error);
+      
+      // Rollback optimistic update on error
+      invalidateCollections(selectedWorkspaceId);
+      loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
+        console.error('Failed to reload after error:', err);
+      });
+      
       toaster.create({
         type: 'error',
         title: 'Failed to move catalogs',
@@ -737,44 +855,89 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     }
   };
 
-  // Handle removing catalogs from folder
-  const handleRemoveCatalogsFromFolder = async () => {
+  // Handle removing catalogs from collection
+  const handleRemoveCatalogsFromCollection = async () => {
     const catalogIds = selectedCatalogsArray.map(c => c.catalog.id);
     if (catalogIds.length === 0 || !selectedWorkspaceId) return;
 
+    // Clear selections immediately for fluid UX
+    setSelectedCatalogs(new Map());
+    setSelectedVariations(prev => {
+      const next = new Map(prev);
+      catalogIds.forEach(catalogId => {
+        // Remove all variations that belong to these catalogs
+        for (const [variationId, selectedVariation] of prev.entries()) {
+          if (selectedVariation.catalog.id === catalogId) {
+            next.delete(variationId);
+          }
+        }
+      });
+      return next;
+    });
+
+    // Optimistically remove catalogs from all collections
+    setCollectionCatalogMap(prev => {
+      const next = new Map(prev);
+      for (const collectionId of next.keys()) {
+        const existingIds = next.get(collectionId) || [];
+        const filteredIds = existingIds.filter(id => !catalogIds.includes(id));
+        next.set(collectionId, filteredIds);
+      }
+      return next;
+    });
+
     try {
-      // Get all folders and remove catalogs from each
-      for (const folder of customFolders) {
-        await invokeLibraryRemoveCatalogsFromFolder(folder.id, catalogIds);
+      // Get all collections and remove catalogs from each
+      for (const collection of customCollections) {
+        await invokeLibraryRemoveCatalogsFromCollection(collection.id, catalogIds);
       }
 
-      // Invalidate cache and reload
-      invalidateFolders(selectedWorkspaceId);
-      await loadFoldersFromDatabase(selectedWorkspaceId);
-
-      // Clear both catalog and variation selections immediately
-      setSelectedCatalogs(new Map());
-      // Also clear variations for the removed catalogs
-      setSelectedVariations(prev => {
-        const next = new Map(prev);
-        catalogIds.forEach(catalogId => {
-          // Remove all variations that belong to these catalogs
-          for (const [variationId, selectedVariation] of prev.entries()) {
-            if (selectedVariation.catalog.id === catalogId) {
-              next.delete(variationId);
-            }
+      // Silently refresh in background to ensure consistency (without loading state)
+      try {
+        const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
+        
+        // Sort collections by order_index, then created_at for consistent ordering
+        const sorted = [...freshCollections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
           }
+          return a.created_at - b.created_at;
         });
-        return next;
-      });
+        
+        const freshMap = new Map<string, string[]>();
+        for (const collection of sorted) {
+          try {
+            const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+            freshMap.set(collection.id, catalogIds);
+          } catch (mapError) {
+            console.error('Failed to load catalog IDs for collection:', mapError);
+            freshMap.set(collection.id, []);
+          }
+        }
+        
+        // Update with fresh data silently (preserving order)
+        setCustomCollections(sorted);
+        setCollectionCatalogMap(freshMap);
+        setCachedCollections(selectedWorkspaceId, sorted);
+      } catch (refreshError) {
+        console.error('Background refresh failed (using optimistic data):', refreshError);
+        // Keep optimistic data - it's good enough
+      }
 
       toaster.create({
         type: 'success',
-        title: 'Removed from folder',
-        description: `Removed ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} from folder`,
+        title: 'Removed from collection',
+        description: `Removed ${catalogIds.length} catalog${catalogIds.length !== 1 ? 's' : ''} from collection`,
       });
     } catch (error) {
-      console.error('Failed to remove catalogs from folder:', error);
+      console.error('Failed to remove catalogs from collection:', error);
+      
+      // Rollback optimistic update on error
+      invalidateCollections(selectedWorkspaceId);
+      loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
+        console.error('Failed to reload after error:', err);
+      });
+      
       toaster.create({
         type: 'error',
         title: 'Failed to remove catalogs',
@@ -783,28 +946,71 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     }
   };
 
-  // Handle deleting a folder
-  const handleDeleteFolder = async (folderId: string) => {
-    const folder = customFolders.find(f => f.id === folderId);
-    if (!folder || !selectedWorkspaceId) return;
+  // Handle deleting a collection
+  const handleDeleteCollection = async (collectionId: string) => {
+    const collection = customCollections.find(c => c.id === collectionId);
+    if (!collection || !selectedWorkspaceId) return;
+
+    // Optimistically remove collection from state immediately
+    setCustomCollections(prev => prev.filter(c => c.id !== collectionId));
+    setCollectionCatalogMap(prev => {
+      const next = new Map(prev);
+      next.delete(collectionId);
+      return next;
+    });
 
     try {
-      await invokeLibraryDeleteFolder(folderId);
+      await invokeLibraryDeleteCollection(collectionId);
 
-      // Invalidate cache and reload
-      invalidateFolders(selectedWorkspaceId);
-      await loadFoldersFromDatabase(selectedWorkspaceId);
+      // Silently refresh in background to ensure consistency (without loading state)
+      try {
+        const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
+        
+        // Sort collections by order_index, then created_at for consistent ordering
+        const sorted = [...freshCollections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+        
+        const freshMap = new Map<string, string[]>();
+        for (const coll of sorted) {
+          try {
+            const catalogIds = await invokeLibraryGetCollectionCatalogIds(coll.id);
+            freshMap.set(coll.id, catalogIds);
+          } catch (mapError) {
+            console.error('Failed to load catalog IDs for collection:', mapError);
+            freshMap.set(coll.id, []);
+          }
+        }
+        
+        // Update with fresh data silently (preserving order)
+        setCustomCollections(sorted);
+        setCollectionCatalogMap(freshMap);
+        setCachedCollections(selectedWorkspaceId, sorted);
+      } catch (refreshError) {
+        console.error('Background refresh failed (using optimistic data):', refreshError);
+        // Keep optimistic data - it's good enough
+      }
 
       toaster.create({
         type: 'success',
-        title: 'Folder deleted',
-        description: `Deleted folder "${folder.name}"`,
+        title: 'Collection deleted',
+        description: `Deleted collection "${collection.name}"`,
       });
     } catch (error) {
-      console.error('Failed to delete folder:', error);
+      console.error('Failed to delete collection:', error);
+      
+      // Rollback optimistic update on error
+      invalidateCollections(selectedWorkspaceId);
+      loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
+        console.error('Failed to reload after error:', err);
+      });
+      
       toaster.create({
         type: 'error',
-        title: 'Failed to delete folder',
+        title: 'Failed to delete collection',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -814,33 +1020,33 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
     await openShell(`https://github.com/${workspace.github_owner}/${workspace.github_repo}`);
   };
 
-  // Organize catalogs by custom folders (using unfiltered catalogs)
+  // Organize catalogs by custom collections (using unfiltered catalogs)
   // Filter is only applied to ungrouped catalogs
   const organizedCatalogs = useMemo(() => {
-    const folderCatalogs = new Map<string, CatalogWithVariations[]>();
-    const catalogInFolder = new Set<string>();
+    const collectionCatalogs = new Map<string, CatalogWithVariations[]>();
+    const catalogInCollection = new Set<string>();
 
-    // First, assign catalogs to folders (using unfiltered catalogs)
-    for (const folder of customFolders) {
-      const folderCats: CatalogWithVariations[] = [];
-      const catalogIds = folderCatalogMap.get(folder.id) || [];
+    // First, assign catalogs to collections (using unfiltered catalogs)
+    for (const collection of sortedCollections) {
+      const collectionCats: CatalogWithVariations[] = [];
+      const catalogIds = collectionCatalogMap.get(collection.id) || [];
       for (const catalogId of catalogIds) {
         const catWithVars = catalogs.find(c => c.catalog.id === catalogId);
         if (catWithVars) {
-          folderCats.push(catWithVars);
-          catalogInFolder.add(catalogId);
+          collectionCats.push(catWithVars);
+          catalogInCollection.add(catalogId);
         }
       }
-      folderCatalogs.set(folder.id, folderCats);
+      collectionCatalogs.set(collection.id, collectionCats);
     }
 
-    // Get ungrouped catalogs (not in any custom folder) and apply filter
+    // Get ungrouped catalogs (not in any custom collection) and apply filter
     const ungrouped = catalogs
-      .filter(c => !catalogInFolder.has(c.catalog.id))
+      .filter(c => !catalogInCollection.has(c.catalog.id))
       .filter(matchesFilter);
 
-    return { folderCatalogs, ungrouped };
-  }, [catalogs, customFolders, folderCatalogMap, matchesFilter]);
+    return { collectionCatalogs, ungrouped };
+  }, [catalogs, sortedCollections, collectionCatalogMap, matchesFilter]);
 
   // Loading state
   if (viewMode === 'loading') {
@@ -923,7 +1129,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         mb={4}
         justify="space-between"
       >
-        {/* Left side: Workspace dropdown + New Folder */}
+        {/* Left side: Workspace dropdown + New Collection */}
         <HStack gap={2}>
           {/* Workspace dropdown */}
           <Select.Root
@@ -967,10 +1173,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
             </Portal>
           </Select.Root>
 
-          {/* New Folder button */}
+          {/* New Collection button */}
           <Button
             size="sm"
-            onClick={() => setShowCreateFolderDialog(true)}
+            onClick={() => setShowCreateCollectionDialog(true)}
             colorPalette="blue"
             variant="subtle"
           >
@@ -978,7 +1184,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
               <Icon>
                 <LuFolderPlus />
               </Icon>
-              <Text>New Folder</Text>
+              <Text>New Collection</Text>
             </HStack>
           </Button>
         </HStack>
@@ -1073,10 +1279,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         selectedCatalogs={selectedCatalogsArray}
         hasSelection={selectedCatalogs.size > 0}
         clearSelection={handleDeleteCatalogsClick}
-        folders={customFolders}
-        onMoveToFolder={handleMoveCatalogsToFolder}
-        onRemoveFromFolder={handleRemoveCatalogsFromFolder}
-        onCreateFolder={() => setShowCreateFolderDialog(true)}
+        collections={sortedCollections}
+        onMoveToCollection={handleMoveCatalogsToCollection}
+        onRemoveFromCollection={handleRemoveCatalogsFromCollection}
+        onCreateCollection={() => setShowCreateCollectionDialog(true)}
       />
 
       {/* Delete Catalogs Confirmation Dialog */}
@@ -1169,13 +1375,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
       </Dialog.Root>
 
       <VStack align="stretch" gap={6} width="100%">
-        {/* Loading state - show when folders or catalogs are loading */}
-        {(foldersLoading || catalogsLoading) && (
+        {/* Loading state - show when collections or catalogs are loading */}
+        {(collectionsLoading || catalogsLoading) && (
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
                 <Heading size="md">
-                  {foldersLoading ? 'Loading Folders...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
+                  {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
                 </Heading>
               </Flex>
             </Flex>
@@ -1183,10 +1389,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
               <VStack gap={4}>
                 <Spinner size="lg" />
                 <Text fontSize="sm" color="text.secondary">
-                  {foldersLoading && catalogsLoading 
-                    ? 'Loading folders and catalogs...'
-                    : foldersLoading 
-                    ? 'Scanning GitHub for folders...'
+                  {collectionsLoading && catalogsLoading
+                    ? 'Loading collections and catalogs...'
+                    : collectionsLoading
+                    ? 'Scanning GitHub for collections...'
                     : 'Loading catalogs...'}
                 </Text>
               </VStack>
@@ -1194,41 +1400,41 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
           </Box>
         )}
 
-        {/* Folders Section - only show if folders exist and not loading */}
-        {!foldersLoading && !catalogsLoading && customFolders.length > 0 && (
+        {/* Collections Section - only show if collections exist and not loading */}
+        {!collectionsLoading && !catalogsLoading && sortedCollections.length > 0 && (
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
-                <Heading size="md">Folders</Heading>
+                <Heading size="md">Collections</Heading>
                 <Text fontSize="sm" color="text.muted">
-                  {customFolders.length}
+                  {sortedCollections.length}
                 </Text>
               </Flex>
             </Flex>
 
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {customFolders.map((folder) => {
-                const folderCats = organizedCatalogs.folderCatalogs.get(folder.id) || [];
-                const isExpanded = expandedFolders.has(folder.id);
+              {sortedCollections.map((collection) => {
+                const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+                const isExpanded = expandedCollections.has(collection.id);
 
                 return (
-                  <LibraryFolderCard
-                    key={folder.id}
-                    folder={folder}
-                    catalogs={folderCats}
+                  <LibraryCollectionCard
+                    key={collection.id}
+                    collection={collection}
+                    catalogs={collectionCats}
                     isExpanded={isExpanded}
                     onToggleExpand={() => {
-                      setExpandedFolders(prev => {
+                      setExpandedCollections(prev => {
                         const next = new Set(prev);
-                        if (next.has(folder.id)) {
-                          next.delete(folder.id);
+                        if (next.has(collection.id)) {
+                          next.delete(collection.id);
                         } else {
-                          next.add(folder.id);
+                          next.add(collection.id);
                         }
                         return next;
                       });
                     }}
-                    onDeleteFolder={() => handleDeleteFolder(folder.id)}
+                    onDeleteCollection={() => handleDeleteCollection(collection.id)}
                     selectedCatalogIds={selectedCatalogs}
                     onCatalogToggle={handleCatalogToggle}
                   />
@@ -1239,15 +1445,15 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         )}
 
         {/* Catalogs Section - only show if not loading */}
-        {!foldersLoading && !catalogsLoading && (
+        {!collectionsLoading && !catalogsLoading && (
           <Box mb={8} position="relative" width="100%" maxW="100%">
             <Flex align="center" gap={2} mb={4}>
               <Heading size="md">Catalogs</Heading>
               <Text fontSize="sm" color="text.muted">
                 {organizedCatalogs.ungrouped.length}
               </Text>
-              {/* Filter Button - only show if there are catalogs or folders */}
-              {(catalogs.length > 0 || customFolders.length > 0) && (
+              {/* Filter Button - only show if there are catalogs or collections */}
+              {(catalogs.length > 0 || customCollections.length > 0) && (
               <Box position="relative">
                 <Button
                   ref={filterButtonRef}
@@ -1287,7 +1493,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
             )}
           </Flex>
 
-          {catalogs.length === 0 && customFolders.length === 0 ? (
+          {catalogs.length === 0 && customCollections.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
@@ -1313,7 +1519,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
               <Text color="text.muted" fontSize="sm">
                 {(nameFilter || selectedTags.length > 0)
                   ? 'No catalogs match the current filters'
-                  : 'All catalogs are organized in folders.'}
+                  : 'All catalogs are organized in collections.'}
               </Text>
             </Box>
           ) : (
@@ -1342,10 +1548,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef>(function LibraryTabCo
         onWorkspaceCreated={handleWorkspaceCreated}
       />
 
-      <CreateLibraryFolderDialog
-        isOpen={showCreateFolderDialog}
-        onClose={() => setShowCreateFolderDialog(false)}
-        onCreate={handleCreateFolder}
+      <CreateLibraryCollectionDialog
+        isOpen={showCreateCollectionDialog}
+        onClose={() => setShowCreateCollectionDialog(false)}
+        onCreate={handleCreateCollection}
       />
     </>
   );
@@ -1499,26 +1705,26 @@ function CatalogCard({
   );
 }
 
-// Library Folder Card (similar to FolderCard)
-interface LibraryFolderCardProps {
-  folder: LibraryFolder;
+// Library Collection Card (similar to CollectionCard)
+interface LibraryCollectionCardProps {
+  collection: LibraryCollection;
   catalogs: CatalogWithVariations[];
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onDeleteFolder: () => void;
+  onDeleteCollection: () => void;
   selectedCatalogIds: Map<string, SelectedCatalog>;
   onCatalogToggle: (catalogWithVariations: CatalogWithVariations) => void;
 }
 
-function LibraryFolderCard({
-  folder,
+function LibraryCollectionCard({
+  collection,
   catalogs,
   isExpanded,
   onToggleExpand,
-  onDeleteFolder,
+  onDeleteCollection,
   selectedCatalogIds,
   onCatalogToggle,
-}: LibraryFolderCardProps) {
+}: LibraryCollectionCardProps) {
   return (
     <Card.Root
       variant="subtle"
@@ -1542,10 +1748,10 @@ function LibraryFolderCard({
             >
               <LuChevronRight />
             </Icon>
-            <Icon boxSize={5} color={folder.color || 'blue.500'}>
+            <Icon boxSize={5} color={collection.color || 'blue.500'}>
               <LuFolder />
             </Icon>
-            <Heading size="md">{folder.name}</Heading>
+            <Heading size="md">{collection.name}</Heading>
             <Badge size="sm" colorPalette="gray">
               {catalogs.length}
             </Badge>
@@ -1556,7 +1762,7 @@ function LibraryFolderCard({
                 <IconButton
                   variant="ghost"
                   size="sm"
-                  aria-label="Folder options"
+                  aria-label="Collection options"
                   onClick={(e) => e.stopPropagation()}
                   bg="transparent"
                   _hover={{ bg: "transparent" }}
@@ -1569,7 +1775,7 @@ function LibraryFolderCard({
               <Portal>
                 <Menu.Positioner>
                   <Menu.Content>
-                    <Menu.Item value="delete" onSelect={onDeleteFolder}>
+                    <Menu.Item value="delete" onSelect={onDeleteCollection}>
                       <HStack gap={2}>
                         <Icon>
                           <LuTrash2 />
@@ -1639,7 +1845,7 @@ function LibraryFolderCard({
             ) : (
               <Box pt={2} borderTopWidth="1px" borderColor="border.subtle">
                 <Text fontSize="sm" color="text.tertiary" textAlign="center">
-                  Empty folder
+                  Empty collection
                 </Text>
               </Box>
             )}
@@ -1882,25 +2088,25 @@ function LibraryVariationActionBar({
   );
 }
 
-// Action bar for catalog bulk operations (folder management)
+// Action bar for catalog bulk operations (collection management)
 interface LibraryCatalogActionBarProps {
   selectedCatalogs: SelectedCatalog[];
   hasSelection: boolean;
   clearSelection: () => void;
-  folders: LibraryFolder[];
-  onMoveToFolder: (folderId: string) => void;
-  onRemoveFromFolder: () => void;
-  onCreateFolder: () => void;
+  collections: LibraryCollection[];
+  onMoveToCollection: (collectionId: string) => void;
+  onRemoveFromCollection: () => void;
+  onCreateCollection: () => void;
 }
 
 function LibraryCatalogActionBar({
   selectedCatalogs,
   hasSelection,
   clearSelection,
-  folders,
-  onMoveToFolder,
-  onRemoveFromFolder,
-  onCreateFolder,
+  collections,
+  onMoveToCollection,
+  onRemoveFromCollection,
+  onCreateCollection,
 }: LibraryCatalogActionBarProps) {
   if (!hasSelection) {
     return null;
@@ -1937,17 +2143,17 @@ function LibraryCatalogActionBar({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={onRemoveFromFolder}
+                  onClick={onRemoveFromCollection}
                 >
                   <HStack gap={2}>
                     <LuTrash2 />
-                    <Text>Remove from Folder</Text>
+                    <Text>Remove from Collection</Text>
                   </HStack>
                 </Button>
 
                 <ActionBar.Separator />
 
-                {/* Move to Folder menu */}
+                {/* Move to Collection menu */}
                 <Menu.Root>
                   <Menu.Trigger asChild>
                     <Button
@@ -1956,7 +2162,7 @@ function LibraryCatalogActionBar({
                     >
                       <HStack gap={2}>
                         <LuFolder />
-                        <Text>Move to Folder</Text>
+                        <Text>Move to Collection</Text>
                         <LuChevronDown />
                       </HStack>
                     </Button>
@@ -1964,33 +2170,33 @@ function LibraryCatalogActionBar({
                   <Portal>
                     <Menu.Positioner zIndex={2000}>
                       <Menu.Content>
-                        {folders.length === 0 ? (
+                        {collections.length === 0 ? (
                           <Box px={3} py={2}>
-                            <Text fontSize="sm" color="text.secondary">No folders yet</Text>
+                            <Text fontSize="sm" color="text.secondary">No collections yet</Text>
                           </Box>
                         ) : (
-                          folders.map((folder) => (
+                          collections.map((collection) => (
                             <Menu.Item
-                              key={folder.id}
-                              value={folder.id}
-                              onSelect={() => onMoveToFolder(folder.id)}
+                              key={collection.id}
+                              value={collection.id}
+                              onSelect={() => onMoveToCollection(collection.id)}
                             >
                               <HStack gap={2}>
-                                <Icon color={folder.color || 'blue.500'}>
+                                <Icon color={collection.color || 'blue.500'}>
                                   <LuFolder />
                                 </Icon>
-                                <Text>{folder.name}</Text>
+                                <Text>{collection.name}</Text>
                               </HStack>
                             </Menu.Item>
                           ))
                         )}
                         <Menu.Separator />
-                        <Menu.Item value="new" onSelect={onCreateFolder}>
+                        <Menu.Item value="new" onSelect={onCreateCollection}>
                           <HStack gap={2}>
                             <Icon color="primary.500">
                               <LuFolderPlus />
                             </Icon>
-                            <Text>Create New Folder</Text>
+                            <Text>Create New Collection</Text>
                           </HStack>
                         </Menu.Item>
                       </Menu.Content>
@@ -2006,14 +2212,14 @@ function LibraryCatalogActionBar({
   );
 }
 
-// Create folder dialog
-interface CreateLibraryFolderDialogProps {
+// Create collection dialog
+interface CreateLibraryCollectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string) => Promise<void>;
 }
 
-function CreateLibraryFolderDialog({ isOpen, onClose, onCreate }: CreateLibraryFolderDialogProps) {
+function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibraryCollectionDialogProps) {
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -2036,7 +2242,7 @@ function CreateLibraryFolderDialog({ isOpen, onClose, onCreate }: CreateLibraryF
       onClose();
     } catch (error) {
       // Error is already handled in onCreate
-      console.error('Failed to create folder:', error);
+      console.error('Failed to create collection:', error);
     } finally {
       setIsCreating(false);
     }
@@ -2067,13 +2273,13 @@ function CreateLibraryFolderDialog({ isOpen, onClose, onCreate }: CreateLibraryF
         onClick={(e) => e.stopPropagation()}
       >
         <VStack align="stretch" gap={4}>
-          <Heading size="md">Create Folder</Heading>
-          
+          <Heading size="md">Create Collection</Heading>
+
           <Input
             ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Folder name"
+            placeholder="Collection name"
             disabled={isCreating}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !isCreating) handleSubmit();

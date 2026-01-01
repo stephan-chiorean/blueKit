@@ -3319,38 +3319,36 @@ pub async fn library_get_artifacts(
     crate::library::library::list_artifacts(&*db, workspace_id).await
 }
 
-/// Creates a folder in a library workspace GitHub repository.
-/// 
-/// Creates a `.bluekitws` file at `{folder_name}/.bluekitws` in the GitHub repo
-/// to establish the folder structure. Git doesn't support empty directories,
-/// so this marker file is necessary for the folder to exist in GitHub.
-/// The `.bluekitws` marker also allows us to identify BlueKit workspace folders
-/// when scanning the repository.
+/// Creates a collection in a library workspace (SQLite only, not in GitHub).
+///
+/// This is a virtual collection that exists only in BlueKit's database
+/// to organize catalogs in the library UI. It doesn't create any files
+/// or directories in the GitHub repository.
 #[tauri::command]
-pub async fn library_create_folder(
+pub async fn library_create_collection(
     db: State<'_, DatabaseConnection>,
     workspace_id: String,
     name: String,
     color: Option<String>,
 ) -> Result<String, String> {
-    use crate::db::entities::library_folder;
+    use crate::db::entities::library_collection;
     use sea_orm::{ActiveModelTrait, Set};
     use chrono::Utc;
     use uuid::Uuid;
 
-    // Validate folder name
+    // Validate collection name
     let trimmed_name = name.trim();
     if trimmed_name.is_empty() {
-        return Err("Folder name cannot be empty".to_string());
+        return Err("Collection name cannot be empty".to_string());
     }
 
     // Generate unique ID
-    let folder_id = format!("folder_{}", Uuid::new_v4());
+    let collection_id = format!("collection_{}", Uuid::new_v4());
     let now = Utc::now().timestamp();
 
-    // Create folder in database
-    let folder = library_folder::ActiveModel {
-        id: Set(folder_id.clone()),
+    // Create collection in database
+    let collection = library_collection::ActiveModel {
+        id: Set(collection_id.clone()),
         workspace_id: Set(workspace_id),
         name: Set(trimmed_name.to_string()),
         color: Set(color),
@@ -3359,101 +3357,101 @@ pub async fn library_create_folder(
         updated_at: Set(now),
     };
 
-    folder
+    collection
         .insert(&*db)
         .await
-        .map_err(|e| format!("Failed to create folder: {}", e))?;
+        .map_err(|e| format!("Failed to create collection: {}", e))?;
 
-    Ok(folder_id)
+    Ok(collection_id)
 }
 
-/// Gets all folders for a workspace
+/// Gets all collections for a workspace
 #[tauri::command]
-pub async fn library_get_folders(
+pub async fn library_get_collections(
     db: State<'_, DatabaseConnection>,
     workspace_id: String,
-) -> Result<Vec<crate::db::entities::library_folder::Model>, String> {
-    use crate::db::entities::library_folder;
+) -> Result<Vec<crate::db::entities::library_collection::Model>, String> {
+    use crate::db::entities::library_collection;
     use sea_orm::{EntityTrait, ColumnTrait, QueryFilter, QueryOrder};
 
-    let folders = library_folder::Entity::find()
-        .filter(library_folder::Column::WorkspaceId.eq(workspace_id))
-        .order_by_asc(library_folder::Column::OrderIndex)
-        .order_by_asc(library_folder::Column::Name)
+    let collections = library_collection::Entity::find()
+        .filter(library_collection::Column::WorkspaceId.eq(workspace_id))
+        .order_by_asc(library_collection::Column::OrderIndex)
+        .order_by_asc(library_collection::Column::Name)
         .all(&*db)
         .await
-        .map_err(|e| format!("Failed to get folders: {}", e))?;
+        .map_err(|e| format!("Failed to get collections: {}", e))?;
 
-    Ok(folders)
+    Ok(collections)
 }
 
-/// Updates a folder's metadata
+/// Updates a collection's metadata
 #[tauri::command]
-pub async fn library_update_folder(
+pub async fn library_update_collection(
     db: State<'_, DatabaseConnection>,
-    folder_id: String,
+    collection_id: String,
     name: Option<String>,
     color: Option<String>,
 ) -> Result<(), String> {
-    use crate::db::entities::library_folder;
+    use crate::db::entities::library_collection;
     use sea_orm::{EntityTrait, ActiveModelTrait, Set};
     use chrono::Utc;
 
-    // Find existing folder
-    let folder = library_folder::Entity::find_by_id(&folder_id)
+    // Find existing collection
+    let collection = library_collection::Entity::find_by_id(&collection_id)
         .one(&*db)
         .await
         .map_err(|e| format!("Database error: {}", e))?
-        .ok_or_else(|| format!("Folder not found: {}", folder_id))?;
+        .ok_or_else(|| format!("Collection not found: {}", collection_id))?;
 
     // Create active model for update
-    let mut active_folder: library_folder::ActiveModel = folder.into();
+    let mut active_collection: library_collection::ActiveModel = collection.into();
 
     if let Some(n) = name {
-        active_folder.name = Set(n);
+        active_collection.name = Set(n);
     }
     if let Some(c) = color {
-        active_folder.color = Set(Some(c));
+        active_collection.color = Set(Some(c));
     }
-    active_folder.updated_at = Set(Utc::now().timestamp());
+    active_collection.updated_at = Set(Utc::now().timestamp());
 
-    active_folder
+    active_collection
         .update(&*db)
         .await
-        .map_err(|e| format!("Failed to update folder: {}", e))?;
+        .map_err(|e| format!("Failed to update collection: {}", e))?;
 
     Ok(())
 }
 
-/// Deletes a folder
+/// Deletes a collection
 #[tauri::command]
-pub async fn library_delete_folder(
+pub async fn library_delete_collection(
     db: State<'_, DatabaseConnection>,
-    folder_id: String,
+    collection_id: String,
 ) -> Result<(), String> {
-    use crate::db::entities::library_folder;
+    use crate::db::entities::library_collection;
     use sea_orm::{EntityTrait, ModelTrait};
 
-    // Find and delete the folder
-    let folder = library_folder::Entity::find_by_id(&folder_id)
+    // Find and delete the collection
+    let collection = library_collection::Entity::find_by_id(&collection_id)
         .one(&*db)
         .await
         .map_err(|e| format!("Database error: {}", e))?
-        .ok_or_else(|| format!("Folder not found: {}", folder_id))?;
+        .ok_or_else(|| format!("Collection not found: {}", collection_id))?;
 
-    folder
+    collection
         .delete(&*db)
         .await
-        .map_err(|e| format!("Failed to delete folder: {}", e))?;
+        .map_err(|e| format!("Failed to delete collection: {}", e))?;
 
     Ok(())
 }
 
-/// Adds catalogs to a folder
+/// Adds catalogs to a collection
 #[tauri::command]
-pub async fn library_add_catalogs_to_folder(
+pub async fn library_add_catalogs_to_collection(
     db: State<'_, DatabaseConnection>,
-    folder_id: String,
+    collection_id: String,
     catalog_ids: Vec<String>,
 ) -> Result<(), String> {
     use sea_orm::{Statement, ConnectionTrait};
@@ -3464,8 +3462,8 @@ pub async fn library_add_catalogs_to_folder(
     for catalog_id in catalog_ids {
         // Use INSERT OR IGNORE to avoid errors if already exists
         let sql = format!(
-            "INSERT OR IGNORE INTO library_folder_catalogs (folder_id, catalog_id, created_at) VALUES ('{}', '{}', {})",
-            folder_id, catalog_id, now
+            "INSERT OR IGNORE INTO library_collection_catalogs (collection_id, catalog_id, created_at) VALUES ('{}', '{}', {})",
+            collection_id, catalog_id, now
         );
 
         db.inner().execute(Statement::from_string(
@@ -3473,25 +3471,25 @@ pub async fn library_add_catalogs_to_folder(
             sql,
         ))
         .await
-        .map_err(|e| format!("Failed to add catalog to folder: {}", e))?;
+        .map_err(|e| format!("Failed to add catalog to collection: {}", e))?;
     }
 
     Ok(())
 }
 
-/// Removes catalogs from a folder
+/// Removes catalogs from a collection
 #[tauri::command]
-pub async fn library_remove_catalogs_from_folder(
+pub async fn library_remove_catalogs_from_collection(
     db: State<'_, DatabaseConnection>,
-    folder_id: String,
+    collection_id: String,
     catalog_ids: Vec<String>,
 ) -> Result<(), String> {
     use sea_orm::{Statement, ConnectionTrait};
 
     for catalog_id in catalog_ids {
         let sql = format!(
-            "DELETE FROM library_folder_catalogs WHERE folder_id = '{}' AND catalog_id = '{}'",
-            folder_id, catalog_id
+            "DELETE FROM library_collection_catalogs WHERE collection_id = '{}' AND catalog_id = '{}'",
+            collection_id, catalog_id
         );
 
         db.inner().execute(Statement::from_string(
@@ -3499,24 +3497,24 @@ pub async fn library_remove_catalogs_from_folder(
             sql,
         ))
         .await
-        .map_err(|e| format!("Failed to remove catalog from folder: {}", e))?;
+        .map_err(|e| format!("Failed to remove catalog from collection: {}", e))?;
     }
 
     Ok(())
 }
 
-/// Gets all catalog IDs in a folder
+/// Gets all catalog IDs in a collection
 #[tauri::command]
-pub async fn library_get_folder_catalog_ids(
+pub async fn library_get_collection_catalog_ids(
     db: State<'_, DatabaseConnection>,
-    folder_id: String,
+    collection_id: String,
 ) -> Result<Vec<String>, String> {
     use sea_orm::{Statement, ConnectionTrait};
 
-    // Get catalog IDs for this folder
+    // Get catalog IDs for this collection
     let query = format!(
-        "SELECT catalog_id FROM library_folder_catalogs WHERE folder_id = '{}'",
-        folder_id
+        "SELECT catalog_id FROM library_collection_catalogs WHERE collection_id = '{}'",
+        collection_id
     );
 
     let catalog_ids_result = db.inner()
@@ -3525,7 +3523,7 @@ pub async fn library_get_folder_catalog_ids(
             query,
         ))
         .await
-        .map_err(|e| format!("Failed to get folder catalog IDs: {}", e))?;
+        .map_err(|e| format!("Failed to get collection catalog IDs: {}", e))?;
 
     let catalog_ids: Vec<String> = catalog_ids_result
         .iter()

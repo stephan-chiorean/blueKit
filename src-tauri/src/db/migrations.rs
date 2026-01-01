@@ -24,9 +24,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_library_variations_table(db).await?;
     create_library_subscriptions_table(db).await?;
 
-    // Library folders (Phase 3)
-    create_library_folders_table(db).await?;
-    create_library_folder_catalogs_table(db).await?;
+    // Library collections (Phase 3)
+    create_library_collections_table(db).await?;
+    create_library_collection_catalogs_table(db).await?;
 
     // Create projects and checkpoints tables
     create_projects_table(db).await?;
@@ -789,9 +789,9 @@ async fn create_library_subscriptions_table(db: &DatabaseConnection) -> Result<(
     Ok(())
 }
 
-async fn create_library_folders_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn create_library_collections_table(db: &DatabaseConnection) -> Result<(), DbErr> {
     let sql = r#"
-        CREATE TABLE IF NOT EXISTS library_folders (
+        CREATE TABLE IF NOT EXISTS library_collections (
             id TEXT PRIMARY KEY NOT NULL,
             workspace_id TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -810,8 +810,8 @@ async fn create_library_folders_table(db: &DatabaseConnection) -> Result<(), DbE
 
     // Create index on workspace_id for faster lookups
     let index_sql = r#"
-        CREATE INDEX IF NOT EXISTS idx_library_folders_workspace_id
-        ON library_folders(workspace_id)
+        CREATE INDEX IF NOT EXISTS idx_library_collections_workspace_id
+        ON library_collections(workspace_id)
     "#;
 
     db.execute(Statement::from_string(
@@ -819,20 +819,20 @@ async fn create_library_folders_table(db: &DatabaseConnection) -> Result<(), DbE
         index_sql.to_string(),
     )).await?;
 
-    info!("Library folders table created");
+    info!("Library collections table created");
     Ok(())
 }
 
-async fn create_library_folder_catalogs_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn create_library_collection_catalogs_table(db: &DatabaseConnection) -> Result<(), DbErr> {
     let sql = r#"
-        CREATE TABLE IF NOT EXISTS library_folder_catalogs (
+        CREATE TABLE IF NOT EXISTS library_collection_catalogs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            folder_id TEXT NOT NULL,
+            collection_id TEXT NOT NULL,
             catalog_id TEXT NOT NULL,
             created_at INTEGER NOT NULL,
-            FOREIGN KEY (folder_id) REFERENCES library_folders(id) ON DELETE CASCADE,
+            FOREIGN KEY (collection_id) REFERENCES library_collections(id) ON DELETE CASCADE,
             FOREIGN KEY (catalog_id) REFERENCES library_catalogs(id) ON DELETE CASCADE,
-            UNIQUE(folder_id, catalog_id)
+            UNIQUE(collection_id, catalog_id)
         )
     "#;
 
@@ -842,19 +842,19 @@ async fn create_library_folder_catalogs_table(db: &DatabaseConnection) -> Result
     )).await?;
 
     // Create indexes for efficient lookups
-    let index_folder_sql = r#"
-        CREATE INDEX IF NOT EXISTS idx_library_folder_catalogs_folder_id
-        ON library_folder_catalogs(folder_id)
+    let index_collection_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_library_collection_catalogs_collection_id
+        ON library_collection_catalogs(collection_id)
     "#;
 
     db.execute(Statement::from_string(
         db.get_database_backend(),
-        index_folder_sql.to_string(),
+        index_collection_sql.to_string(),
     )).await?;
 
     let index_catalog_sql = r#"
-        CREATE INDEX IF NOT EXISTS idx_library_folder_catalogs_catalog_id
-        ON library_folder_catalogs(catalog_id)
+        CREATE INDEX IF NOT EXISTS idx_library_collection_catalogs_catalog_id
+        ON library_collection_catalogs(catalog_id)
     "#;
 
     db.execute(Statement::from_string(
@@ -862,6 +862,6 @@ async fn create_library_folder_catalogs_table(db: &DatabaseConnection) -> Result
         index_catalog_sql.to_string(),
     )).await?;
 
-    info!("Library folder catalogs junction table created");
+    info!("Library collection catalogs junction table created");
     Ok(())
 }

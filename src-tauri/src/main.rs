@@ -118,13 +118,13 @@ async fn main() {
             commands::library_get_workspace, // Get Library workspace
             commands::library_delete_workspace, // Delete Library workspace
             commands::library_get_artifacts, // Get Library artifacts
-            commands::library_create_folder, // Create folder in SQLite
-            commands::library_get_folders, // Get folders from SQLite
-            commands::library_update_folder, // Update folder metadata
-            commands::library_delete_folder, // Delete folder from SQLite
-            commands::library_add_catalogs_to_folder, // Add catalogs to folder
-            commands::library_remove_catalogs_from_folder, // Remove catalogs from folder
-            commands::library_get_folder_catalog_ids, // Get catalog IDs in folder
+            commands::library_create_collection, // Create collection in SQLite
+            commands::library_get_collections, // Get collections from SQLite
+            commands::library_update_collection, // Update collection metadata
+            commands::library_delete_collection, // Delete collection from SQLite
+            commands::library_add_catalogs_to_collection, // Add catalogs to collection
+            commands::library_remove_catalogs_from_collection, // Remove catalogs from collection
+            commands::library_get_collection_catalog_ids, // Get catalog IDs in collection
             commands::scan_project_resources, // Scan project resources (Phase 1)
             commands::get_project_resources, // Get project resources (Phase 1)
             commands::get_resource_by_id, // Get resource by ID (Phase 1)
