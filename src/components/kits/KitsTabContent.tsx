@@ -18,8 +18,10 @@ import {
   SimpleGrid,
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
-import { LuFilter, LuFolderPlus, LuLayoutGrid, LuTable, LuChevronRight, LuFolder, LuCheck, LuSquare } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuChevronRight, LuFolder } from 'react-icons/lu';
+import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
+import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
@@ -44,7 +46,7 @@ interface KitsTabContentProps {
   movingArtifacts?: Set<string>;
 }
 
-type ViewMode = 'card' | 'table';
+type ViewMode = 'card' | 'table' | 'blueprints';
 
 function KitsTabContent({
   kits,
@@ -63,7 +65,7 @@ function KitsTabContent({
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isKitsFilterOpen, setIsKitsFilterOpen] = useState(false);
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
@@ -91,18 +93,23 @@ function KitsTabContent({
     });
   };
 
-  // Get all unique tags from kits
+  // Get root-level kits (not in folders) - unfiltered
+  const rootKitsUnfiltered = useMemo(() => {
+    return getRootArtifacts(kits, folders, 'kits', projectPath);
+  }, [kits, folders, projectPath]);
+
+  // Get all unique tags from root-level kits only
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
-    kits.forEach(kit => {
+    rootKitsUnfiltered.forEach(kit => {
       kit.frontMatter?.tags?.forEach(tag => tagSet.add(tag));
     });
     return Array.from(tagSet).sort();
-  }, [kits]);
+  }, [rootKitsUnfiltered]);
 
-  // Filter kits based on name and selected tags
-  const filteredKits = useMemo(() => {
-    return kits.filter(kit => {
+  // Filter only root-level kits based on name and selected tags
+  const filteredRootKits = useMemo(() => {
+    return rootKitsUnfiltered.filter(kit => {
       const displayName = kit.frontMatter?.alias || kit.name;
       const matchesName = !nameFilter || 
         displayName.toLowerCase().includes(nameFilter.toLowerCase()) ||
@@ -117,7 +124,7 @@ function KitsTabContent({
       
       return matchesName && matchesTags;
     });
-  }, [kits, nameFilter, selectedTags]);
+  }, [rootKitsUnfiltered, nameFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => {
@@ -149,13 +156,14 @@ function KitsTabContent({
   }, [projectPath, kits]); // Reload when kits change (from file watcher)
 
   // Build folder tree when folders or kits change (memoized for performance)
+  // Use all kits (unfiltered) for folders since filter only applies to root-level kits
   const folderTree = useMemo(() => {
-    const tree = buildFolderTree(folders, filteredKits, 'kits', projectPath);
+    const tree = buildFolderTree(folders, kits, 'kits', projectPath);
     return tree.map(node => ({
       ...node,
       isExpanded: expandedFolders.has(node.folder.path),
     }));
-  }, [folders, filteredKits, projectPath, expandedFolders]);
+  }, [folders, kits, projectPath, expandedFolders]);
 
   const handleViewKit = (kit: ArtifactFile) => {
     onViewKit(kit);
@@ -383,51 +391,10 @@ function KitsTabContent({
   };
 
   // Ref for filter button (used by FilterPanel for click-outside detection)
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const kitsFilterButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Get root-level kits (not in folders) - must be before early returns
-  const rootKits = useMemo(() => {
-    return getRootArtifacts(filteredKits, folders, 'kits', projectPath);
-  }, [filteredKits, folders, projectPath]);
-
-  // Check if all filtered kits are selected
-  const allFilteredKitsSelected = useMemo(() => {
-    if (filteredKits.length === 0) return false;
-    return filteredKits.every(kit => isSelected(kit.path));
-  }, [filteredKits, selectedItems]);
-
-  // Handle select all / deselect all
-  const handleSelectAll = () => {
-    if (allFilteredKitsSelected) {
-      // Deselect all filtered kits
-      filteredKits.forEach(kit => {
-        if (isSelected(kit.path)) {
-          toggleItem({
-            id: kit.path,
-            name: kit.frontMatter?.alias || kit.name,
-            type: 'Kit',
-            path: kit.path,
-            projectId,
-            projectPath,
-          });
-        }
-      });
-    } else {
-      // Select all filtered kits
-      filteredKits.forEach(kit => {
-        if (!isSelected(kit.path)) {
-          addItem({
-            id: kit.path,
-            name: kit.frontMatter?.alias || kit.name,
-            type: 'Kit',
-            path: kit.path,
-            projectId,
-            projectPath,
-          });
-        }
-      });
-    }
-  };
+  // Use filtered root kits (filter only applies to root-level kits)
+  const rootKits = filteredRootKits;
 
   if (kitsLoading) {
     return (
@@ -586,47 +553,6 @@ function KitsTabContent({
                 <Text fontSize="sm" color="text.muted">
                   {folderTree.length}
                 </Text>
-                {/* Filter Button */}
-                <Button
-                  ref={filterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  _hover={{ bg: "bg.subtle" }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFilter />
-                    </Icon>
-                    <Text>Filter</Text>
-                    {(nameFilter || selectedTags.length > 0) && (
-                      <Badge size="sm" colorPalette="primary" variant="solid">
-                        {[nameFilter && 1, selectedTags.length]
-                          .filter(Boolean)
-                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
-                {/* Select All Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  _hover={{ bg: "bg.subtle" }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      {allFilteredKitsSelected ? <LuCheck /> : <LuSquare />}
-                    </Icon>
-                    <Text>{allFilteredKitsSelected ? 'Deselect All' : 'Select All'}</Text>
-                  </HStack>
-                </Button>
                 {/* New Folder Button - subtle blue style */}
                 <Button
                   size="sm"
@@ -643,54 +569,16 @@ function KitsTabContent({
                 </Button>
               </Flex>
               {/* View Mode Switcher */}
-              <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
-                <Button
-                  onClick={() => setViewMode('card')}
-                  variant="ghost"
-                  borderRadius={0}
-                  borderRightWidth="1px"
-                  borderRightColor="border.subtle"
-                  bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
-                  color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
-                  size="sm"
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuLayoutGrid />
-                    </Icon>
-                    <Text>Cards</Text>
-                  </HStack>
-                </Button>
-                <Button
-                  onClick={() => setViewMode('table')}
-                  variant="ghost"
-                  borderRadius={0}
-                  bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
-                  color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-                  _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
-                  size="sm"
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuTable />
-                    </Icon>
-                    <Text>Table</Text>
-                  </HStack>
-                </Button>
-              </HStack>
+              <ViewModeSwitcher
+                value={viewMode}
+                onChange={(mode) => setViewMode(mode as ViewMode)}
+                modes={[
+                  STANDARD_VIEW_MODES.card,
+                  STANDARD_VIEW_MODES.table,
+                  { id: 'blueprints', label: 'Blueprints', icon: BsBoxes },
+                ]}
+              />
             </Flex>
-
-            <FilterPanel
-              isOpen={isFilterOpen}
-              onClose={() => setIsFilterOpen(false)}
-              nameFilter={nameFilter}
-              onNameFilterChange={setNameFilter}
-              allTags={allTags}
-              selectedTags={selectedTags}
-              onToggleTag={toggleTag}
-              filterButtonRef={filterButtonRef}
-            />
 
             {viewMode === 'card' ? (
               <SimpleGrid 
@@ -721,6 +609,19 @@ function KitsTabContent({
                   />
                 ))}
               </SimpleGrid>
+            ) : viewMode === 'blueprints' ? (
+              <Box
+                p={6}
+                bg="bg.subtle"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                textAlign="center"
+              >
+                <Text color="text.muted" fontSize="sm">
+                  Blueprints view coming soon
+                </Text>
+              </Box>
             ) : (
               <Table.Root size="sm" variant="outline">
                 <Table.Header>
@@ -869,75 +770,58 @@ function KitsTabContent({
             <Text fontSize="sm" color="text.muted">
               {rootKits.length}
             </Text>
-            {/* Show Filter and New Folder buttons if no folders exist */}
+            {/* Filter Button - always visible */}
+            <Box position="relative">
+              <Button
+                ref={kitsFilterButtonRef}
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsKitsFilterOpen(!isKitsFilterOpen)}
+                bg={isKitsFilterOpen ? "bg.subtle" : "bg.subtle"}
+                borderWidth="1px"
+                borderColor="border.subtle"
+                _hover={{ bg: "bg.subtle" }}
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFilter />
+                  </Icon>
+                  <Text>Filter</Text>
+                  {(nameFilter || selectedTags.length > 0) && (
+                    <Badge size="sm" colorPalette="primary" variant="solid">
+                      {[nameFilter && 1, selectedTags.length]
+                        .filter(Boolean)
+                        .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                    </Badge>
+                  )}
+                </HStack>
+              </Button>
+              <FilterPanel
+                isOpen={isKitsFilterOpen}
+                onClose={() => setIsKitsFilterOpen(false)}
+                nameFilter={nameFilter}
+                onNameFilterChange={setNameFilter}
+                allTags={allTags}
+                selectedTags={selectedTags}
+                onToggleTag={toggleTag}
+                filterButtonRef={kitsFilterButtonRef}
+              />
+            </Box>
+            {/* Show New Folder button if no folders exist */}
             {folderTree.length === 0 && (
-              <>
-                <Box position="relative" overflow="hidden">
-                  <Button
-                    ref={filterButtonRef}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-                    borderWidth="1px"
-                    borderColor="border.subtle"
-                    _hover={{ bg: "bg.subtle" }}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuFilter />
-                      </Icon>
-                      <Text>Filter</Text>
-                      {(nameFilter || selectedTags.length > 0) && (
-                        <Badge size="sm" colorPalette="primary" variant="solid">
-                          {[nameFilter && 1, selectedTags.length]
-                            .filter(Boolean)
-                            .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                        </Badge>
-                      )}
-                    </HStack>
-                  </Button>
-                  <FilterPanel
-                    isOpen={isFilterOpen}
-                    onClose={() => setIsFilterOpen(false)}
-                    nameFilter={nameFilter}
-                    onNameFilterChange={setNameFilter}
-                    allTags={allTags}
-                    selectedTags={selectedTags}
-                    onToggleTag={toggleTag}
-                    filterButtonRef={filterButtonRef}
-                  />
-                </Box>
-                {/* Select All Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  _hover={{ bg: "bg.subtle" }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      {allFilteredKitsSelected ? <LuCheck /> : <LuSquare />}
-                    </Icon>
-                    <Text>{allFilteredKitsSelected ? 'Deselect All' : 'Select All'}</Text>
-                  </HStack>
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setIsCreateFolderOpen(true)}
-                  colorPalette="blue"
-                  variant="subtle"
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFolderPlus />
-                    </Icon>
-                    <Text>New Folder</Text>
-                  </HStack>
-                </Button>
-              </>
+              <Button
+                size="sm"
+                onClick={() => setIsCreateFolderOpen(true)}
+                colorPalette="blue"
+                variant="subtle"
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFolderPlus />
+                  </Icon>
+                  <Text>New Folder</Text>
+                </HStack>
+              </Button>
             )}
           </Flex>
 
@@ -1020,6 +904,19 @@ function KitsTabContent({
                 </Card.Root>
               ))}
             </SimpleGrid>
+          ) : viewMode === 'blueprints' ? (
+            <Box
+              p={6}
+              bg="bg.subtle"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <Text color="text.muted" fontSize="sm">
+                Blueprints view coming soon
+              </Text>
+            </Box>
           ) : viewMode === 'table' ? (
             renderKitsTableView()
           ) : null}

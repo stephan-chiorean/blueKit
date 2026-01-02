@@ -13,8 +13,9 @@ import {
   createListCollection,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuBookOpen, LuFolder, LuBot, LuNotebook, LuNetwork, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
+import { LuArrowLeft, LuPackage, LuFolder, LuBot, LuNotebook, LuNetwork, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
+import { TiDocumentText } from 'react-icons/ti';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
@@ -697,10 +698,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                   )}
                   <Tabs.Trigger value="walkthroughs" flexShrink={0}>
                     <HStack gap={2}>
-                      <Icon>
-                        <LuBookOpen />
+                      <Icon boxSize={5}>
+                        <TiDocumentText />
                       </Icon>
-                      <Text>Walkthroughs</Text>
+                      <Text>Docs</Text>
                     </HStack>
                   </Tabs.Trigger>
                   <Tabs.Trigger value="kits" flexShrink={0}>

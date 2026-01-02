@@ -23,13 +23,13 @@ import {
 } from '@chakra-ui/react';
 import {
   LuPlus,
-  LuLayoutGrid,
-  LuTable,
   LuX,
   LuMap,
 } from 'react-icons/lu';
+import { GrNavigate } from 'react-icons/gr';
 import { Plan } from '../../types/plan';
 import CreatePlanDialog from './CreatePlanDialog';
+import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 
 interface PlansTabContentProps {
   plans: Plan[];
@@ -44,7 +44,7 @@ export interface PlansTabContentRef {
   openCreateDialog: () => void;
 }
 
-type ViewMode = 'card' | 'table';
+type ViewMode = 'card' | 'table' | 'roadmap';
 
 const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
   plans,
@@ -254,42 +254,15 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
         </Flex>
 
         {/* View Mode Switcher */}
-        <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
-          <Button
-            onClick={() => setViewMode('card')}
-            variant="ghost"
-            borderRadius={0}
-            borderRightWidth="1px"
-            borderRightColor="border.subtle"
-            bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
-            color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
-            size="sm"
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuLayoutGrid />
-              </Icon>
-              <Text>Cards</Text>
-            </HStack>
-          </Button>
-          <Button
-            onClick={() => setViewMode('table')}
-            variant="ghost"
-            borderRadius={0}
-            bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
-            color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-            _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
-            size="sm"
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuTable />
-              </Icon>
-              <Text>Table</Text>
-            </HStack>
-          </Button>
-        </HStack>
+        <ViewModeSwitcher
+          value={viewMode}
+          onChange={(mode) => setViewMode(mode as ViewMode)}
+          modes={[
+            STANDARD_VIEW_MODES.card,
+            STANDARD_VIEW_MODES.table,
+            { id: 'roadmap', label: 'Roadmap', icon: GrNavigate },
+          ]}
+        />
       </Flex>
 
       {/* Plans list */}
@@ -310,6 +283,19 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
           {filteredPlans.map(renderPlanCard)}
         </SimpleGrid>
+      ) : viewMode === 'roadmap' ? (
+        <Box
+          p={6}
+          bg="bg.subtle"
+          borderRadius="md"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          textAlign="center"
+        >
+          <Text color="text.muted" fontSize="sm">
+            Roadmap view coming soon
+          </Text>
+        </Box>
       ) : (
         <Table.Root size="sm" variant="outline">
           <Table.Header>
