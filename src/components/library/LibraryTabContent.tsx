@@ -2161,7 +2161,7 @@ function LibraryCollectionCard({
         <Flex align="start" justify="space-between" gap={1.5} mb={1.5}>
           <VStack align="start" gap={1} flex={1} minW={0}>
             <Heading 
-              size="sm" 
+              size="md" 
               fontWeight="medium"
               css={{
                 display: '-webkit-box',
@@ -2186,14 +2186,14 @@ function LibraryCollectionCard({
                   {resourceSummary.map((part, index) => (
                     <HStack key={index} gap={1}>
                       {index > 0 && (
-                        <Text fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                        <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
                           •
                         </Text>
                       )}
-                      <Text fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                      <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
                         {part.count}
                       </Text>
-                      <Icon fontSize="xs" color="blue.600" _dark={{ color: "blue.300" }}>
+                      <Icon fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
                         {part.icon}
                       </Icon>
                     </HStack>
