@@ -288,47 +288,54 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   const loadCollectionsFromDatabase = useCallback(async (workspaceId: string) => {
     // Check cache first
     const cachedCollections = getCachedCollections(workspaceId);
+    let collections: LibraryCollection[];
+
     if (cachedCollections) {
       setCustomCollections(cachedCollections);
-      return;
+      collections = cachedCollections;
+      // Don't return early - continue to load mappings below
+    } else {
+      setCollectionsLoading(true);
+      try {
+        collections = await invokeLibraryGetCollections(workspaceId);
+        console.log('Loaded collections from database:', collections);
+
+        // Sort collections by order_index, then created_at for consistent ordering
+        const sorted = [...collections].sort((a, b) => {
+          if (a.order_index !== b.order_index) {
+            return a.order_index - b.order_index;
+          }
+          return a.created_at - b.created_at;
+        });
+
+        // Cache the collections
+        setCachedCollections(workspaceId, sorted);
+        setCustomCollections(sorted);
+        collections = sorted;
+      } catch (error) {
+        console.error('Failed to load collections from database:', error);
+        setCustomCollections([]);
+        setCollectionCatalogMap(new Map());
+        setCollectionsLoading(false);
+        return;
+      } finally {
+        setCollectionsLoading(false);
+      }
     }
 
-    setCollectionsLoading(true);
+    // ALWAYS load collection-catalog mappings (moved outside cache check)
+    // This ensures mappings are loaded even when collections come from cache
+    const map = new Map<string, string[]>();
     try {
-      const collections = await invokeLibraryGetCollections(workspaceId);
-      console.log('Loaded collections from database:', collections);
-
-      // Sort collections by order_index, then created_at for consistent ordering
-      const sorted = [...collections].sort((a, b) => {
-        if (a.order_index !== b.order_index) {
-          return a.order_index - b.order_index;
-        }
-        return a.created_at - b.created_at;
-      });
-
-      // Cache the collections
-      setCachedCollections(workspaceId, sorted);
-      setCustomCollections(sorted);
-
-      // Load collection-catalog mappings
-      const map = new Map<string, string[]>();
-      try {
-        for (const collection of collections) {
-          const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
-          map.set(collection.id, catalogIds);
-        }
-        setCollectionCatalogMap(map);
-        console.log('Loaded collection-catalog mappings:', map);
-      } catch (mapError) {
-        console.error('Failed to load collection-catalog mappings:', mapError);
-        setCollectionCatalogMap(new Map());
+      for (const collection of collections) {
+        const catalogIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+        map.set(collection.id, catalogIds);
       }
-    } catch (error) {
-      console.error('Failed to load collections from database:', error);
-      setCustomCollections([]);
+      setCollectionCatalogMap(map);
+      console.log('Loaded collection-catalog mappings:', map);
+    } catch (mapError) {
+      console.error('Failed to load collection-catalog mappings:', mapError);
       setCollectionCatalogMap(new Map());
-    } finally {
-      setCollectionsLoading(false);
     }
   }, [getCachedCollections, setCachedCollections]);
 
