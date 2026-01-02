@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Card,
   CardBody,
@@ -20,9 +20,10 @@ import {
   LuGitBranch,
   LuExternalLink,
   LuTrash2,
-  LuFolderPlus,
   LuRefreshCw,
+  LuFilter,
 } from "react-icons/lu";
+import { TbCopyPlus } from "react-icons/tb";
 import { RiFlag2Fill } from "react-icons/ri";
 import type { GitHubCommit, Checkpoint } from "../../ipc/types";
 import {
@@ -34,7 +35,6 @@ import { invokeConnectProjectGit } from "../../ipc/projects";
 import {
   invokeGetProjectCheckpoints,
   invokeUnpinCheckpoint,
-  invokeCreateProjectFromCheckpoint,
 } from "../../ipc/checkpoints";
 import {
   getCheckpointTypeColor,
@@ -43,7 +43,8 @@ import {
   getCheckpointTypeColorPalette,
 } from "../../utils/checkpointUtils";
 import PinCheckpointModal from "./PinCheckpointModal";
-import { open } from "@tauri-apps/api/dialog";
+import BranchOffModal from "./BranchOffModal";
+import { FilterPanel } from "../shared/FilterPanel";
 
 interface TimelineTabContentProps {
   projectId: string;
@@ -75,6 +76,13 @@ export default function TimelineTabContent({
     null
   );
   const perPage = 30;
+
+  // Checkpoint filter state
+  const [checkpointNameFilter, setCheckpointNameFilter] = useState("");
+  const [checkpointSelectedTags, setCheckpointSelectedTags] = useState<string[]>([]);
+  const [checkpointAllTags, setCheckpointAllTags] = useState<string[]>([]);
+  const [isCheckpointFilterOpen, setIsCheckpointFilterOpen] = useState(false);
+  const checkpointFilterButtonRef = useRef<HTMLButtonElement>(null);
 
   // Load commits
   const loadCommits = async (pageNum: number = 1, append: boolean = false) => {
@@ -377,10 +385,14 @@ export default function TimelineTabContent({
       {viewMode === "commits" && (
         <Button
           onClick={handleSync}
-          variant="outline"
+          variant="ghost"
           size="sm"
           loading={loading}
           loadingText="Syncing..."
+          bg="bg.subtle"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          _hover={{ bg: "bg.subtle" }}
         >
           <HStack gap={2}>
             <Icon>
@@ -389,6 +401,34 @@ export default function TimelineTabContent({
             <Text>Sync</Text>
           </HStack>
         </Button>
+      )}
+      {viewMode === "checkpoints" && (
+        <Box position="relative">
+          <Button
+            ref={checkpointFilterButtonRef}
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCheckpointFilterOpen(!isCheckpointFilterOpen)}
+            bg={isCheckpointFilterOpen ? "bg.subtle" : "bg.subtle"}
+            borderWidth="1px"
+            borderColor="border.subtle"
+            _hover={{ bg: "bg.subtle" }}
+          >
+            <HStack gap={2}>
+              <Icon>
+                <LuFilter />
+              </Icon>
+              <Text>Filter</Text>
+              {(checkpointNameFilter || checkpointSelectedTags.length > 0) && (
+                <Badge size="sm" colorPalette="primary" variant="solid">
+                  {[checkpointNameFilter && 1, checkpointSelectedTags.length]
+                    .filter(Boolean)
+                    .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                </Badge>
+              )}
+            </HStack>
+          </Button>
+        </Box>
       )}
       <HStack
         gap={0}
@@ -442,6 +482,28 @@ export default function TimelineTabContent({
   return (
     <VStack align="stretch" gap={4} py={4}>
       {renderViewModeSwitcher()}
+
+      {/* FilterPanel for Checkpoints - positioned absolutely relative to filter button */}
+      {viewMode === "checkpoints" && (
+        <FilterPanel
+          isOpen={isCheckpointFilterOpen}
+          onClose={() => setIsCheckpointFilterOpen(false)}
+          nameFilter={checkpointNameFilter}
+          onNameFilterChange={setCheckpointNameFilter}
+          allTags={checkpointAllTags}
+          selectedTags={checkpointSelectedTags}
+          onToggleTag={(tag) => {
+            setCheckpointSelectedTags((prev) => {
+              if (prev.includes(tag)) {
+                return prev.filter((t) => t !== tag);
+              } else {
+                return [...prev, tag];
+              }
+            });
+          }}
+          filterButtonRef={checkpointFilterButtonRef}
+        />
+      )}
 
       {viewMode === "commits" ? (
         <>
@@ -616,6 +678,9 @@ export default function TimelineTabContent({
           checkpoints={checkpoints}
           loading={loadingCheckpoints}
           onCheckpointsUpdated={loadCheckpoints}
+          nameFilter={checkpointNameFilter}
+          selectedTags={checkpointSelectedTags}
+          onAllTagsUpdate={setCheckpointAllTags}
         />
       )}
 
@@ -643,14 +708,71 @@ interface CheckpointsViewProps {
   checkpoints: Checkpoint[];
   loading: boolean;
   onCheckpointsUpdated: () => void;
+  nameFilter: string;
+  selectedTags: string[];
+  onAllTagsUpdate: (tags: string[]) => void;
 }
 
 function CheckpointsView({
+  projectId,
   gitUrl,
   checkpoints,
   loading,
   onCheckpointsUpdated,
+  nameFilter,
+  selectedTags,
+  onAllTagsUpdate,
 }: CheckpointsViewProps) {
+  const [branchOffModalOpen, setBranchOffModalOpen] = useState(false);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null);
+
+  // Get all unique tags from checkpoints and update parent
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    checkpoints.forEach((checkpoint) => {
+      if (checkpoint.tags) {
+        try {
+          const parsedTags = JSON.parse(checkpoint.tags) as string[];
+          parsedTags.forEach((tag) => tagSet.add(tag));
+        } catch (err) {
+          console.error("Failed to parse tags:", err);
+        }
+      }
+    });
+    const tags = Array.from(tagSet).sort();
+    onAllTagsUpdate(tags); // Pass tags back to parent for FilterPanel
+    return tags;
+  }, [checkpoints, onAllTagsUpdate]);
+
+  // Filter checkpoints based on name and tags
+  const filteredCheckpoints = useMemo(() => {
+    return checkpoints.filter((checkpoint) => {
+      const matchesName =
+        !nameFilter ||
+        checkpoint.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
+        checkpoint.description?.toLowerCase().includes(nameFilter.toLowerCase());
+
+      let checkpointTags: string[] = [];
+      if (checkpoint.tags) {
+        try {
+          checkpointTags = JSON.parse(checkpoint.tags) as string[];
+        } catch (err) {
+          console.error("Failed to parse tags:", err);
+        }
+      }
+
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.some((selectedTag) =>
+          checkpointTags.some(
+            (tag) => tag.toLowerCase() === selectedTag.toLowerCase()
+          )
+        );
+
+      return matchesName && matchesTags;
+    });
+  }, [checkpoints, nameFilter, selectedTags]);
+
   const handleUnpin = async (checkpointId: string) => {
     try {
       await invokeUnpinCheckpoint(checkpointId);
@@ -664,50 +786,6 @@ function CheckpointsView({
     } catch (err) {
       toaster.create({
         title: "Failed to Unpin Checkpoint",
-        description: err instanceof Error ? err.message : "Unknown error",
-        type: "error",
-        duration: 5000,
-      });
-    }
-  };
-
-  const handleCreateProject = async (checkpoint: Checkpoint) => {
-    try {
-      // Open directory picker
-      const selectedPath = await open({
-        directory: true,
-        multiple: false,
-        title: "Select Parent Directory for New Project",
-      });
-
-      if (!selectedPath || typeof selectedPath !== "string") {
-        return;
-      }
-
-      // Create project name from checkpoint name
-      const projectDirName = checkpoint.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-      const targetPath = `${selectedPath}/${projectDirName}`;
-
-      const result = await invokeCreateProjectFromCheckpoint(
-        checkpoint.id,
-        targetPath,
-        checkpoint.name,
-        true // Register project
-      );
-
-      toaster.create({
-        title: "Project Created",
-        description: result,
-        type: "success",
-        duration: 5000,
-      });
-    } catch (err) {
-      toaster.create({
-        title: "Failed to Create Project",
         description: err instanceof Error ? err.message : "Unknown error",
         type: "error",
         duration: 5000,
@@ -739,20 +817,37 @@ function CheckpointsView({
   }
 
   return (
-    <Box
-      css={{
-        '& [data-part="connector"]': {
-          borderColor: "#4287f5 !important",
-          borderWidth: "2px !important",
-          borderStyle: "solid !important",
-          opacity: "1 !important",
-          display: "block !important",
-          visibility: "visible !important",
-        },
-      }}
-    >
-      <Timeline.Root variant="subtle" colorPalette="blue">
-        {checkpoints.map((checkpoint, index) => {
+    <Box>
+      {filteredCheckpoints.length === 0 ? (
+        <Box
+          p={6}
+          bg="bg.subtle"
+          borderRadius="md"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          textAlign="center"
+        >
+          <Text color="fg.muted" fontSize="sm">
+            {nameFilter || selectedTags.length > 0
+              ? "No checkpoints match the current filters"
+              : "No checkpoints found"}
+          </Text>
+        </Box>
+      ) : (
+        <Box
+          css={{
+            '& [data-part="connector"]': {
+              borderColor: "#4287f5 !important",
+              borderWidth: "2px !important",
+              borderStyle: "solid !important",
+              opacity: "1 !important",
+              display: "block !important",
+              visibility: "visible !important",
+            },
+          }}
+        >
+          <Timeline.Root variant="subtle" colorPalette="blue">
+            {filteredCheckpoints.map((checkpoint, index) => {
           const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
           const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
           const typeColorPalette = getCheckpointTypeColorPalette(
@@ -823,10 +918,18 @@ function CheckpointsView({
                         <Button
                           size="xs"
                           variant="ghost"
-                          colorPalette="green"
-                          onClick={() => handleCreateProject(checkpoint)}
+                          onClick={() => {
+                            setSelectedCheckpoint(checkpoint);
+                            setBranchOffModalOpen(true);
+                          }}
+                          css={{
+                            color: "#F28333",
+                            "&:hover": {
+                              bg: "rgba(242, 131, 51, 0.1)",
+                            },
+                          }}
                         >
-                          <LuFolderPlus />
+                          <TbCopyPlus />
                         </Button>
                         <Button
                           size="xs"
@@ -848,8 +951,26 @@ function CheckpointsView({
               </Timeline.Content>
             </Timeline.Item>
           );
-        })}
-      </Timeline.Root>
+          })}
+        </Timeline.Root>
+      </Box>
+      )}
+
+      {/* Branch Off Modal */}
+      {selectedCheckpoint && (
+        <BranchOffModal
+          isOpen={branchOffModalOpen}
+          onClose={() => {
+            setBranchOffModalOpen(false);
+            setSelectedCheckpoint(null);
+          }}
+          checkpoint={selectedCheckpoint}
+          projectId={projectId}
+          onSuccess={() => {
+            onCheckpointsUpdated();
+          }}
+        />
+      )}
     </Box>
   );
 }

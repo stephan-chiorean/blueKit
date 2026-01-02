@@ -7,7 +7,6 @@
  * - Organize and categorize project history
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import { invokeWithTimeout } from '../utils/ipcTimeout';
 import type { Checkpoint } from './types';
 
@@ -100,27 +99,31 @@ export async function invokeUnpinCheckpoint(
 
 /**
  * Create a new project from a checkpoint.
- * 
+ *
  * This command:
  * 1. Clones the git repository to a temporary directory
  * 2. Checks out the specific commit
  * 3. Copies files to the target location (excluding .git)
  * 4. Optionally registers the new project in the database
  * 5. Cleans up the temporary directory
- * 
+ *
  * @param checkpointId - The checkpoint ID
  * @param targetPath - Absolute path where the new project should be created
  * @param projectTitle - Optional title for the new project
  * @param registerProject - Whether to automatically register the new project (default: true)
+ * @param description - Optional description for the new project
+ * @param projectType - Optional project type: "development" | "production" | "experiment" | "template" (for future use)
  * @returns Success message with project path
- * 
+ *
  * @example
  * ```typescript
  * const result = await invokeCreateProjectFromCheckpoint(
  *   'checkpoint-123-456',
  *   '/path/to/new/project',
  *   'My New Project',
- *   true
+ *   true,
+ *   'Development workspace from checkpoint',
+ *   'development'
  * );
  * console.log(result); // "Project created successfully at: /path/to/new/project"
  * ```
@@ -129,12 +132,16 @@ export async function invokeCreateProjectFromCheckpoint(
   checkpointId: string,
   targetPath: string,
   projectTitle?: string,
-  registerProject: boolean = true
+  registerProject: boolean = true,
+  description?: string,
+  projectType?: 'development' | 'production' | 'experiment' | 'template'
 ): Promise<string> {
   return await invokeWithTimeout<string>('create_project_from_checkpoint', {
     checkpointId,
     targetPath,
     projectTitle,
     registerProject,
+    description,
+    projectType,
   }, 60000); // 60 second timeout for git operations
 }
