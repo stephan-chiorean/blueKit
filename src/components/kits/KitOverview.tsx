@@ -26,6 +26,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
   const [isLinked, setIsLinked] = useState<boolean | null>(null);
   const [notes, setNotes] = useState<string>('');
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+  const [isFileInfoHovered, setIsFileInfoHovered] = useState(false);
 
   // Generate unique key for localStorage based on kit path
   const notesKey = `bluekit-notes-${kit.path}`;
@@ -58,6 +59,17 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
       console.error('Failed to copy notes:', error);
     }
   }, [notes]);
+
+  // Copy field to clipboard
+  const copyField = useCallback(async (fieldId: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedNoteId(fieldId);
+      setTimeout(() => setCopiedNoteId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy field:', error);
+    }
+  }, []);
 
 
   // Auto-save notes to localStorage after user stops typing (debounced)
@@ -123,6 +135,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               p={4}
               borderRadius="16px"
               borderWidth="1px"
+              transition="all 0.2s ease-in-out"
               css={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px) saturate(180%)',
@@ -133,6 +146,9 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   background: 'rgba(0, 0, 0, 0.2)',
                   borderColor: 'rgba(255, 255, 255, 0.15)',
                   boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                },
+                _hover: {
+                  transform: 'scale(1.02)',
                 },
               }}
             >
@@ -163,6 +179,9 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               p={4}
               borderRadius="16px"
               borderWidth="1px"
+              transition="all 0.2s ease-in-out"
+              onMouseEnter={() => setIsFileInfoHovered(true)}
+              onMouseLeave={() => setIsFileInfoHovered(false)}
               css={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px) saturate(180%)',
@@ -174,12 +193,15 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   borderColor: 'rgba(255, 255, 255, 0.15)',
                   boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
                 },
+                _hover: {
+                  transform: 'scale(1.02)',
+                },
               }}
             >
-              <Text 
-                fontSize="sm" 
-                fontWeight="semibold" 
-                mb={3} 
+              <Text
+                fontSize="sm"
+                fontWeight="semibold"
+                mb={3}
                 color="text.secondary"
                 css={{
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -192,22 +214,42 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               </Text>
               <VStack align="stretch" gap={2}>
                 <Box>
-                  <Text 
-                    fontSize="xs" 
-                    color="text.tertiary" 
-                    mb={1}
-                    css={{
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                      _dark: {
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                      },
-                    }}
-                  >
-                    Name
-                  </Text>
-                  <Text 
-                    fontSize="sm" 
-                    fontFamily="mono" 
+                  <Flex justify="space-between" align="center" mb={1}>
+                    <Text
+                      fontSize="xs"
+                      color="text.tertiary"
+                      css={{
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                        _dark: {
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                        },
+                      }}
+                    >
+                      Name
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => copyField('name', kit.name)}
+                      p={1}
+                      minW="auto"
+                      opacity={isFileInfoHovered ? 1 : 0}
+                      transition="opacity 0.2s ease-in-out"
+                      pointerEvents={isFileInfoHovered ? 'auto' : 'none'}
+                      css={{
+                        _hover: {
+                          background: 'transparent',
+                        },
+                      }}
+                    >
+                      <Icon fontSize="xs">
+                        {copiedNoteId === 'name' ? <LuCheck /> : <LuCopy />}
+                      </Icon>
+                    </Button>
+                  </Flex>
+                  <Text
+                    fontSize="sm"
+                    fontFamily="mono"
                     color="text.primary"
                     css={{
                       textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -220,23 +262,43 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   </Text>
                 </Box>
                 <Box>
-                  <Text 
-                    fontSize="xs" 
-                    color="text.tertiary" 
-                    mb={1}
-                    css={{
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                      _dark: {
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                      },
-                    }}
-                  >
-                    Path
-                  </Text>
-                  <Text 
-                    fontSize="sm" 
-                    fontFamily="mono" 
-                    color="text.primary" 
+                  <Flex justify="space-between" align="center" mb={1}>
+                    <Text
+                      fontSize="xs"
+                      color="text.tertiary"
+                      css={{
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                        _dark: {
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                        },
+                      }}
+                    >
+                      Path
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => copyField('path', kit.path)}
+                      p={1}
+                      minW="auto"
+                      opacity={isFileInfoHovered ? 1 : 0}
+                      transition="opacity 0.2s ease-in-out"
+                      pointerEvents={isFileInfoHovered ? 'auto' : 'none'}
+                      css={{
+                        _hover: {
+                          background: 'transparent',
+                        },
+                      }}
+                    >
+                      <Icon fontSize="xs">
+                        {copiedNoteId === 'path' ? <LuCheck /> : <LuCopy />}
+                      </Icon>
+                    </Button>
+                  </Flex>
+                  <Text
+                    fontSize="sm"
+                    fontFamily="mono"
+                    color="text.primary"
                     wordBreak="break-all"
                     css={{
                       textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -249,23 +311,43 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   </Text>
                 </Box>
                 <Box>
-                  <Text 
-                    fontSize="xs" 
-                    color="text.tertiary" 
-                    mb={1}
-                    css={{
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                      _dark: {
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                      },
-                    }}
-                  >
-                    Project
-                  </Text>
-                  <Text 
-                    fontSize="sm" 
-                    fontFamily="mono" 
-                    color="text.primary" 
+                  <Flex justify="space-between" align="center" mb={1}>
+                    <Text
+                      fontSize="xs"
+                      color="text.tertiary"
+                      css={{
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                        _dark: {
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                        },
+                      }}
+                    >
+                      Project
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => copyField('project', projectPath)}
+                      p={1}
+                      minW="auto"
+                      opacity={isFileInfoHovered ? 1 : 0}
+                      transition="opacity 0.2s ease-in-out"
+                      pointerEvents={isFileInfoHovered ? 'auto' : 'none'}
+                      css={{
+                        _hover: {
+                          background: 'transparent',
+                        },
+                      }}
+                    >
+                      <Icon fontSize="xs">
+                        {copiedNoteId === 'project' ? <LuCheck /> : <LuCopy />}
+                      </Icon>
+                    </Button>
+                  </Flex>
+                  <Text
+                    fontSize="sm"
+                    fontFamily="mono"
+                    color="text.primary"
                     wordBreak="break-all"
                     css={{
                       textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -285,6 +367,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               p={4}
               borderRadius="16px"
               borderWidth="1px"
+              transition="all 0.2s ease-in-out"
               css={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px) saturate(180%)',
@@ -295,6 +378,9 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   background: 'rgba(0, 0, 0, 0.2)',
                   borderColor: 'rgba(255, 255, 255, 0.15)',
                   boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                },
+                _hover: {
+                  transform: 'scale(1.02)',
                 },
               }}
             >
