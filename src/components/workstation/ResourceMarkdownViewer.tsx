@@ -134,11 +134,30 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
       <VStack align="stretch" gap={6}>
         {/* Header */}
         <Box>
-          <Heading size="xl" mb={2}>
+          <Heading 
+            size="xl" 
+            mb={2}
+            css={{
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+              _dark: {
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+              },
+            }}
+          >
             {displayName}
           </Heading>
           {resource.frontMatter?.description && (
-            <Text fontSize="lg" color="text.secondary" mb={4}>
+            <Text 
+              fontSize="lg" 
+              color="text.secondary" 
+              mb={4}
+              css={{
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                _dark: {
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                },
+              }}
+            >
               {resource.frontMatter.description}
             </Text>
           )}
@@ -258,13 +277,118 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              h1: ({ children }) => <Heading as="h1" size="2xl" mt={6} mb={4}>{children}</Heading>,
-              h2: ({ children }) => <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">{children}</Heading>,
-              h3: ({ children }) => <Heading as="h3" size="lg" mt={4} mb={2}>{children}</Heading>,
-              h4: ({ children }) => <Heading as="h4" size="md" mt={3} mb={2}>{children}</Heading>,
-              h5: ({ children }) => <Heading as="h5" size="sm" mt={3} mb={2}>{children}</Heading>,
-              h6: ({ children }) => <Heading as="h6" size="xs" mt={3} mb={2}>{children}</Heading>,
-              p: ({ children }) => <Text mb={4} lineHeight="1.75" color="text.primary">{children}</Text>,
+              h1: ({ children }) => (
+                <Heading 
+                  as="h1" 
+                  size="2xl" 
+                  mt={6} 
+                  mb={4}
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              h2: ({ children }) => (
+                <Heading 
+                  as="h2" 
+                  size="2xl" 
+                  mt={5} 
+                  mb={3} 
+                  color="primary.500"
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              h3: ({ children }) => (
+                <Heading 
+                  as="h3" 
+                  size="lg" 
+                  mt={4} 
+                  mb={2}
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              h4: ({ children }) => (
+                <Heading 
+                  as="h4" 
+                  size="md" 
+                  mt={3} 
+                  mb={2}
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              h5: ({ children }) => (
+                <Heading 
+                  as="h5" 
+                  size="sm" 
+                  mt={3} 
+                  mb={2}
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              h6: ({ children }) => (
+                <Heading 
+                  as="h6" 
+                  size="xs" 
+                  mt={3} 
+                  mb={2}
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Heading>
+              ),
+              p: ({ children }) => (
+                <Text 
+                  mb={4} 
+                  lineHeight="1.75" 
+                  color="text.primary"
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
+                  {children}
+                </Text>
+              ),
               ul: ({ children }) => (
                 <List.Root mb={4} pl={4}>
                   {children}

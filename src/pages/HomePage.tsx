@@ -27,7 +27,6 @@ import WorkflowsTabContent from "../components/workflows/WorkflowsTabContent";
 import TasksTabContent, {
   TasksTabContentRef,
 } from "../components/tasks/TasksTabContent";
-import NotebookBackground from "../components/shared/NotebookBackground";
 import ResourceViewPage from "./ResourceViewPage";
 import {
   invokeGetProjectRegistry,
@@ -40,6 +39,7 @@ import {
   TimeoutError,
 } from "../ipc";
 import { useSelection } from "../contexts/SelectionContext";
+import { useColorMode } from "../contexts/ColorModeContext";
 import { ResourceFile, ResourceType } from "../types/resource";
 
 interface HomePageProps {
@@ -57,7 +57,13 @@ export default function HomePage({
   const [kits, setKits] = useState<ArtifactFile[]>([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const { selectedItems } = useSelection();
+  const { colorMode } = useColorMode();
   const [activeTab, setActiveTab] = useState("projects");
+
+  // Glass styling for light/dark mode
+  const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+  const tabsBorder = colorMode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)';
+  const indicatorBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.15)';
   const tasksTabRef = useRef<TasksTabContentRef>(null);
   const libraryTabRef = useRef<LibraryTabContentRef>(null);
 
@@ -358,27 +364,32 @@ export default function HomePage({
   }
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" style={{ height: '100vh', maxHeight: '100vh' }}>
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" style={{ height: '100vh', maxHeight: '100vh' }} bg="transparent">
       {/* Header above everything */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} bg="transparent">
         <Header onNavigateToTasks={() => setActiveTab('tasks')} />
       </Box>
 
       {/* Full screen content area - no workstation until kit is selected */}
-      <Box flex="1" minH={0} overflow="hidden" style={{ height: '100%', maxHeight: '100%' }}>
-        <Box h="100%" p={6} position="relative" overflow="auto" style={{ height: '100%', maxHeight: '100%' }}>
-          <NotebookBackground />
+      <Box flex="1" minH={0} overflow="hidden" style={{ height: '100%', maxHeight: '100%' }} bg="transparent">
+        <Box 
+          h="100%" 
+          p={6} 
+          position="relative" 
+          overflow="auto" 
+          style={{ height: '100%', maxHeight: '100%' }}
+          css={{
+            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          }}
+        >
           <Box position="relative" zIndex={1}>
           <Tabs.Root
             defaultValue="projects"
-            variant="enclosed"
+            variant="plain"
             value={activeTab}
             onValueChange={(e) => setActiveTab(e.value as string)}
-            css={{
-              "& [data-selected]": {
-                borderColor: "colors.primary.300",
-              },
-            }}
           >
             <Flex
               align="center"
@@ -405,7 +416,15 @@ export default function HomePage({
               <Box
                 position="absolute"
                 left="50%"
-                style={{ transform: "translateX(-50%)" }}
+                borderRadius="lg"
+                p={2}
+                style={{
+                  transform: "translateX(-50%)",
+                  background: tabsBg,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: tabsBorder,
+                }}
               >
                 <Tabs.List>
                   <Tabs.Trigger value="projects">
@@ -440,6 +459,14 @@ export default function HomePage({
                       <Text>Tasks</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Indicator
+                    rounded="md"
+                    style={{
+                      background: indicatorBg,
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                    }}
+                  />
                 </Tabs.List>
               </Box>
               {activeTab === "tasks" && (

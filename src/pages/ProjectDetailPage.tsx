@@ -26,12 +26,12 @@ import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import TimelineTabContent from '../components/commits/TimelineTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
-import NotebookBackground from '../components/shared/NotebookBackground';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -42,6 +42,12 @@ interface ProjectDetailPageProps {
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
   // Feature flags
   const { flags } = useFeatureFlags();
+  const { colorMode } = useColorMode();
+  
+  // Glass styling for light/dark mode
+  const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+  const tabsBorder = colorMode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)';
+  const indicatorBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.15)';
   
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
@@ -543,9 +549,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   }
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
       {/* Header above everything */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} bg="transparent">
         <Header 
           currentProject={currentProjectForHeader}
           onNavigateToTasks={() => setCurrentTab('tasks')}
@@ -553,22 +559,36 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       </Box>
       
       {/* Full screen content area */}
-      <Box flex="1" minH={0} overflow="hidden" width="100%">
-        <Box h="100%" p={6} position="relative" overflow="auto" width="100%" maxW="100%">
-          <NotebookBackground />
+      <Box flex="1" minH={0} overflow="hidden" width="100%" bg="transparent">
+        <Box 
+          h="100%" 
+          p={6} 
+          position="relative" 
+          overflow="auto" 
+          width="100%" 
+          maxW="100%"
+          css={{
+            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          }}
+        >
           <Box position="relative" zIndex={1} width="100%" maxW="100%">
           <Tabs.Root
             value={currentTab}
             onValueChange={(details) => setCurrentTab(details.value)}
-            variant="enclosed"
-            css={{
-              '& [data-selected]': {
-                borderColor: 'colors.primary.300',
-              },
-            }}
+            variant="plain"
           >
             {/* Back button, project title, and tabs all on the same row */}
-            <Flex align="center" gap={4} mb={6} mt={3} position="relative" w="100%" maxW="100%">
+            <Flex 
+              align="center" 
+              gap={4} 
+              mb={6} 
+              mt={3} 
+              position="relative" 
+              w="100%" 
+              maxW="100%"
+            >
               {/* Left side: Back button and project title */}
               <Flex align="center" gap={4}>
                 <Button
@@ -630,10 +650,18 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               <Box 
                 position="absolute" 
                 left="50%" 
-                style={{ transform: 'translateX(-50%)' }}
                 maxW="min(700px, calc(100vw - 450px))"
                 overflowX="auto"
                 overflowY="hidden"
+                borderRadius="lg"
+                p={2}
+                style={{
+                  transform: 'translateX(-50%)',
+                  background: tabsBg,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: tabsBorder,
+                }}
                 css={{
                   '&::-webkit-scrollbar': {
                     height: '4px',
@@ -740,6 +768,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                       <Text>Timeline</Text>
                     </HStack>
                   </Tabs.Trigger>
+                  <Tabs.Indicator
+                    rounded="md"
+                    style={{
+                      background: indicatorBg,
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                    }}
+                  />
                 </Tabs.List>
               </Box>
               {currentTab === 'tasks' && (

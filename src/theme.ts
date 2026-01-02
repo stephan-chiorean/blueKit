@@ -69,6 +69,20 @@ export const system = createSystem(defaultConfig, {
         // Default foreground color - uses blue in dark mode
         fg: { value: { _light: '{colors.gray.900}', _dark: '{colors.primary.200}' } },
         'fg.muted': { value: { _light: '{colors.gray.600}', _dark: '{colors.primary.400}' } },
+        // Glassmorphism backgrounds - semi-transparent with blur effect
+        'glass.light': { value: 'rgba(255, 255, 255, 0.15)' },
+        'glass.dark': { value: 'rgba(0, 0, 0, 0.2)' },
+        'glass.border.light': { value: 'rgba(255, 255, 255, 0.2)' },
+        'glass.border.dark': { value: 'rgba(255, 255, 255, 0.15)' },
+        // Glassmorphism for main content areas
+        'glass.content.light': { value: 'rgba(255, 255, 255, 0.1)' },
+        'glass.content.dark': { value: 'rgba(0, 0, 0, 0.15)' },
+        // Glassmorphism for cards
+        'glass.card.light': { value: 'rgba(255, 255, 255, 0.2)' },
+        'glass.card.dark': { value: 'rgba(0, 0, 0, 0.25)' },
+        // Glassmorphism for navigation/tabs
+        'glass.nav.light': { value: 'rgba(255, 255, 255, 0.15)' },
+        'glass.nav.dark': { value: 'rgba(0, 0, 0, 0.2)' },
       },
     },
   },

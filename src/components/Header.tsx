@@ -71,24 +71,51 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
     // Dialogs will reload their own data
   };
 
+  // Glass styling for light/dark mode
+  const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+  const headerBorder = colorMode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)';
+
   return (
     <Box
-      bg="bg.subtle"
       px={6}
       py={2}
       position="sticky"
       top={0}
       zIndex={10}
-      boxShadow="sm"
+      style={{
+        background: headerBg,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: headerBorder,
+      }}
     >
       <Flex align="center" justify="space-between" gap={4}>
         {/* blueKit branding on the left */}
         <Box flex="1">
           <Heading size="lg">
-            <Text as="span" color="primary.500">
+            <Text 
+              as="span" 
+              color="primary.500"
+              css={{
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                _dark: {
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                },
+              }}
+            >
               blue
             </Text>
-            <Text as="span">Kit</Text>
+            <Text 
+              as="span"
+              css={{
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                _dark: {
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                },
+              }}
+            >
+              Kit
+            </Text>
           </Heading>
         </Box>
 

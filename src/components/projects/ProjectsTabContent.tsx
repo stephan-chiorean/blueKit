@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
   Heading,
-  SimpleGrid,
   Text,
   VStack,
   HStack,
@@ -20,6 +16,7 @@ import {
   Dialog,
   Input,
 } from '@chakra-ui/react';
+import { useColorMode } from '../../contexts/ColorModeContext';
 import { Project, invokeOpenProjectInEditor, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
 import { LuFolder, LuChevronRight, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
@@ -50,6 +47,11 @@ export default function ProjectsTabContent({
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const { colorMode } = useColorMode();
+
+  // Glass styling for light/dark mode
+  const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+  const cardBorder = colorMode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)';
 
   // Update local projects when props change
   useEffect(() => {
@@ -250,32 +252,33 @@ export default function ProjectsTabContent({
 
   return (
     <VStack align="stretch" gap={4}>
-      <SimpleGrid 
-        columns={{ base: 1, lg: 2 }} 
+      <Box
+        display="grid"
         gap={6}
-        css={{
-          '@media (min-width: 1920px)': {
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          },
-        }}
+        gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 400px), 1fr))"
       >
         {localProjects.map((project) => {
           const isConnectingThis = connectingProjectId === project.id;
 
           return (
-            <Card.Root
+            <Box
               key={project.id}
-              variant="subtle"
-              borderWidth="1px"
-              borderColor="border.subtle"
               cursor="pointer"
               _hover={{ borderColor: "primary.400" }}
               transition="all 0.2s"
               onClick={() => onProjectSelect(project)}
               position="relative"
               overflow="visible"
+              borderRadius="lg"
+              p={4}
+              style={{
+                background: cardBg,
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: cardBorder,
+              }}
             >
-              <CardHeader>
+              <Box bg="transparent">
                 <Flex align="start" justify="space-between" gap={4}>
                   <VStack align="start" gap={3} flex={1}>
                     <HStack gap={2} align="center">
@@ -400,19 +403,19 @@ export default function ProjectsTabContent({
                     </Menu.Root>
                   </Box>
                 </Flex>
-              </CardHeader>
-              <CardBody>
+              </Box>
+              <Box bg="transparent" pt={2}>
                 <Text fontSize="sm" color="text.secondary" mb={3}>
                   {project.description || 'No description'}
                 </Text>
                 <Text fontSize="xs" color="text.tertiary" fontFamily="mono" lineClamp={1}>
                   {project.path}
                 </Text>
-              </CardBody>
-            </Card.Root>
+              </Box>
+            </Box>
           );
         })}
-      </SimpleGrid>
+      </Box>
 
       {/* Edit Project Dialog */}
       <Dialog.Root

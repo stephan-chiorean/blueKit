@@ -74,14 +74,14 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   // Diagrams use a different layout (full-screen viewer without split view)
   if (resourceType === 'diagram') {
     return (
-      <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+      <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
         {/* Header above everything */}
-        <Box flexShrink={0}>
+        <Box flexShrink={0} bg="transparent">
           <Header />
         </Box>
 
         {/* Back button */}
-        <Box p={4} borderBottomWidth="1px" borderColor="border.subtle">
+        <Box p={4} borderBottomWidth="1px" borderColor="border.subtle" bg="transparent">
           <Button
             variant="ghost"
             size="sm"
@@ -97,7 +97,17 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
         </Box>
 
         {/* Diagram viewer */}
-        <Box flex="1" minH={0} overflow="hidden">
+        <Box 
+          flex="1" 
+          minH={0} 
+          overflow="hidden"
+          bg="transparent"
+          css={{
+            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          }}
+        >
           <MermaidDiagramViewer diagram={resource} content={resourceContent} />
         </Box>
       </VStack>
@@ -107,14 +117,24 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   // Plan mode uses PlanOverview instead of KitOverview
   if (viewMode === 'plan') {
     return (
-      <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+      <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
         {/* Header above everything */}
-        <Box flexShrink={0}>
+        <Box flexShrink={0} bg="transparent">
           <Header />
         </Box>
 
         {/* Splitter layout below header */}
-        <Box flex="1" minH={0} overflow="hidden">
+        <Box 
+          flex="1" 
+          minH={0} 
+          overflow="hidden"
+          bg="transparent"
+          css={{
+            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          }}
+        >
           <Splitter.Root
             defaultSize={[40, 60]}
             panels={[
@@ -125,7 +145,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
             orientation="horizontal"
           >
             {/* Plan Overview Panel */}
-            <Splitter.Panel id="overview" bg="bg.subtle">
+            <Splitter.Panel id="overview" bg="transparent">
               <PlanOverview plan={resource} onBack={onBack} />
             </Splitter.Panel>
 
@@ -144,14 +164,24 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
 
   // All other resource types use the split view layout (overview + workstation)
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
       {/* Header above everything */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} bg="transparent">
         <Header />
       </Box>
 
       {/* Splitter layout below header */}
-      <Box flex="1" minH={0} overflow="hidden">
+      <Box 
+        flex="1" 
+        minH={0} 
+        overflow="hidden"
+        bg="transparent"
+        css={{
+          background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        }}
+      >
         <Splitter.Root
           defaultSize={[40, 60]}
           panels={[
@@ -162,7 +192,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
           orientation="horizontal"
         >
           {/* Overview Panel */}
-          <Splitter.Panel id="overview" bg="bg.subtle">
+          <Splitter.Panel id="overview" bg="transparent">
             <KitOverview kit={resource} onBack={onBack} />
           </Splitter.Panel>
 

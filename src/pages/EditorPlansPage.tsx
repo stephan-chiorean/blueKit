@@ -121,15 +121,25 @@ export default function EditorPlansPage({ plansSource, onBack }: EditorPlansPage
   }
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
       {/* Header above everything */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} bg="transparent">
         <Header />
       </Box>
       
       {/* Full screen content area */}
-      <Box flex="1" minH={0} overflow="hidden">
-        <Box h="100%" p={6} position="relative" overflow="auto">
+      <Box flex="1" minH={0} overflow="hidden" bg="transparent">
+        <Box 
+          h="100%" 
+          p={6} 
+          position="relative" 
+          overflow="auto"
+          css={{
+            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          }}
+        >
           {/* Back button and title */}
           <Flex align="center" gap={4} mb={6} mt={3}>
             <Button

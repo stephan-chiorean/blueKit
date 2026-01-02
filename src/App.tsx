@@ -17,6 +17,7 @@ import { Project } from './ipc';
 import GlobalActionBar from './components/shared/GlobalActionBar';
 import DraggableNotepad from './components/workstation/DraggableNotepad';
 import { useNotepad } from './contexts/NotepadContext';
+import GradientBackground from './components/shared/GradientBackground';
 
 type View = 'welcome' | 'github-auth' | 'home' | 'project-detail' | 'plans';
 
@@ -73,7 +74,10 @@ function AppContent() {
         <FeatureFlagsProvider>
           <LibraryCacheProvider>
             <ResourceProvider>
-              <PreviewWindowPage />
+              <GradientBackground />
+              <Box position="relative" zIndex={1}>
+                <PreviewWindowPage />
+              </Box>
             </ResourceProvider>
           </LibraryCacheProvider>
         </FeatureFlagsProvider>
@@ -89,7 +93,8 @@ function AppContent() {
           <LibraryCacheProvider>
             <ResourceProvider>
               <SelectionProvider>
-                <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
+                <GradientBackground />
+                <Box display="flex" justifyContent="center" alignItems="center" h="100vh" position="relative" zIndex={1}>
                   <Spinner size="xl" />
                 </Box>
               </SelectionProvider>
@@ -106,29 +111,32 @@ function AppContent() {
         <LibraryCacheProvider>
           <ResourceProvider>
             <SelectionProvider>
-            {currentView === 'welcome' ? (
-              <WelcomeScreen onGetStarted={handleGetStarted} />
-            ) : currentView === 'github-auth' ? (
-              <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
-            ) : currentView === 'project-detail' && selectedProject ? (
-              <ProjectDetailPage
-                project={selectedProject}
-                onBack={handleBackToHome}
-                onProjectSelect={handleProjectSelect}
+            <GradientBackground />
+            <Box position="relative" zIndex={1}>
+              {currentView === 'welcome' ? (
+                <WelcomeScreen onGetStarted={handleGetStarted} />
+              ) : currentView === 'github-auth' ? (
+                <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
+              ) : currentView === 'project-detail' && selectedProject ? (
+                <ProjectDetailPage
+                  project={selectedProject}
+                  onBack={handleBackToHome}
+                  onProjectSelect={handleProjectSelect}
+                />
+              ) : currentView === 'plans' && plansSource ? (
+                <EditorPlansPage
+                  plansSource={plansSource}
+                  onBack={handleBackFromPlans}
+                />
+              ) : (
+                <HomePage onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
+              )}
+              <GlobalActionBar />
+              <DraggableNotepad
+                isOpen={isNotepadOpen}
+                onClose={toggleNotepad}
               />
-            ) : currentView === 'plans' && plansSource ? (
-              <EditorPlansPage
-                plansSource={plansSource}
-                onBack={handleBackFromPlans}
-              />
-            ) : (
-              <HomePage onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
-            )}
-            <GlobalActionBar />
-            <DraggableNotepad
-              isOpen={isNotepadOpen}
-              onClose={toggleNotepad}
-            />
+            </Box>
           </SelectionProvider>
         </ResourceProvider>
       </LibraryCacheProvider>

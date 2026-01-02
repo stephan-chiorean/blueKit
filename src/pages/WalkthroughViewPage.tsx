@@ -30,14 +30,24 @@ export default function WalkthroughViewPage({ kit, kitContent, onBack }: Walkthr
   }, [kit, kitContent, setSelectedResource, clearSelectedResource]);
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
+    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
       {/* Header above everything */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} bg="transparent">
         <Header />
       </Box>
       
       {/* Splitter layout below header */}
-      <Box flex="1" minH={0} overflow="hidden">
+      <Box 
+        flex="1" 
+        minH={0} 
+        overflow="hidden"
+        bg="transparent"
+        css={{
+          background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        }}
+      >
         <Splitter.Root
           defaultSize={[40, 60]}
           panels={[
@@ -48,7 +58,7 @@ export default function WalkthroughViewPage({ kit, kitContent, onBack }: Walkthr
           orientation="horizontal"
         >
           {/* Overview Panel */}
-          <Splitter.Panel id="overview" bg="bg.subtle">
+          <Splitter.Panel id="overview" bg="transparent">
             <KitOverview kit={kit} onBack={onBack} />
           </Splitter.Panel>
 

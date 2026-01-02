@@ -90,13 +90,13 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
   }, [projectPath]);
 
   return (
-    <Box h="100%" overflow="auto" bg="bg.subtle">
+    <Box h="100%" overflow="auto" bg="transparent">
       <Card.Root 
         variant="elevated" 
         h="100%" 
         borderRadius={0}
         borderWidth={0}
-        bg="bg.subtle"
+        bg="transparent"
       >
         <CardBody p={6}>
           <VStack align="stretch" gap={6} h="100%">
@@ -124,19 +124,30 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               borderRadius="16px"
               borderWidth="1px"
               css={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
                 borderColor: 'rgba(255, 255, 255, 0.2)',
                 boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
                 _dark: {
                   background: 'rgba(0, 0, 0, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
                 },
               }}
             >
-              <Text fontSize="sm" fontWeight="semibold" mb={3} color="text.secondary">
+              <Text 
+                fontSize="sm" 
+                fontWeight="semibold" 
+                mb={3} 
+                color="text.secondary"
+                css={{
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                  _dark: {
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  },
+                }}
+              >
                 Project Status
               </Text>
               <Status.Root
@@ -153,43 +164,116 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               borderRadius="16px"
               borderWidth="1px"
               css={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
                 borderColor: 'rgba(255, 255, 255, 0.2)',
                 boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
                 _dark: {
                   background: 'rgba(0, 0, 0, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
                 },
               }}
             >
-              <Text fontSize="sm" fontWeight="semibold" mb={3} color="text.secondary">
+              <Text 
+                fontSize="sm" 
+                fontWeight="semibold" 
+                mb={3} 
+                color="text.secondary"
+                css={{
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                  _dark: {
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  },
+                }}
+              >
                 File Information
               </Text>
               <VStack align="stretch" gap={2}>
                 <Box>
-                  <Text fontSize="xs" color="text.tertiary" mb={1}>
+                  <Text 
+                    fontSize="xs" 
+                    color="text.tertiary" 
+                    mb={1}
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     Name
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text.primary">
+                  <Text 
+                    fontSize="sm" 
+                    fontFamily="mono" 
+                    color="text.primary"
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     {kit.name}
                   </Text>
                 </Box>
                 <Box>
-                  <Text fontSize="xs" color="text.tertiary" mb={1}>
+                  <Text 
+                    fontSize="xs" 
+                    color="text.tertiary" 
+                    mb={1}
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     Path
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text.primary" wordBreak="break-all">
+                  <Text 
+                    fontSize="sm" 
+                    fontFamily="mono" 
+                    color="text.primary" 
+                    wordBreak="break-all"
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     {kit.path}
                   </Text>
                 </Box>
                 <Box>
-                  <Text fontSize="xs" color="text.tertiary" mb={1}>
+                  <Text 
+                    fontSize="xs" 
+                    color="text.tertiary" 
+                    mb={1}
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     Project
                   </Text>
-                  <Text fontSize="sm" fontFamily="mono" color="text.primary" wordBreak="break-all">
+                  <Text 
+                    fontSize="sm" 
+                    fontFamily="mono" 
+                    color="text.primary" 
+                    wordBreak="break-all"
+                    css={{
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      _dark: {
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                      },
+                    }}
+                  >
                     {projectPath}
                   </Text>
                 </Box>
@@ -202,20 +286,30 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               borderRadius="16px"
               borderWidth="1px"
               css={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
                 borderColor: 'rgba(255, 255, 255, 0.2)',
                 boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
                 _dark: {
                   background: 'rgba(0, 0, 0, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
                 },
               }}
             >
               <Flex justify="space-between" align="center" mb={3}>
-                <Text fontSize="sm" fontWeight="semibold" color="text.secondary">
+                <Text 
+                  fontSize="sm" 
+                  fontWeight="semibold" 
+                  color="text.secondary"
+                  css={{
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    _dark: {
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                    },
+                  }}
+                >
                   Notes
                 </Text>
                 <Button

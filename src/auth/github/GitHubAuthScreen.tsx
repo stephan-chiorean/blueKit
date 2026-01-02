@@ -178,15 +178,25 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
 
   if (isLoading || !authUrl) {
     return (
-      <Center h="100vh">
+      <Center h="100vh" bg="transparent">
         <Box
-          bg="bg.surface"
-          borderRadius="xl"
+          borderRadius="2xl"
           pt={4}
           px={8}
           pb={8}
           w="400px"
-          boxShadow="lg"
+          css={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+            _dark: {
+              background: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+            },
+          }}
         >
           <VStack gap={3}>
             <Heading size="lg" textAlign="center">
@@ -208,15 +218,25 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
   }
 
   return (
-    <Center h="100vh" bg="main.bg">
+    <Center h="100vh" bg="transparent">
       <Box
-        bg="bg.surface"
-        borderRadius="xl"
+        borderRadius="2xl"
         pt={4}
         px={8}
         pb={8}
         w="400px"
-        boxShadow="lg"
+        css={{
+          background: 'rgba(255, 255, 255, 0.15)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          _dark: {
+            background: 'rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+          },
+        }}
       >
         <VStack gap={3} align="stretch">
           <Heading size="lg" textAlign="center">

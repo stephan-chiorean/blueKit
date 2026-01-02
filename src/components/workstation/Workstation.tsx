@@ -13,14 +13,14 @@ export default function Workstation() {
     <Flex
       direction="column"
       h="100%"
-      bg="main.bg"
+      bg="transparent"
       position="relative"
       overflow="hidden"
     >
       {/* Content Area */}
       <Box
         flex="1"
-        bg="main.bg"
+        bg="transparent"
         position="relative"
         overflow="auto"
       >
