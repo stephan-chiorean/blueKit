@@ -159,6 +159,7 @@ export default function EditorPlansPage({ plansSource, onBack }: EditorPlansPage
             error={error}
             onViewPlan={handleViewPlan}
             plansSource={plansSource}
+            onReload={loadPlans}
           />
         </Box>
       </Box>

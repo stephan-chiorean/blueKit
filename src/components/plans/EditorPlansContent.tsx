@@ -18,7 +18,7 @@ import {
   InputGroup,
   Field,
 } from '@chakra-ui/react';
-import { LuLayoutGrid, LuTable, LuX, LuFilter } from 'react-icons/lu';
+import { LuLayoutGrid, LuTable, LuX, LuFilter, LuRefreshCw } from 'react-icons/lu';
 import { ArtifactFile } from '../../ipc';
 
 interface EditorPlansContentProps {
@@ -27,6 +27,7 @@ interface EditorPlansContentProps {
   error: string | null;
   onViewPlan: (plan: ArtifactFile) => void;
   plansSource?: 'claude' | 'cursor';
+  onReload?: () => void;
 }
 
 type ViewMode = 'card' | 'table';
@@ -37,6 +38,7 @@ export default function EditorPlansContent({
   error,
   onViewPlan,
   plansSource,
+  onReload,
 }: EditorPlansContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
@@ -206,24 +208,41 @@ export default function EditorPlansContent({
       {/* Main Content */}
       <VStack align="stretch" gap={4}>
         <Flex justify="space-between" align="center">
-          {/* Filter Button */}
-          <Button
-            ref={filterButtonRef}
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
-            borderWidth="1px"
-            borderColor="border.subtle"
-            _hover={{ bg: "bg.subtle" }}
-          >
-            <HStack gap={2}>
+          <HStack gap={2}>
+            {/* Sync Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onReload?.()}
+              bg="bg.subtle"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              _hover={{ bg: "bg.subtle" }}
+              loading={plansLoading}
+            >
               <Icon>
-                <LuFilter />
+                <LuRefreshCw />
               </Icon>
-              <Text>Filter</Text>
-            </HStack>
-          </Button>
+            </Button>
+            {/* Filter Button */}
+            <Button
+              ref={filterButtonRef}
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+              borderWidth="1px"
+              borderColor="border.subtle"
+              _hover={{ bg: "bg.subtle" }}
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuFilter />
+                </Icon>
+                <Text>Filter</Text>
+              </HStack>
+            </Button>
+          </HStack>
 
           {/* View Mode Switcher */}
           <HStack gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md" overflow="hidden" bg="bg.subtle">

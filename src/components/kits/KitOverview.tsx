@@ -11,9 +11,8 @@ import {
   HStack,
   Icon,
   Textarea,
-  IconButton,
 } from '@chakra-ui/react';
-import { LuArrowLeft, LuSave, LuCopy, LuCheck, LuTrash2 } from 'react-icons/lu';
+import { LuArrowLeft, LuCopy, LuCheck } from 'react-icons/lu';
 import { ArtifactFile, invokeGetProjectRegistry } from '../../ipc';
 
 interface KitOverviewProps {
@@ -21,85 +20,25 @@ interface KitOverviewProps {
   onBack?: () => void;
 }
 
-interface PreviousNote {
-  id: string;
-  content: string;
-  timestamp: number;
-}
-
 export default function KitOverview({ kit, onBack }: KitOverviewProps) {
   // Extract project path from kit path
   const projectPath = kit.path.split('/.bluekit/')[0] || kit.path;
   const [isLinked, setIsLinked] = useState<boolean | null>(null);
   const [notes, setNotes] = useState<string>('');
-  const [isSaving, setIsSaving] = useState(false);
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
-  const [previousNotes, setPreviousNotes] = useState<PreviousNote[]>([]);
 
-  // Generate unique keys for localStorage based on kit path
+  // Generate unique key for localStorage based on kit path
   const notesKey = `bluekit-notes-${kit.path}`;
-  const previousNotesKey = `bluekit-previous-notes-${kit.path}`;
 
-  // Load notes and previous notes from localStorage on mount
+  // Load notes from localStorage on mount
   useEffect(() => {
     const savedNotes = localStorage.getItem(notesKey);
     if (savedNotes !== null) {
       setNotes(savedNotes);
     }
+  }, [notesKey]);
 
-    const savedPreviousNotes = localStorage.getItem(previousNotesKey);
-    if (savedPreviousNotes !== null) {
-      try {
-        const parsed = JSON.parse(savedPreviousNotes);
-        setPreviousNotes(parsed);
-      } catch (error) {
-        console.error('Failed to parse previous notes:', error);
-        // Generate mock previous notes if none exist
-        const mockNotes: PreviousNote[] = [
-          {
-            id: '1',
-            content: 'Remember to check the authentication flow implementation. The token refresh mechanism needs attention.',
-            timestamp: Date.now() - 86400000, // 1 day ago
-          },
-          {
-            id: '2',
-            content: 'The database schema has been updated. Need to run migrations before deploying.',
-            timestamp: Date.now() - 172800000, // 2 days ago
-          },
-          {
-            id: '3',
-            content: 'Found a bug in the error handling. The catch block should log the error before rethrowing.',
-            timestamp: Date.now() - 259200000, // 3 days ago
-          },
-        ];
-        setPreviousNotes(mockNotes);
-        localStorage.setItem(previousNotesKey, JSON.stringify(mockNotes));
-      }
-    } else {
-      // Generate mock previous notes if none exist
-      const mockNotes: PreviousNote[] = [
-        {
-          id: '1',
-          content: 'Remember to check the authentication flow implementation. The token refresh mechanism needs attention.',
-          timestamp: Date.now() - 86400000, // 1 day ago
-        },
-        {
-          id: '2',
-          content: 'The database schema has been updated. Need to run migrations before deploying.',
-          timestamp: Date.now() - 172800000, // 2 days ago
-        },
-        {
-          id: '3',
-          content: 'Found a bug in the error handling. The catch block should log the error before rethrowing.',
-          timestamp: Date.now() - 259200000, // 3 days ago
-        },
-      ];
-      setPreviousNotes(mockNotes);
-      localStorage.setItem(previousNotesKey, JSON.stringify(mockNotes));
-    }
-  }, [notesKey, previousNotesKey]);
-
-  // Auto-save current notes to localStorage (doesn't add to Previous)
+  // Auto-save current notes to localStorage
   const autoSaveNotes = useCallback(() => {
     try {
       localStorage.setItem(notesKey, notes);
@@ -108,58 +47,17 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
     }
   }, [notes, notesKey]);
 
-  // Save notes to Previous section and clear the field (only called on button click)
-  const saveNotes = useCallback(async () => {
-    if (notes.trim() === '') return;
-    
-    setIsSaving(true);
-    try {
-      // Add to previous notes
-      const newNote: PreviousNote = {
-        id: Date.now().toString(),
-        content: notes,
-        timestamp: Date.now(),
-      };
-      const updatedPreviousNotes = [newNote, ...previousNotes].slice(0, 10); // Keep last 10 notes
-      setPreviousNotes(updatedPreviousNotes);
-      localStorage.setItem(previousNotesKey, JSON.stringify(updatedPreviousNotes));
-      
-      // Clear the notes field
-      setNotes('');
-      localStorage.setItem(notesKey, '');
-      
-      // Small delay to show save feedback
-      await new Promise(resolve => setTimeout(resolve, 300));
-    } catch (error) {
-      console.error('Failed to save notes:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [notes, notesKey, previousNotes, previousNotesKey]);
-
   // Copy notes to clipboard
-  const copyNotes = useCallback(async (content: string, noteId?: string) => {
-    if (!content) return;
+  const copyNotes = useCallback(async () => {
+    if (!notes) return;
     try {
-      await navigator.clipboard.writeText(content);
-      if (noteId) {
-        setCopiedNoteId(noteId);
-        setTimeout(() => setCopiedNoteId(null), 2000);
-      } else {
-        setCopiedNoteId('current');
-        setTimeout(() => setCopiedNoteId(null), 2000);
-      }
+      await navigator.clipboard.writeText(notes);
+      setCopiedNoteId('current');
+      setTimeout(() => setCopiedNoteId(null), 2000);
     } catch (error) {
       console.error('Failed to copy notes:', error);
     }
-  }, []);
-
-  // Delete a previous note
-  const deleteNote = useCallback((noteId: string) => {
-    const updatedPreviousNotes = previousNotes.filter((note) => note.id !== noteId);
-    setPreviousNotes(updatedPreviousNotes);
-    localStorage.setItem(previousNotesKey, JSON.stringify(updatedPreviousNotes));
-  }, [previousNotes, previousNotesKey]);
+  }, [notes]);
 
 
   // Auto-save notes to localStorage after user stops typing (debounced)
@@ -201,7 +99,7 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
         bg="bg.subtle"
       >
         <CardBody p={6}>
-          <VStack align="stretch" gap={6}>
+          <VStack align="stretch" gap={6} h="100%">
             {/* Back Button */}
             {onBack && (
               <Flex>
@@ -220,9 +118,25 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               </Flex>
             )}
             
-            {/* Project Status */}
-            <Box>
-              <Text fontSize="sm" fontWeight="semibold" mb={2} color="text.secondary">
+            {/* Project Status - Glass Bubble */}
+            <Box
+              p={4}
+              borderRadius="16px"
+              borderWidth="1px"
+              css={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                },
+              }}
+            >
+              <Text fontSize="sm" fontWeight="semibold" mb={3} color="text.secondary">
                 Project Status
               </Text>
               <Status.Root
@@ -233,9 +147,25 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               </Status.Root>
             </Box>
             
-            {/* File Information */}
-            <Box>
-              <Text fontSize="sm" fontWeight="semibold" mb={2} color="text.secondary">
+            {/* File Information - Glass Bubble */}
+            <Box
+              p={4}
+              borderRadius="16px"
+              borderWidth="1px"
+              css={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                },
+              }}
+            >
+              <Text fontSize="sm" fontWeight="semibold" mb={3} color="text.secondary">
                 File Information
               </Text>
               <VStack align="stretch" gap={2}>
@@ -266,129 +196,69 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
               </VStack>
             </Box>
 
-            {/* Notepad */}
-            <Box>
-              <Flex justify="space-between" align="center" mb={2}>
+            {/* Notepad - Glass Bubble */}
+            <Box
+              p={4}
+              borderRadius="16px"
+              borderWidth="1px"
+              css={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+                },
+              }}
+            >
+              <Flex justify="space-between" align="center" mb={3}>
                 <Text fontSize="sm" fontWeight="semibold" color="text.secondary">
                   Notes
                 </Text>
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={saveNotes}
-                  loading={isSaving}
-                  loadingText="Saving..."
+                  onClick={copyNotes}
+                  disabled={!notes}
                 >
                   <HStack gap={2}>
                     <Icon>
-                      <LuSave />
+                      {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
                     </Icon>
-                    <Text>Save</Text>
+                    <Text>{copiedNoteId === 'current' ? 'Copied!' : 'Copy'}</Text>
                   </HStack>
                 </Button>
               </Flex>
-              <Box position="relative">
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Jot down your notes here..."
-                  minH="200px"
-                  resize="vertical"
-                  fontSize="sm"
-                />
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  position="absolute"
-                  top={2}
-                  right={2}
-                  onClick={() => copyNotes(notes)}
-                  disabled={!notes}
-                  aria-label="Copy notes"
-                  colorPalette={copiedNoteId === 'current' ? 'green' : undefined}
-                >
-                  <Icon>
-                    {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
-                  </Icon>
-                </IconButton>
-              </Box>
-            </Box>
-
-            {/* Previous Notes */}
-            <Box>
-              <Text fontSize="sm" fontWeight="semibold" mb={2} color="text.secondary">
-                Previous
-              </Text>
-              <VStack align="stretch" gap={3}>
-                {previousNotes.length === 0 ? (
-                  <Text fontSize="xs" color="text.tertiary" fontStyle="italic">
-                    No previous notes
-                  </Text>
-                ) : (
-                  previousNotes.map((note) => (
-                    <Box
-                      key={note.id}
-                      position="relative"
-                      p={3}
-                      bg="bg.subtle"
-                      borderRadius="md"
-                      borderWidth="1px"
-                      borderColor="border.subtle"
-                      transition="transform 0.2s ease-in-out"
-                      _hover={{
-                        transform: 'scale(1.02)',
-                      }}
-                      css={{
-                        '& .copy-button, & .delete-button': {
-                          opacity: 0,
-                          transition: 'opacity 0.2s ease-in-out',
-                        },
-                        '&:hover .copy-button, &:hover .delete-button': {
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      <HStack
-                        position="absolute"
-                        top={2}
-                        right={2}
-                        gap={1}
-                      >
-                        <IconButton
-                          className="copy-button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => copyNotes(note.content, note.id)}
-                          aria-label="Copy note"
-                          colorPalette={copiedNoteId === note.id ? 'green' : undefined}
-                        >
-                          <Icon>
-                            {copiedNoteId === note.id ? <LuCheck /> : <LuCopy />}
-                          </Icon>
-                        </IconButton>
-                        <IconButton
-                          className="delete-button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => deleteNote(note.id)}
-                          aria-label="Delete note"
-                          colorPalette="red"
-                        >
-                          <Icon>
-                            <LuTrash2 />
-                          </Icon>
-                        </IconButton>
-                      </HStack>
-                      <Text fontSize="sm" color="text.primary" pr={16}>
-                        {note.content}
-                      </Text>
-                      <Text fontSize="xs" color="text.tertiary" mt={2}>
-                        {new Date(note.timestamp).toLocaleDateString()}
-                      </Text>
-                    </Box>
-                  ))
-                )}
-              </VStack>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Jot down your notes here..."
+                minH="200px"
+                resize="vertical"
+                fontSize="sm"
+                borderWidth={0}
+                borderColor="transparent"
+                outline="none"
+                _focus={{
+                  boxShadow: 'none',
+                  borderWidth: 0,
+                  borderColor: 'transparent',
+                  outline: 'none',
+                }}
+                _focusVisible={{
+                  boxShadow: 'none',
+                  borderWidth: 0,
+                  borderColor: 'transparent',
+                  outline: 'none',
+                }}
+                _hover={{
+                  borderWidth: 0,
+                  borderColor: 'transparent',
+                }}
+              />
             </Box>
           </VStack>
         </CardBody>
