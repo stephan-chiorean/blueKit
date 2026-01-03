@@ -400,12 +400,28 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       <Card.Root
         key={task.id}
         variant="subtle"
+        borderRadius="16px"
         borderWidth={taskSelected ? "2px" : "1px"}
-        borderColor={taskSelected ? "primary.500" : "border.subtle"}
         position="relative"
         cursor="pointer"
         onClick={() => handleViewTask(task)}
-        _hover={{ borderColor: hoverColors.borderColor }}
+        transition="all 0.2s ease-in-out"
+        css={{
+          background: 'rgba(255, 255, 255, 0.15)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          borderColor: taskSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          _dark: {
+            background: 'rgba(0, 0, 0, 0.2)',
+            borderColor: taskSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+          },
+          _hover: {
+            transform: 'scale(1.02)',
+            borderColor: hoverColors.borderColor,
+          },
+        }}
       >
         <CardHeader>
           <VStack align="stretch" gap={3}>
@@ -706,7 +722,18 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             </Box>
           </Flex>
           {/* View Mode Switcher */}
-          <HStack gap={0} borderRadius="md" overflow="hidden" bg="bg.subtle" shadow="sm">
+          <HStack 
+            gap={0} 
+            overflow="hidden"
+            css={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(30px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.2)',
+              },
+            }}
+          >
             <Button
               onClick={() => setViewMode('card')}
               variant="ghost"

@@ -255,7 +255,16 @@ export default function ProjectsTabContent({
       <Box
         display="grid"
         gap={6}
-        gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 400px), 1fr))"
+        gridTemplateColumns={{
+          base: "1fr",
+          md: "repeat(2, 1fr)",
+          lg: "repeat(3, 1fr)",
+        }}
+        css={{
+          '@media (min-width: 1920px)': {
+            gridTemplateColumns: 'repeat(4, 1fr)',
+          },
+        }}
       >
         {localProjects.map((project) => {
           const isConnectingThis = connectingProjectId === project.id;

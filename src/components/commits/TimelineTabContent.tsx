@@ -847,8 +847,24 @@ export default function TimelineTabContent({
                     </Timeline.Indicator>
                     <Timeline.Content>
                       <Card.Root
-                        borderWidth={isPinned ? "1px" : undefined}
-                        borderColor={checkpointTypeColor || undefined}
+                        borderRadius="16px"
+                        borderWidth="1px"
+                        transition="all 0.2s ease-in-out"
+                        css={{
+                          background: 'rgba(255, 255, 255, 0.15)',
+                          backdropFilter: 'blur(30px) saturate(180%)',
+                          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                          borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.2)',
+                          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                          _dark: {
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.15)',
+                            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                          },
+                          _hover: {
+                            transform: 'scale(1.005)',
+                          },
+                        }}
                       >
                         <CardHeader pb={2}>
                           <HStack justify="space-between" align="start">
@@ -1226,7 +1242,26 @@ function CheckpointsView({
                 <RiFlag2Fill />
               </Timeline.Indicator>
               <Timeline.Content>
-                <Card.Root>
+                <Card.Root
+                  borderRadius="16px"
+                  borderWidth="1px"
+                  transition="all 0.2s ease-in-out"
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(30px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                    },
+                    _hover: {
+                      transform: 'scale(1.005)',
+                    },
+                  }}
+                >
                   <CardHeader pb={2}>
                     <HStack justify="space-between" align="start">
                       <VStack align="start" gap={1} flex={1}>
