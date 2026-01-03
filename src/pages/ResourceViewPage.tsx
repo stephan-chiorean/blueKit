@@ -136,7 +136,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
           }}
         >
           <Splitter.Root
-            defaultSize={[40, 60]}
+            defaultSize={[30, 70]}
             panels={[
               { id: 'overview', minSize: 25, maxSize: 50 },
               { id: 'workstation', minSize: 30 },
@@ -183,7 +183,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
         }}
       >
         <Splitter.Root
-          defaultSize={[40, 60]}
+          defaultSize={[30, 70]}
           panels={[
             { id: 'overview', minSize: 25, maxSize: 50 },
             { id: 'workstation', minSize: 30 },

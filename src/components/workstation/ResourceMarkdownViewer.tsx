@@ -130,7 +130,20 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
   const displayName = getResourceDisplayName(resource);
 
   return (
-    <Box p={6} maxW="100%" h="100%" overflow="auto">
+    <Box 
+      p={6} 
+      maxW="100%" 
+      h="100%" 
+      overflow="auto"
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+        },
+      }}
+    >
       <VStack align="stretch" gap={6}>
         {/* Header */}
         <Box>
