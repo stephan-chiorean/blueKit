@@ -58,7 +58,7 @@ interface TimelineTabContentProps {
 type ViewMode = "commits" | "checkpoints";
 
 // Activity calculation constants
-const CHANGES_PER_CIRCLE = 50;
+const CHANGES_PER_CIRCLE = 1000;
 const MAX_CIRCLES = 10;
 
 // Calculate activity score for commits
@@ -82,13 +82,6 @@ const calculateCheckpointActivity = (checkpoints: Checkpoint[]): number => {
 
 // Get summary stats for commits
 const getCommitStats = (commits: GitHubCommit[]) => {
-  // Debug logging
-  if (commits.length > 0) {
-    console.log('[DEBUG] Sample commit:', commits[0]);
-    console.log('[DEBUG] Has files?', commits[0]?.files);
-    console.log('[DEBUG] Files length:', commits[0]?.files?.length);
-  }
-
   const totalAdditions = commits.reduce(
     (sum, commit) =>
       sum +
@@ -758,12 +751,6 @@ export default function TimelineTabContent({
           {groupCommitsByDate(commits).map((group, _groupIndex) => {
             const activityScore = calculateCommitActivity(group.commits);
             const stats = getCommitStats(group.commits);
-
-            // Debug logging
-            console.log('[DEBUG] Date Group:', group.dateString);
-            console.log('[DEBUG] - Commits:', group.commits.length);
-            console.log('[DEBUG] - Activity Score:', activityScore);
-            console.log('[DEBUG] - Stats:', stats);
 
             return (
             <Box key={`group-${_groupIndex}`}>

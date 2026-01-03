@@ -1916,10 +1916,25 @@ function CatalogCard({
 
   return (
     <Card.Root 
-      variant="subtle"
+      borderRadius="16px"
       borderWidth={isSelected ? "2px" : "1px"}
-      borderColor={isSelected ? "primary.500" : "border.subtle"}
-      _hover={{ borderColor: isSelected ? "primary.600" : "primary.400" }}
+      transition="all 0.2s ease-in-out"
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        borderColor: isSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderColor: isSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        },
+        _hover: {
+          transform: 'scale(1.02)',
+          borderColor: isSelected ? 'var(--chakra-colors-primary-600)' : 'var(--chakra-colors-primary-400)',
+        },
+      }}
     >
       <CardHeader pb={2}>
         <Flex justify="space-between" align="center">
@@ -1951,9 +1966,9 @@ function CatalogCard({
           </Text>
         )}
         {tags.length > 0 && (
-          <HStack gap={1} mb={2} wrap="wrap">
+          <HStack gap={2} flexWrap="wrap" mb={2}>
             {tags.map((tag: string, index: number) => (
-              <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" colorPalette="gray" variant="subtle">
+              <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" variant="subtle" colorPalette="primary">
                 <Tag.Label>{tag}</Tag.Label>
               </Tag.Root>
             ))}
@@ -2145,24 +2160,31 @@ function LibraryCollectionCard({
 
   return (
     <Card.Root
-      variant="subtle"
-      borderWidth="1px"
-      borderColor={collection.color || "border.subtle"}
       cursor="pointer"
       onClick={onOpenModal}
-      _hover={{ 
-        borderColor: collection.color || "border.emphasized",
-        transform: "translateY(-1px)",
-        boxShadow: "sm"
-      }}
-      transition="all 0.2s"
+      transition="all 0.2s ease-in-out"
       position="relative"
       overflow="hidden"
-      borderRadius="md"
+      borderRadius="16px"
+      borderWidth="1px"
       p={2.5}
-      bg="bg.subtle"
       display="flex"
       flexDirection="column"
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        borderColor: collection.color || 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderColor: collection.color || 'rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        },
+        _hover: {
+          transform: 'scale(1.02)',
+        },
+      }}
     >
       <VStack align="stretch" gap={0}>
         <Flex align="start" justify="space-between" gap={1.5} mb={1.5}>
@@ -2186,8 +2208,7 @@ function LibraryCollectionCard({
                 px={2}
                 py={1}
                 borderRadius="sm"
-                bg="blue.50"
-                _dark={{ bg: "blue.900/30" }}
+                bg="transparent"
               >
                 <HStack gap={1.5} justify="flex-start" wrap="wrap">
                   {resourceSummary.map((part, index) => (

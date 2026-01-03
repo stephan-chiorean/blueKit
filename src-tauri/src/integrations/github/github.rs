@@ -318,6 +318,22 @@ impl GitHubClient {
 
         self.request::<Vec<GitHubCommit>>("GET", endpoint, None).await
     }
+
+    /// Gets a single commit with full details including file changes.
+    ///
+    /// # Arguments
+    /// * `owner` - Repository owner (username or org)
+    /// * `repo` - Repository name
+    /// * `sha` - Commit SHA
+    pub async fn get_commit(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<GitHubCommit, String> {
+        let endpoint = format!("/repos/{}/{}/commits/{}", owner, repo, sha);
+        self.request::<GitHubCommit>("GET", endpoint, None).await
+    }
 }
 
 /// GitHub content response (file or directory).
@@ -361,6 +377,18 @@ pub struct GitHubCommit {
     pub author: Option<GitHubCommitUser>,
     pub committer: Option<GitHubCommitUser>,
     pub html_url: String,
+    #[serde(default)]
+    pub files: Option<Vec<GitHubCommitFile>>,
+}
+
+/// File change information in a commit.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubCommitFile {
+    pub filename: String,
+    pub status: String,
+    pub additions: u32,
+    pub deletions: u32,
+    pub changes: u32,
 }
 
 /// GitHub commit details nested in commit object.

@@ -4047,10 +4047,48 @@ pub async fn fetch_project_commits(
         )
         .await?;
 
-    // Cache the results
-    commit_cache.set(&project_id, branch.as_deref(), page_num, commits.clone());
+    // Enrich commits with file details by fetching each commit individually
+    // GitHub API rate limits: 5,000 requests/hour for authenticated users
+    // This adds N additional API calls for N commits (e.g., 30 commits = 30 extra calls)
+    // Mitigations:
+    // - Results are cached, so subsequent views don't re-fetch
+    // - Concurrency limited to 3 to be respectful of rate limits
+    // - Falls back to basic info if individual fetch fails
+    use futures::stream::{self, StreamExt};
 
-    Ok(commits)
+    tracing::info!(
+        "Enriching {} commits with file details (will make {} additional API calls)",
+        commits.len(),
+        commits.len()
+    );
+
+    let enriched_commits: Vec<GitHubCommit> = stream::iter(commits.into_iter().map(|commit| {
+        let client = &client;
+        let owner = owner.clone();
+        let repo = repo.clone();
+        let sha = commit.sha.clone();
+
+        async move {
+            // Try to fetch detailed commit info, fall back to original if it fails
+            match client.get_commit(&owner, &repo, &sha).await {
+                Ok(detailed_commit) => detailed_commit,
+                Err(e) => {
+                    eprintln!("Failed to fetch details for commit {}: {}. Using basic commit info.", sha, e);
+                    commit
+                }
+            }
+        }
+    }))
+    .buffer_unordered(3) // Fetch up to 3 commits in parallel (conservative to respect rate limits)
+    .collect()
+    .await;
+
+    tracing::info!("Successfully enriched {} commits with file details", enriched_commits.len());
+
+    // Cache the results to avoid re-fetching
+    commit_cache.set(&project_id, branch.as_deref(), page_num, enriched_commits.clone());
+
+    Ok(enriched_commits)
 }
 
 /// Open a commit diff in GitHub (in default browser).
