@@ -188,7 +188,241 @@ A cross-project timeline consolidates commits from **all registered projects**:
 
 ### Optimization Strategies
 
-#### Strategy 1: **Lazy Loading + Virtualization** (Recommended First Step)
+#### Strategy 0: **Smart Project Filtering** (MOST IMPORTANT - Do This First!)
+
+Instead of fetching commits from ALL projects, identify which projects have recent activity using lightweight checks:
+
+**Option A: GitHub Events API** (Recommended - 1 API call for all repos)
+
+```rust
+// GET /users/{username}/events
+// Returns recent activity across all repos (last 90 days)
+pub async fn get_active_repos(
+    client: &GitHubClient,
+    since_days: u32,
+) -> Result<HashSet<String>, String> {
+    let events = client.get_user_events(1, 100).await?; // 1 API call
+
+    let cutoff = SystemTime::now() - Duration::from_secs(since_days as u64 * 86400);
+    let mut active_repos = HashSet::new();
+
+    for event in events {
+        if event.event_type == "PushEvent" && event.created_at > cutoff {
+            active_repos.insert(event.repo.full_name);
+        }
+    }
+
+    Ok(active_repos)
+}
+```
+
+**Option B: Lightweight HEAD Checks** (N calls, but very cheap)
+
+```rust
+// Store last known commit SHA in database
+pub struct ProjectSyncState {
+    pub project_id: String,
+    pub last_commit_sha: String,
+    pub last_checked_at: i64,
+}
+
+// Check if repo has new commits (lightweight)
+pub async fn has_new_commits(
+    client: &GitHubClient,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    last_known_sha: &str,
+) -> Result<bool, String> {
+    // GET /repos/{owner}/{repo}/branches/{branch}
+    // Returns just the latest commit SHA (~1KB response)
+    let branch_info = client.get_branch(owner, repo, branch).await?;
+    Ok(branch_info.commit.sha != last_known_sha)
+}
+```
+
+**Option C: GraphQL Batch HEAD Check** (1 call for 10+ repos)
+
+```graphql
+query CheckMultipleReposForNewCommits {
+  repo1: repository(owner: "user", name: "repo1") {
+    defaultBranchRef {
+      target { oid } # Just the SHA
+    }
+  }
+  repo2: repository(owner: "user", name: "repo2") {
+    defaultBranchRef {
+      target { oid }
+    }
+  }
+  # ... up to 10-15 repos per query
+}
+```
+
+**Consolidated Timeline Architecture**:
+
+```
+User Opens Cross-Project Timeline
+       ↓
+[1] Identify Active Projects (1-10 API calls)
+    - Option A: Events API (1 call) → get repos with PushEvents
+    - Option B: HEAD checks (N calls) → compare cached SHAs
+    - Option C: GraphQL batch (1-2 calls) → check 10+ repos at once
+       ↓
+[2] Filter to Active Projects Only
+    - Example: 50 total projects → 8 have commits in last 7 days
+       ↓
+[3] Fetch Commits from Active Projects (8 × 31 = 248 calls)
+    - Only query the 8 active repos
+    - Use existing enrichment logic
+       ↓
+[4] Merge & Sort by Date
+    - Combine all commits into single timeline
+    - Sort by commit date (descending)
+    - Label each commit card with project name
+       ↓
+Display Unified Timeline
+```
+
+**API Call Comparison**:
+
+| Approach | Active Project Detection | Commit Fetching | Total |
+|----------|-------------------------|-----------------|-------|
+| Naive (all projects) | 0 | 50 × 31 = 1,550 | 1,550 |
+| Events API + Filter | 1 | 8 × 31 = 248 | 249 |
+| HEAD Checks + Filter | 50 | 8 × 31 = 248 | 298 |
+| GraphQL + Filter | 5 (batches of 10) | 8 × 31 = 248 | 253 |
+
+**Recommended Flow for Consolidated Timeline**:
+
+```rust
+// src-tauri/src/commands.rs
+#[tauri::command]
+pub async fn fetch_cross_project_timeline(
+    db: State<'_, DatabaseConnection>,
+    commit_cache: State<'_, CommitCache>,
+    days_back: Option<u32>, // e.g., 7 days
+) -> Result<Vec<TimelineCommit>, String> {
+    let days = days_back.unwrap_or(7);
+
+    // Step 1: Get all registered projects
+    let all_projects = db_get_projects(&db).await?;
+
+    // Step 2: Filter to active projects (lightweight!)
+    let client = GitHubClient::from_keychain()?;
+    let active_repos = get_active_repos(&client, days).await?; // 1 API call
+
+    let active_projects: Vec<_> = all_projects
+        .into_iter()
+        .filter(|p| {
+            if let Some(url) = &p.git_url {
+                active_repos.contains(&parse_repo_full_name(url))
+            } else {
+                false
+            }
+        })
+        .collect();
+
+    tracing::info!(
+        "Consolidated timeline: {} active projects (filtered from {})",
+        active_projects.len(),
+        all_projects.len()
+    );
+
+    // Step 3: Fetch commits from active projects only
+    let mut all_commits = Vec::new();
+    for project in active_projects {
+        let commits = fetch_project_commits(
+            db.clone(),
+            commit_cache.clone(),
+            project.id.clone(),
+            None, // default branch
+            Some(1), // first page only
+            Some(30),
+        ).await?;
+
+        // Add project context to each commit
+        for commit in commits {
+            all_commits.push(TimelineCommit {
+                project_id: project.id.clone(),
+                project_name: project.name.clone(),
+                commit,
+            });
+        }
+    }
+
+    // Step 4: Sort by date (most recent first)
+    all_commits.sort_by(|a, b| {
+        b.commit.commit.author.date.cmp(&a.commit.commit.author.date)
+    });
+
+    Ok(all_commits)
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TimelineCommit {
+    pub project_id: String,
+    pub project_name: String,
+    #[serde(flatten)]
+    pub commit: GitHubCommit,
+}
+```
+
+**Frontend Display**:
+
+```typescript
+// Consolidated timeline with project labels
+interface TimelineCommitWithProject extends GitHubCommit {
+  projectId: string;
+  projectName: string;
+}
+
+const CrossProjectTimeline = () => {
+  const [commits, setCommits] = useState<TimelineCommitWithProject[]>([]);
+
+  useEffect(() => {
+    invokeFetchCrossProjectTimeline(7) // last 7 days
+      .then(setCommits);
+  }, []);
+
+  return (
+    <Timeline.Root>
+      {commits.map(commit => (
+        <Timeline.Item key={`${commit.projectId}-${commit.sha}`}>
+          <Timeline.Indicator />
+          <Timeline.Content>
+            <Card.Root>
+              <CardHeader>
+                {/* Project badge */}
+                <Badge colorPalette="blue">{commit.projectName}</Badge>
+
+                {/* Commit message */}
+                <Text>{commit.commit.message}</Text>
+
+                {/* Activity circles */}
+                <ActivityCircles activityScore={calculateActivity(commit)} />
+              </CardHeader>
+            </Card.Root>
+          </Timeline.Content>
+        </Timeline.Item>
+      ))}
+    </Timeline.Root>
+  );
+};
+```
+
+**Benefits**:
+- **Massive API savings**: 249 calls vs 1,550 calls (84% reduction!)
+- **Faster loading**: Only fetch from repos with activity
+- **Smart filtering**: Automatically focuses on what matters
+- **Cache-friendly**: Active projects likely already cached from project views
+
+**Trade-offs**:
+- Requires 1 extra call to Events API (or N HEAD checks)
+- May miss private repo activity in Events API (use GraphQL instead)
+- Users wanting "all commits ever" need separate view
+
+#### Strategy 1: **Lazy Loading + Virtualization** (Secondary Optimization)
 
 Only fetch commits when project comes into viewport:
 
@@ -380,20 +614,43 @@ impl GitHubClient {
 2. Add persistent disk cache with 24-hour TTL
 3. Add rate limit monitoring and display
 
-### Phase 2: Cross-Project View (Next)
-4. Build cross-project timeline UI with lazy loading
-5. Only enrich first page of each project
-6. Implement smart refresh (only fetch new commits)
+### Phase 2: Cross-Project View (Next - CRITICAL)
+4. **🎯 Implement Smart Project Filtering (Strategy 0)**
+   - Add GitHub Events API support (`get_user_events`)
+   - Filter to projects with recent PushEvents (last 7-30 days)
+   - **Reduces 1,550 calls → 249 calls** (84% reduction!)
+5. Build consolidated timeline UI
+   - Single merged timeline sorted by date
+   - Project badges on each commit card
+   - Activity circles for visual impact
+6. Implement `fetch_cross_project_timeline` command
+   - Returns `TimelineCommit` with project context
+   - Merges and sorts commits from active projects
 
 ### Phase 3: Optimization (Future)
-7. Add user preference to disable activity circles
-8. Migrate to GraphQL API for batch fetching
-9. Implement background sync (fetch updates every 15 mins)
+7. Add GraphQL batch HEAD checks (optional alternative to Events API)
+8. Implement smart refresh (only fetch new commits since last sync)
+9. Add user preference to disable activity circles
+10. Background sync for active projects every 15 mins
 
 ### Phase 4: Scale (Long-term)
-10. Consider GitHub App installation for 15k/hour limit
-11. Server-side caching layer (if multi-user)
-12. Webhook-based updates (real-time without polling)
+11. Migrate to GraphQL API for batch commit fetching
+12. Consider GitHub App installation for 15k/hour limit
+13. Server-side caching layer (if multi-user)
+14. Webhook-based updates (real-time without polling)
+
+### Why Smart Project Filtering is CRITICAL
+
+**Without it** (naive approach):
+- 50 projects × 31 calls = **1,550 API calls**
+- Only 3 full refreshes before hitting hourly limit
+- Slow loading (fetching from all repos)
+
+**With it** (Events API filter):
+- 1 call to detect activity + (8 active × 31) = **249 calls**
+- 20 full refreshes before hitting limit
+- Fast loading (only active repos)
+- Better UX (shows what matters)
 
 ## Code References
 
@@ -573,16 +830,31 @@ Consider if:
 
 ## Conclusion
 
-The current implementation is **well-positioned for single-project usage** with caching as the primary rate limit defense. For cross-project timelines:
+The current implementation is **well-positioned for single-project usage** with caching as the primary rate limit defense. For the consolidated cross-project timeline:
 
-**Short-term** (works with current limits):
-- Lazy loading + selective enrichment
-- Persistent caching
-- Smart refresh (only new commits)
+**🎯 KEY INSIGHT**: Smart Project Filtering (Strategy 0) is the **game-changer**.
 
-**Long-term** (scale to 100+ projects):
-- GraphQL API migration
-- GitHub App installation
-- Webhook-based updates
+**Without it**:
+- 50 projects = 1,550 API calls
+- Unsustainable at scale
+
+**With it** (GitHub Events API):
+- 50 projects → filter to 8 active = 249 API calls
+- **84% reduction** in API usage
+- **6x more refreshes** before hitting limit
+
+**Recommended Short-term Stack** (works with current 5k/hour limit):
+1. **Smart Project Filtering** (Events API or GraphQL HEAD checks)
+2. Persistent disk cache with 24-hour TTL
+3. Consolidated timeline UI with project badges
+4. Smart refresh (only fetch new commits)
+
+**Long-term Scale** (100+ projects, multi-user):
+5. GraphQL API migration for batch operations
+6. GitHub App installation (15k/hour limit)
+7. Webhook-based real-time updates
+8. Server-side caching layer
+
+**The Bottom Line**: With Smart Project Filtering, you can **comfortably support 50+ projects** on the default OAuth app limits. The consolidated timeline becomes highly practical without requiring GraphQL or GitHub App migration upfront.
 
 The architecture supports incremental improvements without breaking changes.
