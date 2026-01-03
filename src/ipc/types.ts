@@ -463,5 +463,13 @@ export interface GitHubCommit {
   committer?: GitHubUser;
   /** URL to commit on GitHub */
   html_url: string;
+  /** Files changed in commit */
+  files?: Array<{
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+  }>;
 }
 

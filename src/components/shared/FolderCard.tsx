@@ -158,17 +158,33 @@ export function FolderCard({
 
   return (
     <Card.Root
-      variant='subtle'
       borderWidth='1px'
-      borderColor='border.subtle'
+      borderRadius='16px'
       cursor='pointer'
       onClick={onToggleExpand}
-      _hover={{ borderColor: 'blue.400' }}
       position='relative'
       overflow='hidden'
       width='100%'
       height='fit-content'
       alignSelf='start'
+      transition='all 0.2s ease-in-out'
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        },
+        _hover: {
+          transform: 'scale(1.02)',
+          borderColor: 'var(--chakra-colors-blue-400)',
+          zIndex: 10,
+        },
+      }}
     >
       <CardHeader>
         <Flex align='center' justify='space-between' gap={4}>

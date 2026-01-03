@@ -14,6 +14,7 @@ import {
   Icon,
   Flex,
   Badge,
+  Tag,
 } from "@chakra-ui/react";
 import { toaster } from "../ui/toaster";
 import {
@@ -41,6 +42,7 @@ import {
   getCheckpointTypeLabel,
   getCheckpointTypeIcon,
   getCheckpointTypeColorPalette,
+  parseCheckpointTags,
 } from "../../utils/checkpointUtils";
 import PinCheckpointModal from "./PinCheckpointModal";
 import BranchOffModal from "./BranchOffModal";
@@ -54,6 +56,187 @@ interface TimelineTabContentProps {
 }
 
 type ViewMode = "commits" | "checkpoints";
+
+// Activity calculation constants
+const CHANGES_PER_CIRCLE = 50;
+const MAX_CIRCLES = 10;
+
+// Calculate activity score for commits
+const calculateCommitActivity = (commits: GitHubCommit[]): number => {
+  const totalChanges = commits.reduce((sum, commit) => {
+    const commitChanges = (commit.files || []).reduce(
+      (fileSum: number, file: { additions: number; deletions: number }) =>
+        fileSum + file.additions + file.deletions,
+      0
+    );
+    return sum + commitChanges;
+  }, 0);
+
+  return Math.min(totalChanges / CHANGES_PER_CIRCLE, MAX_CIRCLES);
+};
+
+// Calculate activity score for checkpoints
+const calculateCheckpointActivity = (checkpoints: Checkpoint[]): number => {
+  return Math.min(checkpoints.length, MAX_CIRCLES);
+};
+
+// Get summary stats for commits
+const getCommitStats = (commits: GitHubCommit[]) => {
+  // Debug logging
+  if (commits.length > 0) {
+    console.log('[DEBUG] Sample commit:', commits[0]);
+    console.log('[DEBUG] Has files?', commits[0]?.files);
+    console.log('[DEBUG] Files length:', commits[0]?.files?.length);
+  }
+
+  const totalAdditions = commits.reduce(
+    (sum, commit) =>
+      sum +
+      (commit.files || []).reduce(
+        (s: number, f: { additions: number }) => s + f.additions,
+        0
+      ),
+    0
+  );
+  const totalDeletions = commits.reduce(
+    (sum, commit) =>
+      sum +
+      (commit.files || []).reduce(
+        (s: number, f: { deletions: number }) => s + f.deletions,
+        0
+      ),
+    0
+  );
+
+  return {
+    count: commits.length,
+    additions: totalAdditions,
+    deletions: totalDeletions,
+  };
+};
+
+// ActivityCircles component
+interface ActivityCirclesProps {
+  activityScore: number;
+}
+
+const ActivityCircles = ({
+  activityScore,
+}: ActivityCirclesProps) => {
+  // Don't render anything if no activity
+  if (activityScore === 0) {
+    return null;
+  }
+
+  const fullCircles = Math.floor(activityScore);
+  const partialFill = activityScore - fullCircles;
+
+  return (
+    <HStack gap={0.5} ml={2}>
+      {/* Full circles */}
+      {Array.from({ length: fullCircles }).map((_, i) => (
+        <Box
+          key={`full-${i}`}
+          w="10px"
+          h="10px"
+          borderRadius="full"
+          bg="blue.500"
+          borderWidth="1px"
+          borderColor="blue.600"
+        />
+      ))}
+
+      {/* Partial circle */}
+      {partialFill > 0 && (
+        <Box
+          position="relative"
+          w="10px"
+          h="10px"
+          borderRadius="full"
+          borderWidth="1px"
+          borderColor="blue.600"
+          overflow="hidden"
+        >
+          <Box
+            position="absolute"
+            left={0}
+            top={0}
+            bottom={0}
+            width={`${partialFill * 100}%`}
+            bg="blue.500"
+          />
+          <Box
+            position="absolute"
+            right={0}
+            top={0}
+            bottom={0}
+            width={`${(1 - partialFill) * 100}%`}
+            bg="gray.200"
+            _dark={{ bg: "gray.700" }}
+          />
+        </Box>
+      )}
+    </HStack>
+  );
+};
+
+// DateHeader component with activity indicators
+interface DateHeaderProps {
+  dateString: string;
+  activityScore: number;
+  count: number;
+  itemType: "commits" | "checkpoints";
+  additions?: number;
+  deletions?: number;
+}
+
+const DateHeader = ({
+  dateString,
+  activityScore,
+  count,
+  itemType,
+  additions,
+  deletions,
+}: DateHeaderProps) => (
+  <Box
+    py={1}
+    px={2}
+    mb={2}
+    mt={2}
+  >
+    <HStack gap={2} align="center">
+      {/* Date Label */}
+      <Text fontSize="sm" fontWeight="bold" color="fg.emphasized">
+        {dateString}
+      </Text>
+
+      {/* Count Badge */}
+      <Badge size="sm" variant="subtle" colorPalette="blue">
+        {count} {itemType}
+      </Badge>
+
+      {/* Lines Changed (commits only) */}
+      {itemType === "commits" &&
+        additions !== undefined &&
+        deletions !== undefined && (
+          <HStack gap={1} fontSize="xs">
+            <Text color="green.600" _dark={{ color: "green.400" }}>
+              +{additions}
+            </Text>
+            <Text color="red.600" _dark={{ color: "red.400" }}>
+              -{deletions}
+            </Text>
+          </HStack>
+        )}
+
+      {/* Activity Circles */}
+      <ActivityCircles activityScore={activityScore} />
+
+      {/* Divider Line */}
+      <Box flex={1} height="1px" bg="border.subtle" ml={2} />
+    </HStack>
+  </Box>
+);
 
 export default function TimelineTabContent({
   projectId,
@@ -318,6 +501,71 @@ export default function TimelineTabContent({
     }
   };
 
+  // Format elegant date for headers
+  const formatElegantDate = (date: Date): string => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const targetDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    if (targetDate.getTime() === today.getTime()) {
+      return "Today";
+    } else if (targetDate.getTime() === yesterday.getTime()) {
+      return "Yesterday";
+    } else {
+      const daysDiff = Math.floor(
+        (today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysDiff < 7 && daysDiff > 0) {
+        // This week - show day of week
+        return date.toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        });
+      } else {
+        // Older - show full date
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+        });
+      }
+    }
+  };
+
+  // Group commits by date
+  const groupCommitsByDate = (
+    commits: GitHubCommit[]
+  ): { date: Date; dateString: string; commits: GitHubCommit[] }[] => {
+    const groups: Map<
+      string,
+      { date: Date; dateString: string; commits: GitHubCommit[] }
+    > = new Map();
+
+    commits.forEach((commit) => {
+      const commitDate = new Date(commit.commit.author.date);
+      const dateKey = `${commitDate.getFullYear()}-${commitDate.getMonth()}-${commitDate.getDate()}`;
+
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, {
+          date: commitDate,
+          dateString: formatElegantDate(commitDate),
+          commits: [],
+        });
+      }
+
+      groups.get(dateKey)!.commits.push(commit);
+    });
+
+    return Array.from(groups.values());
+  };
+
   // Empty state: not connected to git
   if (!gitConnected) {
     return (
@@ -507,56 +755,76 @@ export default function TimelineTabContent({
 
       {viewMode === "commits" ? (
         <>
-          <Box
-            css={{
-              // Target all possible connector selectors with maximum specificity
-              '& [data-part="connector"]': {
-                borderColor: "#4287f5 !important",
-                borderWidth: "2px !important",
-                borderStyle: "solid !important",
-                opacity: "1 !important",
-                display: "block !important",
-                visibility: "visible !important",
-              },
-              '& [data-part="connector-line"]': {
-                borderColor: "#4287f5 !important",
-                borderWidth: "2px !important",
-                borderStyle: "solid !important",
-                opacity: "1 !important",
-                display: "block !important",
-                visibility: "visible !important",
-              },
-              // Target by class if Chakra uses classes
-              "& .chakra-timeline__connector": {
-                borderColor: "#4287f5 !important",
-                borderWidth: "2px !important",
-                borderStyle: "solid !important",
-                opacity: "1 !important",
-                display: "block !important",
-                visibility: "visible !important",
-              },
-              // More generic selector for any connector element
-              '& [class*="connector"]': {
-                borderColor: "#4287f5 !important",
-                borderWidth: "2px !important",
-                borderStyle: "solid !important",
-                opacity: "1 !important",
-                display: "block !important",
-                visibility: "visible !important",
-              },
-              // Target any element that might be the connector line
-              '& [class*="timeline"] [class*="connector"]': {
-                borderColor: "#4287f5 !important",
-                borderWidth: "2px !important",
-                borderStyle: "solid !important",
-                opacity: "1 !important",
-                display: "block !important",
-                visibility: "visible !important",
-              },
-            }}
-          >
-            <Timeline.Root variant="subtle" colorPalette="blue">
-              {commits.map((commit, index) => {
+          {groupCommitsByDate(commits).map((group, _groupIndex) => {
+            const activityScore = calculateCommitActivity(group.commits);
+            const stats = getCommitStats(group.commits);
+
+            // Debug logging
+            console.log('[DEBUG] Date Group:', group.dateString);
+            console.log('[DEBUG] - Commits:', group.commits.length);
+            console.log('[DEBUG] - Activity Score:', activityScore);
+            console.log('[DEBUG] - Stats:', stats);
+
+            return (
+            <Box key={`group-${_groupIndex}`}>
+              <DateHeader
+                dateString={group.dateString}
+                activityScore={activityScore}
+                count={stats.count}
+                itemType="commits"
+                additions={stats.additions}
+                deletions={stats.deletions}
+              />
+              <Box
+                css={{
+                  // Target all possible connector selectors with maximum specificity
+                  '& [data-part="connector"]': {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                  '& [data-part="connector-line"]': {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                  // Target by class if Chakra uses classes
+                  "& .chakra-timeline__connector": {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                  // More generic selector for any connector element
+                  '& [class*="connector"]': {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                  // Target any element that might be the connector line
+                  '& [class*="timeline"] [class*="connector"]': {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                }}
+              >
+                <Timeline.Root variant="subtle" colorPalette="blue">
+                  {group.commits.map((commit) => {
                 const commitMessage = commit.commit.message.split("\n")[0]; // First line only
                 const commitBody = commit.commit.message
                   .split("\n")
@@ -647,9 +915,12 @@ export default function TimelineTabContent({
                     </Timeline.Content>
                   </Timeline.Item>
                 );
-              })}
-            </Timeline.Root>
-          </Box>
+                  })}
+                </Timeline.Root>
+              </Box>
+            </Box>
+            );
+          })}
 
           {/* Load More Button */}
           {hasMore && (
@@ -726,8 +997,71 @@ function CheckpointsView({
   const [branchOffModalOpen, setBranchOffModalOpen] = useState(false);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null);
 
+  // Format date from milliseconds timestamp
+  const formatDateFromMs = (timestampMs: number): string => {
+    const date = new Date(timestampMs);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHours === 0) {
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        return `${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""} ago`;
+      }
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    } else {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+      });
+    }
+  };
+
+  // Format elegant date for headers
+  const formatElegantDate = (date: Date): string => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const targetDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    if (targetDate.getTime() === today.getTime()) {
+      return "Today";
+    } else if (targetDate.getTime() === yesterday.getTime()) {
+      return "Yesterday";
+    } else {
+      const daysDiff = Math.floor(
+        (today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysDiff < 7 && daysDiff > 0) {
+        // This week - show day of week
+        return date.toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        });
+      } else {
+        // Older - show full date
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+        });
+      }
+    }
+  };
+
   // Get all unique tags from checkpoints and update parent
-  const allTags = useMemo(() => {
+  useMemo(() => {
     const tagSet = new Set<string>();
     checkpoints.forEach((checkpoint) => {
       if (checkpoint.tags) {
@@ -772,6 +1106,31 @@ function CheckpointsView({
       return matchesName && matchesTags;
     });
   }, [checkpoints, nameFilter, selectedTags]);
+
+  // Group checkpoints by date
+  const groupedCheckpoints = useMemo(() => {
+    const groups: Map<
+      string,
+      { date: Date; dateString: string; checkpoints: Checkpoint[] }
+    > = new Map();
+
+    filteredCheckpoints.forEach((checkpoint) => {
+      const checkpointDate = new Date(checkpoint.createdAt);
+      const dateKey = `${checkpointDate.getFullYear()}-${checkpointDate.getMonth()}-${checkpointDate.getDate()}`;
+
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, {
+          date: checkpointDate,
+          dateString: formatElegantDate(checkpointDate),
+          checkpoints: [],
+        });
+      }
+
+      groups.get(dateKey)!.checkpoints.push(checkpoint);
+    });
+
+    return Array.from(groups.values());
+  }, [filteredCheckpoints]);
 
   const handleUnpin = async (checkpointId: string) => {
     try {
@@ -834,25 +1193,33 @@ function CheckpointsView({
           </Text>
         </Box>
       ) : (
-        <Box
-          css={{
-            '& [data-part="connector"]': {
-              borderColor: "#4287f5 !important",
-              borderWidth: "2px !important",
-              borderStyle: "solid !important",
-              opacity: "1 !important",
-              display: "block !important",
-              visibility: "visible !important",
-            },
-          }}
-        >
-          <Timeline.Root variant="subtle" colorPalette="blue">
-            {filteredCheckpoints.map((checkpoint, index) => {
-          const typeIcon = getCheckpointTypeIcon(checkpoint.checkpointType);
+        <>
+          {groupedCheckpoints.map((group, _groupIndex) => {
+            const activityScore = calculateCheckpointActivity(group.checkpoints);
+
+            return (
+            <Box key={`group-${_groupIndex}`}>
+              <DateHeader
+                dateString={group.dateString}
+                activityScore={activityScore}
+                count={group.checkpoints.length}
+                itemType="checkpoints"
+              />
+              <Box
+                css={{
+                  '& [data-part="connector"]': {
+                    borderColor: "#4287f5 !important",
+                    borderWidth: "2px !important",
+                    borderStyle: "solid !important",
+                    opacity: "1 !important",
+                    display: "block !important",
+                    visibility: "visible !important",
+                  },
+                }}
+              >
+                <Timeline.Root variant="subtle" colorPalette="blue">
+                  {group.checkpoints.map((checkpoint) => {
           const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
-          const typeColorPalette = getCheckpointTypeColorPalette(
-            checkpoint.checkpointType
-          );
           return (
             <Timeline.Item key={checkpoint.id}>
               <Timeline.Indicator bg={`${typeColor}`} color="white">
@@ -899,6 +1266,9 @@ function CheckpointsView({
                             {checkpoint.description}
                           </Text>
                         )}
+                        <Text fontSize="xs" color="fg.muted">
+                          Created {formatDateFromMs(checkpoint.createdAt)}
+                        </Text>
                       </VStack>
                       <HStack gap={2}>
                         {gitUrl && (
@@ -943,17 +1313,40 @@ function CheckpointsView({
                     </HStack>
                   </CardHeader>
                   <CardBody pt={2}>
-                    <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
-                      {checkpoint.gitCommitSha.substring(0, 7)}
-                    </Text>
+                    <VStack align="start" gap={2}>
+                      <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
+                        {checkpoint.gitCommitSha.substring(0, 7)}
+                      </Text>
+                      {(() => {
+                        const tags = parseCheckpointTags(checkpoint.tags);
+                        return tags.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {tags.map((tag) => (
+                              <Tag.Root
+                                key={tag}
+                                size="sm"
+                                variant="subtle"
+                                colorPalette="gray"
+                              >
+                                <Tag.Label>{tag}</Tag.Label>
+                              </Tag.Root>
+                            ))}
+                          </HStack>
+                        ) : null;
+                      })()}
+                    </VStack>
                   </CardBody>
                 </Card.Root>
               </Timeline.Content>
             </Timeline.Item>
           );
+                  })}
+                </Timeline.Root>
+              </Box>
+            </Box>
+            );
           })}
-        </Timeline.Root>
-      </Box>
+        </>
       )}
 
       {/* Branch Off Modal */}

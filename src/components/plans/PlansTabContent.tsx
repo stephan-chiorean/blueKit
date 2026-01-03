@@ -113,13 +113,28 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
     return (
       <Card.Root
         key={plan.id}
-        variant="subtle"
         borderWidth="1px"
-        borderColor="border.subtle"
+        borderRadius="16px"
         cursor="pointer"
         onClick={() => onViewPlan(plan)}
-        _hover={{ borderColor: 'primary.400' }}
-        transition="all 0.2s"
+        transition="all 0.2s ease-in-out"
+        css={{
+          background: 'rgba(255, 255, 255, 0.15)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          _dark: {
+            background: 'rgba(0, 0, 0, 0.2)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+          },
+          _hover: {
+            transform: 'scale(1.02)',
+            borderColor: 'var(--chakra-colors-primary-400)',
+            zIndex: 10,
+          },
+        }}
       >
         <CardHeader>
           <VStack align="stretch" gap={2}>
@@ -280,7 +295,7 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
           </Text>
         </Box>
       ) : viewMode === 'card' ? (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
           {filteredPlans.map(renderPlanCard)}
         </SimpleGrid>
       ) : viewMode === 'roadmap' ? (
@@ -297,9 +312,26 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
           </Text>
         </Box>
       ) : (
-        <Table.Root size="sm" variant="outline">
+        <Table.Root
+          size="sm"
+          variant="outline"
+          borderRadius="16px"
+          overflow="hidden"
+          css={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(30px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+            _dark: {
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderColor: 'rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+            },
+          }}
+        >
           <Table.Header>
-            <Table.Row bg="bg.subtle">
+            <Table.Row bg="transparent">
               <Table.ColumnHeader w="30%">Name</Table.ColumnHeader>
               <Table.ColumnHeader w="35%">Description</Table.ColumnHeader>
               <Table.ColumnHeader w="10%">Status</Table.ColumnHeader>
@@ -313,8 +345,13 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
                 key={plan.id}
                 cursor="pointer"
                 onClick={() => onViewPlan(plan)}
-                bg="bg.surface"
-                _hover={{ borderColor: 'primary.400' }}
+                bg="transparent"
+                borderBottomWidth="1px"
+                borderBottomColor="transparent"
+                _hover={{ 
+                  bg: "rgba(255, 255, 255, 0.05)",
+                  borderBottomColor: "primary.500",
+                }}
               >
                 <Table.Cell>
                   <HStack gap={2}>

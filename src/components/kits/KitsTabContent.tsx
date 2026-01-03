@@ -429,9 +429,26 @@ function KitsTabContent({
   }
 
   const renderKitsTableView = () => (
-    <Table.Root size="sm" variant="outline">
+    <Table.Root
+      size="sm"
+      variant="outline"
+      borderRadius="16px"
+      overflow="hidden"
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        },
+      }}
+    >
       <Table.Header>
-        <Table.Row bg="bg.subtle">
+        <Table.Row bg="transparent">
           <Table.ColumnHeader w="6">
               <Checkbox.Root
               size="sm"
@@ -472,8 +489,8 @@ function KitsTabContent({
               cursor="pointer"
               onClick={() => handleViewKit(kit)}
               onContextMenu={(e) => handleContextMenu(e, kit)}
-              bg="bg.surface"
-              _hover={{ bg: "bg.subtle" }}
+              bg="transparent"
+              _hover={{ bg: "rgba(255, 255, 255, 0.1)" }}
               data-selected={kitSelected ? "" : undefined}
             >
               <Table.Cell>
@@ -542,7 +559,7 @@ function KitsTabContent({
   );
 
   return (
-    <Box position="relative" width="100%" maxW="100%" overflow="hidden">
+    <Box position="relative" width="100%" maxW="100%">
       <VStack align="stretch" gap={6} width="100%">
         {/* Folders Section - only show if folders exist */}
         {folderTree.length > 0 && (
@@ -586,6 +603,7 @@ function KitsTabContent({
                 gap={4} 
                 width="100%" 
                 maxW="100%"
+                overflow="visible"
                 css={{
                   alignItems: 'start',
                 }}
@@ -623,9 +641,26 @@ function KitsTabContent({
                 </Text>
               </Box>
             ) : (
-              <Table.Root size="sm" variant="outline">
+              <Table.Root
+                size="sm"
+                variant="outline"
+                borderRadius="16px"
+                overflow="hidden"
+                css={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(30px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                  _dark: {
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                  },
+                }}
+              >
                 <Table.Header>
-                  <Table.Row bg="bg.subtle">
+                  <Table.Row bg="transparent">
                     <Table.ColumnHeader w="6"></Table.ColumnHeader>
                     <Table.ColumnHeader>Name</Table.ColumnHeader>
                     <Table.ColumnHeader>Description</Table.ColumnHeader>
@@ -646,8 +681,8 @@ function KitsTabContent({
                           key={node.folder.path}
                           cursor="pointer"
                           onClick={() => toggleFolderExpanded(node.folder.path)}
-                          bg="bg.surface"
-                          _hover={{ bg: "bg.subtle" }}
+                          bg="transparent"
+                          _hover={{ bg: "rgba(255, 255, 255, 0.1)" }}
                         >
                           <Table.Cell>
                             <Icon
@@ -704,8 +739,8 @@ function KitsTabContent({
                                 e.stopPropagation();
                                 handleContextMenu(e, artifact);
                               }}
-                              _hover={{ bg: "bg.subtle" }}
-                              bg="bg.subtle"
+                              _hover={{ bg: "rgba(255, 255, 255, 0.15)" }}
+                              bg="rgba(255, 255, 255, 0.05)"
                               data-selected={artifactSelected ? "" : undefined}
                             >
                               <Table.Cell>
@@ -764,7 +799,7 @@ function KitsTabContent({
         )}
 
         {/* Kits Section */}
-        <Box mb={8} position="relative" width="100%" maxW="100%" overflow="hidden">
+        <Box mb={8} position="relative" width="100%" maxW="100%">
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">Kits</Heading>
             <Text fontSize="sm" color="text.muted">
@@ -846,6 +881,7 @@ function KitsTabContent({
               gap={4} 
               width="100%" 
               maxW="100%"
+              overflow="visible"
               css={{
                 alignItems: 'start',
               }}
@@ -853,17 +889,33 @@ function KitsTabContent({
               {rootKits.map((kit) => (
                 <Card.Root
                   key={kit.path}
-                  variant="subtle"
                   borderWidth={isSelected(kit.path) ? "2px" : "1px"}
-                  borderColor={isSelected(kit.path) ? "primary.500" : "border.subtle"}
+                  borderRadius="16px"
                   position="relative"
                   cursor="pointer"
                   onClick={() => handleViewKit(kit)}
                   onContextMenu={(e) => handleContextMenu(e, kit)}
-                  _hover={{ borderColor: "primary.400" }}
+                  transition="all 0.2s ease-in-out"
                   height="100%"
                   display="flex"
                   flexDirection="column"
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(30px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                    borderColor: isSelected(kit.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: isSelected(kit.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                    },
+                    _hover: {
+                      transform: 'scale(1.02)',
+                      borderColor: 'var(--chakra-colors-primary-400)',
+                      zIndex: 10,
+                    },
+                  }}
                 >
                   <CardHeader>
                     <Flex align="center" justify="space-between" gap={4}>

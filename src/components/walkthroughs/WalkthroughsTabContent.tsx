@@ -369,9 +369,26 @@ function WalkthroughsTabContent({
   }, [filteredWalkthroughs, folders, projectPath]);
 
   const renderWalkthroughsTableView = () => (
-    <Table.Root size="sm" variant="outline">
+    <Table.Root
+      size="sm"
+      variant="outline"
+      borderRadius="16px"
+      overflow="hidden"
+      css={{
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+        _dark: {
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        },
+      }}
+    >
       <Table.Header>
-        <Table.Row bg="bg.subtle">
+        <Table.Row bg="transparent">
           <Table.ColumnHeader w="6">
             <Checkbox.Root
               size="sm"
@@ -410,8 +427,13 @@ function WalkthroughsTabContent({
               key={walkthrough.path}
               cursor="pointer"
               onClick={() => handleViewWalkthrough(walkthrough)}
-              bg="bg.surface"
-              _hover={{ bg: "bg.subtle" }}
+              bg="transparent"
+              borderBottomWidth="1px"
+              borderBottomColor="transparent"
+              _hover={{ 
+                bg: "rgba(255, 255, 255, 0.05)",
+                borderBottomColor: "primary.500",
+              }}
               data-selected={walkthroughSelected ? "" : undefined}
             >
               <Table.Cell>
@@ -603,6 +625,7 @@ function WalkthroughsTabContent({
             <SimpleGrid 
               columns={{ base: 1, md: 2, lg: 3 }} 
               gap={4}
+              overflow="visible"
               css={{
                 alignItems: 'start',
               }}
@@ -627,9 +650,26 @@ function WalkthroughsTabContent({
               ))}
             </SimpleGrid>
           ) : (
-            <Table.Root size="sm" variant="outline">
+            <Table.Root
+              size="sm"
+              variant="outline"
+              borderRadius="16px"
+              overflow="hidden"
+              css={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                },
+              }}
+            >
               <Table.Header>
-                <Table.Row bg="bg.subtle">
+                <Table.Row bg="transparent">
                   <Table.ColumnHeader w="6"></Table.ColumnHeader>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Description</Table.ColumnHeader>
@@ -650,8 +690,13 @@ function WalkthroughsTabContent({
                         key={node.folder.path}
                         cursor="pointer"
                         onClick={() => toggleFolderExpanded(node.folder.path)}
-                        bg="bg.surface"
-                        _hover={{ bg: "bg.subtle" }}
+                        bg="transparent"
+                        borderBottomWidth="1px"
+                        borderBottomColor="transparent"
+                        _hover={{ 
+                          bg: "rgba(255, 255, 255, 0.05)",
+                          borderBottomColor: "primary.500",
+                        }}
                       >
                         <Table.Cell>
                           <Icon
@@ -704,8 +749,13 @@ function WalkthroughsTabContent({
                               e.stopPropagation();
                               handleViewWalkthrough(artifact);
                             }}
-                            bg="bg.subtle"
-                            _hover={{ bg: "bg.subtle" }}
+                            bg="rgba(255, 255, 255, 0.05)"
+                            borderBottomWidth="1px"
+                            borderBottomColor="transparent"
+                            _hover={{ 
+                              bg: "rgba(255, 255, 255, 0.08)",
+                              borderBottomColor: "primary.500",
+                            }}
                             data-selected={artifactSelected ? "" : undefined}
                           >
                             <Table.Cell>
@@ -787,20 +837,36 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
               {rootWalkthroughs.map((walkthrough) => (
                 <Card.Root
                   key={walkthrough.path}
-                  variant="subtle"
                   borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
-                  borderColor={isSelected(walkthrough.path) ? "primary.500" : "border.subtle"}
+                  borderRadius="16px"
                   position="relative"
                   cursor="pointer"
                   onClick={() => handleViewWalkthrough(walkthrough)}
-                  _hover={{ borderColor: "primary.400" }}
+                  transition="all 0.2s ease-in-out"
                   height="100%"
                   display="flex"
                   flexDirection="column"
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(30px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                    borderColor: isSelected(walkthrough.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: isSelected(walkthrough.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                    },
+                    _hover: {
+                      transform: 'scale(1.02)',
+                      borderColor: 'var(--chakra-colors-primary-400)',
+                      zIndex: 10,
+                    },
+                  }}
                 >
                   <CardHeader>
                     <Flex align="center" justify="space-between" gap={4}>
