@@ -9,6 +9,8 @@ import {
   Icon,
   HStack,
   Button,
+  Dialog,
+  Portal,
 } from "@chakra-ui/react";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -59,6 +61,10 @@ export default function HomePage({
   const { selectedItems } = useSelection();
   const { colorMode } = useColorMode();
   const [activeTab, setActiveTab] = useState("projects");
+
+  // Library tab exit warning state
+  const [showLibraryExitWarning, setShowLibraryExitWarning] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
 
   // Glass styling for light/dark mode
   const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
@@ -351,6 +357,32 @@ export default function HomePage({
     setLibraryResourceType(null);
   };
 
+  // Handler for tab changes with library exit warning
+  const handleTabChange = (newTab: string) => {
+    if (activeTab === 'library' && newTab !== 'library' && libraryTabRef.current?.hasSelections()) {
+      setPendingTab(newTab);
+      setShowLibraryExitWarning(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  // Confirm leaving library tab
+  const handleConfirmLeaveLibrary = () => {
+    libraryTabRef.current?.clearSelections();
+    setShowLibraryExitWarning(false);
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
+  };
+
+  // Cancel leaving library tab
+  const handleCancelLeaveLibrary = () => {
+    setShowLibraryExitWarning(false);
+    setPendingTab(null);
+  };
+
   // If viewing a library resource, show ResourceViewPage
   if (viewingLibraryResource && libraryResourceType && libraryResourceContent) {
     return (
@@ -389,7 +421,7 @@ export default function HomePage({
             defaultValue="projects"
             variant="plain"
             value={activeTab}
-            onValueChange={(e) => setActiveTab(e.value as string)}
+            onValueChange={(e) => handleTabChange(e.value as string)}
           >
             <Flex
               align="center"
@@ -527,6 +559,39 @@ export default function HomePage({
           </Box>
         </Box>
       </Box>
+
+      {/* Library Exit Warning Dialog */}
+      <Dialog.Root open={showLibraryExitWarning} onOpenChange={(e) => !e.open && handleCancelLeaveLibrary()}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="400px" borderRadius="16px">
+              <Dialog.Header>
+                <Dialog.Title>Leave Library?</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text>
+                  You have items selected in the Library. Leaving will clear your selection.
+                </Text>
+              </Dialog.Body>
+              <Dialog.Footer gap={2}>
+                <Button
+                  variant="outline"
+                  onClick={handleCancelLeaveLibrary}
+                >
+                  Stay
+                </Button>
+                <Button
+                  colorPalette="red"
+                  onClick={handleConfirmLeaveLibrary}
+                >
+                  Leave
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </VStack>
   );
 }
