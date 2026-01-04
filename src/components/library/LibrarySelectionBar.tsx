@@ -13,13 +13,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
     LuBookmark,
     LuBookmarkPlus,
-    LuChevronDown,
     LuTrash2,
     LuX,
 } from 'react-icons/lu';
 import { Project } from '../../ipc';
 import { LibraryCollection } from '../../ipc/library';
 import { PullButton } from './PullButton';
+import { SelectorPopover } from './SelectorPopover';
 
 interface LibrarySelectionBarProps {
     isOpen: boolean;
@@ -159,56 +159,43 @@ export function LibrarySelectionBar({
                                 <Separator orientation="vertical" height="20px" />
 
                                 {/* Move to Collection */}
-                                <Menu.Root>
-                                    <Menu.Trigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={isLoading}
-                                        >
-                                            <HStack gap={2}>
+                                <SelectorPopover
+                                    items={collections}
+                                    triggerIcon={<LuBookmark />}
+                                    triggerLabel="Move"
+                                    showArrow={false}
+                                    triggerVariant="outline"
+                                    triggerColorPalette="gray"
+                                    popoverTitle="Add to Collection"
+                                    searchPlaceholder="Search collections..."
+                                    emptyStateMessage="No collections yet"
+                                    noResultsMessage="No collections match your search."
+                                    renderItem={(collection) => (
+                                        <HStack gap={2}>
+                                            <Icon color={collection.color || 'blue.500'}>
                                                 <LuBookmark />
-                                                <Text>Move</Text>
-                                                <LuChevronDown />
-                                            </HStack>
-                                        </Button>
-                                    </Menu.Trigger>
-                                    <Portal>
-                                        <Menu.Positioner zIndex={position === 'absolute' ? 3000 : 1500}>
-                                            <Menu.Content>
-                                                {collections.length === 0 ? (
-                                                    <Box px={3} py={2}>
-                                                        <Text fontSize="sm" color="text.secondary">No collections yet</Text>
-                                                    </Box>
-                                                ) : (
-                                                    collections.map((col) => (
-                                                        <Menu.Item
-                                                            key={col.id}
-                                                            value={col.id}
-                                                            onSelect={() => onMoveToCollection(col.id)}
-                                                        >
-                                                            <HStack gap={2}>
-                                                                <Icon color={col.color || 'blue.500'}>
-                                                                    <LuBookmark />
-                                                                </Icon>
-                                                                <Text>{col.name}</Text>
-                                                            </HStack>
-                                                        </Menu.Item>
-                                                    ))
-                                                )}
-                                                <Menu.Separator />
-                                                <Menu.Item value="new" onSelect={onCreateCollection}>
-                                                    <HStack gap={2}>
-                                                        <Icon color="primary.500">
-                                                            <LuBookmarkPlus />
-                                                        </Icon>
-                                                        <Text>Create New</Text>
-                                                    </HStack>
-                                                </Menu.Item>
-                                            </Menu.Content>
-                                        </Menu.Positioner>
-                                    </Portal>
-                                </Menu.Root>
+                                            </Icon>
+                                            <Text fontSize="sm" fontWeight="medium">
+                                                {collection.name}
+                                            </Text>
+                                        </HStack>
+                                    )}
+                                    filterItem={(collection, query) =>
+                                        collection.name.toLowerCase().includes(query.toLowerCase())
+                                    }
+                                    getConfirmLabel={(count) =>
+                                        `Add to ${count} Collection${count !== 1 ? 's' : ''}`
+                                    }
+                                    onConfirm={(selectedCollections) => {
+                                        // Move to first selected collection
+                                        // (In practice, users typically select one collection)
+                                        if (selectedCollections.length > 0) {
+                                            onMoveToCollection(selectedCollections[0].id);
+                                        }
+                                    }}
+                                    loading={isLoading}
+                                    disabled={isLoading}
+                                />
 
                                 <Separator orientation="vertical" height="20px" />
 
