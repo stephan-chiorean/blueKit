@@ -3,19 +3,19 @@ import {
     Button,
     HStack,
     Icon,
-    Menu,
     Portal,
     Separator,
     Text,
     VStack,
 } from '@chakra-ui/react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     LuBookmark,
-    LuBookmarkPlus,
     LuTrash2,
     LuX,
 } from 'react-icons/lu';
+import { CiBookmarkPlus } from 'react-icons/ci';
 import { Project } from '../../ipc';
 import { LibraryCollection } from '../../ipc/library';
 import { PullButton } from './PullButton';
@@ -27,17 +27,12 @@ interface LibrarySelectionBarProps {
     onClearSelection: () => void;
     onRemoveFromCollection: () => void;
     onMoveToCollection: (collectionId: string) => void;
-    onCreateCollection: () => void;
     onBulkPull: (projects: Project[]) => void;
     projects: Project[];
     collections: LibraryCollection[];
     isLoading?: boolean;
-    // Positioning mode: 'fixed' (bottom of screen) or 'static' (rendered in place, e.g. inside a modal's footer area)
-    // Actually, 'static' inside a flex container or absolute inside a relative container.
-    // For the modal, we want it to be inside the content flow but animated.
-    // OR we can make it absolute bottom of the container.
+    // Positioning mode: 'fixed' (bottom of screen) or 'absolute' (rendered in place, e.g. inside a modal's footer area)
     position?: 'fixed' | 'absolute';
-    containerWidth?: string;
     bottomOffset?: string;
 }
 
@@ -47,22 +42,82 @@ export function LibrarySelectionBar({
     onClearSelection,
     onRemoveFromCollection,
     onMoveToCollection,
-    onCreateCollection,
     onBulkPull,
     projects,
     collections,
     isLoading = false,
     position = 'fixed',
-    containerWidth = 'auto',
     bottomOffset = '20px',
 }: LibrarySelectionBarProps) {
+    const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
+    const [isPullPopoverOpen, setIsPullPopoverOpen] = useState(false);
+    const [shouldShowBlur, setShouldShowBlur] = useState(false);
+    
+    // Use refs to track popover states synchronously (no render delay)
+    const isAddPopoverOpenRef = useRef(false);
+    const isPullPopoverOpenRef = useRef(false);
+    const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Update blur state based on refs (synchronous check)
+    const updateBlurState = useCallback(() => {
+        const anyPopoverOpen = isAddPopoverOpenRef.current || isPullPopoverOpenRef.current;
+        
+        if (anyPopoverOpen) {
+            // Clear any pending timeout and show blur immediately
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+                blurTimeoutRef.current = null;
+            }
+            setShouldShowBlur(true);
+        } else {
+            // Only hide blur after a delay to prevent flicker during rapid transitions
+            blurTimeoutRef.current = setTimeout(() => {
+                // Double-check refs before hiding (in case state changed during delay)
+                if (!isAddPopoverOpenRef.current && !isPullPopoverOpenRef.current) {
+                    setShouldShowBlur(false);
+                }
+            }, 100);
+        }
+    }, []);
+
+    // Handlers that update both refs and state immediately
+    const handleAddPopoverChange = useCallback((isOpen: boolean) => {
+        isAddPopoverOpenRef.current = isOpen;
+        setIsAddPopoverOpen(isOpen);
+        updateBlurState();
+    }, [updateBlurState]);
+
+    const handlePullPopoverChange = useCallback((isOpen: boolean) => {
+        isPullPopoverOpenRef.current = isOpen;
+        setIsPullPopoverOpen(isOpen);
+        updateBlurState();
+    }, [updateBlurState]);
+
+    // Sync refs when state changes (fallback for external state changes)
+    useEffect(() => {
+        isAddPopoverOpenRef.current = isAddPopoverOpen;
+        updateBlurState();
+    }, [isAddPopoverOpen, updateBlurState]);
+
+    useEffect(() => {
+        isPullPopoverOpenRef.current = isPullPopoverOpen;
+        updateBlurState();
+    }, [isPullPopoverOpen, updateBlurState]);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Style config based on position
     const positionStyles = position === 'fixed' ? {
         position: 'fixed' as const,
         bottom: bottomOffset,
         left: '50%',
-        x: '-50%', // use x instead of translateX for simpler framer motion
         zIndex: 1400, // Higher than most things, lower than heavy modals if needed
     } : {
         position: 'absolute' as const,
@@ -70,16 +125,50 @@ export function LibrarySelectionBar({
         left: 0,
         right: 0,
         zIndex: 10,
+    };
+
+    // Motion props for framer-motion (x transform for centering when fixed)
+    const motionProps = position === 'fixed' ? {
+        x: '-50%',
+    } : {
         x: 0,
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
+        <>
+            {/* Backdrop blur when popover is open - positioned below selection bar and popover */}
+            {shouldShowBlur && (
+                <Portal>
+                    <Box
+                        position="fixed"
+                        top={0}
+                        left={0}
+                        right={0}
+                        bottom={0}
+                        zIndex={position === 'fixed' ? 1300 : 5} // Below selection bar (1400 when fixed, 10 when absolute)
+                        css={{
+                            backdropFilter: 'blur(8px) saturate(120%)',
+                            WebkitBackdropFilter: 'blur(8px) saturate(120%)',
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            _dark: {
+                                background: 'rgba(0, 0, 0, 0.4)',
+                            },
+                            pointerEvents: 'auto', // Allow clicks to close popover
+                        }}
+                        onClick={() => {
+                            setIsAddPopoverOpen(false);
+                            setIsPullPopoverOpen(false);
+                        }}
+                    />
+                </Portal>
+            )}
+
+            <AnimatePresence>
+                {isOpen && (
                 <motion.div
-                    initial={{ y: "100%", opacity: 0, ...positionStyles }}
-                    animate={{ y: 0, opacity: 1, ...positionStyles }}
-                    exit={{ y: "100%", opacity: 0, ...positionStyles }}
+                    initial={{ y: "100%", opacity: 0, ...motionProps }}
+                    animate={{ y: 0, opacity: 1, ...motionProps }}
+                    exit={{ y: "100%", opacity: 0, ...motionProps }}
                     transition={{
                         type: "spring",
                         stiffness: 300,
@@ -91,6 +180,7 @@ export function LibrarySelectionBar({
                         width: position === 'absolute' ? '100%' : 'auto',
                         minWidth: position === 'fixed' ? '400px' : 'auto',
                         maxWidth: '90vw',
+                        pointerEvents: 'auto', // Ensure selection bar is clickable above backdrop
                     }}
                 >
                     <Box
@@ -126,6 +216,22 @@ export function LibrarySelectionBar({
 
                             {/* Action buttons */}
                             <HStack gap={2} justify="center" wrap="wrap">
+                                {/* Remove from Collection - far left */}
+                                <Button
+                                    variant="subtle"
+                                    size="sm"
+                                    onClick={onRemoveFromCollection}
+                                    disabled={isLoading}
+                                    colorPalette="red"
+                                >
+                                    <HStack gap={2}>
+                                        <LuTrash2 />
+                                        <Text>Remove</Text>
+                                    </HStack>
+                                </Button>
+
+                                <Separator orientation="vertical" height="20px" />
+
                                 {/* Clear selection */}
                                 <Button
                                     variant="surface"
@@ -142,34 +248,23 @@ export function LibrarySelectionBar({
 
                                 <Separator orientation="vertical" height="20px" />
 
-                                {/* Remove from Collection */}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={onRemoveFromCollection}
-                                    disabled={isLoading}
-                                    colorPalette="red"
-                                >
-                                    <HStack gap={2}>
-                                        <LuTrash2 />
-                                        <Text>Remove</Text>
-                                    </HStack>
-                                </Button>
-
-                                <Separator orientation="vertical" height="20px" />
-
-                                {/* Move to Collection */}
+                                {/* Add to Collection */}
                                 <SelectorPopover
                                     items={collections}
-                                    triggerIcon={<LuBookmark />}
-                                    triggerLabel="Move"
+                                    triggerIcon={<CiBookmarkPlus />}
+                                    triggerLabel="Add"
                                     showArrow={false}
-                                    triggerVariant="outline"
-                                    triggerColorPalette="gray"
+                                    triggerVariant="subtle"
+                                    triggerColorPalette="blue"
                                     popoverTitle="Add to Collection"
                                     searchPlaceholder="Search collections..."
-                                    emptyStateMessage="No collections yet"
-                                    noResultsMessage="No collections match your search."
+                                    emptyStateMessage="No Collections Found"
+                                    noResultsMessage="No Collections Found"
+                                    emptyStateIcon={
+                                        <Icon fontSize="2xl" color="blue.500">
+                                            <LuBookmark />
+                                        </Icon>
+                                    }
                                     renderItem={(collection) => (
                                         <HStack gap={2}>
                                             <Icon color={collection.color || 'blue.500'}>
@@ -186,6 +281,8 @@ export function LibrarySelectionBar({
                                     getConfirmLabel={(count) =>
                                         `Add to ${count} Collection${count !== 1 ? 's' : ''}`
                                     }
+                                    confirmButtonLabel="Add"
+                                    confirmButtonColorPalette="blue"
                                     onConfirm={(selectedCollections) => {
                                         // Move to first selected collection
                                         // (In practice, users typically select one collection)
@@ -193,6 +290,7 @@ export function LibrarySelectionBar({
                                             onMoveToCollection(selectedCollections[0].id);
                                         }
                                     }}
+                                    onOpenChange={handleAddPopoverChange}
                                     loading={isLoading}
                                     disabled={isLoading}
                                 />
@@ -204,6 +302,7 @@ export function LibrarySelectionBar({
                                     projects={projects}
                                     onConfirmPull={onBulkPull}
                                     loading={isLoading}
+                                    onOpenChange={handlePullPopoverChange}
                                 />
                             </HStack>
                         </VStack>
@@ -211,5 +310,6 @@ export function LibrarySelectionBar({
                 </motion.div>
             )}
         </AnimatePresence>
+        </>
     );
 }

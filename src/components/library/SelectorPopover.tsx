@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, ReactNode } from 'react';
 import {
     Box,
     Button,
+    Flex,
     HStack,
     Icon,
     Input,
@@ -28,7 +29,7 @@ export interface SelectorPopoverProps<T extends SelectorItem> {
     triggerIcon: ReactNode;
     triggerLabel: string;
     showArrow?: boolean;
-    triggerVariant?: 'outline' | 'solid' | 'ghost' | 'surface';
+    triggerVariant?: 'outline' | 'solid' | 'ghost' | 'surface' | 'subtle';
     triggerColorPalette?: string;
 
     // Popover content
@@ -36,6 +37,7 @@ export interface SelectorPopoverProps<T extends SelectorItem> {
     searchPlaceholder?: string;
     emptyStateMessage?: string;
     noResultsMessage?: string;
+    emptyStateIcon?: ReactNode; // Icon to show in empty state
 
     // Item rendering
     renderItem: (item: T, isSelected: boolean) => ReactNode;
@@ -45,9 +47,12 @@ export interface SelectorPopoverProps<T extends SelectorItem> {
 
     // Confirm button
     getConfirmLabel: (selectedCount: number) => string;
+    confirmButtonLabel?: string; // Simple label like "Add" or "Pull"
+    confirmButtonColorPalette?: string; // Color for confirm button (green for Add, blue for Pull)
 
     // Callbacks
     onConfirm: (selectedItems: T[]) => void;
+    onOpenChange?: (isOpen: boolean) => void;
 
     // State
     loading?: boolean;
@@ -65,10 +70,14 @@ export function SelectorPopover<T extends SelectorItem>({
     searchPlaceholder = 'Search...',
     emptyStateMessage = 'No items found.',
     noResultsMessage = 'No items match your search.',
+    emptyStateIcon,
     renderItem,
     filterItem,
     getConfirmLabel,
+    confirmButtonLabel,
+    confirmButtonColorPalette,
     onConfirm,
+    onOpenChange,
     loading = false,
     disabled = false,
 }: SelectorPopoverProps<T>) {
@@ -114,11 +123,17 @@ export function SelectorPopover<T extends SelectorItem>({
 
     const filteredItems = items.filter(item => filterItem(item, searchQuery));
 
+    const handleOpenChange = (e: { open: boolean }) => {
+        setIsOpen(e.open);
+        onOpenChange?.(e.open);
+    };
+
     return (
         <Menu.Root
             closeOnSelect={false}
             open={isOpen}
-            onOpenChange={(e) => setIsOpen(e.open)}
+            onOpenChange={handleOpenChange}
+            positioning={{ placement: 'top', gutter: 50 }}
         >
             <Menu.Trigger asChild>
                 <Button
@@ -141,13 +156,47 @@ export function SelectorPopover<T extends SelectorItem>({
                 </Button>
             </Menu.Trigger>
             <Menu.Positioner zIndex={3000}>
-                <Menu.Content width="400px" maxH="500px">
-                    {/* Header */}
-                    <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                <Menu.Content 
+                    width="400px" 
+                    maxH="500px" 
+                    position="relative"
+                    css={{
+                        background: 'rgba(255, 255, 255, 0.85)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                        _dark: {
+                            background: 'rgba(30, 30, 30, 0.85)',
+                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)',
+                        },
+                    }}
+                >
+                    {/* Header with title and confirm button */}
+                    <Flex px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle" align="center" justify="space-between">
                         <Text fontSize="sm" fontWeight="semibold">
                             {popoverTitle}
                         </Text>
-                    </Box>
+                        {confirmButtonLabel && (
+                            <Button
+                                variant="solid"
+                                colorPalette={confirmButtonColorPalette || triggerColorPalette}
+                                size="sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirm();
+                                }}
+                                disabled={loading || selectedItemIds.size === 0}
+                            >
+                                {loading ? (
+                                    <Spinner size="xs" />
+                                ) : (
+                                    confirmButtonLabel
+                                )}
+                            </Button>
+                        )}
+                    </Flex>
 
                     {/* Search Input */}
                     <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
@@ -160,15 +209,57 @@ export function SelectorPopover<T extends SelectorItem>({
                                 size="sm"
                                 onClick={(e) => e.stopPropagation()}
                                 onKeyDown={(e) => e.stopPropagation()}
+                                css={{
+                                    borderColor: 'rgba(0, 0, 0, 0.06) !important',
+                                    '&:focus': {
+                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
+                                        boxShadow: 'none !important',
+                                        outline: 'none !important',
+                                    },
+                                    '&:focus-visible': {
+                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
+                                        boxShadow: 'none !important',
+                                        outline: 'none !important',
+                                    },
+                                    '&:focus-within': {
+                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
+                                        boxShadow: 'none !important',
+                                    },
+                                    _dark: {
+                                        borderColor: 'rgba(255, 255, 255, 0.08) !important',
+                                        '&:focus': {
+                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
+                                        },
+                                        '&:focus-visible': {
+                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
+                                        },
+                                        '&:focus-within': {
+                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
+                                        },
+                                    },
+                                }}
                             />
                         </InputGroup>
                     </Box>
 
                     {/* Item List */}
-                    <Box maxH="300px" overflowY="auto">
+                    <Box maxH="300px" minH="200px" overflowY="auto">
                         {filteredItems.length === 0 ? (
-                            <Box textAlign="center" py={4} px={3}>
-                                <Text fontSize="sm" color="text.secondary">
+                            <Box 
+                                display="flex" 
+                                flexDirection="column" 
+                                alignItems="center" 
+                                justifyContent="center" 
+                                py={8} 
+                                px={3}
+                                minH="200px"
+                            >
+                                {emptyStateIcon && (
+                                    <Box mb={3} color="text.muted">
+                                        {emptyStateIcon}
+                                    </Box>
+                                )}
+                                <Text fontSize="sm" color="text.secondary" fontWeight="medium">
                                     {searchQuery ? noResultsMessage : emptyStateMessage}
                                 </Text>
                             </Box>
@@ -195,37 +286,6 @@ export function SelectorPopover<T extends SelectorItem>({
                                 );
                             })
                         )}
-                    </Box>
-
-                    {/* Footer with Confirm Button */}
-                    <Box
-                        px={3}
-                        py={2}
-                        borderTopWidth="1px"
-                        borderColor="border.subtle"
-                        bg="bg.panel"
-                        opacity={selectedItemIds.size > 0 ? 1 : 0.5}
-                    >
-                        <Button
-                            variant="solid"
-                            colorPalette={triggerColorPalette}
-                            size="sm"
-                            width="100%"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleConfirm();
-                            }}
-                            disabled={loading || selectedItemIds.size === 0}
-                        >
-                            {loading ? (
-                                <HStack gap={2}>
-                                    <Spinner size="xs" />
-                                    <Text>Processing...</Text>
-                                </HStack>
-                            ) : (
-                                getConfirmLabel(selectedItemIds.size)
-                            )}
-                        </Button>
                     </Box>
                 </Menu.Content>
             </Menu.Positioner>
