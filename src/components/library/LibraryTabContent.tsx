@@ -52,7 +52,6 @@ import {
   LuPencil,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
-import { FaBook } from 'react-icons/fa';
 import { open as openShell } from '@tauri-apps/api/shell';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -1728,7 +1727,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                   <Box mb={8} position="relative" width="100%" maxW="100%">
                     <Flex align="center" gap={2} mb={4}>
                       <Icon>
-                        <FaBook />
+                        <LuBookOpen />
                       </Icon>
                       <Heading size="md">Catalog</Heading>
                       <Text fontSize="sm" color="text.muted">
