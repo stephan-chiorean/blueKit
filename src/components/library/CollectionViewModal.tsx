@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Dialog,
@@ -17,9 +17,6 @@ import {
   Checkbox,
   Tag,
   Button,
-  Input,
-  InputGroup,
-  Menu,
   Spinner,
   Separator,
   Code,
@@ -35,20 +32,15 @@ import {
   LuBot,
   LuNetwork,
   LuChevronRight,
-  LuSearch,
-  LuCheck,
-  LuFolder,
-  LuTrash2,
-  LuBookmarkPlus,
-  LuChevronDown,
-  LuDownload,
   LuArrowLeft,
+  LuDownload,
 } from 'react-icons/lu';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CatalogWithVariations, LibraryVariation, LibraryCatalog } from '../../types/github';
 import { LibraryCollection } from '../../ipc/library';
 import { Project } from '../../ipc';
+import { LibrarySelectionBar } from './LibrarySelectionBar';
 
 // Types for selected items
 interface SelectedVariation {
@@ -86,7 +78,7 @@ const artifactTypeIcon: Record<string, React.ReactNode> = {
 function formatTimeAgo(date: Date): string {
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
+
   if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -380,7 +372,7 @@ function VariationsPickerView({
           {catalog.description}
         </Text>
       )}
-      
+
       <Text fontSize="sm" color="text.tertiary">
         Select a version to view its content
       </Text>
@@ -505,8 +497,6 @@ interface CollectionCatalogCardProps {
   isSelected: boolean;
   onCatalogToggle: () => void;
   onVariationClick: (variation: LibraryVariation, catalog: LibraryCatalog) => void;
-  selectedVariationIds: Map<string, SelectedVariation>;
-  onVariationToggle: (variation: LibraryVariation, catalog: LibraryCatalog) => void;
   onOpenVariationsPicker: (catalog: LibraryCatalog, variations: LibraryVariation[]) => void;
 }
 
@@ -515,8 +505,6 @@ function CollectionCatalogCard({
   isSelected,
   onCatalogToggle,
   onVariationClick,
-  selectedVariationIds,
-  onVariationToggle,
   onOpenVariationsPicker,
 }: CollectionCatalogCardProps) {
   const { catalog, variations } = catalogWithVariations;
@@ -643,177 +631,6 @@ function CollectionCatalogCard({
   );
 }
 
-// Modal Pull Button component (renders inline, no Portal)
-interface ModalPullButtonProps {
-  projects: Project[];
-  onBulkPull: (projects: Project[]) => void;
-  loading: boolean;
-}
-
-function ModalPullButton({ projects, onBulkPull, loading }: ModalPullButtonProps) {
-  const [isPullMenuOpen, setIsPullMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isPullMenuOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
-    }
-  }, [isPullMenuOpen]);
-
-  const toggleProject = (projectId: string) => {
-    setSelectedProjectIds(prev => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
-  };
-
-  const handleConfirmPull = () => {
-    const selectedProjects = projects.filter(p => selectedProjectIds.has(p.id));
-    onBulkPull(selectedProjects);
-    setIsPullMenuOpen(false);
-    setSelectedProjectIds(new Set());
-  };
-
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.path.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const truncatePath = (path: string, maxLength: number = 40): string => {
-    if (path.length <= maxLength) return path;
-    return `...${path.slice(-(maxLength - 3))}`;
-  };
-
-  return (
-    <Menu.Root
-      closeOnSelect={false}
-      open={isPullMenuOpen}
-      onOpenChange={(e) => setIsPullMenuOpen(e.open)}
-    >
-      <Menu.Trigger asChild>
-        <Button
-          variant="solid"
-          colorPalette="primary"
-          size="sm"
-          disabled={loading}
-        >
-          <HStack gap={2}>
-            <LuDownload />
-            <Text>Pull</Text>
-          </HStack>
-        </Button>
-      </Menu.Trigger>
-      <Menu.Positioner zIndex={3000}>
-        <Menu.Content width="400px" maxH="500px">
-          {/* Header */}
-          <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-            <Text fontSize="sm" fontWeight="semibold">
-              Pull to Project
-            </Text>
-          </Box>
-
-          {/* Search Input */}
-          <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-            <InputGroup startElement={<LuSearch />}>
-              <Input
-                ref={searchInputRef}
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                size="sm"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-              />
-            </InputGroup>
-          </Box>
-
-          {/* Project List */}
-          <Box maxH="300px" overflowY="auto">
-            {filteredProjects.length === 0 ? (
-              <Box textAlign="center" py={4} px={3}>
-                <Text fontSize="sm" color="text.secondary">
-                  {searchQuery ? 'No projects match your search.' : 'No projects found.'}
-                </Text>
-              </Box>
-            ) : (
-              filteredProjects.map((project) => {
-                const isSelected = selectedProjectIds.has(project.id);
-                return (
-                  <Menu.Item
-                    key={project.id}
-                    value={project.id}
-                    onSelect={() => toggleProject(project.id)}
-                  >
-                    <HStack gap={2} justify="space-between" width="100%" minW={0}>
-                      <HStack gap={2} flex="1" minW={0} overflow="hidden">
-                        <Icon flexShrink={0}>
-                          <LuFolder />
-                        </Icon>
-                        <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
-                          <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
-                            {project.name}
-                          </Text>
-                          <Text fontSize="xs" color="text.secondary" title={project.path}>
-                            {truncatePath(project.path, 35)}
-                          </Text>
-                        </VStack>
-                      </HStack>
-                      {isSelected && (
-                        <Icon color="primary.500" flexShrink={0}>
-                          <LuCheck />
-                        </Icon>
-                      )}
-                    </HStack>
-                  </Menu.Item>
-                );
-              })
-            )}
-          </Box>
-
-          {/* Footer with Confirm Button */}
-          <Box
-            px={3}
-            py={2}
-            borderTopWidth="1px"
-            borderColor="border.subtle"
-            bg="bg.panel"
-            opacity={selectedProjectIds.size > 0 ? 1 : 0.5}
-          >
-            <Button
-              variant="solid"
-              colorPalette="primary"
-              size="sm"
-              width="100%"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirmPull();
-              }}
-              disabled={loading || selectedProjectIds.size === 0}
-            >
-              {loading ? (
-                <HStack gap={2}>
-                  <Spinner size="xs" />
-                  <Text>Pulling...</Text>
-                </HStack>
-              ) : (
-                `Pull to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
-              )}
-            </Button>
-          </Box>
-        </Menu.Content>
-      </Menu.Positioner>
-    </Menu.Root>
-  );
-}
 
 interface CollectionViewModalProps {
   isOpen: boolean;
@@ -849,13 +666,11 @@ export default function CollectionViewModal({
   onCatalogToggle,
   onVariationClick,
   onVariationToggle,
-  onDeleteCollection,
   onMoveToCollection,
   onRemoveFromCollection,
   onCreateCollection,
   onBulkPull,
   clearVariationSelection,
-  clearCatalogSelection,
   projects,
   bulkPulling,
   allCollections,
@@ -885,13 +700,6 @@ export default function CollectionViewModal({
     onClose();
   };
 
-  const selectedVariationsArray = useMemo(() => {
-    return Array.from(selectedVariations.values());
-  }, [selectedVariations]);
-
-  const selectedCatalogsArray = useMemo(() => {
-    return Array.from(selectedCatalogs.values());
-  }, [selectedCatalogs]);
 
   // Reset view state when modal closes
   useEffect(() => {
@@ -969,16 +777,6 @@ export default function CollectionViewModal({
     }
   };
 
-  // Get header title based on current view
-  const getHeaderTitle = () => {
-    if (currentView === 'variations-picker' && viewContext.pickerCatalog) {
-      return viewContext.pickerCatalog.name;
-    }
-    if (currentView === 'variation-preview' && viewContext.previewCatalog) {
-      return viewContext.previewCatalog.name;
-    }
-    return collection?.name || 'Collection';
-  };
 
   // Get breadcrumb for navigation
   const getBreadcrumb = () => {
@@ -990,8 +788,8 @@ export default function CollectionViewModal({
       parts.push({ label: viewContext.pickerCatalog.name });
     } else if (currentView === 'variation-preview') {
       if (viewContext.cameFromPicker && viewContext.pickerCatalog) {
-        parts.push({ 
-          label: viewContext.pickerCatalog.name, 
+        parts.push({
+          label: viewContext.pickerCatalog.name,
           onClick: () => {
             setCurrentView('variations-picker');
             setViewContext(prev => ({
@@ -1014,402 +812,295 @@ export default function CollectionViewModal({
 
   if (!collection) return null;
 
-  const icon = currentView === 'collection' 
-    ? <LuBookmark /> 
+  const icon = currentView === 'collection'
+    ? <LuBookmark />
     : artifactTypeIcon[viewContext.pickerCatalog?.artifact_type || viewContext.previewCatalog?.artifact_type || 'kit'] || <LuPackage />;
 
   const breadcrumb = getBreadcrumb();
 
   return (
     <>
-    <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content
-            maxW="90vw"
-            maxH="90vh"
-            w="1200px"
-            h="85vh"
-            borderRadius="16px"
-            css={{
-              background: 'rgba(255, 255, 255, 0.25)',
-              backdropFilter: 'blur(30px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-              borderColor: 'rgba(0, 0, 0, 0.08)',
-              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.06)',
-              _dark: {
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-              },
-            }}
-          >
-            <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
-              <HStack gap={2} align="center" flex={1}>
-                {/* Back button when not on collection view */}
-                {currentView !== 'collection' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBack}
-                    px={2}
-                  >
-                    <LuArrowLeft />
-                  </Button>
-                )}
-                
-                {/* Breadcrumb navigation */}
-                <HStack gap={1} align="center" flex={1}>
-                  {breadcrumb.map((part, index) => (
-                    <HStack key={index} gap={1}>
-                      {index > 0 && (
-                        <Icon color="text.tertiary" boxSize={4}>
-                          <LuChevronRight />
-                        </Icon>
-                      )}
-                      {part.onClick && index < breadcrumb.length - 1 ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={part.onClick}
-                          px={2}
-                          fontWeight="normal"
-                          color="text.secondary"
-                          _hover={{ color: 'primary.500' }}
-                        >
-                          {index === 0 && (
-                            <Icon boxSize={4} color={collection.color || 'blue.500'} mr={1}>
-                              <LuBookmark />
-                            </Icon>
-                          )}
-                          {part.label}
-                        </Button>
-                      ) : (
-                        <HStack gap={1}>
-                          {index === 0 && currentView === 'collection' && (
-                            <Icon boxSize={5} color={collection.color || 'blue.500'}>
-                              <LuBookmark />
-                            </Icon>
-                          )}
-                          {index > 0 && currentView !== 'collection' && index === breadcrumb.length - 1 && (
-                            <Icon boxSize={4} color="primary.500">
-                              {icon}
-                            </Icon>
-                          )}
-                          <Dialog.Title fontSize={index === breadcrumb.length - 1 ? 'lg' : 'md'}>
-                            {part.label}
-                          </Dialog.Title>
-                        </HStack>
-                      )}
-                    </HStack>
-                  ))}
-                  
-                  {/* Badge for collection view */}
-                  {currentView === 'collection' && (
-                    <Badge
-                      size="sm"
-                      colorPalette="gray"
-                      bg="transparent"
-                      _dark={{ bg: "transparent" }}
-                    >
-                      {catalogs.length}
-                    </Badge>
-                  )}
-                  
-                  {/* Badge for variations picker */}
-                  {currentView === 'variations-picker' && viewContext.pickerVariations && (
-                    <Badge
-                      size="sm"
-                      colorPalette="gray"
-                      bg="transparent"
-                      _dark={{ bg: "transparent" }}
-                    >
-                      {viewContext.pickerVariations.length} versions
-                    </Badge>
-                  )}
-                </HStack>
-              </HStack>
-              
-              {/* Action buttons */}
-              <HStack gap={2} align="center">
-                {currentView === 'variation-preview' && viewContext.previewVariation && (
-                  <>
-                    {(() => {
-                      const isSelected = selectedVariations.has(viewContext.previewVariation!.id);
-                      return (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => {
-                            if (viewContext.previewVariation && viewContext.previewCatalog) {
-                              onVariationToggle(viewContext.previewVariation, viewContext.previewCatalog);
-                            }
-                          }}
-                          borderWidth="1px"
-                          borderRadius="lg"
-                          css={isSelected ? {
-                            background: 'rgba(59, 130, 246, 0.15)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(59, 130, 246, 0.3)',
-                            boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.1)',
-                            color: 'var(--chakra-colors-primary-600)',
-                            _dark: {
-                              background: 'rgba(59, 130, 246, 0.2)',
-                              borderColor: 'rgba(59, 130, 246, 0.4)',
-                              boxShadow: '0 4px 16px 0 rgba(59, 130, 246, 0.2)',
-                              color: 'var(--chakra-colors-primary-400)',
-                            },
-                          } : {
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                            _dark: {
-                              background: 'rgba(0, 0, 0, 0.2)',
-                              borderColor: 'rgba(255, 255, 255, 0.15)',
-                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                            },
-                          }}
-                        >
-                          {isSelected ? 'Selected' : 'Select'}
-                        </Button>
-                      );
-                    })()}
+      <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content
+              maxW="90vw"
+              maxH="90vh"
+              w="1200px"
+              h="85vh"
+              borderRadius="16px"
+              css={{
+                background: 'rgba(255, 255, 255, 0.25)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.06)',
+                _dark: {
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                },
+              }}
+            >
+              <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
+                <HStack gap={2} align="center" flex={1}>
+                  {/* Back button when not on collection view */}
+                  {currentView !== 'collection' && (
                     <Button
-                      variant="solid"
-                      colorPalette="primary"
-                      size="xs"
-                      mr={4}
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBack}
+                      px={2}
                     >
-                      <HStack gap={1.5}>
-                        <LuDownload />
-                        <Text>Pull</Text>
-                      </HStack>
+                      <LuArrowLeft />
                     </Button>
-                  </>
-                )}
-                <Dialog.CloseTrigger asChild>
-                  <IconButton
-                    variant="ghost"
-                    size="xs"
-                    aria-label="Close"
-                  >
-                    <LuX />
-                  </IconButton>
-                </Dialog.CloseTrigger>
-              </HStack>
-            </Dialog.Header>
-
-            <Dialog.Body overflow="auto" position="relative" p={currentView === 'variation-preview' ? 4 : undefined}>
-              {/* Collection View */}
-              {currentView === 'collection' && (
-                <VStack align="stretch" gap={4}>
-                  {/* Catalogs List */}
-                  {catalogs.length > 0 ? (
-                    <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
-                      {catalogs.map((catWithVars) => (
-                        <CollectionCatalogCard
-                          key={catWithVars.catalog.id}
-                          catalogWithVariations={catWithVars}
-                          isSelected={selectedCatalogs.has(catWithVars.catalog.id)}
-                          onCatalogToggle={() => onCatalogToggle(catWithVars)}
-                          onVariationClick={(variation, catalog) => handleVariationClick(variation, catalog, false)}
-                          selectedVariationIds={selectedVariations}
-                          onVariationToggle={onVariationToggle}
-                          onOpenVariationsPicker={openVariationsPicker}
-                        />
-                      ))}
-                    </SimpleGrid>
-                  ) : (
-                    <Box textAlign="center" py={12}>
-                      <Text color="text.secondary">No catalogs yet</Text>
-                    </Box>
                   )}
-                </VStack>
-              )}
 
-              {/* Variations Picker View */}
-              {currentView === 'variations-picker' && viewContext.pickerCatalog && viewContext.pickerVariations && (
-                <VariationsPickerView
-                  catalog={viewContext.pickerCatalog}
-                  variations={viewContext.pickerVariations}
-                  selectedVariationIds={selectedVariations}
-                  onVariationClick={(variation, catalog) => handleVariationClick(variation, catalog, true)}
-                  onVariationToggle={onVariationToggle}
-                />
-              )}
-
-              {/* Variation Preview View */}
-              {currentView === 'variation-preview' && viewContext.previewVariation && viewContext.previewCatalog && (
-                <VariationPreviewView
-                  variation={viewContext.previewVariation}
-                  catalog={viewContext.previewCatalog}
-                  content={viewContext.previewContent || ''}
-                  loading={viewContext.previewLoading || false}
-                />
-              )}
-            </Dialog.Body>
-
-            {/* Modal Action Bar Footer - only shown when there are selections */}
-            {hasSelections && currentView === 'collection' && (
-              <Dialog.Footer
-                borderTopWidth="1px"
-                borderColor="border.subtle"
-                py={3}
-                px={4}
-                css={{
-                  background: 'rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.3)',
-                  },
-                }}
-              >
-                <VStack align="stretch" gap={2} width="100%">
-                  {/* Selection summary */}
-                  <HStack gap={1.5} justify="center" wrap="wrap">
-                    <Text fontSize="xs" color="text.secondary">
-                      {selectedVariations.size} item{selectedVariations.size !== 1 ? 's' : ''} selected
-                    </Text>
-                  </HStack>
-
-                  {/* Action buttons */}
-                  <HStack gap={2} justify="center" wrap="wrap">
-                    {/* Clear selection */}
-                    <Button
-                      variant="surface"
-                      colorPalette="red"
-                      size="sm"
-                      onClick={clearVariationSelection}
-                      disabled={bulkPulling}
-                    >
-                      <HStack gap={2}>
-                        <LuX />
-                        <Text>Clear</Text>
-                      </HStack>
-                    </Button>
-
-                    <Separator orientation="vertical" height="20px" />
-
-                    {/* Remove from Collection */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onRemoveFromCollection}
-                      disabled={bulkPulling}
-                    >
-                      <HStack gap={2}>
-                        <LuTrash2 />
-                        <Text>Remove</Text>
-                      </HStack>
-                    </Button>
-
-                    <Separator orientation="vertical" height="20px" />
-
-                    {/* Move to Collection */}
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={bulkPulling}
-                        >
-                          <HStack gap={2}>
-                            <LuBookmark />
-                            <Text>Move</Text>
-                            <LuChevronDown />
-                          </HStack>
-                        </Button>
-                      </Menu.Trigger>
-                      <Menu.Positioner zIndex={3000}>
-                        <Menu.Content>
-                          {allCollections.length === 0 ? (
-                            <Box px={3} py={2}>
-                              <Text fontSize="sm" color="text.secondary">No collections yet</Text>
-                            </Box>
-                          ) : (
-                            allCollections.map((col) => (
-                              <Menu.Item
-                                key={col.id}
-                                value={col.id}
-                                onSelect={() => onMoveToCollection(col.id)}
-                              >
-                                <HStack gap={2}>
-                                  <Icon color={col.color || 'blue.500'}>
-                                    <LuBookmark />
-                                  </Icon>
-                                  <Text>{col.name}</Text>
-                                </HStack>
-                              </Menu.Item>
-                            ))
-                          )}
-                          <Menu.Separator />
-                          <Menu.Item value="new" onSelect={onCreateCollection}>
-                            <HStack gap={2}>
-                              <Icon color="primary.500">
-                                <LuBookmarkPlus />
+                  {/* Breadcrumb navigation */}
+                  <HStack gap={1} align="center" flex={1}>
+                    {breadcrumb.map((part, index) => (
+                      <HStack key={index} gap={1}>
+                        {index > 0 && (
+                          <Icon color="text.tertiary" boxSize={4}>
+                            <LuChevronRight />
+                          </Icon>
+                        )}
+                        {part.onClick && index < breadcrumb.length - 1 ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={part.onClick}
+                            px={2}
+                            fontWeight="normal"
+                            color="text.secondary"
+                            _hover={{ color: 'primary.500' }}
+                          >
+                            {index === 0 && (
+                              <Icon boxSize={4} color={collection.color || 'blue.500'} mr={1}>
+                                <LuBookmark />
                               </Icon>
-                              <Text>Create New</Text>
-                            </HStack>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Positioner>
-                    </Menu.Root>
+                            )}
+                            {part.label}
+                          </Button>
+                        ) : (
+                          <HStack gap={1}>
+                            {index === 0 && currentView === 'collection' && (
+                              <Icon boxSize={5} color={collection.color || 'blue.500'}>
+                                <LuBookmark />
+                              </Icon>
+                            )}
+                            {index > 0 && currentView !== 'collection' && index === breadcrumb.length - 1 && (
+                              <Icon boxSize={4} color="primary.500">
+                                {icon}
+                              </Icon>
+                            )}
+                            <Dialog.Title fontSize={index === breadcrumb.length - 1 ? 'lg' : 'md'}>
+                              {part.label}
+                            </Dialog.Title>
+                          </HStack>
+                        )}
+                      </HStack>
+                    ))}
 
-                    <Separator orientation="vertical" height="20px" />
+                    {/* Badge for collection view */}
+                    {currentView === 'collection' && (
+                      <Badge
+                        size="sm"
+                        colorPalette="gray"
+                        bg="transparent"
+                        _dark={{ bg: "transparent" }}
+                      >
+                        {catalogs.length}
+                      </Badge>
+                    )}
 
-                    {/* Pull button */}
-                    <ModalPullButton
-                      projects={projects}
-                      onBulkPull={onBulkPull}
-                      loading={bulkPulling}
-                    />
+                    {/* Badge for variations picker */}
+                    {currentView === 'variations-picker' && viewContext.pickerVariations && (
+                      <Badge
+                        size="sm"
+                        colorPalette="gray"
+                        bg="transparent"
+                        _dark={{ bg: "transparent" }}
+                      >
+                        {viewContext.pickerVariations.length} versions
+                      </Badge>
+                    )}
                   </HStack>
-                </VStack>
-              </Dialog.Footer>
-            )}
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+                </HStack>
 
-    {/* Exit Warning Dialog */}
-    <Dialog.Root open={showExitWarning} onOpenChange={(e) => !e.open && setShowExitWarning(false)}>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content maxW="400px" borderRadius="16px">
-            <Dialog.Header>
-              <Dialog.Title>Leave Collection?</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Text>
-                You have {selectedVariations.size} item{selectedVariations.size !== 1 ? 's' : ''} selected.
-                Leaving will clear your selection.
-              </Text>
-            </Dialog.Body>
-            <Dialog.Footer gap={2}>
-              <Button
-                variant="outline"
-                onClick={() => setShowExitWarning(false)}
-              >
-                Stay
-              </Button>
-              <Button
-                colorPalette="red"
-                onClick={handleConfirmClose}
-              >
-                Leave
-              </Button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+                {/* Action buttons */}
+                <HStack gap={2} align="center">
+                  {currentView === 'variation-preview' && viewContext.previewVariation && (
+                    <>
+                      {(() => {
+                        const isSelected = selectedVariations.has(viewContext.previewVariation!.id);
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => {
+                              if (viewContext.previewVariation && viewContext.previewCatalog) {
+                                onVariationToggle(viewContext.previewVariation, viewContext.previewCatalog);
+                              }
+                            }}
+                            borderWidth="1px"
+                            borderRadius="lg"
+                            css={isSelected ? {
+                              background: 'rgba(59, 130, 246, 0.15)',
+                              backdropFilter: 'blur(20px) saturate(180%)',
+                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                              borderColor: 'rgba(59, 130, 246, 0.3)',
+                              boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.1)',
+                              color: 'var(--chakra-colors-primary-600)',
+                              _dark: {
+                                background: 'rgba(59, 130, 246, 0.2)',
+                                borderColor: 'rgba(59, 130, 246, 0.4)',
+                                boxShadow: '0 4px 16px 0 rgba(59, 130, 246, 0.2)',
+                                color: 'var(--chakra-colors-primary-400)',
+                              },
+                            } : {
+                              background: 'rgba(255, 255, 255, 0.25)',
+                              backdropFilter: 'blur(20px) saturate(180%)',
+                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                              borderColor: 'rgba(0, 0, 0, 0.08)',
+                              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                              _dark: {
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                borderColor: 'rgba(255, 255, 255, 0.15)',
+                                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                              },
+                            }}
+                          >
+                            {isSelected ? 'Selected' : 'Select'}
+                          </Button>
+                        );
+                      })()}
+                      <Button
+                        variant="solid"
+                        colorPalette="primary"
+                        size="xs"
+                        mr={4}
+                      >
+                        <HStack gap={1.5}>
+                          <LuDownload />
+                          <Text>Pull</Text>
+                        </HStack>
+                      </Button>
+                    </>
+                  )}
+                  <Dialog.CloseTrigger asChild>
+                    <IconButton
+                      variant="ghost"
+                      size="xs"
+                      aria-label="Close"
+                    >
+                      <LuX />
+                    </IconButton>
+                  </Dialog.CloseTrigger>
+                </HStack>
+              </Dialog.Header>
+
+              <Dialog.Body overflow="auto" position="relative" p={currentView === 'variation-preview' ? 4 : undefined}>
+                {/* Collection View */}
+                {currentView === 'collection' && (
+                  <VStack align="stretch" gap={4}>
+                    {/* Catalogs List */}
+                    {catalogs.length > 0 ? (
+                      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                        {catalogs.map((catWithVars) => (
+                          <CollectionCatalogCard
+                            key={catWithVars.catalog.id}
+                            catalogWithVariations={catWithVars}
+                            isSelected={selectedCatalogs.has(catWithVars.catalog.id)}
+                            onCatalogToggle={() => onCatalogToggle(catWithVars)}
+                            onVariationClick={(variation, catalog) => handleVariationClick(variation, catalog, false)}
+                            onOpenVariationsPicker={openVariationsPicker}
+                          />
+                        ))}
+                      </SimpleGrid>
+                    ) : (
+                      <Box textAlign="center" py={12}>
+                        <Text color="text.secondary">No catalogs yet</Text>
+                      </Box>
+                    )}
+                  </VStack>
+                )}
+
+                {/* Variations Picker View */}
+                {currentView === 'variations-picker' && viewContext.pickerCatalog && viewContext.pickerVariations && (
+                  <VariationsPickerView
+                    catalog={viewContext.pickerCatalog}
+                    variations={viewContext.pickerVariations}
+                    selectedVariationIds={selectedVariations}
+                    onVariationClick={(variation, catalog) => handleVariationClick(variation, catalog, true)}
+                    onVariationToggle={onVariationToggle}
+                  />
+                )}
+
+                {/* Variation Preview View */}
+                {currentView === 'variation-preview' && viewContext.previewVariation && viewContext.previewCatalog && (
+                  <VariationPreviewView
+                    variation={viewContext.previewVariation}
+                    catalog={viewContext.previewCatalog}
+                    content={viewContext.previewContent || ''}
+                    loading={viewContext.previewLoading || false}
+                  />
+                )}
+              </Dialog.Body>
+
+              {/* Modal Action Bar Footer - using absolute positioning inside the modal content */}
+              <LibrarySelectionBar
+                isOpen={hasSelections && currentView === 'collection'}
+                selectedCount={selectedVariations.size}
+                onClearSelection={clearVariationSelection}
+                onRemoveFromCollection={onRemoveFromCollection}
+                onMoveToCollection={onMoveToCollection}
+                onCreateCollection={onCreateCollection}
+                onBulkPull={onBulkPull}
+                projects={projects}
+                collections={allCollections}
+                isLoading={bulkPulling}
+                position="absolute"
+              />
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+
+      {/* Exit Warning Dialog */}
+      <Dialog.Root open={showExitWarning} onOpenChange={(e) => !e.open && setShowExitWarning(false)}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="400px" borderRadius="16px">
+              <Dialog.Header>
+                <Dialog.Title>Leave Collection?</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text>
+                  You have {selectedVariations.size} item{selectedVariations.size !== 1 ? 's' : ''} selected.
+                  Leaving will clear your selection.
+                </Text>
+              </Dialog.Body>
+              <Dialog.Footer gap={2}>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExitWarning(false)}
+                >
+                  Stay
+                </Button>
+                <Button
+                  colorPalette="red"
+                  onClick={handleConfirmClose}
+                >
+                  Leave
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </>
   );
 }

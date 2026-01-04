@@ -3,8 +3,6 @@ import {
   Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   EmptyState,
   Flex,
   Heading,
@@ -43,14 +41,8 @@ import {
   LuBot,
   LuNetwork,
   LuGithub,
-  LuChevronRight,
   LuTrash2,
   LuExternalLink,
-  LuFolder,
-  LuX,
-  LuFolderPlus,
-  LuSearch,
-  LuCheck,
   LuLayers,
   LuFilter,
   LuBookmark,
@@ -58,14 +50,12 @@ import {
   LuPin,
   LuPinOff,
   LuPencil,
-  LuArrowLeft,
-  LuDownload,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaBook } from 'react-icons/fa';
 import { open as openShell } from '@tauri-apps/api/shell';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { AnimatePresence, motion } from 'framer-motion';
+
 import { toaster } from '../ui/toaster';
 import {
   invokeLibraryListWorkspaces,
@@ -94,25 +84,15 @@ import {
 } from '../../types/github';
 import { Project, invokeGetProjectRegistry } from '../../ipc';
 import { invokeGitHubGetUser, invokeGitHubGetFile } from '../../ipc/github';
-import AddWorkspaceDialog from './AddWorkspaceDialog';
-import { FilterPanel } from '../shared/FilterPanel';
 import { useLibraryCache } from '../../contexts/LibraryCacheContext';
 import { ResourceFile, ResourceType } from '../../types/resource';
-import CollectionViewModal from './CollectionViewModal';
+import AddWorkspaceDialog from './AddWorkspaceDialog';
+import { FilterPanel } from '../shared/FilterPanel';
+import CollectionView from './CollectionView';
 import EditLibraryCollectionModal from './EditLibraryCollectionModal';
-import LibraryActionBar from './LibraryActionBar';
-
-// Selected variation with its catalog info for pulling
-interface SelectedVariation {
-  variation: LibraryVariation;
-  catalog: LibraryCatalog;
-}
-
-// Selected catalog for collection operations
-interface SelectedCatalog {
-  catalog: LibraryCatalog;
-  variations: LibraryVariation[];
-}
+import { LibrarySelectionBar } from './LibrarySelectionBar';
+import { CatalogCard, artifactTypeIcon } from './CatalogCard';
+import { CatalogDetailModal, SelectedVariation } from './CatalogDetailModal';
 
 type ViewMode = 'loading' | 'no-auth' | 'no-workspaces' | 'browse';
 
@@ -128,30 +108,7 @@ interface LibraryTabContentProps {
   onViewVariation?: (resource: ResourceFile, content: string, resourceType: ResourceType) => void;
 }
 
-const artifactTypeIcon: Record<string, React.ReactNode> = {
-  kit: <LuPackage />,
-  walkthrough: <LuBookOpen />,
-  agent: <LuBot />,
-  diagram: <LuNetwork />,
-};
 
-// Format relative time (e.g., "2 hours ago", "3 days ago")
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  const years = Math.floor(months / 12);
-  return `${years}y ago`;
-}
 
 // Library collection is now imported from IPC - no local interface needed
 
@@ -177,10 +134,10 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   // Collection modal state
   const [viewingCollection, setViewingCollection] = useState<string | null>(null);
-  
+
   // Catalog detail modal state
   const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
-  
+
   // Edit collection modal state
   const [editingCollection, setEditingCollection] = useState<LibraryCollection | null>(null);
   const [showEditCollectionModal, setShowEditCollectionModal] = useState(false);
@@ -261,14 +218,14 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     return Array.from(catalogMap.values());
   }, [selectedVariations]);
 
-  // Create a Map version for CollectionViewModal compatibility (until modal uses local state)
+
+  // Map of selected catalogs for O(1) lookup in CollectionView
   const selectedCatalogsMap = useMemo(() => {
-    const map = new Map<string, SelectedCatalog>();
-    for (const { catalog, variations } of selectedCatalogsFromVariations) {
-      map.set(catalog.id, { catalog, variations });
-    }
+    const map = new Map();
+    selectedCatalogsFromVariations.forEach(sc => map.set(sc.catalog.id, sc));
     return map;
   }, [selectedCatalogsFromVariations]);
+
 
   // Get all unique tags from ungrouped catalogs (since filter only applies to ungrouped)
   const allTags = useMemo(() => {
@@ -297,17 +254,17 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   const matchesFilter = useCallback((catWithVars: CatalogWithVariations): boolean => {
     const catalog = catWithVars.catalog;
     const displayName = catalog.name;
-    const matchesName = !nameFilter || 
+    const matchesName = !nameFilter ||
       displayName.toLowerCase().includes(nameFilter.toLowerCase());
-    
+
     const catalogTags = catalog.tags ? JSON.parse(catalog.tags) : [];
-    const matchesTags = selectedTags.length === 0 || 
+    const matchesTags = selectedTags.length === 0 ||
       selectedTags.some(selectedTag =>
-        catalogTags.some((tag: string) => 
+        catalogTags.some((tag: string) =>
           tag.toLowerCase() === selectedTag.toLowerCase()
         )
       );
-    
+
     return matchesName && matchesTags;
   }, [nameFilter, selectedTags]);
 
@@ -614,7 +571,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       const fileName = variation.remote_path.split('/').pop() || 'Unknown';
       const name = fileName.replace(/\.(md|markdown)$/, '');
       const frontMatter = parseFrontMatter(content);
-      
+
       // Determine resource type from catalog artifact_type
       const resourceTypeMap: Record<string, ResourceType> = {
         kit: 'kit',
@@ -674,12 +631,6 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     setSelectedVariations(new Map());
   };
 
-  // Handle opening delete confirmation dialog
-  const handleDeleteCatalogsClick = () => {
-    if (selectedCatalogsFromVariations.length === 0) return;
-    setShowDeleteCatalogsDialog(true);
-  };
-
   // Handle deleting catalogs from workspace (called after confirmation)
   const handleDeleteCatalogs = async () => {
     const catalogIds = selectedCatalogsFromVariations.map(c => c.catalog.id);
@@ -700,7 +651,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       console.log('Deleting catalogs:', catalogIds);
       const deletedCount = await invokeDeleteCatalogs(catalogIds);
       console.log('Delete completed, deleted count:', deletedCount);
-      
+
       if (deletedCount === 0) {
         toaster.create({
           type: 'warning',
@@ -709,7 +660,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         });
         return;
       }
-      
+
       // Clear selections immediately (only variations, catalogs are derived)
       setSelectedVariations(prev => {
         const next = new Map(prev);
@@ -832,7 +783,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
       // Optimistically create collection object
       const now = Math.floor(Date.now() / 1000);
-      const maxOrderIndex = customCollections.length > 0 
+      const maxOrderIndex = customCollections.length > 0
         ? Math.max(...customCollections.map(c => c.order_index)) + 1
         : 0;
       const optimisticCollection: LibraryCollection = {
@@ -876,7 +827,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       // This ensures we have the correct order_index and timestamps from the database
       try {
         const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
-        
+
         // Sort collections by order_index, then created_at for consistent ordering
         const sorted = [...freshCollections].sort((a, b) => {
           if (a.order_index !== b.order_index) {
@@ -884,7 +835,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           }
           return a.created_at - b.created_at;
         });
-        
+
         const freshMap = new Map<string, string[]>();
         for (const collection of sorted) {
           try {
@@ -896,7 +847,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
             freshMap.set(collection.id, []);
           }
         }
-        
+
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
@@ -914,13 +865,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     } catch (error) {
       console.error('Failed to create collection:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Rollback optimistic update on error
       invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
-      
+
       toaster.create({
         type: 'error',
         title: 'Failed to create collection',
@@ -953,7 +904,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       // Silently refresh in background to ensure consistency (without loading state)
       try {
         const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
-        
+
         // Sort collections by order_index, then created_at for consistent ordering
         const sorted = [...freshCollections].sort((a, b) => {
           if (a.order_index !== b.order_index) {
@@ -961,7 +912,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           }
           return a.created_at - b.created_at;
         });
-        
+
         const freshMap = new Map<string, string[]>();
         for (const collection of sorted) {
           try {
@@ -973,7 +924,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
             freshMap.set(collection.id, []);
           }
         }
-        
+
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
@@ -990,13 +941,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       });
     } catch (error) {
       console.error('Failed to move catalogs to collection:', error);
-      
+
       // Rollback optimistic update on error
       invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
-      
+
       toaster.create({
         type: 'error',
         title: 'Failed to move catalogs',
@@ -1033,7 +984,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       // Silently refresh in background to ensure consistency (without loading state)
       try {
         const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
-        
+
         // Sort collections by order_index, then created_at for consistent ordering
         const sorted = [...freshCollections].sort((a, b) => {
           if (a.order_index !== b.order_index) {
@@ -1041,19 +992,19 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           }
           return a.created_at - b.created_at;
         });
-        
+
         const freshMap = new Map<string, string[]>();
-        for (const collection of sorted) {
+        for (const coll of sorted) {
           try {
-            const catIds = await invokeLibraryGetCollectionCatalogIds(collection.id);
+            const catIds = await invokeLibraryGetCollectionCatalogIds(coll.id);
             // Deduplicate catalog IDs to prevent duplicate keys in React rendering
-            freshMap.set(collection.id, [...new Set(catIds)]);
+            freshMap.set(coll.id, [...new Set(catIds)]);
           } catch (mapError) {
             console.error('Failed to load catalog IDs for collection:', mapError);
-            freshMap.set(collection.id, []);
+            freshMap.set(coll.id, []);
           }
         }
-        
+
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
@@ -1070,13 +1021,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       });
     } catch (error) {
       console.error('Failed to remove catalogs from collection:', error);
-      
+
       // Rollback optimistic update on error
       invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
-      
+
       toaster.create({
         type: 'error',
         title: 'Failed to remove catalogs',
@@ -1100,7 +1051,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
       // Optimistically update collection in state
       setCustomCollections(prev => {
-        const updated = prev.map(c => 
+        const updated = prev.map(c =>
           c.id === updatedCollection.id ? updatedCollection : c
         );
         // Sort by order_index, then created_at
@@ -1172,7 +1123,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       // Silently refresh in background to ensure consistency (without loading state)
       try {
         const freshCollections = await invokeLibraryGetCollections(selectedWorkspaceId);
-        
+
         // Sort collections by order_index, then created_at for consistent ordering
         const sorted = [...freshCollections].sort((a, b) => {
           if (a.order_index !== b.order_index) {
@@ -1180,7 +1131,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           }
           return a.created_at - b.created_at;
         });
-        
+
         const freshMap = new Map<string, string[]>();
         for (const coll of sorted) {
           try {
@@ -1192,7 +1143,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
             freshMap.set(coll.id, []);
           }
         }
-        
+
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
@@ -1209,13 +1160,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       });
     } catch (error) {
       console.error('Failed to delete collection:', error);
-      
+
       // Rollback optimistic update on error
       invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
-      
+
       toaster.create({
         type: 'error',
         title: 'Failed to delete collection',
@@ -1273,7 +1224,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       toaster.create({
         type: 'success',
         title: newPinnedState ? 'Workspace pinned' : 'Workspace unpinned',
-        description: newPinnedState 
+        description: newPinnedState
           ? `"${updated.name}" is now your default workspace`
           : `"${updated.name}" is no longer pinned`,
       });
@@ -1392,9 +1343,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   return (
     <>
       {/* Toolbar row - sits above catalog cards */}
-      <Flex 
-        gap={2} 
-        align="center" 
+      <Flex
+        gap={2}
+        align="center"
         mb={4}
         justify="space-between"
       >
@@ -1562,19 +1513,21 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       </Flex>
 
       {/* Unified Library Action Bar - hide when collection modal is open */}
-      {!viewingCollection && (
-        <LibraryActionBar
-          selectedVariations={selectedVariationsArray}
-          onPull={handleBulkPull}
-          onMoveToCollection={handleMoveCatalogsToCollection}
-          onRemoveFromCollection={handleRemoveCatalogsFromCollection}
+      <Portal>
+        <LibrarySelectionBar
+          isOpen={!viewingCollection && selectedVariations.size > 0}
+          selectedCount={selectedVariations.size}
           onClearSelection={clearVariationSelection}
+          onRemoveFromCollection={handleRemoveCatalogsFromCollection}
+          onMoveToCollection={handleMoveCatalogsToCollection}
           onCreateCollection={() => setShowCreateCollectionDialog(true)}
-          collections={sortedCollections}
+          onBulkPull={handleBulkPull}
           projects={projects}
-          loading={bulkPulling}
+          collections={sortedCollections}
+          isLoading={bulkPulling}
+          position="fixed"
         />
-      )}
+      </Portal>
 
       {/* Delete Catalogs Confirmation Dialog */}
       <Dialog.Root
@@ -1601,7 +1554,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                   <Text>
                     Are you sure you want to delete <strong>{selectedCatalogsFromVariations.length}</strong> catalog{selectedCatalogsFromVariations.length !== 1 ? 's' : ''}?
                   </Text>
-                  
+
                   <Box p={3} bg="red.50" borderRadius="md" borderWidth="1px" borderColor="red.200" _dark={{ bg: "red.950", borderColor: "red.800" }}>
                     <VStack gap={2} align="stretch">
                       <HStack gap={2}>
@@ -1665,176 +1618,222 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         </Portal>
       </Dialog.Root>
 
-      <VStack align="stretch" gap={6} width="100%">
-        {/* Loading state - show when collections or catalogs are loading */}
-        {(collectionsLoading || catalogsLoading) && (
-          <Box position="relative">
-            <Flex align="center" justify="space-between" gap={2} mb={4}>
-              <Flex align="center" gap={2}>
-                <Heading size="md">
-                  {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
-                </Heading>
-              </Flex>
-            </Flex>
-            <Flex justify="center" align="center" py={12}>
-              <VStack gap={4}>
-                <Spinner size="lg" />
-                <Text fontSize="sm" color="text.secondary">
-                  {collectionsLoading && catalogsLoading
-                    ? 'Loading collections and catalogs...'
-                    : collectionsLoading
-                    ? 'Scanning GitHub for collections...'
-                    : 'Loading catalogs...'}
-                </Text>
-              </VStack>
-            </Flex>
-          </Box>
-        )}
-
-        {/* Collections Section - only show if collections exist and not loading */}
-        {!collectionsLoading && !catalogsLoading && sortedCollections.length > 0 && (
-          <Box position="relative">
-            <Flex align="center" justify="space-between" gap={2} mb={4}>
-              <Flex align="center" gap={2}>
-                <Icon>
-                  <LuBookmark />
-                </Icon>
-                <Heading size="md">Collections</Heading>
-                <Text fontSize="sm" color="text.muted">
-                  {sortedCollections.length}
-                </Text>
-              </Flex>
-            </Flex>
-
-            <SimpleGrid 
-              columns={{ base: 3, md: 4, lg: 5, xl: 6 }} 
-              gap={2}
+      <Box position="relative" width="100%">
+        <AnimatePresence mode="popLayout" initial={false}>
+          {viewingCollection && sortedCollections.find(c => c.id === viewingCollection) ? (
+            <motion.div
+              key="collection"
+              initial={{ x: 100, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 100, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              style={{ width: "100%" }}
             >
-              {sortedCollections.map((collection) => {
-                const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
-                
-                return (
-                  <LibraryCollectionCard
-                    key={collection.id}
-                    collection={collection}
-                    catalogs={collectionCats}
-                    onOpenModal={() => setViewingCollection(collection.id)}
-                    onDeleteCollection={() => handleDeleteCollection(collection.id)}
-                    onEditCollection={() => handleEditCollection(collection.id)}
-                  />
-                );
-              })}
-            </SimpleGrid>
-          </Box>
-        )}
+              <CollectionView
+                workspaceName={selectedWorkspace?.name || 'Workspace'}
+                collection={sortedCollections.find(c => c.id === viewingCollection)!}
+                catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
+                selectedVariations={selectedVariations}
+                selectedCatalogs={selectedCatalogsMap}
+                onCatalogToggle={handleCatalogToggle}
 
-        {/* Catalogs Section - only show if not loading */}
-        {!collectionsLoading && !catalogsLoading && (
-          <Box mb={8} position="relative" width="100%" maxW="100%">
-            <Flex align="center" gap={2} mb={4}>
-              <Icon>
-                <FaBook />
-              </Icon>
-              <Heading size="md">Catalog</Heading>
-              <Text fontSize="sm" color="text.muted">
-                {organizedCatalogs.ungrouped.length}
-              </Text>
-              {/* Filter Button - only show if there are catalogs or collections */}
-              {(catalogs.length > 0 || customCollections.length > 0) && (
-              <Box position="relative">
-                <Button
-                  ref={filterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  borderWidth="1px"
-                  borderRadius="lg"
-                  css={{
-                    background: 'rgba(255, 255, 255, 0.25)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                    borderColor: 'rgba(0, 0, 0, 0.08)',
-                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                    },
-                  }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFilter />
-                    </Icon>
-                    <Text>Filter</Text>
-                    {(nameFilter || selectedTags.length > 0) && (
-                      <Badge size="sm" colorPalette="primary" variant="solid">
-                        {[nameFilter && 1, selectedTags.length]
-                          .filter(Boolean)
-                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
-                <FilterPanel
-                  isOpen={isFilterOpen}
-                  onClose={() => setIsFilterOpen(false)}
-                  nameFilter={nameFilter}
-                  onNameFilterChange={setNameFilter}
-                  allTags={allTags}
-                  selectedTags={selectedTags}
-                  onToggleTag={toggleTag}
-                  filterButtonRef={filterButtonRef}
-                />
-              </Box>
-            )}
-          </Flex>
-
-          {catalogs.length === 0 && customCollections.length === 0 ? (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <Icon size="lg" color="gray.400">
-                    <LuLibrary />
-                  </Icon>
-                </EmptyState.Indicator>
-                <EmptyState.Title>No catalogs yet</EmptyState.Title>
-                <EmptyState.Description>
-                  Sync to fetch catalogs from GitHub, or publish resources to this workspace.
-                </EmptyState.Description>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          ) : organizedCatalogs.ungrouped.length === 0 ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                {(nameFilter || selectedTags.length > 0)
-                  ? 'No catalogs match the current filters'
-                  : 'All catalogs are organized in collections.'}
-              </Text>
-            </Box>
+                onVariationToggle={handleVariationToggle}
+                onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
+                onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
+                onCreateCollection={() => setShowCreateCollectionDialog(true)}
+                onBulkPull={handleBulkPull}
+                clearVariationSelection={clearVariationSelection}
+                projects={projects}
+                bulkPulling={bulkPulling}
+                allCollections={sortedCollections}
+                onFetchVariationContent={fetchVariationContent}
+                onBack={() => setViewingCollection(null)}
+              />
+            </motion.div>
           ) : (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {organizedCatalogs.ungrouped.map((catWithVars) => (
-                <CatalogCard
-                  key={catWithVars.catalog.id}
-                  catalogWithVariations={catWithVars}
-                  isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
-                  onCatalogToggle={() => handleCatalogToggle(catWithVars)}
-                  onCardClick={() => setViewingCatalog(catWithVars)}
-                />
-              ))}
-            </SimpleGrid>
+            <motion.div
+              key="library"
+              initial={{ x: -100, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -100, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              style={{ width: "100%" }}
+            >
+              <VStack align="stretch" gap={6} width="100%">
+                {/* Loading state - show when collections or catalogs are loading */}
+                {(collectionsLoading || catalogsLoading) && (
+                  <Box position="relative">
+                    <Flex align="center" justify="space-between" gap={2} mb={4}>
+                      <Flex align="center" gap={2}>
+                        <Heading size="md">
+                          {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
+                        </Heading>
+                      </Flex>
+                    </Flex>
+                    <Flex justify="center" align="center" py={12}>
+                      <VStack gap={4}>
+                        <Spinner size="lg" />
+                        <Text fontSize="sm" color="text.secondary">
+                          {collectionsLoading && catalogsLoading
+                            ? 'Loading collections and catalogs...'
+                            : collectionsLoading
+                              ? 'Scanning GitHub for collections...'
+                              : 'Loading catalogs...'}
+                        </Text>
+                      </VStack>
+                    </Flex>
+                  </Box>
+                )}
+
+                {/* Collections Section - only show if collections exist and not loading */}
+                {!collectionsLoading && !catalogsLoading && sortedCollections.length > 0 && (
+                  <Box position="relative">
+                    <Flex align="center" justify="space-between" gap={2} mb={4}>
+                      <Flex align="center" gap={2}>
+                        <Icon>
+                          <LuBookmark />
+                        </Icon>
+                        <Heading size="md">Collections</Heading>
+                        <Text fontSize="sm" color="text.muted">
+                          {sortedCollections.length}
+                        </Text>
+                      </Flex>
+                    </Flex>
+
+                    <SimpleGrid
+                      columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                      gap={2}
+                      p={1}
+                    >
+                      {sortedCollections.map((collection) => {
+                        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+
+                        return (
+                          <LibraryCollectionCard
+                            key={collection.id}
+                            collection={collection}
+                            catalogs={collectionCats}
+                            onOpenModal={() => setViewingCollection(collection.id)}
+                            onDeleteCollection={() => handleDeleteCollection(collection.id)}
+                            onEditCollection={() => handleEditCollection(collection.id)}
+                          />
+                        );
+                      })}
+                    </SimpleGrid>
+                  </Box>
+                )}
+
+                {/* Catalogs Section - only show if not loading */}
+                {!collectionsLoading && !catalogsLoading && (
+                  <Box mb={8} position="relative" width="100%" maxW="100%">
+                    <Flex align="center" gap={2} mb={4}>
+                      <Icon>
+                        <FaBook />
+                      </Icon>
+                      <Heading size="md">Catalog</Heading>
+                      <Text fontSize="sm" color="text.muted">
+                        {organizedCatalogs.ungrouped.length}
+                      </Text>
+                      {/* Filter Button - only show if there are catalogs or collections */}
+                      {(catalogs.length > 0 || customCollections.length > 0) && (
+                        <Box position="relative">
+                          <Button
+                            ref={filterButtonRef}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            borderWidth="1px"
+                            borderRadius="lg"
+                            css={{
+                              background: 'rgba(255, 255, 255, 0.25)',
+                              backdropFilter: 'blur(20px) saturate(180%)',
+                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                              borderColor: 'rgba(0, 0, 0, 0.08)',
+                              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                              _dark: {
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                borderColor: 'rgba(255, 255, 255, 0.15)',
+                                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                              },
+                            }}
+                          >
+                            <HStack gap={2}>
+                              <Icon>
+                                <LuFilter />
+                              </Icon>
+                              <Text>Filter</Text>
+                              {(nameFilter || selectedTags.length > 0) && (
+                                <Badge size="sm" colorPalette="primary" variant="solid">
+                                  {[nameFilter && 1, selectedTags.length]
+                                    .filter(Boolean)
+                                    .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                                </Badge>
+                              )}
+                            </HStack>
+                          </Button>
+                          <FilterPanel
+                            isOpen={isFilterOpen}
+                            onClose={() => setIsFilterOpen(false)}
+                            nameFilter={nameFilter}
+                            onNameFilterChange={setNameFilter}
+                            allTags={allTags}
+                            selectedTags={selectedTags}
+                            onToggleTag={toggleTag}
+                            filterButtonRef={filterButtonRef}
+                          />
+                        </Box>
+                      )}
+                    </Flex>
+
+                    {catalogs.length === 0 && customCollections.length === 0 ? (
+                      <EmptyState.Root>
+                        <EmptyState.Content>
+                          <EmptyState.Indicator>
+                            <Icon size="lg" color="gray.400">
+                              <LuLibrary />
+                            </Icon>
+                          </EmptyState.Indicator>
+                          <EmptyState.Title>No catalogs yet</EmptyState.Title>
+                          <EmptyState.Description>
+                            Sync to fetch catalogs from GitHub, or publish resources to this workspace.
+                          </EmptyState.Description>
+                        </EmptyState.Content>
+                      </EmptyState.Root>
+                    ) : organizedCatalogs.ungrouped.length === 0 ? (
+                      <Box
+                        p={6}
+                        bg="bg.subtle"
+                        borderRadius="md"
+                        borderWidth="1px"
+                        borderColor="border.subtle"
+                        textAlign="center"
+                      >
+                        <Text color="text.muted" fontSize="sm">
+                          {(nameFilter || selectedTags.length > 0)
+                            ? 'No catalogs match the current filters'
+                            : 'All catalogs are organized in collections.'}
+                        </Text>
+                      </Box>
+                    ) : (
+                      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
+                        {organizedCatalogs.ungrouped.map((catWithVars) => (
+                          <CatalogCard
+                            key={catWithVars.catalog.id}
+                            catalogWithVariations={catWithVars}
+                            isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
+                            onCatalogToggle={() => handleCatalogToggle(catWithVars)}
+                            onCardClick={() => setViewingCatalog(catWithVars)}
+                          />
+                        ))}
+                      </SimpleGrid>
+                    )}
+                  </Box>
+                )}
+              </VStack>
+            </motion.div>
           )}
-          </Box>
-        )}
-      </VStack>
+        </AnimatePresence>
+      </Box>
 
       {/* Dialogs */}
       <AddWorkspaceDialog
@@ -1858,41 +1857,6 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       />
 
       {/* Collection View Modal */}
-      {viewingCollection && (() => {
-        const collection = sortedCollections.find(c => c.id === viewingCollection);
-        if (!collection) return null;
-        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
-        return (
-          <CollectionViewModal
-            isOpen={true}
-            onClose={() => setViewingCollection(null)}
-            collection={collection}
-            catalogs={collectionCats}
-            selectedVariations={selectedVariations}
-            selectedCatalogs={selectedCatalogsMap}
-            onCatalogToggle={handleCatalogToggle}
-            onVariationClick={handleVariationClick}
-            onVariationToggle={handleVariationToggle}
-            onDeleteCollection={() => {
-              handleDeleteCollection(collection.id);
-              setViewingCollection(null);
-            }}
-            onMoveToCollection={handleMoveCatalogsToCollection}
-            onRemoveFromCollection={handleRemoveCatalogsFromCollection}
-            onCreateCollection={() => {
-              setShowCreateCollectionDialog(true);
-              setViewingCollection(null);
-            }}
-            onBulkPull={handleBulkPull}
-            clearVariationSelection={clearVariationSelection}
-            clearCatalogSelection={handleDeleteCatalogsClick}
-            projects={projects}
-            bulkPulling={bulkPulling}
-            allCollections={sortedCollections}
-            onFetchVariationContent={fetchVariationContent}
-          />
-        );
-      })()}
 
       {/* Edit Collection Modal */}
       <EditLibraryCollectionModal
@@ -1906,988 +1870,26 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       />
 
       {/* Catalog Detail Modal */}
-      {viewingCatalog && (
-        <CatalogDetailModal
-          isOpen={true}
-          onClose={() => setViewingCatalog(null)}
-          catalogWithVariations={viewingCatalog}
-          onVariationClick={handleVariationClick}
-          onFetchVariationContent={fetchVariationContent}
-          selectedVariations={selectedVariations}
-          onVariationToggle={handleVariationToggle}
-          projects={projects}
-          onBulkPull={handleBulkPull}
-          bulkPulling={bulkPulling}
-        />
-      )}
+      {
+        viewingCatalog && (
+          <CatalogDetailModal
+            isOpen={true}
+            onClose={() => setViewingCatalog(null)}
+            catalogWithVariations={viewingCatalog}
+            onFetchVariationContent={fetchVariationContent}
+            selectedVariations={selectedVariations}
+            onVariationToggle={handleVariationToggle}
+            projects={projects}
+            onBulkPull={handleBulkPull}
+            bulkPulling={bulkPulling}
+          />
+        )
+      }
     </>
   );
 });
 
-interface CatalogCardProps {
-  catalogWithVariations: CatalogWithVariations;
-  isSelected: boolean;
-  onCatalogToggle: () => void;
-  onCardClick: () => void;
-}
 
-function CatalogCard({ 
-  catalogWithVariations, 
-  isSelected,
-  onCatalogToggle,
-  onCardClick,
-}: CatalogCardProps) {
-  const { catalog, variations } = catalogWithVariations;
-  const hasSingleVariation = variations.length === 1;
-
-  const icon = artifactTypeIcon[catalog.artifact_type] || <LuPackage />;
-  const tags = catalog.tags ? JSON.parse(catalog.tags) : [];
-
-  return (
-    <Card.Root 
-      borderRadius="16px"
-      borderWidth="1px"
-      cursor="pointer"
-      onClick={onCardClick}
-      transition="all 0.2s ease-in-out"
-      css={{
-        background: 'rgba(255, 255, 255, 0.25)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-        borderColor: isSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(0, 0, 0, 0.08)',
-        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.06)',
-        _dark: {
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderColor: isSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        },
-        _hover: {
-          transform: 'scale(1.02)',
-          borderColor: isSelected ? 'var(--chakra-colors-primary-600)' : 'var(--chakra-colors-primary-400)',
-        },
-      }}
-    >
-      <CardHeader pb={2}>
-        <Flex justify="space-between" align="center">
-          <HStack gap={2} flex={1}>
-            <Icon color="primary.500">{icon}</Icon>
-            <Heading size="sm">{catalog.name}</Heading>
-            {!hasSingleVariation && (
-              <Badge 
-                size="sm" 
-                colorPalette="gray"
-                bg="transparent"
-                _dark={{ bg: "bg.subtle" }}
-              >
-                {variations.length}
-              </Badge>
-            )}
-          </HStack>
-          <Checkbox.Root
-            checked={isSelected}
-            colorPalette="primary"
-            onCheckedChange={onCatalogToggle}
-            onClick={(e) => e.stopPropagation()}
-            cursor="pointer"
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control
-              cursor="pointer"
-              css={{
-                width: '20px',
-                height: '20px',
-                borderWidth: '2px',
-                borderColor: isSelected ? 'primary.500' : 'border.emphasized',
-                background: isSelected
-                  ? 'rgba(59, 130, 246, 0.15)'
-                  : 'rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                boxShadow: isSelected
-                  ? '0 0 0 2px rgba(59, 130, 246, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                  : '0 1px 2px rgba(0, 0, 0, 0.05)',
-                _dark: {
-                  background: isSelected
-                    ? 'rgba(59, 130, 246, 0.25)'
-                    : 'rgba(255, 255, 255, 0.1)',
-                  borderColor: isSelected ? 'primary.400' : 'border.emphasized',
-                  boxShadow: isSelected
-                    ? '0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3)'
-                    : '0 1px 2px rgba(0, 0, 0, 0.2)',
-                },
-                _hover: {
-                  background: isSelected
-                    ? 'rgba(59, 130, 246, 0.2)'
-                    : 'rgba(255, 255, 255, 0.4)',
-                  _dark: {
-                    background: isSelected
-                      ? 'rgba(59, 130, 246, 0.3)'
-                      : 'rgba(255, 255, 255, 0.15)',
-                  },
-                },
-              }}
-            >
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-          </Checkbox.Root>
-        </Flex>
-      </CardHeader>
-      <CardBody pt={0}>
-        {catalog.description && (
-          <Text fontSize="sm" color="text.secondary" mb={2}>
-            {catalog.description}
-          </Text>
-        )}
-        {tags.length > 0 && (
-          <HStack gap={2} flexWrap="wrap">
-            {tags.map((tag: string, index: number) => (
-              <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" variant="subtle" colorPalette="primary">
-                <Tag.Label>{tag}</Tag.Label>
-              </Tag.Root>
-            ))}
-          </HStack>
-        )}
-      </CardBody>
-    </Card.Root>
-  );
-}
-
-// Catalog Detail Modal - shows variations picker and/or preview
-type CatalogModalView = 'variations-picker' | 'variation-preview';
-
-interface CatalogDetailModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  catalogWithVariations: CatalogWithVariations;
-  onVariationClick: (variation: LibraryVariation, catalog: LibraryCatalog) => void;
-  onFetchVariationContent: (variation: LibraryVariation, catalog: LibraryCatalog) => Promise<string>;
-  selectedVariations: Map<string, SelectedVariation>;
-  onVariationToggle: (variation: LibraryVariation, catalog: LibraryCatalog) => void;
-  projects: Project[];
-  onBulkPull: (projects: Project[]) => void;
-  bulkPulling: boolean;
-}
-
-function CatalogDetailModal({
-  isOpen,
-  onClose,
-  catalogWithVariations,
-  onFetchVariationContent,
-  selectedVariations,
-  onVariationToggle,
-  projects,
-  onBulkPull,
-  bulkPulling,
-}: CatalogDetailModalProps) {
-  const { catalog, variations } = catalogWithVariations;
-  const [currentView, setCurrentView] = useState<CatalogModalView>('variations-picker');
-  const [previewVariation, setPreviewVariation] = useState<LibraryVariation | null>(null);
-  const [previewContent, setPreviewContent] = useState<string>('');
-  const [previewLoading, setPreviewLoading] = useState(false);
-
-  const hasSingleVariation = variations.length === 1;
-
-  // Helper to load variation content
-  const loadVariationContent = async (variation: LibraryVariation) => {
-    setPreviewVariation(variation);
-    setPreviewLoading(true);
-    setPreviewContent('');
-
-    try {
-      const content = await onFetchVariationContent(variation, catalog);
-      setPreviewContent(content);
-    } catch (error) {
-      console.error('Failed to fetch variation content:', error);
-      setPreviewContent('# Error\n\nFailed to load content.');
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
-  // Reset state when modal opens/closes - auto-open preview for single variation
-  useEffect(() => {
-    if (isOpen) {
-      if (hasSingleVariation) {
-        // Single variation - go directly to preview
-        setCurrentView('variation-preview');
-        loadVariationContent(variations[0]);
-      } else {
-        // Multiple variations - show picker
-        setCurrentView('variations-picker');
-        setPreviewVariation(null);
-        setPreviewContent('');
-        setPreviewLoading(false);
-      }
-    }
-  }, [isOpen, hasSingleVariation]);
-
-  const icon = artifactTypeIcon[catalog.artifact_type] || <LuPackage />;
-
-  const handleVariationSelect = async (variation: LibraryVariation) => {
-    setCurrentView('variation-preview');
-    loadVariationContent(variation);
-  };
-
-  const handleBack = () => {
-    if (hasSingleVariation) {
-      // Single variation - close modal since there's no picker
-      onClose();
-    } else {
-      // Multiple variations - go back to picker
-      setCurrentView('variations-picker');
-      setPreviewVariation(null);
-      setPreviewContent('');
-    }
-  };
-
-  const getVersionLabel = (variation: LibraryVariation, index: number): string => {
-    if (variation.version_tag) return variation.version_tag;
-    return `v${variations.length - index}`;
-  };
-
-  // Parse front matter from content
-  const frontMatter = useMemo(() => {
-    const fm: Record<string, any> = {};
-    if (previewContent.trim().startsWith('---')) {
-      const endIndex = previewContent.indexOf('\n---', 4);
-      if (endIndex !== -1) {
-        const frontMatterText = previewContent.substring(4, endIndex);
-        const lines = frontMatterText.split('\n');
-        lines.forEach((line) => {
-          const colonIndex = line.indexOf(':');
-          if (colonIndex > 0) {
-            const key = line.substring(0, colonIndex).trim();
-            let value = line.substring(colonIndex + 1).trim();
-            if (key === 'tags' && value.startsWith('[')) {
-              fm[key] = value
-                .slice(1, -1)
-                .split(',')
-                .map((t) => t.trim().replace(/['"]/g, ''));
-            } else {
-              fm[key] = value.replace(/^["']|["']$/g, '');
-            }
-          }
-        });
-      }
-    }
-    return fm;
-  }, [previewContent]);
-
-  const contentWithoutFrontMatter = previewContent.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
-  const displayName = frontMatter.title || frontMatter.name || catalog.name;
-
-  // Get selected variations for action bar
-  const selectedVariationsArray = useMemo(() => {
-    return Array.from(selectedVariations.values());
-  }, [selectedVariations]);
-
-  const hasSelection = selectedVariations.size > 0;
-
-  // Action bar handlers
-  const [isAddToProjectOpen, setIsAddToProjectOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!hasSelection) {
-      setSelectedProjectIds(new Set());
-      setSearchQuery('');
-      setIsAddToProjectOpen(false);
-    }
-  }, [hasSelection]);
-
-  useEffect(() => {
-    if (isAddToProjectOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
-    }
-  }, [isAddToProjectOpen]);
-
-  const toggleProject = (projectId: string) => {
-    setSelectedProjectIds(prev => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
-  };
-
-  const handleConfirmPull = () => {
-    const selectedProjects = projects.filter(p => selectedProjectIds.has(p.id));
-    onBulkPull(selectedProjects);
-    setIsAddToProjectOpen(false);
-    setSelectedProjectIds(new Set());
-  };
-
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.path.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const truncatePath = (path: string, maxLength: number = 40): string => {
-    if (path.length <= maxLength) return path;
-    return `...${path.slice(-(maxLength - 3))}`;
-  };
-
-  return (
-    <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content
-            maxW="90vw"
-            maxH="90vh"
-            w="900px"
-            h="80vh"
-            borderRadius="16px"
-            css={{
-              background: 'rgba(255, 255, 255, 0.25)',
-              backdropFilter: 'blur(30px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-              borderColor: 'rgba(0, 0, 0, 0.08)',
-              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.06)',
-              _dark: {
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-              },
-            }}
-          >
-            <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
-              <HStack gap={2} align="center" flex={1}>
-                {/* Back button when on preview view with multiple variations */}
-                {currentView === 'variation-preview' && !hasSingleVariation && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBack}
-                    px={2}
-                  >
-                    <LuArrowLeft />
-                  </Button>
-                )}
-
-                {/* Breadcrumb navigation */}
-                <HStack gap={1} align="center" flex={1}>
-                  {currentView === 'variation-preview' ? (
-                    hasSingleVariation ? (
-                      // Single variation - just show catalog name
-                      <>
-                        <Icon boxSize={5} color="primary.500">
-                          {icon}
-                        </Icon>
-                        <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
-                      </>
-                    ) : (
-                      // Multiple variations - show breadcrumb
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleBack}
-                          px={2}
-                          fontWeight="normal"
-                          color="text.secondary"
-                          _hover={{ color: 'primary.500' }}
-                        >
-                          <Icon boxSize={4} color="primary.500" mr={1}>
-                            {icon}
-                          </Icon>
-                          {catalog.name}
-                        </Button>
-                        <Icon color="text.tertiary" boxSize={4}>
-                          <LuChevronRight />
-                        </Icon>
-                        <Dialog.Title fontSize="lg">
-                          {previewVariation && getVersionLabel(previewVariation, variations.indexOf(previewVariation))}
-                        </Dialog.Title>
-                      </>
-                    )
-                  ) : (
-                    // Picker view - show catalog name with version count
-                    <>
-                      <Icon boxSize={5} color="primary.500">
-                        {icon}
-                      </Icon>
-                      <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
-                      <Badge
-                        size="sm"
-                        colorPalette="gray"
-                        bg="transparent"
-                        _dark={{ bg: "transparent" }}
-                      >
-                        {variations.length} versions
-                      </Badge>
-                    </>
-                  )}
-                </HStack>
-              </HStack>
-
-              {/* Action buttons */}
-              <HStack gap={2} align="center">
-                {currentView === 'variation-preview' && previewVariation && (
-                  <>
-                    {(() => {
-                      const isSelected = selectedVariations.has(previewVariation.id);
-                      return (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => onVariationToggle(previewVariation, catalog)}
-                          borderWidth="1px"
-                          borderRadius="lg"
-                          css={isSelected ? {
-                            background: 'rgba(59, 130, 246, 0.15)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(59, 130, 246, 0.3)',
-                            boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.1)',
-                            color: 'var(--chakra-colors-primary-600)',
-                            _dark: {
-                              background: 'rgba(59, 130, 246, 0.2)',
-                              borderColor: 'rgba(59, 130, 246, 0.4)',
-                              boxShadow: '0 4px 16px 0 rgba(59, 130, 246, 0.2)',
-                              color: 'var(--chakra-colors-primary-400)',
-                            },
-                          } : {
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                            _dark: {
-                              background: 'rgba(0, 0, 0, 0.2)',
-                              borderColor: 'rgba(255, 255, 255, 0.15)',
-                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                            },
-                          }}
-                        >
-                          {isSelected ? 'Selected' : 'Select'}
-                        </Button>
-                      );
-                    })()}
-                    <Button
-                      variant="solid"
-                      colorPalette="primary"
-                      size="xs"
-                      mr={4}
-                    >
-                      <HStack gap={1.5}>
-                        <LuDownload />
-                        <Text>Pull</Text>
-                      </HStack>
-                    </Button>
-                  </>
-                )}
-                <Dialog.CloseTrigger asChild>
-                  <IconButton
-                    variant="ghost"
-                    size="xs"
-                    aria-label="Close"
-                  >
-                    <LuX />
-                  </IconButton>
-                </Dialog.CloseTrigger>
-              </HStack>
-            </Dialog.Header>
-
-            <Dialog.Body overflow="auto" position="relative" p={currentView === 'variation-preview' ? 4 : undefined}>
-              {/* Variations Picker View */}
-              {currentView === 'variations-picker' && (
-                <VStack align="stretch" gap={4}>
-                  {/* Action Bar */}
-                  {hasSelection && (
-                    <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
-                      <Portal>
-                        <ActionBar.Positioner zIndex={1000}>
-                          <ActionBar.Content>
-                            <VStack align="stretch" gap={0}>
-                              <Box pb={1} mt={-0.5}>
-                                <HStack gap={1.5} justify="center">
-                                  <Text fontSize="xs" color="text.secondary">
-                                    {selectedVariationsArray.length} variation{selectedVariationsArray.length !== 1 ? 's' : ''} selected
-                                  </Text>
-                                </HStack>
-                              </Box>
-                              <HStack gap={2}>
-                                <Button
-                                  variant="surface"
-                                  colorPalette="red"
-                                  size="sm"
-                                  onClick={() => {
-                                    // Clear only variations from this catalog
-                                    for (const v of variations) {
-                                      if (selectedVariations.has(v.id)) {
-                                        onVariationToggle(v, catalog);
-                                      }
-                                    }
-                                  }}
-                                  disabled={bulkPulling}
-                                >
-                                  <HStack gap={2}>
-                                    <LuX />
-                                    <Text>Remove</Text>
-                                  </HStack>
-                                </Button>
-
-                                <ActionBar.Separator />
-
-                                <Menu.Root 
-                                  closeOnSelect={false}
-                                  open={isAddToProjectOpen}
-                                  onOpenChange={(e) => setIsAddToProjectOpen(e.open)}
-                                >
-                                  <Menu.Trigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={bulkPulling}
-                                    >
-                                      <HStack gap={2}>
-                                        <LuFolderPlus />
-                                        <Text>Add to Project</Text>
-                                      </HStack>
-                                    </Button>
-                                  </Menu.Trigger>
-                                  <Portal>
-                                    <Menu.Positioner zIndex={2000}>
-                                      <Menu.Content width="400px" maxH="500px" position="relative" zIndex={2000}>
-                                        <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                                          <Text fontSize="sm" fontWeight="semibold">
-                                            Add to Project
-                                          </Text>
-                                        </Box>
-
-                                        <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                                          <InputGroup startElement={<LuSearch />}>
-                                            <Input
-                                              ref={searchInputRef}
-                                              placeholder="Search projects..."
-                                              value={searchQuery}
-                                              onChange={(e) => setSearchQuery(e.target.value)}
-                                              size="sm"
-                                              onClick={(e) => e.stopPropagation()}
-                                              onKeyDown={(e) => e.stopPropagation()}
-                                            />
-                                          </InputGroup>
-                                        </Box>
-
-                                        <Box maxH="300px" overflowY="auto">
-                                          {filteredProjects.length === 0 ? (
-                                            <Box textAlign="center" py={4} px={3}>
-                                              <Text fontSize="sm" color="text.secondary">
-                                                {searchQuery ? 'No projects match your search.' : 'No projects found.'}
-                                              </Text>
-                                            </Box>
-                                          ) : (
-                                            filteredProjects.map((project) => {
-                                              const isSelected = selectedProjectIds.has(project.id);
-                                              return (
-                                                <Menu.Item
-                                                  key={project.id}
-                                                  value={project.id}
-                                                  onSelect={() => toggleProject(project.id)}
-                                                >
-                                                  <HStack gap={2} justify="space-between" width="100%" minW={0}>
-                                                    <HStack gap={2} flex="1" minW={0} overflow="hidden">
-                                                      <Icon flexShrink={0}>
-                                                        <LuFolder />
-                                                      </Icon>
-                                                      <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
-                                                        <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
-                                                          {project.name}
-                                                        </Text>
-                                                        <Text fontSize="xs" color="text.secondary" title={project.path}>
-                                                          {truncatePath(project.path, 35)}
-                                                        </Text>
-                                                      </VStack>
-                                                    </HStack>
-                                                    {isSelected && (
-                                                      <Icon color="primary.500" flexShrink={0}>
-                                                        <LuCheck />
-                                                      </Icon>
-                                                    )}
-                                                  </HStack>
-                                                </Menu.Item>
-                                              );
-                                            })
-                                          )}
-                                        </Box>
-
-                                        <Box
-                                          px={3}
-                                          py={2}
-                                          borderTopWidth="1px"
-                                          borderColor="border.subtle"
-                                          bg="bg.panel"
-                                          opacity={selectedProjectIds.size > 0 ? 1 : 0.5}
-                                        >
-                                          <Button
-                                            variant="solid"
-                                            colorPalette="primary"
-                                            size="sm"
-                                            width="100%"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleConfirmPull();
-                                            }}
-                                            disabled={bulkPulling || selectedProjectIds.size === 0}
-                                          >
-                                            {bulkPulling ? (
-                                              <HStack gap={2}>
-                                                <Spinner size="xs" />
-                                                <Text>Pulling...</Text>
-                                              </HStack>
-                                            ) : (
-                                              `Pull to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
-                                            )}
-                                          </Button>
-                                        </Box>
-                                      </Menu.Content>
-                                    </Menu.Positioner>
-                                  </Portal>
-                                </Menu.Root>
-                              </HStack>
-                            </VStack>
-                          </ActionBar.Content>
-                        </ActionBar.Positioner>
-                      </Portal>
-                    </ActionBar.Root>
-                  )}
-
-                  {catalog.description && (
-                    <Text fontSize="md" color="text.secondary">
-                      {catalog.description}
-                    </Text>
-                  )}
-
-                  <Text fontSize="sm" color="text.tertiary">
-                    Select a version to view its content
-                  </Text>
-
-                  <VStack align="stretch" gap={2}>
-                    {variations.map((v, index) => {
-                      const publishDate = new Date(v.published_at * 1000);
-                      const timeAgo = formatTimeAgo(publishDate);
-                      const isVariationSelected = selectedVariations.has(v.id);
-                      const versionLabel = getVersionLabel(v, index);
-
-                      return (
-                        <HStack
-                          key={v.id}
-                          justify="space-between"
-                          align="center"
-                          py={3}
-                          px={4}
-                          borderRadius="12px"
-                          cursor="pointer"
-                          transition="all 0.15s"
-                          css={{
-                            background: 'rgba(255, 255, 255, 0.15)',
-                            _dark: {
-                              background: 'rgba(255, 255, 255, 0.05)',
-                            },
-                            _hover: {
-                              background: 'rgba(255, 255, 255, 0.25)',
-                              _dark: {
-                                background: 'rgba(255, 255, 255, 0.1)',
-                              },
-                            },
-                          }}
-                          onClick={() => handleVariationSelect(v)}
-                          gap={3}
-                        >
-                          <HStack gap={3} flex={1}>
-                            <Icon boxSize={5} color="primary.500">
-                              {icon}
-                            </Icon>
-                            <VStack align="start" gap={0}>
-                              <Text fontSize="md" fontWeight="medium">
-                                {versionLabel}
-                              </Text>
-                              <HStack gap={2}>
-                                <Text fontSize="sm" color="text.tertiary">
-                                  {timeAgo}
-                                </Text>
-                                {v.publisher_name && (
-                                  <Text fontSize="sm" color="text.tertiary">
-                                    by {v.publisher_name}
-                                  </Text>
-                                )}
-                              </HStack>
-                            </VStack>
-                          </HStack>
-                          <HStack gap={3}>
-                            <Icon color="text.tertiary">
-                              <LuChevronRight />
-                            </Icon>
-                            <Checkbox.Root
-                              checked={isVariationSelected}
-                              colorPalette="primary"
-                              onCheckedChange={() => onVariationToggle(v, catalog)}
-                              onClick={(e) => e.stopPropagation()}
-                              cursor="pointer"
-                            >
-                              <Checkbox.HiddenInput />
-                              <Checkbox.Control
-                                cursor="pointer"
-                                css={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderWidth: '2px',
-                                  borderColor: isVariationSelected ? 'primary.500' : 'border.emphasized',
-                                  background: isVariationSelected
-                                    ? 'rgba(59, 130, 246, 0.15)'
-                                    : 'rgba(255, 255, 255, 0.3)',
-                                  backdropFilter: 'blur(10px)',
-                                  WebkitBackdropFilter: 'blur(10px)',
-                                  boxShadow: isVariationSelected
-                                    ? '0 0 0 2px rgba(59, 130, 246, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                                    : '0 1px 2px rgba(0, 0, 0, 0.05)',
-                                  _dark: {
-                                    background: isVariationSelected
-                                      ? 'rgba(59, 130, 246, 0.25)'
-                                      : 'rgba(255, 255, 255, 0.1)',
-                                    borderColor: isVariationSelected ? 'primary.400' : 'border.emphasized',
-                                    boxShadow: isVariationSelected
-                                      ? '0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3)'
-                                      : '0 1px 2px rgba(0, 0, 0, 0.2)',
-                                  },
-                                  _hover: {
-                                    background: isVariationSelected
-                                      ? 'rgba(59, 130, 246, 0.2)'
-                                      : 'rgba(255, 255, 255, 0.4)',
-                                    _dark: {
-                                      background: isVariationSelected
-                                        ? 'rgba(59, 130, 246, 0.3)'
-                                        : 'rgba(255, 255, 255, 0.15)',
-                                    },
-                                  },
-                                }}
-                              >
-                                <Checkbox.Indicator />
-                              </Checkbox.Control>
-                            </Checkbox.Root>
-                          </HStack>
-                        </HStack>
-                      );
-                    })}
-                  </VStack>
-                </VStack>
-              )}
-
-              {/* Variation Preview View */}
-              {currentView === 'variation-preview' && (
-                <Box h="100%" display="flex" flexDirection="column">
-                  {previewLoading ? (
-                    <Flex justify="center" align="center" h="100%" minH="400px">
-                      <VStack gap={4}>
-                        <Spinner size="lg" />
-                        <Text color="text.secondary">Loading content...</Text>
-                      </VStack>
-                    </Flex>
-                  ) : (
-                    <Box
-                      flex="1"
-                      overflow="auto"
-                      borderRadius="12px"
-                      css={{
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        _dark: {
-                          background: 'rgba(255, 255, 255, 0.03)',
-                        },
-                      }}
-                    >
-                      <Box p={6}>
-                        <VStack align="stretch" gap={6}>
-                          {/* Header */}
-                          <Box>
-                            <Heading
-                              size="xl"
-                              mb={2}
-                              css={{
-                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                                _dark: {
-                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                                },
-                              }}
-                            >
-                              {displayName}
-                            </Heading>
-                            {frontMatter.description && (
-                              <Text
-                                fontSize="lg"
-                                color="text.secondary"
-                                mb={4}
-                                css={{
-                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                                  _dark: {
-                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                                  },
-                                }}
-                              >
-                                {frontMatter.description}
-                              </Text>
-                            )}
-
-                            {/* Metadata Tags */}
-                            <HStack gap={2} flexWrap="wrap" mt={4}>
-                              {frontMatter.tags && frontMatter.tags.map((tag: string) => (
-                                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                  <Tag.Label>{tag}</Tag.Label>
-                                </Tag.Root>
-                              ))}
-                              {frontMatter.version && (
-                                <Tag.Root size="sm" variant="outline">
-                                  <Tag.Label>v{frontMatter.version}</Tag.Label>
-                                </Tag.Root>
-                              )}
-                            </HStack>
-                          </Box>
-
-                          <Separator />
-
-                          {/* Markdown Content */}
-                          <Box
-                            css={{
-                              '& > *': { mb: 4 },
-                              '& > *:last-child': { mb: 0 },
-                              '& h1': { fontSize: '2xl', fontWeight: 'bold', mt: 6, mb: 4 },
-                              '& h2': { fontSize: '2xl', fontWeight: 'semibold', mt: 5, mb: 3, color: 'primary.500' },
-                              '& h3': { fontSize: 'lg', fontWeight: 'semibold', mt: 4, mb: 2 },
-                              '& h4, & h5, & h6': { fontSize: 'md', fontWeight: 'semibold', mt: 3, mb: 2 },
-                              '& p': { lineHeight: '1.75', color: 'text.primary' },
-                              '& ul, & ol': { pl: 4, mb: 4 },
-                              '& li': { mb: 2 },
-                              '& pre': { mb: 4 },
-                              '& code': { fontSize: '0.9em' },
-                              '& a': { color: 'primary.500', textDecoration: 'underline' },
-                              '& a:hover': { color: 'primary.600' },
-                              '& blockquote': { borderLeft: '4px solid', borderColor: 'border.emphasized', pl: 4, py: 2, my: 4, fontStyle: 'italic' },
-                              '& table': { width: '100%', borderCollapse: 'collapse', mb: 4 },
-                              '& th, & td': { border: '1px solid', borderColor: 'border.subtle', px: 3, py: 2 },
-                              '& th': { fontWeight: 'semibold' },
-                            }}
-                          >
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                h1: ({ children }) => (
-                                  <Heading as="h1" size="2xl" mt={6} mb={4}>
-                                    {children}
-                                  </Heading>
-                                ),
-                                h2: ({ children }) => (
-                                  <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">
-                                    {children}
-                                  </Heading>
-                                ),
-                                h3: ({ children }) => (
-                                  <Heading as="h3" size="lg" mt={4} mb={2}>
-                                    {children}
-                                  </Heading>
-                                ),
-                                h4: ({ children }) => (
-                                  <Heading as="h4" size="md" mt={3} mb={2}>
-                                    {children}
-                                  </Heading>
-                                ),
-                                p: ({ children }) => (
-                                  <Text mb={4} lineHeight="1.75" color="text.primary">
-                                    {children}
-                                  </Text>
-                                ),
-                                ul: ({ children }) => (
-                                  <List.Root mb={4} pl={4}>
-                                    {children}
-                                  </List.Root>
-                                ),
-                                ol: ({ children }) => (
-                                  <List.Root as="ol" mb={4} pl={4}>
-                                    {children}
-                                  </List.Root>
-                                ),
-                                li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
-                                code: ({ className, children, ...props }) => {
-                                  const match = /language-(.+)/.exec(className || '');
-                                  const isInline = !match;
-                                  const codeString = String(children).replace(/\n$/, '');
-
-                                  if (isInline) {
-                                    return (
-                                      <Code px={1.5} py={0.5} borderRadius="sm" fontSize="0.9em" {...props}>
-                                        {children}
-                                      </Code>
-                                    );
-                                  }
-
-                                  return (
-                                    <Box
-                                      as="pre"
-                                      p={4}
-                                      borderRadius="md"
-                                      overflow="auto"
-                                      mb={4}
-                                      css={{
-                                        background: 'rgba(0, 0, 0, 0.1)',
-                                        _dark: {
-                                          background: 'rgba(0, 0, 0, 0.3)',
-                                        },
-                                      }}
-                                    >
-                                      <Code display="block" whiteSpace="pre" fontSize="sm">
-                                        {codeString}
-                                      </Code>
-                                    </Box>
-                                  );
-                                },
-                                a: ({ href, children }) => (
-                                  <Link
-                                    href={href}
-                                    color="primary.500"
-                                    textDecoration="underline"
-                                    _hover={{ color: 'primary.600' }}
-                                  >
-                                    {children}
-                                  </Link>
-                                ),
-                                blockquote: ({ children }) => (
-                                  <Box
-                                    as="blockquote"
-                                    borderLeft="4px solid"
-                                    borderColor="border.emphasized"
-                                    pl={4}
-                                    py={2}
-                                    my={4}
-                                    fontStyle="italic"
-                                  >
-                                    {children}
-                                  </Box>
-                                ),
-                                hr: () => <Separator my={6} />,
-                              }}
-                            >
-                              {contentWithoutFrontMatter}
-                            </ReactMarkdown>
-                          </Box>
-                        </VStack>
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-              )}
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
-  );
-}
 
 
 // Library Collection Card - simplified to open modal
@@ -2910,14 +1912,14 @@ function LibraryCollectionCard({
   const inferArtifactType = (catalogWithVariations: CatalogWithVariations): string => {
     const catalog = catalogWithVariations.catalog;
     let type = catalog.artifact_type;
-    
+
     // If type is "unknown", try to infer from remote_path or variations
     if (type === 'unknown' || !type) {
       // First, check variations' remote_path
       for (const variation of catalogWithVariations.variations) {
         const remotePath = variation.remote_path || '';
         const pathParts = remotePath.split('/');
-        
+
         // Look for artifact type directories in the path
         const artifactTypeMap: Record<string, string> = {
           'kits': 'kit',
@@ -2925,49 +1927,49 @@ function LibraryCollectionCard({
           'agents': 'agent',
           'diagrams': 'diagram',
         };
-        
+
         for (const part of pathParts) {
           if (artifactTypeMap[part]) {
             type = artifactTypeMap[part];
             return type;
           }
         }
-        
+
         // Check file extension for diagrams
         if (remotePath.endsWith('.mmd') || remotePath.endsWith('.mermaid')) {
           type = 'diagram';
           return type;
         }
       }
-      
+
       // Fallback: check catalog's remote_path
       const remotePath = catalog.remote_path || '';
       const pathParts = remotePath.split('/');
-      
+
       const artifactTypeMap: Record<string, string> = {
         'kits': 'kit',
         'walkthroughs': 'walkthrough',
         'agents': 'agent',
         'diagrams': 'diagram',
       };
-      
+
       for (const part of pathParts) {
         if (artifactTypeMap[part]) {
           type = artifactTypeMap[part];
           return type;
         }
       }
-      
+
       // Check file extension for diagrams
       if (remotePath.endsWith('.mmd') || remotePath.endsWith('.mermaid')) {
         type = 'diagram';
         return type;
       }
     }
-    
+
     return type || 'unknown';
   };
-  
+
   // Count catalogs by artifact type
   const typeCounts = catalogs.reduce((acc, cat) => {
     const type = inferArtifactType(cat);
@@ -2991,7 +1993,7 @@ function LibraryCollectionCard({
   if (typeCounts.diagram) {
     resourceSummary.push({ count: typeCounts.diagram, icon: <LuNetwork /> });
   }
-  
+
   // If we have catalogs but couldn't determine types, show total count
   // This handles cases where artifact_type is "unknown" and paths don't contain type info
   if (resourceSummary.length === 0 && catalogs.length > 0) {
@@ -3029,10 +2031,10 @@ function LibraryCollectionCard({
       }}
     >
       {/* Menu button positioned absolutely in top-right corner */}
-      <Box 
-        position="absolute" 
-        top={1.5} 
-        right={1.5} 
+      <Box
+        position="absolute"
+        top={1.5}
+        right={1.5}
         onClick={(e) => e.stopPropagation()}
       >
         <Menu.Root>
@@ -3072,8 +2074,8 @@ function LibraryCollectionCard({
 
       {/* Centered content */}
       <VStack align="center" gap={1.5}>
-        <Heading 
-          size="md" 
+        <Heading
+          size="md"
           fontWeight="medium"
           textAlign="center"
           css={{
@@ -3144,7 +2146,7 @@ function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibr
       // Parse tags: split by comma, trim, filter empty
       const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
       const tagsJson = tagsArray.length > 0 ? JSON.stringify(tagsArray) : undefined;
-      
+
       await onCreate(
         name.trim(),
         description.trim() || undefined,

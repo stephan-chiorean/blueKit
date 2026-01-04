@@ -157,7 +157,21 @@ export default function LibraryActionBar({
     <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
       <Portal>
         <ActionBar.Positioner zIndex={1000}>
-          <ActionBar.Content>
+          <ActionBar.Content
+            css={{
+              animation: 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '@keyframes slideUp': {
+                from: {
+                  opacity: 0,
+                  transform: 'translateY(100%)',
+                },
+                to: {
+                  opacity: 1,
+                  transform: 'translateY(0)',
+                },
+              },
+            }}
+          >
             <VStack align="stretch" gap={0}>
               {/* Selection summary with icons */}
               <Box pb={1} mt={-0.5}>
