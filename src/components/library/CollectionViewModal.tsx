@@ -453,8 +453,9 @@ function VariationsPickerView({
                   <Checkbox.HiddenInput />
                   <Checkbox.Control
                     cursor="pointer"
-                    size="md"
                     css={{
+                      width: '20px',
+                      height: '20px',
                       borderWidth: '2px',
                       borderColor: isVariationSelected ? 'primary.500' : 'border.emphasized',
                       background: isVariationSelected
@@ -536,7 +537,7 @@ function CollectionCatalogCard({
   return (
     <Card.Root
       borderRadius="16px"
-      borderWidth={isSelected ? "2px" : "1px"}
+      borderWidth="1px"
       cursor="pointer"
       onClick={handleCardClick}
       transition="all 0.2s ease-in-out"
@@ -583,8 +584,9 @@ function CollectionCatalogCard({
             <Checkbox.HiddenInput />
             <Checkbox.Control
               cursor="pointer"
-              size="md"
               css={{
+                width: '20px',
+                height: '20px',
                 borderWidth: '2px',
                 borderColor: isSelected ? 'primary.500' : 'border.emphasized',
                 background: isSelected
@@ -628,9 +630,9 @@ function CollectionCatalogCard({
           </Text>
         )}
         {tags.length > 0 && (
-          <HStack gap={1} wrap="wrap">
-            {tags.map((tag: string) => (
-              <Tag.Root key={tag} size="sm" colorPalette="gray" variant="subtle">
+          <HStack gap={2} flexWrap="wrap">
+            {tags.map((tag: string, index: number) => (
+              <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" variant="subtle" colorPalette="primary">
                 <Tag.Label>{tag}</Tag.Label>
               </Tag.Root>
             ))}

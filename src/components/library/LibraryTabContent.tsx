@@ -1946,7 +1946,7 @@ function CatalogCard({
   return (
     <Card.Root 
       borderRadius="16px"
-      borderWidth={isSelected ? "2px" : "1px"}
+      borderWidth="1px"
       cursor="pointer"
       onClick={onCardClick}
       transition="all 0.2s ease-in-out"
@@ -1991,7 +1991,42 @@ function CatalogCard({
             cursor="pointer"
           >
             <Checkbox.HiddenInput />
-            <Checkbox.Control cursor="pointer">
+            <Checkbox.Control
+              cursor="pointer"
+              css={{
+                width: '20px',
+                height: '20px',
+                borderWidth: '2px',
+                borderColor: isSelected ? 'primary.500' : 'border.emphasized',
+                background: isSelected
+                  ? 'rgba(59, 130, 246, 0.15)'
+                  : 'rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: isSelected
+                  ? '0 0 0 2px rgba(59, 130, 246, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                  : '0 1px 2px rgba(0, 0, 0, 0.05)',
+                _dark: {
+                  background: isSelected
+                    ? 'rgba(59, 130, 246, 0.25)'
+                    : 'rgba(255, 255, 255, 0.1)',
+                  borderColor: isSelected ? 'primary.400' : 'border.emphasized',
+                  boxShadow: isSelected
+                    ? '0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3)'
+                    : '0 1px 2px rgba(0, 0, 0, 0.2)',
+                },
+                _hover: {
+                  background: isSelected
+                    ? 'rgba(59, 130, 246, 0.2)'
+                    : 'rgba(255, 255, 255, 0.4)',
+                  _dark: {
+                    background: isSelected
+                      ? 'rgba(59, 130, 246, 0.3)'
+                      : 'rgba(255, 255, 255, 0.15)',
+                  },
+                },
+              }}
+            >
               <Checkbox.Indicator />
             </Checkbox.Control>
           </Checkbox.Root>
@@ -2599,7 +2634,42 @@ function CatalogDetailModal({
                               cursor="pointer"
                             >
                               <Checkbox.HiddenInput />
-                              <Checkbox.Control cursor="pointer">
+                              <Checkbox.Control
+                                cursor="pointer"
+                                css={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderWidth: '2px',
+                                  borderColor: isVariationSelected ? 'primary.500' : 'border.emphasized',
+                                  background: isVariationSelected
+                                    ? 'rgba(59, 130, 246, 0.15)'
+                                    : 'rgba(255, 255, 255, 0.3)',
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  boxShadow: isVariationSelected
+                                    ? '0 0 0 2px rgba(59, 130, 246, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                                    : '0 1px 2px rgba(0, 0, 0, 0.05)',
+                                  _dark: {
+                                    background: isVariationSelected
+                                      ? 'rgba(59, 130, 246, 0.25)'
+                                      : 'rgba(255, 255, 255, 0.1)',
+                                    borderColor: isVariationSelected ? 'primary.400' : 'border.emphasized',
+                                    boxShadow: isVariationSelected
+                                      ? '0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3)'
+                                      : '0 1px 2px rgba(0, 0, 0, 0.2)',
+                                  },
+                                  _hover: {
+                                    background: isVariationSelected
+                                      ? 'rgba(59, 130, 246, 0.2)'
+                                      : 'rgba(255, 255, 255, 0.4)',
+                                    _dark: {
+                                      background: isVariationSelected
+                                        ? 'rgba(59, 130, 246, 0.3)'
+                                        : 'rgba(255, 255, 255, 0.15)',
+                                    },
+                                  },
+                                }}
+                              >
                                 <Checkbox.Indicator />
                               </Checkbox.Control>
                             </Checkbox.Root>
