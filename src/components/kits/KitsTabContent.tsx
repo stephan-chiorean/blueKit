@@ -534,7 +534,7 @@ function KitsTabContent({
                   <HStack gap={1} flexWrap="wrap">
                     {kit.frontMatter.tags.map((tag) => (
                       <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                        <Tag.Label>{tag}</Tag.Label>
+                        <Tag.Label>#{tag}</Tag.Label>
                       </Tag.Root>
                     ))}
                   </HStack>
@@ -710,7 +710,7 @@ function KitsTabContent({
                               <HStack gap={1} flexWrap="wrap">
                                 {node.folder.config.tags.map((tag) => (
                                   <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                    <Tag.Label>{tag}</Tag.Label>
+                                    <Tag.Label>#{tag}</Tag.Label>
                                   </Tag.Root>
                                 ))}
                               </HStack>
@@ -775,7 +775,7 @@ function KitsTabContent({
                                   <HStack gap={1} flexWrap="wrap">
                                     {artifact.frontMatter.tags.map((tag) => (
                                       <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                        <Tag.Label>{tag}</Tag.Label>
+                                        <Tag.Label>#{tag}</Tag.Label>
                                       </Tag.Root>
                                     ))}
                                   </HStack>
@@ -947,7 +947,7 @@ function KitsTabContent({
                       <HStack gap={2} flexWrap="wrap" mt="auto">
                         {kit.frontMatter.tags.map((tag) => (
                           <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                            <Tag.Label>{tag}</Tag.Label>
+                            <Tag.Label>#{tag}</Tag.Label>
                           </Tag.Root>
                         ))}
                       </HStack>

@@ -1519,7 +1519,6 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           onClearSelection={clearVariationSelection}
           onRemoveFromCollection={handleRemoveCatalogsFromCollection}
           onMoveToCollection={handleMoveCatalogsToCollection}
-          onCreateCollection={() => setShowCreateCollectionDialog(true)}
           onBulkPull={handleBulkPull}
           projects={projects}
           collections={sortedCollections}
@@ -1629,17 +1628,14 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
               style={{ width: "100%" }}
             >
               <CollectionView
-                workspaceName={selectedWorkspace?.name || 'Workspace'}
                 collection={sortedCollections.find(c => c.id === viewingCollection)!}
                 catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
                 selectedVariations={selectedVariations}
                 selectedCatalogs={selectedCatalogsMap}
                 onCatalogToggle={handleCatalogToggle}
-
                 onVariationToggle={handleVariationToggle}
                 onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
                 onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
-                onCreateCollection={() => setShowCreateCollectionDialog(true)}
                 onBulkPull={handleBulkPull}
                 clearVariationSelection={clearVariationSelection}
                 projects={projects}

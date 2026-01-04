@@ -758,7 +758,7 @@ export function CatalogDetailModal({
                                                         <HStack gap={2} flexWrap="wrap" mt={4}>
                                                             {frontMatter.tags && frontMatter.tags.map((tag: string) => (
                                                                 <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                                                    <Tag.Label>{tag}</Tag.Label>
+                                                                    <Tag.Label>#{tag}</Tag.Label>
                                                                 </Tag.Root>
                                                             ))}
                                                             {frontMatter.version && (

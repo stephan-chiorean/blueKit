@@ -33,7 +33,6 @@ interface SelectedCatalog {
 
 
 interface CollectionViewProps {
-    workspaceName: string;
     collection: LibraryCollection | null;
     catalogs: CatalogWithVariations[];
     selectedVariations: Map<string, SelectedVariation>;
@@ -42,7 +41,6 @@ interface CollectionViewProps {
     onVariationToggle: (variation: LibraryVariation, catalog: LibraryCatalog) => void;
     onMoveToCollection: (collectionId: string) => void;
     onRemoveFromCollection: () => void;
-    onCreateCollection: () => void;
     onBulkPull: (projects: Project[]) => void;
     clearVariationSelection: () => void;
     projects: Project[];
@@ -53,7 +51,6 @@ interface CollectionViewProps {
 }
 
 export default function CollectionView({
-    workspaceName,
     collection,
     catalogs,
     selectedVariations,
@@ -62,7 +59,6 @@ export default function CollectionView({
     onVariationToggle,
     onMoveToCollection,
     onRemoveFromCollection,
-    onCreateCollection,
     onBulkPull,
     clearVariationSelection,
     projects,
@@ -163,7 +159,6 @@ export default function CollectionView({
                     onClearSelection={clearVariationSelection}
                     onRemoveFromCollection={onRemoveFromCollection}
                     onMoveToCollection={onMoveToCollection}
-                    onCreateCollection={onCreateCollection}
                     onBulkPull={onBulkPull}
                     projects={projects}
                     collections={allCollections}

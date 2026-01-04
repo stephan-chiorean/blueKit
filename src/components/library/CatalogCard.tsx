@@ -129,7 +129,7 @@ export function CatalogCard({
                     <HStack gap={2} flexWrap="wrap">
                         {tags.map((tag: string, index: number) => (
                             <Tag.Root key={`${catalog.id}-${tag}-${index}`} size="sm" variant="subtle" colorPalette="primary">
-                                <Tag.Label>{tag}</Tag.Label>
+                                <Tag.Label>#{tag}</Tag.Label>
                             </Tag.Root>
                         ))}
                     </HStack>
