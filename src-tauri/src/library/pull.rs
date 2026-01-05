@@ -71,13 +71,17 @@ pub async fn pull_variation(
         return Err("Content hash mismatch. The file in GitHub has changed.".to_string());
     }
 
-    // Determine local file path based on artifact type
+    // Determine local file path based on artifact type from YAML front matter
     let file_name = variation.remote_path
         .split('/')
         .last()
         .ok_or_else(|| format!("Invalid remote path: {}", variation.remote_path))?;
 
-    let relative_path = determine_local_path(&catalog.artifact_type, file_name);
+    // Extract artifact type from YAML front matter (more reliable than catalog.artifact_type)
+    let artifact_type = extract_artifact_type_from_content(&content)
+        .unwrap_or_else(|| catalog.artifact_type.clone());
+
+    let relative_path = determine_local_path(&artifact_type, file_name);
     let full_path = Path::new(&options.target_project_path).join(&relative_path);
 
     // Check if file already exists
@@ -245,6 +249,40 @@ fn extract_yaml_metadata(content: &str) -> Option<String> {
     // Parse YAML and convert to JSON
     if let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
         serde_json::to_string(&yaml_value).ok()
+    } else {
+        None
+    }
+}
+
+/// Extract artifact type from markdown content's YAML front matter.
+/// Returns the value of the 'type' field if present (e.g., "kit", "walkthrough").
+fn extract_artifact_type_from_content(content: &str) -> Option<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() || lines[0] != "---" {
+        return None;
+    }
+
+    // Find the closing ---
+    let mut yaml_end = 0;
+    for (i, line) in lines.iter().enumerate().skip(1) {
+        if *line == "---" {
+            yaml_end = i;
+            break;
+        }
+    }
+
+    if yaml_end == 0 {
+        return None;
+    }
+
+    // Extract YAML content
+    let yaml_content = lines[1..yaml_end].join("\n");
+
+    // Parse YAML and extract type field
+    if let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
+        yaml_value.get("type")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
     } else {
         None
     }
