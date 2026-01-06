@@ -2763,8 +2763,18 @@ pub async fn open_project_in_editor(
                 ("code", vec![&project_path])
             }
         }
+        "antigravity" => {
+            #[cfg(target_os = "macos")]
+            {
+                ("open", vec!["-a", "Antigravity", &project_path])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                ("antigravity", vec![&project_path])
+            }
+        }
         _ => {
-            return Err(format!("Unknown editor: {}. Supported editors: 'cursor', 'vscode'", editor));
+            return Err(format!("Unknown editor: {}. Supported editors: 'cursor', 'vscode', 'antigravity'", editor));
         }
     };
 

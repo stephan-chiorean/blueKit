@@ -23,6 +23,7 @@ import {
     Checkbox,
     Flex,
 } from '@chakra-ui/react';
+import { useColorMode } from '../../contexts/ColorModeContext';
 import {
     LuArrowLeft,
     LuChevronRight,
@@ -34,6 +35,7 @@ import {
     LuFolder,
     LuCheck,
 } from 'react-icons/lu';
+import { AnimatePresence, motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CatalogWithVariations, LibraryVariation, LibraryCatalog } from '../../types/github';
@@ -92,10 +94,18 @@ export function CatalogDetailModal({
     initialVariation,
 }: CatalogDetailModalProps) {
     const { catalog, variations } = catalogWithVariations;
+    const { colorMode } = useColorMode();
     const [currentView, setCurrentView] = useState<CatalogModalView>('variations-picker');
     const [previewVariation, setPreviewVariation] = useState<LibraryVariation | null>(null);
     const [previewContent, setPreviewContent] = useState<string>('');
     const [previewLoading, setPreviewLoading] = useState(false);
+
+    // Dynamic styles for glassmorphism
+    const isDark = colorMode === 'dark';
+    const backdropBg = isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+    const contentBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.25)';
+    const contentBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+    const contentShadow = isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.4)' : '0 4px 16px 0 rgba(0, 0, 0, 0.06)';
 
     const hasSingleVariation = variations.length === 1;
 
@@ -251,136 +261,191 @@ export function CatalogDetailModal({
     };
 
     return (
-        <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
-            <Portal>
-                <Dialog.Backdrop />
-                <Dialog.Positioner>
-                    <Dialog.Content
-                        maxW="90vw"
-                        maxH="90vh"
-                        w="900px"
-                        h="80vh"
-                        borderRadius="16px"
-                        css={{
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            backdropFilter: 'blur(30px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                            borderColor: 'rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.06)',
-                            _dark: {
-                                background: 'rgba(255, 255, 255, 0.08)',
-                                borderColor: 'rgba(255, 255, 255, 0.15)',
-                                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                            },
-                        }}
-                    >
-                        <Dialog.Header 
-                            borderBottomWidth="1px" 
-                            borderColor="border.subtle"
-                        >
-                            <Flex
-                                width="100%"
-                                justify="space-between"
-                                align="center"
-                                gap={4}
-                            >
-                                {/* Left side - Breadcrumb */}
-                                <HStack gap={2} align="center" flex={1} minW={0}>
-                                    {/* Back button when on preview view with multiple variations */}
-                                    {currentView === 'variation-preview' && !hasSingleVariation && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleBack}
-                                            px={2}
-                                        >
-                                            <LuArrowLeft />
-                                        </Button>
-                                    )}
+        <AnimatePresence>
+            {isOpen && (
+                <Dialog.Root open={true} onOpenChange={(e) => !e.open && onClose()}>
+                    <Portal>
+                        <Dialog.Backdrop asChild>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                style={{
+                                    position: 'fixed',
+                                    inset: 0,
+                                    zIndex: 1400,
+                                    backdropFilter: 'blur(12px) saturate(150%)',
+                                    WebkitBackdropFilter: 'blur(12px) saturate(150%)',
+                                    background: backdropBg,
+                                }}
+                            />
+                        </Dialog.Backdrop>
+                        <Dialog.Positioner>
+                            <Dialog.Content asChild>
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.2 }}
+                                    style={{
+                                        maxWidth: '90vw',
+                                        maxHeight: '90vh',
+                                        width: '900px',
+                                        height: '80vh',
+                                        borderRadius: '16px',
+                                        background: contentBg,
+                                        backdropFilter: 'blur(30px) saturate(180%)',
+                                        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                                        border: `1px solid ${contentBorder}`,
+                                        boxShadow: contentShadow,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                    }}
+                                >
 
-                                    {/* Breadcrumb navigation */}
-                                    <HStack gap={1} align="center" flex={1} minW={0}>
-                                        {currentView === 'variation-preview' ? (
-                                            hasSingleVariation ? (
-                                                // Single variation - just show catalog name
-                                                <>
-                                                    <Icon boxSize={5} color="primary.500">
-                                                        {icon}
-                                                    </Icon>
-                                                    <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
-                                                </>
-                                            ) : (
-                                                // Multiple variations - show breadcrumb
-                                                <>
+                                    <Dialog.Header
+                                        borderBottomWidth="1px"
+                                        borderColor="border.subtle"
+                                    >
+                                        <Flex
+                                            width="100%"
+                                            justify="space-between"
+                                            align="center"
+                                            gap={4}
+                                        >
+                                            {/* Left side - Breadcrumb */}
+                                            <HStack gap={2} align="center" flex={1} minW={0}>
+                                                {/* Back button when on preview view with multiple variations */}
+                                                {currentView === 'variation-preview' && !hasSingleVariation && (
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={handleBack}
                                                         px={2}
-                                                        fontWeight="normal"
-                                                        color="text.secondary"
-                                                        _hover={{ color: 'primary.500' }}
                                                     >
-                                                        <Icon boxSize={4} color="primary.500" mr={1}>
-                                                            {icon}
-                                                        </Icon>
-                                                        {catalog.name}
+                                                        <LuArrowLeft />
                                                     </Button>
-                                                    <Icon color="text.tertiary" boxSize={4}>
-                                                        <LuChevronRight />
-                                                    </Icon>
-                                                    <Dialog.Title fontSize="lg">
-                                                        {previewVariation && getVersionLabel(previewVariation, variations.indexOf(previewVariation))}
-                                                    </Dialog.Title>
-                                                </>
-                                            )
-                                        ) : (
-                                            // Picker view - show catalog name with version count
-                                            <>
-                                                <Icon boxSize={5} color="primary.500">
-                                                    {icon}
-                                                </Icon>
-                                                <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
-                                                <Badge
-                                                    size="sm"
-                                                    colorPalette="gray"
-                                                    bg="transparent"
-                                                    _dark={{ bg: "transparent" }}
-                                                >
-                                                    {variations.length} versions
-                                                </Badge>
-                                            </>
-                                        )}
-                                    </HStack>
-                                </HStack>
+                                                )}
 
-                                {/* Right side - Action buttons */}
-                                <HStack gap={2} align="center" flexShrink={0}>
-                                {currentView === 'variation-preview' && previewVariation && (
-                                    <>
-                                        {(() => {
-                                            const isSelected = selectedVariations.has(previewVariation.id);
-                                            return (
+                                                {/* Breadcrumb navigation */}
+                                                <HStack gap={1} align="center" flex={1} minW={0}>
+                                                    {currentView === 'variation-preview' ? (
+                                                        hasSingleVariation ? (
+                                                            // Single variation - just show catalog name
+                                                            <>
+                                                                <Icon boxSize={5} color="primary.500">
+                                                                    {icon}
+                                                                </Icon>
+                                                                <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
+                                                            </>
+                                                        ) : (
+                                                            // Multiple variations - show breadcrumb
+                                                            <>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={handleBack}
+                                                                    px={2}
+                                                                    fontWeight="normal"
+                                                                    color="text.secondary"
+                                                                    _hover={{ color: 'primary.500' }}
+                                                                >
+                                                                    <Icon boxSize={4} color="primary.500" mr={1}>
+                                                                        {icon}
+                                                                    </Icon>
+                                                                    {catalog.name}
+                                                                </Button>
+                                                                <Icon color="text.tertiary" boxSize={4}>
+                                                                    <LuChevronRight />
+                                                                </Icon>
+                                                                <Dialog.Title fontSize="lg">
+                                                                    {previewVariation && getVersionLabel(previewVariation, variations.indexOf(previewVariation))}
+                                                                </Dialog.Title>
+                                                            </>
+                                                        )
+                                                    ) : (
+                                                        // Picker view - show catalog name with version count
+                                                        <>
+                                                            <Icon boxSize={5} color="primary.500">
+                                                                {icon}
+                                                            </Icon>
+                                                            <Dialog.Title fontSize="lg">{catalog.name}</Dialog.Title>
+                                                            <Badge
+                                                                size="sm"
+                                                                colorPalette="gray"
+                                                                bg="transparent"
+                                                                _dark={{ bg: "transparent" }}
+                                                            >
+                                                                {variations.length} versions
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </HStack>
+                                            </HStack>
+
+                                            {/* Right side - Action buttons */}
+                                            <HStack gap={2} align="center" flexShrink={0}>
+                                                {currentView === 'variation-preview' && previewVariation && (
+                                                    <>
+                                                        {(() => {
+                                                            const isSelected = selectedVariations.has(previewVariation.id);
+                                                            return (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="xs"
+                                                                    onClick={() => onVariationToggle(previewVariation, catalog)}
+                                                                    borderWidth="1px"
+                                                                    borderRadius="lg"
+                                                                    css={isSelected ? {
+                                                                        background: 'rgba(59, 130, 246, 0.15)',
+                                                                        backdropFilter: 'blur(20px) saturate(180%)',
+                                                                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                                                                        borderColor: 'rgba(59, 130, 246, 0.3)',
+                                                                        boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.1)',
+                                                                        color: 'var(--chakra-colors-primary-600)',
+                                                                        _dark: {
+                                                                            background: 'rgba(59, 130, 246, 0.2)',
+                                                                            borderColor: 'rgba(59, 130, 246, 0.4)',
+                                                                            boxShadow: '0 4px 16px 0 rgba(59, 130, 246, 0.2)',
+                                                                            color: 'var(--chakra-colors-primary-400)',
+                                                                        },
+                                                                    } : {
+                                                                        background: 'rgba(255, 255, 255, 0.25)',
+                                                                        backdropFilter: 'blur(20px) saturate(180%)',
+                                                                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                                                                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                                                                        boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                                                                        _dark: {
+                                                                            background: 'rgba(0, 0, 0, 0.2)',
+                                                                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                                                                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    {isSelected ? 'Selected' : 'Select'}
+                                                                </Button>
+                                                            );
+                                                        })()}
+                                                        <Button
+                                                            variant="solid"
+                                                            colorPalette="primary"
+                                                            size="xs"
+                                                        >
+                                                            <HStack gap={1.5}>
+                                                                <LuDownload />
+                                                                <Text>Pull</Text>
+                                                            </HStack>
+                                                        </Button>
+                                                    </>
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="xs"
-                                                    onClick={() => onVariationToggle(previewVariation, catalog)}
+                                                    onClick={onClose}
                                                     borderWidth="1px"
                                                     borderRadius="lg"
-                                                    css={isSelected ? {
-                                                        background: 'rgba(59, 130, 246, 0.15)',
-                                                        backdropFilter: 'blur(20px) saturate(180%)',
-                                                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                                                        borderColor: 'rgba(59, 130, 246, 0.3)',
-                                                        boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.1)',
-                                                        color: 'var(--chakra-colors-primary-600)',
-                                                        _dark: {
-                                                            background: 'rgba(59, 130, 246, 0.2)',
-                                                            borderColor: 'rgba(59, 130, 246, 0.4)',
-                                                            boxShadow: '0 4px 16px 0 rgba(59, 130, 246, 0.2)',
-                                                            color: 'var(--chakra-colors-primary-400)',
-                                                        },
-                                                    } : {
+                                                    css={{
                                                         background: 'rgba(255, 255, 255, 0.25)',
                                                         backdropFilter: 'blur(20px) saturate(180%)',
                                                         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
@@ -393,517 +458,485 @@ export function CatalogDetailModal({
                                                         },
                                                     }}
                                                 >
-                                                    {isSelected ? 'Selected' : 'Select'}
+                                                    Close
                                                 </Button>
-                                            );
-                                        })()}
-                                        <Button
-                                            variant="solid"
-                                            colorPalette="primary"
-                                            size="xs"
-                                        >
-                                            <HStack gap={1.5}>
-                                                <LuDownload />
-                                                <Text>Pull</Text>
                                             </HStack>
-                                        </Button>
-                                    </>
-                                )}
-                                <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    onClick={onClose}
-                                    borderWidth="1px"
-                                    borderRadius="lg"
-                                    css={{
-                                        background: 'rgba(255, 255, 255, 0.25)',
-                                        backdropFilter: 'blur(20px) saturate(180%)',
-                                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                                        borderColor: 'rgba(0, 0, 0, 0.08)',
-                                        boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                                        _dark: {
-                                            background: 'rgba(0, 0, 0, 0.2)',
-                                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                                        },
-                                    }}
-                                >
-                                    Close
-                                </Button>
-                                </HStack>
-                            </Flex>
-                        </Dialog.Header>
-
-                        <Dialog.Body overflow="auto" position="relative" p={currentView === 'variation-preview' ? 4 : undefined}>
-                            {/* Variations Picker View */}
-                            {currentView === 'variations-picker' && (
-                                <VStack align="stretch" gap={4}>
-                                    {/* Action Bar */}
-                                    {hasSelection && (
-                                        <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
-                                            <Portal>
-                                                <ActionBar.Positioner zIndex={1000}>
-                                                    <ActionBar.Content>
-                                                        <VStack align="stretch" gap={0}>
-                                                            <Box pb={1} mt={-0.5}>
-                                                                <HStack gap={1.5} justify="center">
-                                                                    <Text fontSize="xs" color="text.secondary">
-                                                                        {selectedVariationsArray.length} variation{selectedVariationsArray.length !== 1 ? 's' : ''} selected
-                                                                    </Text>
-                                                                </HStack>
-                                                            </Box>
-                                                            <HStack gap={2}>
-                                                                <Button
-                                                                    variant="surface"
-                                                                    colorPalette="red"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        // Clear only variations from this catalog
-                                                                        for (const v of variations) {
-                                                                            if (selectedVariations.has(v.id)) {
-                                                                                onVariationToggle(v, catalog);
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                    disabled={bulkPulling}
-                                                                >
-                                                                    <HStack gap={2}>
-                                                                        <LuX />
-                                                                        <Text>Remove</Text>
-                                                                    </HStack>
-                                                                </Button>
-
-                                                                <ActionBar.Separator />
-
-                                                                <Menu.Root
-                                                                    closeOnSelect={false}
-                                                                    open={isAddToProjectOpen}
-                                                                    onOpenChange={(e) => setIsAddToProjectOpen(e.open)}
-                                                                >
-                                                                    <Menu.Trigger asChild>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            disabled={bulkPulling}
-                                                                        >
-                                                                            <HStack gap={2}>
-                                                                                <LuFolderPlus />
-                                                                                <Text>Add to Project</Text>
-                                                                            </HStack>
-                                                                        </Button>
-                                                                    </Menu.Trigger>
-                                                                    <Portal>
-                                                                        <Menu.Positioner zIndex={2000}>
-                                                                            <Menu.Content width="400px" maxH="500px" position="relative" zIndex={2000}>
-                                                                                <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                                                                                    <Text fontSize="sm" fontWeight="semibold">
-                                                                                        Add to Project
-                                                                                    </Text>
-                                                                                </Box>
-
-                                                                                <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                                                                                    <InputGroup startElement={<LuSearch />}>
-                                                                                        <Input
-                                                                                            ref={searchInputRef}
-                                                                                            placeholder="Search projects..."
-                                                                                            value={searchQuery}
-                                                                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                                                                            size="sm"
-                                                                                            onClick={(e) => e.stopPropagation()}
-                                                                                            onKeyDown={(e) => e.stopPropagation()}
-                                                                                        />
-                                                                                    </InputGroup>
-                                                                                </Box>
-
-                                                                                <Box maxH="300px" overflowY="auto">
-                                                                                    {filteredProjects.length === 0 ? (
-                                                                                        <Box textAlign="center" py={4} px={3}>
-                                                                                            <Text fontSize="sm" color="text.secondary">
-                                                                                                {searchQuery ? 'No projects match your search.' : 'No projects found.'}
-                                                                                            </Text>
-                                                                                        </Box>
-                                                                                    ) : (
-                                                                                        filteredProjects.map((project) => {
-                                                                                            const isSelected = selectedProjectIds.has(project.id);
-                                                                                            return (
-                                                                                                <Menu.Item
-                                                                                                    key={project.id}
-                                                                                                    value={project.id}
-                                                                                                    onSelect={() => toggleProject(project.id)}
-                                                                                                >
-                                                                                                    <HStack gap={2} justify="space-between" width="100%" minW={0}>
-                                                                                                        <HStack gap={2} flex="1" minW={0} overflow="hidden">
-                                                                                                            <Icon flexShrink={0}>
-                                                                                                                <LuFolder />
-                                                                                                            </Icon>
-                                                                                                            <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
-                                                                                                                <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
-                                                                                                                    {project.name}
-                                                                                                                </Text>
-                                                                                                                <Text fontSize="xs" color="text.secondary" title={project.path}>
-                                                                                                                    {truncatePath(project.path, 35)}
-                                                                                                                </Text>
-                                                                                                            </VStack>
-                                                                                                        </HStack>
-                                                                                                        {isSelected && (
-                                                                                                            <Icon color="primary.500" flexShrink={0}>
-                                                                                                                <LuCheck />
-                                                                                                            </Icon>
-                                                                                                        )}
-                                                                                                    </HStack>
-                                                                                                </Menu.Item>
-                                                                                            );
-                                                                                        })
-                                                                                    )}
-                                                                                </Box>
-
-                                                                                <Box
-                                                                                    px={3}
-                                                                                    py={2}
-                                                                                    borderTopWidth="1px"
-                                                                                    borderColor="border.subtle"
-                                                                                    bg="bg.panel"
-                                                                                    opacity={selectedProjectIds.size > 0 ? 1 : 0.5}
-                                                                                >
-                                                                                    <Button
-                                                                                        variant="solid"
-                                                                                        colorPalette="primary"
-                                                                                        size="sm"
-                                                                                        width="100%"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            handleConfirmPull();
-                                                                                        }}
-                                                                                        disabled={bulkPulling || selectedProjectIds.size === 0}
-                                                                                    >
-                                                                                        {bulkPulling ? (
-                                                                                            <HStack gap={2}>
-                                                                                                <Spinner size="xs" />
-                                                                                                <Text>Pulling...</Text>
-                                                                                            </HStack>
-                                                                                        ) : (
-                                                                                            `Pull to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
-                                                                                        )}
-                                                                                    </Button>
-                                                                                </Box>
-                                                                            </Menu.Content>
-                                                                        </Menu.Positioner>
-                                                                    </Portal>
-                                                                </Menu.Root>
-                                                            </HStack>
-                                                        </VStack>
-                                                    </ActionBar.Content>
-                                                </ActionBar.Positioner>
-                                            </Portal>
-                                        </ActionBar.Root>
-                                    )}
-
-                                    {catalog.description && (
-                                        <Text fontSize="md" color="text.secondary">
-                                            {catalog.description}
-                                        </Text>
-                                    )}
-
-                                    <Text fontSize="sm" color="text.tertiary">
-                                        Select a version to view its content
-                                    </Text>
-
-                                    <VStack align="stretch" gap={2}>
-                                        {variations.map((v, index) => {
-                                            const publishDate = new Date(v.published_at * 1000);
-                                            const timeAgo = formatTimeAgo(publishDate);
-                                            const isVariationSelected = selectedVariations.has(v.id);
-                                            const versionLabel = getVersionLabel(v, index);
-
-                                            return (
-                                                <HStack
-                                                    key={v.id}
-                                                    justify="space-between"
-                                                    align="center"
-                                                    py={3}
-                                                    px={4}
-                                                    borderRadius="12px"
-                                                    cursor="pointer"
-                                                    transition="all 0.15s"
-                                                    css={{
-                                                        background: 'rgba(255, 255, 255, 0.15)',
-                                                        _dark: {
-                                                            background: 'rgba(255, 255, 255, 0.05)',
-                                                        },
-                                                        _hover: {
-                                                            background: 'rgba(255, 255, 255, 0.25)',
-                                                            _dark: {
-                                                                background: 'rgba(255, 255, 255, 0.1)',
-                                                            },
-                                                        },
-                                                    }}
-                                                    onClick={() => handleVariationSelect(v)}
-                                                    gap={3}
-                                                >
-                                                    <HStack gap={3} flex={1}>
-                                                        <Icon boxSize={5} color="primary.500">
-                                                            {icon}
-                                                        </Icon>
-                                                        <VStack align="start" gap={0}>
-                                                            <Text fontSize="md" fontWeight="medium">
-                                                                {versionLabel}
-                                                            </Text>
-                                                            <HStack gap={2}>
-                                                                <Text fontSize="sm" color="text.tertiary">
-                                                                    {timeAgo}
-                                                                </Text>
-                                                                {v.publisher_name && (
-                                                                    <Text fontSize="sm" color="text.tertiary">
-                                                                        by {v.publisher_name}
-                                                                    </Text>
-                                                                )}
-                                                            </HStack>
-                                                        </VStack>
-                                                    </HStack>
-                                                    <HStack gap={3}>
-                                                        <Icon color="text.tertiary">
-                                                            <LuChevronRight />
-                                                        </Icon>
-                                                        <Checkbox.Root
-                                                            checked={isVariationSelected}
-                                                            colorPalette="primary"
-                                                            variant="outline"
-                                                            onCheckedChange={() => onVariationToggle(v, catalog)}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            cursor="pointer"
-                                                        >
-                                                            <Checkbox.HiddenInput />
-                                                            <Checkbox.Control 
-                                                                cursor="pointer"
-                                                                css={{
-                                                                    borderColor: isVariationSelected ? 'primary.500' : 'border.emphasized',
-                                                                    _checked: {
-                                                                        borderColor: 'primary.500',
-                                                                    },
-                                                                }}
-                                                            >
-                                                                <Checkbox.Indicator 
-                                                                    css={{
-                                                                        color: 'primary.500',
-                                                                        _dark: {
-                                                                            color: 'primary.500',
-                                                                        },
-                                                                    }}
-                                                                />
-                                                            </Checkbox.Control>
-                                                        </Checkbox.Root>
-                                                    </HStack>
-                                                </HStack>
-                                            );
-                                        })}
-                                    </VStack>
-                                </VStack>
-                            )}
-
-                            {/* Variation Preview View */}
-                            {currentView === 'variation-preview' && (
-                                <Box h="100%" display="flex" flexDirection="column">
-                                    {previewLoading ? (
-                                        <Flex justify="center" align="center" h="100%" minH="400px">
-                                            <VStack gap={4}>
-                                                <Spinner size="lg" />
-                                                <Text color="text.secondary">Loading content...</Text>
-                                            </VStack>
                                         </Flex>
-                                    ) : (
-                                        <Box
-                                            flex="1"
-                                            overflow="auto"
-                                            borderRadius="12px"
-                                            css={{
-                                                background: 'rgba(255, 255, 255, 0.1)',
-                                                _dark: {
-                                                    background: 'rgba(255, 255, 255, 0.03)',
-                                                },
-                                            }}
-                                        >
-                                            <Box p={6}>
-                                                <VStack align="stretch" gap={6}>
-                                                    {/* Header */}
-                                                    <Box>
-                                                        <Heading
-                                                            size="xl"
-                                                            mb={2}
-                                                            css={{
-                                                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                                                                _dark: {
-                                                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                                                                },
-                                                            }}
-                                                        >
-                                                            {displayName}
-                                                        </Heading>
-                                                        {frontMatter.description && (
-                                                            <Text
-                                                                fontSize="lg"
-                                                                color="text.secondary"
-                                                                mb={4}
+                                    </Dialog.Header>
+
+                                    <Dialog.Body overflow="auto" position="relative" p={currentView === 'variation-preview' ? 4 : undefined}>
+                                        {/* Variations Picker View */}
+                                        {currentView === 'variations-picker' && (
+                                            <VStack align="stretch" gap={4}>
+                                                {/* Action Bar */}
+                                                {hasSelection && (
+                                                    <ActionBar.Root open={hasSelection} closeOnInteractOutside={false}>
+                                                        <Portal>
+                                                            <ActionBar.Positioner zIndex={1000}>
+                                                                <ActionBar.Content>
+                                                                    <VStack align="stretch" gap={0}>
+                                                                        <Box pb={1} mt={-0.5}>
+                                                                            <HStack gap={1.5} justify="center">
+                                                                                <Text fontSize="xs" color="text.secondary">
+                                                                                    {selectedVariationsArray.length} variation{selectedVariationsArray.length !== 1 ? 's' : ''} selected
+                                                                                </Text>
+                                                                            </HStack>
+                                                                        </Box>
+                                                                        <HStack gap={2}>
+                                                                            <Button
+                                                                                variant="surface"
+                                                                                colorPalette="red"
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    // Clear only variations from this catalog
+                                                                                    for (const v of variations) {
+                                                                                        if (selectedVariations.has(v.id)) {
+                                                                                            onVariationToggle(v, catalog);
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                disabled={bulkPulling}
+                                                                            >
+                                                                                <HStack gap={2}>
+                                                                                    <LuX />
+                                                                                    <Text>Remove</Text>
+                                                                                </HStack>
+                                                                            </Button>
+
+                                                                            <ActionBar.Separator />
+
+                                                                            <Menu.Root
+                                                                                closeOnSelect={false}
+                                                                                open={isAddToProjectOpen}
+                                                                                onOpenChange={(e) => setIsAddToProjectOpen(e.open)}
+                                                                            >
+                                                                                <Menu.Trigger asChild>
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        disabled={bulkPulling}
+                                                                                    >
+                                                                                        <HStack gap={2}>
+                                                                                            <LuFolderPlus />
+                                                                                            <Text>Add to Project</Text>
+                                                                                        </HStack>
+                                                                                    </Button>
+                                                                                </Menu.Trigger>
+                                                                                <Portal>
+                                                                                    <Menu.Positioner zIndex={2000}>
+                                                                                        <Menu.Content width="400px" maxH="500px" position="relative" zIndex={2000}>
+                                                                                            <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                                                                                                <Text fontSize="sm" fontWeight="semibold">
+                                                                                                    Add to Project
+                                                                                                </Text>
+                                                                                            </Box>
+
+                                                                                            <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                                                                                                <InputGroup startElement={<LuSearch />}>
+                                                                                                    <Input
+                                                                                                        ref={searchInputRef}
+                                                                                                        placeholder="Search projects..."
+                                                                                                        value={searchQuery}
+                                                                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                                                                        size="sm"
+                                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                                                                    />
+                                                                                                </InputGroup>
+                                                                                            </Box>
+
+                                                                                            <Box maxH="300px" overflowY="auto">
+                                                                                                {filteredProjects.length === 0 ? (
+                                                                                                    <Box textAlign="center" py={4} px={3}>
+                                                                                                        <Text fontSize="sm" color="text.secondary">
+                                                                                                            {searchQuery ? 'No projects match your search.' : 'No projects found.'}
+                                                                                                        </Text>
+                                                                                                    </Box>
+                                                                                                ) : (
+                                                                                                    filteredProjects.map((project) => {
+                                                                                                        const isSelected = selectedProjectIds.has(project.id);
+                                                                                                        return (
+                                                                                                            <Menu.Item
+                                                                                                                key={project.id}
+                                                                                                                value={project.id}
+                                                                                                                onSelect={() => toggleProject(project.id)}
+                                                                                                            >
+                                                                                                                <HStack gap={2} justify="space-between" width="100%" minW={0}>
+                                                                                                                    <HStack gap={2} flex="1" minW={0} overflow="hidden">
+                                                                                                                        <Icon flexShrink={0}>
+                                                                                                                            <LuFolder />
+                                                                                                                        </Icon>
+                                                                                                                        <VStack align="start" gap={0} flex="1" minW={0} overflow="hidden">
+                                                                                                                            <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
+                                                                                                                                {project.name}
+                                                                                                                            </Text>
+                                                                                                                            <Text fontSize="xs" color="text.secondary" title={project.path}>
+                                                                                                                                {truncatePath(project.path, 35)}
+                                                                                                                            </Text>
+                                                                                                                        </VStack>
+                                                                                                                    </HStack>
+                                                                                                                    {isSelected && (
+                                                                                                                        <Icon color="primary.500" flexShrink={0}>
+                                                                                                                            <LuCheck />
+                                                                                                                        </Icon>
+                                                                                                                    )}
+                                                                                                                </HStack>
+                                                                                                            </Menu.Item>
+                                                                                                        );
+                                                                                                    })
+                                                                                                )}
+                                                                                            </Box>
+
+                                                                                            <Box
+                                                                                                px={3}
+                                                                                                py={2}
+                                                                                                borderTopWidth="1px"
+                                                                                                borderColor="border.subtle"
+                                                                                                bg="bg.panel"
+                                                                                                opacity={selectedProjectIds.size > 0 ? 1 : 0.5}
+                                                                                            >
+                                                                                                <Button
+                                                                                                    variant="solid"
+                                                                                                    colorPalette="primary"
+                                                                                                    size="sm"
+                                                                                                    width="100%"
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        handleConfirmPull();
+                                                                                                    }}
+                                                                                                    disabled={bulkPulling || selectedProjectIds.size === 0}
+                                                                                                >
+                                                                                                    {bulkPulling ? (
+                                                                                                        <HStack gap={2}>
+                                                                                                            <Spinner size="xs" />
+                                                                                                            <Text>Pulling...</Text>
+                                                                                                        </HStack>
+                                                                                                    ) : (
+                                                                                                        `Pull to ${selectedProjectIds.size} Project${selectedProjectIds.size !== 1 ? 's' : ''}`
+                                                                                                    )}
+                                                                                                </Button>
+                                                                                            </Box>
+                                                                                        </Menu.Content>
+                                                                                    </Menu.Positioner>
+                                                                                </Portal>
+                                                                            </Menu.Root>
+                                                                        </HStack>
+                                                                    </VStack>
+                                                                </ActionBar.Content>
+                                                            </ActionBar.Positioner>
+                                                        </Portal>
+                                                    </ActionBar.Root>
+                                                )}
+
+                                                {catalog.description && (
+                                                    <Text fontSize="md" color="text.secondary">
+                                                        {catalog.description}
+                                                    </Text>
+                                                )}
+
+                                                <Text fontSize="sm" color="text.tertiary">
+                                                    Select a version to view its content
+                                                </Text>
+
+                                                <VStack align="stretch" gap={2}>
+                                                    {variations.map((v, index) => {
+                                                        const publishDate = new Date(v.published_at * 1000);
+                                                        const timeAgo = formatTimeAgo(publishDate);
+                                                        const isVariationSelected = selectedVariations.has(v.id);
+                                                        const versionLabel = getVersionLabel(v, index);
+
+                                                        return (
+                                                            <HStack
+                                                                key={v.id}
+                                                                justify="space-between"
+                                                                align="center"
+                                                                py={3}
+                                                                px={4}
+                                                                borderRadius="12px"
+                                                                cursor="pointer"
+                                                                transition="all 0.15s"
                                                                 css={{
-                                                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                                                                    background: 'rgba(255, 255, 255, 0.15)',
                                                                     _dark: {
-                                                                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                                                                        background: 'rgba(255, 255, 255, 0.05)',
+                                                                    },
+                                                                    _hover: {
+                                                                        background: 'rgba(255, 255, 255, 0.25)',
+                                                                        _dark: {
+                                                                            background: 'rgba(255, 255, 255, 0.1)',
+                                                                        },
                                                                     },
                                                                 }}
+                                                                onClick={() => handleVariationSelect(v)}
+                                                                gap={3}
                                                             >
-                                                                {frontMatter.description}
-                                                            </Text>
-                                                        )}
-
-                                                        {/* Metadata Tags */}
-                                                        <HStack gap={2} flexWrap="wrap" mt={4}>
-                                                            {frontMatter.tags && frontMatter.tags.map((tag: string) => (
-                                                                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                                                    <Tag.Label>#{tag}</Tag.Label>
-                                                                </Tag.Root>
-                                                            ))}
-                                                            {frontMatter.version && (
-                                                                <Tag.Root size="sm" variant="outline">
-                                                                    <Tag.Label>v{frontMatter.version}</Tag.Label>
-                                                                </Tag.Root>
-                                                            )}
-                                                        </HStack>
-                                                    </Box>
-
-                                                    <Separator />
-
-                                                    {/* Markdown Content */}
-                                                    <Box
-                                                        css={{
-                                                            '& > *': { mb: 4 },
-                                                            '& > *:last-child': { mb: 0 },
-                                                            '& h1': { fontSize: '2xl', fontWeight: 'bold', mt: 6, mb: 4 },
-                                                            '& h2': { fontSize: '2xl', fontWeight: 'semibold', mt: 5, mb: 3, color: 'primary.500' },
-                                                            '& h3': { fontSize: 'lg', fontWeight: 'semibold', mt: 4, mb: 2 },
-                                                            '& h4, & h5, & h6': { fontSize: 'md', fontWeight: 'semibold', mt: 3, mb: 2 },
-                                                            '& p': { lineHeight: '1.75', color: 'text.primary' },
-                                                            '& ul, & ol': { pl: 4, mb: 4 },
-                                                            '& li': { mb: 2 },
-                                                            '& pre': { mb: 4 },
-                                                            '& code': { fontSize: '0.9em' },
-                                                            '& a': { color: 'primary.500', textDecoration: 'underline' },
-                                                            '& a:hover': { color: 'primary.600' },
-                                                            '& blockquote': { borderLeft: '4px solid', borderColor: 'border.emphasized', pl: 4, py: 2, my: 4, fontStyle: 'italic' },
-                                                            '& table': { width: '100%', borderCollapse: 'collapse', mb: 4 },
-                                                            '& th, & td': { border: '1px solid', borderColor: 'border.subtle', px: 3, py: 2 },
-                                                            '& th': { fontWeight: 'semibold' },
-                                                        }}
-                                                    >
-                                                        <ReactMarkdown
-                                                            remarkPlugins={[remarkGfm]}
-                                                            components={{
-                                                                h1: ({ children }) => (
-                                                                    <Heading as="h1" size="2xl" mt={6} mb={4}>
-                                                                        {children}
-                                                                    </Heading>
-                                                                ),
-                                                                h2: ({ children }) => (
-                                                                    <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">
-                                                                        {children}
-                                                                    </Heading>
-                                                                ),
-                                                                h3: ({ children }) => (
-                                                                    <Heading as="h3" size="lg" mt={4} mb={2}>
-                                                                        {children}
-                                                                    </Heading>
-                                                                ),
-                                                                h4: ({ children }) => (
-                                                                    <Heading as="h4" size="md" mt={3} mb={2}>
-                                                                        {children}
-                                                                    </Heading>
-                                                                ),
-                                                                p: ({ children }) => (
-                                                                    <Text mb={4} lineHeight="1.75" color="text.primary">
-                                                                        {children}
-                                                                    </Text>
-                                                                ),
-                                                                ul: ({ children }) => (
-                                                                    <List.Root mb={4} pl={4}>
-                                                                        {children}
-                                                                    </List.Root>
-                                                                ),
-                                                                ol: ({ children }) => (
-                                                                    <List.Root as="ol" mb={4} pl={4}>
-                                                                        {children}
-                                                                    </List.Root>
-                                                                ),
-                                                                li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
-                                                                code: ({ className, children, ...props }) => {
-                                                                    const match = /language-(.+)/.exec(className || '');
-                                                                    const isInline = !match;
-                                                                    const codeString = String(children).replace(/\n$/, '');
-
-                                                                    if (isInline) {
-                                                                        return (
-                                                                            <Code px={1.5} py={0.5} borderRadius="sm" fontSize="0.9em" {...props}>
-                                                                                {children}
-                                                                            </Code>
-                                                                        );
-                                                                    }
-
-                                                                    return (
-                                                                        <Box
-                                                                            as="pre"
-                                                                            p={4}
-                                                                            borderRadius="md"
-                                                                            overflow="auto"
-                                                                            mb={4}
+                                                                <HStack gap={3} flex={1}>
+                                                                    <Icon boxSize={5} color="primary.500">
+                                                                        {icon}
+                                                                    </Icon>
+                                                                    <VStack align="start" gap={0}>
+                                                                        <Text fontSize="md" fontWeight="medium">
+                                                                            {versionLabel}
+                                                                        </Text>
+                                                                        <HStack gap={2}>
+                                                                            <Text fontSize="sm" color="text.tertiary">
+                                                                                {timeAgo}
+                                                                            </Text>
+                                                                            {v.publisher_name && (
+                                                                                <Text fontSize="sm" color="text.tertiary">
+                                                                                    by {v.publisher_name}
+                                                                                </Text>
+                                                                            )}
+                                                                        </HStack>
+                                                                    </VStack>
+                                                                </HStack>
+                                                                <HStack gap={3}>
+                                                                    <Icon color="text.tertiary">
+                                                                        <LuChevronRight />
+                                                                    </Icon>
+                                                                    <Checkbox.Root
+                                                                        checked={isVariationSelected}
+                                                                        colorPalette="primary"
+                                                                        variant="outline"
+                                                                        onCheckedChange={() => onVariationToggle(v, catalog)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        cursor="pointer"
+                                                                    >
+                                                                        <Checkbox.HiddenInput />
+                                                                        <Checkbox.Control
+                                                                            cursor="pointer"
                                                                             css={{
-                                                                                background: 'rgba(0, 0, 0, 0.1)',
-                                                                                _dark: {
-                                                                                    background: 'rgba(0, 0, 0, 0.3)',
+                                                                                borderColor: isVariationSelected ? 'primary.500' : 'border.emphasized',
+                                                                                _checked: {
+                                                                                    borderColor: 'primary.500',
                                                                                 },
                                                                             }}
                                                                         >
-                                                                            <Code display="block" whiteSpace="pre" fontSize="sm">
-                                                                                {codeString}
-                                                                            </Code>
-                                                                        </Box>
-                                                                    );
-                                                                },
-                                                                a: ({ href, children }) => (
-                                                                    <Link
-                                                                        href={href}
-                                                                        color="primary.500"
-                                                                        textDecoration="underline"
-                                                                        _hover={{ color: 'primary.600' }}
-                                                                    >
-                                                                        {children}
-                                                                    </Link>
-                                                                ),
-                                                                blockquote: ({ children }) => (
-                                                                    <Box
-                                                                        as="blockquote"
-                                                                        borderLeft="4px solid"
-                                                                        borderColor="border.emphasized"
-                                                                        pl={4}
-                                                                        py={2}
-                                                                        my={4}
-                                                                        fontStyle="italic"
-                                                                    >
-                                                                        {children}
-                                                                    </Box>
-                                                                ),
-                                                                hr: () => <Separator my={6} />,
-                                                            }}
-                                                        >
-                                                            {contentWithoutFrontMatter}
-                                                        </ReactMarkdown>
-                                                    </Box>
+                                                                            <Checkbox.Indicator
+                                                                                css={{
+                                                                                    color: 'primary.500',
+                                                                                    _dark: {
+                                                                                        color: 'primary.500',
+                                                                                    },
+                                                                                }}
+                                                                            />
+                                                                        </Checkbox.Control>
+                                                                    </Checkbox.Root>
+                                                                </HStack>
+                                                            </HStack>
+                                                        );
+                                                    })}
                                                 </VStack>
+                                            </VStack>
+                                        )}
+
+                                        {/* Variation Preview View */}
+                                        {currentView === 'variation-preview' && (
+                                            <Box h="100%" display="flex" flexDirection="column">
+                                                {previewLoading ? (
+                                                    <Flex justify="center" align="center" h="100%" minH="400px">
+                                                        <VStack gap={4}>
+                                                            <Spinner size="lg" />
+                                                            <Text color="text.secondary">Loading content...</Text>
+                                                        </VStack>
+                                                    </Flex>
+                                                ) : (
+                                                    <Box
+                                                        flex="1"
+                                                        overflow="auto"
+                                                        borderRadius="12px"
+                                                        css={{
+                                                            background: 'rgba(255, 255, 255, 0.1)',
+                                                            _dark: {
+                                                                background: 'rgba(255, 255, 255, 0.03)',
+                                                            },
+                                                        }}
+                                                    >
+                                                        <Box p={6}>
+                                                            <VStack align="stretch" gap={6}>
+                                                                {/* Header */}
+                                                                <Box>
+                                                                    <Heading
+                                                                        size="xl"
+                                                                        mb={2}
+                                                                        css={{
+                                                                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                                                                            _dark: {
+                                                                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                                                                            },
+                                                                        }}
+                                                                    >
+                                                                        {displayName}
+                                                                    </Heading>
+                                                                    {frontMatter.description && (
+                                                                        <Text
+                                                                            fontSize="lg"
+                                                                            color="text.secondary"
+                                                                            mb={4}
+                                                                            css={{
+                                                                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                                                                                _dark: {
+                                                                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                                                                                },
+                                                                            }}
+                                                                        >
+                                                                            {frontMatter.description}
+                                                                        </Text>
+                                                                    )}
+
+                                                                    {/* Metadata Tags */}
+                                                                    <HStack gap={2} flexWrap="wrap" mt={4}>
+                                                                        {frontMatter.tags && frontMatter.tags.map((tag: string) => (
+                                                                            <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                                                                                <Tag.Label>#{tag}</Tag.Label>
+                                                                            </Tag.Root>
+                                                                        ))}
+                                                                        {frontMatter.version && (
+                                                                            <Tag.Root size="sm" variant="outline">
+                                                                                <Tag.Label>v{frontMatter.version}</Tag.Label>
+                                                                            </Tag.Root>
+                                                                        )}
+                                                                    </HStack>
+                                                                </Box>
+
+                                                                <Separator />
+
+                                                                {/* Markdown Content */}
+                                                                <Box
+                                                                    css={{
+                                                                        '& > *': { mb: 4 },
+                                                                        '& > *:last-child': { mb: 0 },
+                                                                        '& h1': { fontSize: '2xl', fontWeight: 'bold', mt: 6, mb: 4 },
+                                                                        '& h2': { fontSize: '2xl', fontWeight: 'semibold', mt: 5, mb: 3, color: 'primary.500' },
+                                                                        '& h3': { fontSize: 'lg', fontWeight: 'semibold', mt: 4, mb: 2 },
+                                                                        '& h4, & h5, & h6': { fontSize: 'md', fontWeight: 'semibold', mt: 3, mb: 2 },
+                                                                        '& p': { lineHeight: '1.75', color: 'text.primary' },
+                                                                        '& ul, & ol': { pl: 4, mb: 4 },
+                                                                        '& li': { mb: 2 },
+                                                                        '& pre': { mb: 4 },
+                                                                        '& code': { fontSize: '0.9em' },
+                                                                        '& a': { color: 'primary.500', textDecoration: 'underline' },
+                                                                        '& a:hover': { color: 'primary.600' },
+                                                                        '& blockquote': { borderLeft: '4px solid', borderColor: 'border.emphasized', pl: 4, py: 2, my: 4, fontStyle: 'italic' },
+                                                                        '& table': { width: '100%', borderCollapse: 'collapse', mb: 4 },
+                                                                        '& th, & td': { border: '1px solid', borderColor: 'border.subtle', px: 3, py: 2 },
+                                                                        '& th': { fontWeight: 'semibold' },
+                                                                    }}
+                                                                >
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm]}
+                                                                        components={{
+                                                                            h1: ({ children }) => (
+                                                                                <Heading as="h1" size="2xl" mt={6} mb={4}>
+                                                                                    {children}
+                                                                                </Heading>
+                                                                            ),
+                                                                            h2: ({ children }) => (
+                                                                                <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">
+                                                                                    {children}
+                                                                                </Heading>
+                                                                            ),
+                                                                            h3: ({ children }) => (
+                                                                                <Heading as="h3" size="lg" mt={4} mb={2}>
+                                                                                    {children}
+                                                                                </Heading>
+                                                                            ),
+                                                                            h4: ({ children }) => (
+                                                                                <Heading as="h4" size="md" mt={3} mb={2}>
+                                                                                    {children}
+                                                                                </Heading>
+                                                                            ),
+                                                                            p: ({ children }) => (
+                                                                                <Text mb={4} lineHeight="1.75" color="text.primary">
+                                                                                    {children}
+                                                                                </Text>
+                                                                            ),
+                                                                            ul: ({ children }) => (
+                                                                                <List.Root mb={4} pl={4}>
+                                                                                    {children}
+                                                                                </List.Root>
+                                                                            ),
+                                                                            ol: ({ children }) => (
+                                                                                <List.Root as="ol" mb={4} pl={4}>
+                                                                                    {children}
+                                                                                </List.Root>
+                                                                            ),
+                                                                            li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
+                                                                            code: ({ className, children, ...props }) => {
+                                                                                const match = /language-(.+)/.exec(className || '');
+                                                                                const isInline = !match;
+                                                                                const codeString = String(children).replace(/\n$/, '');
+
+                                                                                if (isInline) {
+                                                                                    return (
+                                                                                        <Code px={1.5} py={0.5} borderRadius="sm" fontSize="0.9em" {...props}>
+                                                                                            {children}
+                                                                                        </Code>
+                                                                                    );
+                                                                                }
+
+                                                                                return (
+                                                                                    <Box
+                                                                                        as="pre"
+                                                                                        p={4}
+                                                                                        borderRadius="md"
+                                                                                        overflow="auto"
+                                                                                        mb={4}
+                                                                                        css={{
+                                                                                            background: 'rgba(0, 0, 0, 0.1)',
+                                                                                            _dark: {
+                                                                                                background: 'rgba(0, 0, 0, 0.3)',
+                                                                                            },
+                                                                                        }}
+                                                                                    >
+                                                                                        <Code display="block" whiteSpace="pre" fontSize="sm">
+                                                                                            {codeString}
+                                                                                        </Code>
+                                                                                    </Box>
+                                                                                );
+                                                                            },
+                                                                            a: ({ href, children }) => (
+                                                                                <Link
+                                                                                    href={href}
+                                                                                    color="primary.500"
+                                                                                    textDecoration="underline"
+                                                                                    _hover={{ color: 'primary.600' }}
+                                                                                >
+                                                                                    {children}
+                                                                                </Link>
+                                                                            ),
+                                                                            blockquote: ({ children }) => (
+                                                                                <Box
+                                                                                    as="blockquote"
+                                                                                    borderLeft="4px solid"
+                                                                                    borderColor="border.emphasized"
+                                                                                    pl={4}
+                                                                                    py={2}
+                                                                                    my={4}
+                                                                                    fontStyle="italic"
+                                                                                >
+                                                                                    {children}
+                                                                                </Box>
+                                                                            ),
+                                                                            hr: () => <Separator my={6} />,
+                                                                        }}
+                                                                    >
+                                                                        {contentWithoutFrontMatter}
+                                                                    </ReactMarkdown>
+                                                                </Box>
+                                                            </VStack>
+                                                        </Box>
+                                                    </Box>
+                                                )}
                                             </Box>
-                                        </Box>
-                                    )}
-                                </Box>
-                            )}
-                        </Dialog.Body>
-                    </Dialog.Content>
-                </Dialog.Positioner>
-            </Portal>
-        </Dialog.Root>
+                                        )}
+                                    </Dialog.Body>
+                                </motion.div>
+                            </Dialog.Content>
+                        </Dialog.Positioner>
+                    </Portal>
+                </Dialog.Root>
+            )}
+        </AnimatePresence>
     );
 }

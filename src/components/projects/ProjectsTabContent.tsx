@@ -161,7 +161,7 @@ export default function ProjectsTabContent({
 
   const handleOpenInEditor = async (
     project: Project,
-    editor: 'cursor' | 'vscode'
+    editor: 'cursor' | 'vscode' | 'antigravity'
   ) => {
     try {
       await invokeOpenProjectInEditor(project.path, editor);
@@ -385,6 +385,12 @@ export default function ProjectsTabContent({
                                       onSelect={() => handleOpenInEditor(project, 'vscode')}
                                     >
                                       VSCode
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      value="antigravity"
+                                      onSelect={() => handleOpenInEditor(project, 'antigravity')}
+                                    >
+                                      Antigravity
                                     </Menu.Item>
                                   </Menu.Content>
                                 </Menu.Positioner>

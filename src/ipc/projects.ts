@@ -252,21 +252,22 @@ export async function invokeCreateNewProject(
 }
 
 /**
- * Opens a project in the specified editor (Cursor or VSCode).
+ * Opens a project in the specified editor (Cursor, VSCode, or Antigravity).
  *
  * @param projectPath - Absolute path to the project directory
- * @param editor - The editor to use: 'cursor' or 'vscode'
+ * @param editor - The editor to use: 'cursor', 'vscode', or 'antigravity'
  * @returns Promise that resolves when the editor is opened
  *
  * @example
  * ```typescript
  * await invokeOpenProjectInEditor('/path/to/project', 'cursor');
  * await invokeOpenProjectInEditor('/path/to/project', 'vscode');
+ * await invokeOpenProjectInEditor('/path/to/project', 'antigravity');
  * ```
  */
 export async function invokeOpenProjectInEditor(
   projectPath: string,
-  editor: 'cursor' | 'vscode'
+  editor: 'cursor' | 'vscode' | 'antigravity'
 ): Promise<void> {
   return await invokeWithTimeout<void>(
     'open_project_in_editor',

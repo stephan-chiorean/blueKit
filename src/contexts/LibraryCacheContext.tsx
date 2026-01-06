@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { CatalogWithVariations } from '../types/github';
 import { LibraryCollection } from '../ipc/library';
+import { cacheStorage } from '../utils/cacheStorage';
 
 interface CachedCatalogs {
   catalogs: CatalogWithVariations[];
@@ -30,6 +31,11 @@ interface LibraryCacheContextType {
   getCachedCollections: (workspaceId: string) => LibraryCollection[] | null;
   setCachedCollections: (workspaceId: string, collections: LibraryCollection[]) => void;
 
+  // Content cache (persistent via IndexedDB)
+  getCachedVariationContent: (path: string) => Promise<string | null>;
+  setCachedVariationContent: (path: string, content: string) => Promise<void>;
+  invalidateVariationContent: (path?: string) => Promise<void>;
+
   // Cache invalidation
   invalidateCatalogs: (workspaceId: string) => void;
   invalidateFolders: (workspaceId: string) => void;
@@ -45,17 +51,18 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
   const [foldersCache, setFoldersCache] = useState<Map<string, CachedFolders>>(new Map());
   const [collectionsCache, setCollectionsCache] = useState<Map<string, CachedCollections>>(new Map());
 
-  // Cache TTL: 5 minutes
-  const CACHE_TTL = 5 * 60 * 1000;
+  // Cache TTL: 5 minutes for lists, 24 hours for content
+  const LIST_CACHE_TTL = 5 * 60 * 1000;
+  const CONTENT_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   // Catalogs cache (library workspace catalogs)
   const getCachedCatalogs = useCallback((workspaceId: string): CatalogWithVariations[] | null => {
     const cached = catalogsCache.get(workspaceId);
-    
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+
+    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
       return cached.catalogs;
     }
-    
+
     return null;
   }, [catalogsCache]);
 
@@ -73,11 +80,11 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
   // Folders cache (GitHub folder names)
   const getCachedFolders = useCallback((workspaceId: string): string[] | null => {
     const cached = foldersCache.get(workspaceId);
-    
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+
+    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
       return cached.folders;
     }
-    
+
     return null;
   }, [foldersCache]);
 
@@ -90,6 +97,31 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
       });
       return next;
     });
+  }, []);
+
+  // Content cache (Persistent)
+  const getCachedVariationContent = useCallback(async (path: string): Promise<string | null> => {
+    const cached = await cacheStorage.get(path);
+    if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
+      return cached.content;
+    }
+    // If expired, delete it (lazy cleanup)
+    if (cached) {
+      await cacheStorage.delete(path);
+    }
+    return null;
+  }, []);
+
+  const setCachedVariationContent = useCallback(async (path: string, content: string) => {
+    await cacheStorage.set(path, content, Date.now());
+  }, []);
+
+  const invalidateVariationContent = useCallback(async (path?: string) => {
+    if (path) {
+      await cacheStorage.delete(path);
+    } else {
+      await cacheStorage.clear();
+    }
   }, []);
 
   // Cache invalidation
@@ -113,7 +145,7 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
   const getCachedCollections = useCallback((workspaceId: string): LibraryCollection[] | null => {
     const cached = collectionsCache.get(workspaceId);
 
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
       return cached.collections;
     }
 
@@ -139,10 +171,12 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const clearAllCache = useCallback(() => {
+  const clearAllCache = useCallback(async () => {
     setCatalogsCache(new Map());
     setFoldersCache(new Map());
     setCollectionsCache(new Map());
+    // Also clear persistent cache
+    await cacheStorage.clear();
   }, []);
 
   return (
@@ -154,6 +188,9 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
         setCachedFolders,
         getCachedCollections,
         setCachedCollections,
+        getCachedVariationContent,
+        setCachedVariationContent,
+        invalidateVariationContent,
         invalidateCatalogs,
         invalidateFolders,
         invalidateCollections,

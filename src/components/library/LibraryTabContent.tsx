@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, 
 import {
   Box,
   Button,
-  Card,
   EmptyState,
   Flex,
   Heading,
@@ -11,7 +10,6 @@ import {
   IconButton,
   SimpleGrid,
   Spinner,
-  Tag,
   Text,
   VStack,
   Badge,
@@ -19,18 +17,11 @@ import {
   Portal,
   Select,
   createListCollection,
-  Checkbox,
-  ActionBar,
   Input,
-  InputGroup,
   Textarea,
   Dialog,
   CloseButton,
   Field,
-  Separator,
-  Code,
-  Link,
-  List,
 } from '@chakra-ui/react';
 import {
   LuLibrary,
@@ -54,6 +45,7 @@ import {
 import { IoIosMore } from 'react-icons/io';
 import { open as openShell } from '@tauri-apps/api/shell';
 import { AnimatePresence, motion } from 'framer-motion';
+import { GlassCard } from '../shared/GlassCard';
 
 import { toaster } from '../ui/toaster';
 import {
@@ -90,7 +82,7 @@ import { FilterPanel } from '../shared/FilterPanel';
 import CollectionView from './CollectionView';
 import EditLibraryCollectionModal from './EditLibraryCollectionModal';
 import { LibrarySelectionBar } from './LibrarySelectionBar';
-import { CatalogCard, artifactTypeIcon } from './CatalogCard';
+import { CatalogCard } from './CatalogCard';
 import { CatalogDetailModal, SelectedVariation } from './CatalogDetailModal';
 
 type ViewMode = 'loading' | 'no-auth' | 'no-workspaces' | 'browse';
@@ -111,8 +103,17 @@ interface LibraryTabContentProps {
 
 // Library collection is now imported from IPC - no local interface needed
 
-const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewVariation }, ref) {
-  const { getCachedCatalogs, setCachedCatalogs, getCachedCollections, setCachedCollections, invalidateCatalogs, invalidateCollections } = useLibraryCache();
+const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewVariation: _onViewVariation }, ref) {
+  const {
+    getCachedCatalogs,
+    setCachedCatalogs,
+    getCachedCollections,
+    setCachedCollections,
+    invalidateCatalogs,
+    invalidateCollections,
+    getCachedVariationContent,
+    setCachedVariationContent
+  } = useLibraryCache();
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [workspaces, setWorkspaces] = useState<LibraryWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
@@ -136,6 +137,14 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   // Catalog detail modal state
   const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
+  const [lastViewingCatalog, setLastViewingCatalog] = useState<CatalogWithVariations | null>(null);
+
+  // Keep track of the last valid catalog to allow exit animations
+  useEffect(() => {
+    if (viewingCatalog) {
+      setLastViewingCatalog(viewingCatalog);
+    }
+  }, [viewingCatalog]);
 
   // Edit collection modal state
   const [editingCollection, setEditingCollection] = useState<LibraryCollection | null>(null);
@@ -503,40 +512,23 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     });
   };
 
-  // Parse front matter from content
-  const parseFrontMatter = (content: string): any => {
-    let frontMatter: any = {};
-    if (content.trim().startsWith('---')) {
-      const endIndex = content.indexOf('\n---', 4);
-      if (endIndex !== -1) {
-        const frontMatterText = content.substring(4, endIndex);
-        const lines = frontMatterText.split('\n');
-        lines.forEach((line) => {
-          const colonIndex = line.indexOf(':');
-          if (colonIndex > 0) {
-            const key = line.substring(0, colonIndex).trim();
-            let value = line.substring(colonIndex + 1).trim();
-            // Handle arrays (tags)
-            if (key === 'tags' && value.startsWith('[')) {
-              frontMatter[key] = value
-                .slice(1, -1)
-                .split(',')
-                .map((t) => t.trim().replace(/['"]/g, ''));
-            } else {
-              // Remove quotes from value
-              frontMatter[key] = value.replace(/^["']|["']$/g, '');
-            }
-          }
-        });
-      }
-    }
-    return frontMatter;
-  };
+
 
   // Fetch variation content for preview modal
   const fetchVariationContent = async (variation: LibraryVariation, _catalog: LibraryCatalog): Promise<string> => {
     if (!selectedWorkspace) {
       throw new Error('No workspace selected');
+    }
+
+    // Check cache first
+    try {
+      const cached = await getCachedVariationContent(variation.remote_path);
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      console.warn('Failed to read from cache:', error);
+      // Continue to fetch from network
     }
 
     const content = await invokeGitHubGetFile(
@@ -545,59 +537,18 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       variation.remote_path
     );
 
+    // Update cache
+    try {
+      await setCachedVariationContent(variation.remote_path, content);
+    } catch (error) {
+      console.warn('Failed to write to cache:', error);
+      // Non-fatal error
+    }
+
     return content;
   };
 
-  // Handle variation click to navigate to ResourceViewPage
-  const handleVariationClick = async (variation: LibraryVariation, catalog: LibraryCatalog) => {
-    if (!selectedWorkspace || !onViewVariation) {
-      toaster.create({
-        type: 'error',
-        title: 'No workspace selected',
-        description: 'Please select a workspace first',
-      });
-      return;
-    }
 
-    try {
-      const content = await invokeGitHubGetFile(
-        selectedWorkspace.github_owner,
-        selectedWorkspace.github_repo,
-        variation.remote_path
-      );
-
-      // Convert to ResourceFile
-      const fileName = variation.remote_path.split('/').pop() || 'Unknown';
-      const name = fileName.replace(/\.(md|markdown)$/, '');
-      const frontMatter = parseFrontMatter(content);
-
-      // Determine resource type from catalog artifact_type
-      const resourceTypeMap: Record<string, ResourceType> = {
-        kit: 'kit',
-        walkthrough: 'walkthrough',
-        agent: 'agent',
-        diagram: 'diagram',
-      };
-      const resourceType = resourceTypeMap[catalog.artifact_type] || 'kit';
-
-      const resourceFile: ResourceFile = {
-        path: variation.remote_path,
-        name,
-        frontMatter,
-        resourceType,
-      };
-
-      // Call callback to navigate
-      onViewVariation(resourceFile, content, resourceType);
-    } catch (error) {
-      console.error('Failed to fetch variation content:', error);
-      toaster.create({
-        type: 'error',
-        title: 'Failed to load variation',
-        description: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  };
 
 
   // Handle catalog selection toggle - toggles all variations of the catalog
@@ -1426,6 +1377,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                 WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                 borderColor: 'rgba(0, 0, 0, 0.08)',
                 boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                transition: 'none',
                 _dark: {
                   background: 'rgba(0, 0, 0, 0.2)',
                   borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1745,6 +1697,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                               WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                               borderColor: 'rgba(0, 0, 0, 0.08)',
                               boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                              transition: 'none',
                               _dark: {
                                 background: 'rgba(0, 0, 0, 0.2)',
                                 borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1865,12 +1818,13 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       />
 
       {/* Catalog Detail Modal */}
+      {/* Catalog Detail Modal - always render if we have a catalog (current or last) to allow exit animations */}
       {
-        viewingCatalog && (
+        (viewingCatalog || lastViewingCatalog) && (
           <CatalogDetailModal
-            isOpen={true}
+            isOpen={!!viewingCatalog}
             onClose={() => setViewingCatalog(null)}
-            catalogWithVariations={viewingCatalog}
+            catalogWithVariations={(viewingCatalog || lastViewingCatalog)!}
             onFetchVariationContent={fetchVariationContent}
             selectedVariations={selectedVariations}
             onVariationToggle={handleVariationToggle}
@@ -1996,115 +1950,100 @@ function LibraryCollectionCard({
   }
 
   return (
-    <Card.Root
+    <GlassCard
+      intensity="medium"
       cursor="pointer"
       onClick={onOpenModal}
-      transition="all 0.2s ease-in-out"
-      position="relative"
-      overflow="hidden"
-      borderRadius="16px"
-      borderWidth="1px"
-      p={2.5}
-      display="flex"
-      flexDirection="column"
-      justifyContent="center"
-      minH="100px"
-      css={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-        borderColor: collection.color || 'rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-        _dark: {
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderColor: collection.color || 'rgba(255, 255, 255, 0.15)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        },
-        _hover: {
-          transform: 'scale(1.02)',
-        },
-      }}
     >
-      {/* Menu button positioned absolutely in top-right corner */}
       <Box
-        position="absolute"
-        top={1.5}
-        right={1.5}
-        onClick={(e) => e.stopPropagation()}
+        position="relative"
+        p={2.5}
+        display="flex"
+        flexDirection="column"
+        justifyContent="center"
+        minH="100px"
       >
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <IconButton
-              variant="ghost"
-              size="xs"
-              aria-label="Collection options"
-              onClick={(e) => e.stopPropagation()}
-              bg="transparent"
-              _hover={{ bg: "bg.subtle" }}
-              _active={{ bg: "bg.subtle" }}
-              _focus={{ bg: "bg.subtle" }}
-              _focusVisible={{ bg: "bg.subtle" }}
-            >
-              <Icon fontSize="xs">
-                <IoIosMore />
-              </Icon>
-            </IconButton>
-          </Menu.Trigger>
-          <Portal>
-            <Menu.Positioner>
-              <Menu.Content>
-                <Menu.Item value="edit" onSelect={onEditCollection}>
-                  <Icon><LuPencil /></Icon>
-                  Edit Collection
-                </Menu.Item>
-                <Menu.Item value="delete" onSelect={onDeleteCollection}>
-                  <Icon><LuTrash2 /></Icon>
-                  Remove Collection
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Positioner>
-          </Portal>
-        </Menu.Root>
-      </Box>
-
-      {/* Centered content */}
-      <VStack align="center" gap={1.5}>
-        <Heading
-          size="md"
-          fontWeight="medium"
-          textAlign="center"
-          css={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            wordBreak: 'break-word',
-            lineHeight: '1.2',
-          }}
+        {/* Menu button positioned absolutely in top-right corner */}
+        <Box
+          position="absolute"
+          top={1.5}
+          right={1.5}
+          onClick={(e) => e.stopPropagation()}
         >
-          {collection.name}
-        </Heading>
-        {resourceSummary.length > 0 && (
-          <HStack gap={1.5} justify="center" wrap="wrap">
-            {resourceSummary.map((part, index) => (
-              <HStack key={index} gap={1}>
-                {index > 0 && (
-                  <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                    •
-                  </Text>
-                )}
-                <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                  {part.count}
-                </Text>
-                <Icon fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                  {part.icon}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <IconButton
+                variant="ghost"
+                size="xs"
+                aria-label="Collection options"
+                onClick={(e) => e.stopPropagation()}
+                bg="transparent"
+                _hover={{ bg: "bg.subtle" }}
+                _active={{ bg: "bg.subtle" }}
+                _focus={{ bg: "bg.subtle" }}
+                _focusVisible={{ bg: "bg.subtle" }}
+              >
+                <Icon fontSize="xs">
+                  <IoIosMore />
                 </Icon>
-              </HStack>
-            ))}
-          </HStack>
-        )}
-      </VStack>
-    </Card.Root>
+              </IconButton>
+            </Menu.Trigger>
+            <Portal>
+              <Menu.Positioner>
+                <Menu.Content>
+                  <Menu.Item value="edit" onSelect={onEditCollection}>
+                    <Icon><LuPencil /></Icon>
+                    Edit Collection
+                  </Menu.Item>
+                  <Menu.Item value="delete" onSelect={onDeleteCollection}>
+                    <Icon><LuTrash2 /></Icon>
+                    Remove Collection
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Positioner>
+            </Portal>
+          </Menu.Root>
+        </Box>
+
+        {/* Centered content */}
+        <VStack align="center" gap={1.5}>
+          <Heading
+            size="md"
+            fontWeight="medium"
+            textAlign="center"
+            css={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              wordBreak: 'break-word',
+              lineHeight: '1.2',
+            }}
+          >
+            {collection.name}
+          </Heading>
+          {resourceSummary.length > 0 && (
+            <HStack gap={1.5} justify="center" wrap="wrap">
+              {resourceSummary.map((part, index) => (
+                <HStack key={index} gap={1}>
+                  {index > 0 && (
+                    <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                      •
+                    </Text>
+                  )}
+                  <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                    {part.count}
+                  </Text>
+                  <Icon fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                    {part.icon}
+                  </Icon>
+                </HStack>
+              ))}
+            </HStack>
+          )}
+        </VStack>
+      </Box>
+    </GlassCard>
   );
 }
 
