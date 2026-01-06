@@ -10,8 +10,8 @@ import {
 } from '@chakra-ui/react';
 import {
     LuArrowLeft,
-    LuBookmark,
 } from 'react-icons/lu';
+import { BsBookmarkFill } from 'react-icons/bs';
 import { CatalogWithVariations, LibraryVariation, LibraryCatalog } from '../../types/github';
 import { LibraryCollection } from '../../ipc/library';
 import { Project } from '../../ipc';
@@ -118,8 +118,8 @@ export default function CollectionView({
                         <Text fontWeight="bold" fontSize="md" color="fg">
                             {collection.name}
                         </Text>
-                        <Icon color="text.secondary" boxSize={4}>
-                            <LuBookmark />
+                        <Icon color="secondary.solid" boxSize={4}>
+                            <BsBookmarkFill />
                         </Icon>
                     </HStack>
                 </HStack>

@@ -257,7 +257,7 @@ export default function HomePage({
       // Update kits - merge changed artifacts
       setKits(prev => {
         const updated = new Map(prev.map((kit: ArtifactFile) => [kit.path, kit]));
-        
+
         artifactsWithFrontMatter.forEach((artifact: ArtifactFile) => {
           updated.set(artifact.path, artifact);
         });
@@ -404,11 +404,11 @@ export default function HomePage({
 
       {/* Full screen content area - no workstation until kit is selected */}
       <Box flex="1" minH={0} overflow="hidden" style={{ height: '100%', maxHeight: '100%' }} bg="transparent">
-        <Box 
-          h="100%" 
-          p={6} 
-          position="relative" 
-          overflow="auto" 
+        <Box
+          h="100%"
+          p={6}
+          position="relative"
+          overflow="auto"
           style={{ height: '100%', maxHeight: '100%' }}
           css={{
             background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
@@ -417,145 +417,148 @@ export default function HomePage({
           }}
         >
           <Box position="relative" zIndex={1}>
-          <Tabs.Root
-            defaultValue="projects"
-            variant="plain"
-            value={activeTab}
-            onValueChange={(e) => handleTabChange(e.value as string)}
-          >
-            <Flex
-              align="center"
-              gap={4}
-              mb={6}
-              mt={3}
-              position="relative"
-              w="100%"
+            <Tabs.Root
+              defaultValue="projects"
+              variant="plain"
+              value={activeTab}
+              onValueChange={(e) => handleTabChange(e.value as string)}
             >
-              <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
-                {({ onOpen }) => (
-                  <IconButton
-                    variant="ghost"
-                    size="lg"
-                    aria-label="Open menu"
-                    onClick={onOpen}
-                    color="gray.600"
-                    _hover={{ bg: "transparent" }}
-                  >
-                    <LuMenu />
-                  </IconButton>
-                )}
-              </NavigationMenu>
-              <Box
-                position="absolute"
-                left="50%"
-                borderRadius="lg"
-                p={2}
-                style={{
-                  transform: "translateX(-50%)",
-                  background: tabsBg,
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: tabsBorder,
-                }}
+              <Flex
+                align="center"
+                gap={4}
+                mb={6}
+                mt={3}
+                position="relative"
+                w="100%"
               >
-                <Tabs.List>
-                  <Tabs.Trigger value="projects">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuFolder />
-                      </Icon>
-                      <Text>Projects</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="library">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuLibrary />
-                      </Icon>
-                      <Text>Library</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="workflows">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuWorkflow />
-                      </Icon>
-                      <Text>Workflows</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="tasks">
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuListTodo />
-                      </Icon>
-                      <Text>Tasks</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Indicator
-                    rounded="md"
-                    style={{
-                      background: indicatorBg,
-                      backdropFilter: 'blur(8px)',
-                      WebkitBackdropFilter: 'blur(8px)',
-                    }}
-                  />
-                </Tabs.List>
-              </Box>
-              {activeTab === "tasks" && (
-                <Box position="absolute" right={0}>
-                  <Button
-                    colorPalette="primary"
-                    onClick={() => tasksTabRef.current?.openCreateDialog()}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPlus />
-                      </Icon>
-                      <Text>Add Task</Text>
-                    </HStack>
-                  </Button>
-                </Box>
-              )}
-              {activeTab === "library" && (
-                <Box position="absolute" right={0}>
-                  <Button
-                    colorPalette="primary"
-                    onClick={() => libraryTabRef.current?.openAddWorkspaceDialog()}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPlus />
-                      </Icon>
-                      <Text>Add Workspace</Text>
-                    </HStack>
-                  </Button>
-                </Box>
-              )}
-            </Flex>
+                <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
+                  {({ onOpen }) => (
+                    <IconButton
+                      variant="ghost"
+                      size="lg"
+                      aria-label="Open menu"
+                      onClick={onOpen}
+                      color="gray.600"
+                      _hover={{ bg: "transparent" }}
+                    >
+                      <LuMenu />
+                    </IconButton>
+                  )}
+                </NavigationMenu>
 
-            <Tabs.Content value="projects">
-              <ProjectsTabContent
-                projects={projects}
-                projectsLoading={projectsLoading}
-                error={projectsError}
-                onProjectSelect={onProjectSelect}
-                onProjectsChanged={loadProjects}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="library">
-              <LibraryTabContent ref={libraryTabRef} onViewVariation={handleViewLibraryVariation} />
-            </Tabs.Content>
-            <Tabs.Content value="workflows">
-              <WorkflowsTabContent />
-            </Tabs.Content>
-            <Tabs.Content value="tasks">
-              <TasksTabContent
-                ref={tasksTabRef}
-                context="workspace"
-                projects={projects}
-              />
-            </Tabs.Content>
-          </Tabs.Root>
+                {/* Portal target for left-side header actions (e.g. workspace selector) */}
+                <Box id="header-left-actions" display={activeTab === 'library' ? 'block' : 'none'} />
+                <Box
+                  position="absolute"
+                  left="50%"
+                  borderRadius="lg"
+                  p={2}
+                  style={{
+                    transform: "translateX(-50%)",
+                    background: tabsBg,
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: tabsBorder,
+                  }}
+                >
+                  <Tabs.List>
+                    <Tabs.Trigger value="projects">
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuFolder />
+                        </Icon>
+                        <Text>Projects</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="library">
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuLibrary />
+                        </Icon>
+                        <Text>Library</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="workflows">
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuWorkflow />
+                        </Icon>
+                        <Text>Workflows</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="tasks">
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuListTodo />
+                        </Icon>
+                        <Text>Tasks</Text>
+                      </HStack>
+                    </Tabs.Trigger>
+                    <Tabs.Indicator
+                      rounded="md"
+                      style={{
+                        background: indicatorBg,
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                      }}
+                    />
+                  </Tabs.List>
+                </Box>
+                {activeTab === "tasks" && (
+                  <Box position="absolute" right={0}>
+                    <Button
+                      colorPalette="primary"
+                      onClick={() => tasksTabRef.current?.openCreateDialog()}
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuPlus />
+                        </Icon>
+                        <Text>Add Task</Text>
+                      </HStack>
+                    </Button>
+                  </Box>
+                )}
+                {activeTab === "library" && (
+                  <Box position="absolute" right={0}>
+                    <Button
+                      colorPalette="primary"
+                      onClick={() => libraryTabRef.current?.openAddWorkspaceDialog()}
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuPlus />
+                        </Icon>
+                        <Text>Add Workspace</Text>
+                      </HStack>
+                    </Button>
+                  </Box>
+                )}
+              </Flex>
+
+              <Tabs.Content value="projects">
+                <ProjectsTabContent
+                  projects={projects}
+                  projectsLoading={projectsLoading}
+                  error={projectsError}
+                  onProjectSelect={onProjectSelect}
+                  onProjectsChanged={loadProjects}
+                />
+              </Tabs.Content>
+              <Tabs.Content value="library">
+                <LibraryTabContent ref={libraryTabRef} onViewVariation={handleViewLibraryVariation} />
+              </Tabs.Content>
+              <Tabs.Content value="workflows">
+                <WorkflowsTabContent />
+              </Tabs.Content>
+              <Tabs.Content value="tasks">
+                <TasksTabContent
+                  ref={tasksTabRef}
+                  context="workspace"
+                  projects={projects}
+                />
+              </Tabs.Content>
+            </Tabs.Root>
           </Box>
         </Box>
       </Box>

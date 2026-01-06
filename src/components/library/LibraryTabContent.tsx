@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box,
   Button,
@@ -43,6 +44,7 @@ import {
   LuPencil,
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
+import { BsBookmarkFill } from 'react-icons/bs';
 import { open as openShell } from '@tauri-apps/api/shell';
 import { AnimatePresence, motion } from 'framer-motion';
 import { GlassCard } from '../shared/GlassCard';
@@ -1292,176 +1294,95 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   // Browse catalogs
   return (
     <>
-      {/* Toolbar row - sits above catalog cards */}
-      <Flex
-        gap={2}
-        align="center"
-        mb={4}
-        justify="space-between"
-      >
-        {/* Left side: Workspace dropdown + New Collection */}
-        <HStack gap={2}>
-          {/* Workspace dropdown */}
-          <Select.Root
-            collection={workspacesCollection}
-            value={selectedWorkspaceId ? [selectedWorkspaceId] : []}
-            onValueChange={(details) => setSelectedWorkspaceId(details.value[0] || null)}
-            size="sm"
-            variant="subtle"
-            width="180px"
+      {/* Workspace Selector Portal - Rendered in top bar next to menu */}
+      {document.getElementById('header-left-actions') && createPortal(
+        <Select.Root
+          collection={workspacesCollection}
+          value={selectedWorkspaceId ? [selectedWorkspaceId] : []}
+          onValueChange={(details) => setSelectedWorkspaceId(details.value[0] || null)}
+          size="sm"
+          width="180px"
+        >
+          <Select.HiddenSelect />
+          <Select.Control
+            cursor="pointer"
+            borderWidth="1px"
+            borderRadius="lg"
+            px={2}
+            css={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              borderColor: 'rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+              transition: 'none',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+              },
+            }}
           >
-            <Select.HiddenSelect />
-            <Select.Control cursor="pointer">
-              <Select.Trigger>
-                <HStack gap={2}>
-                  <Icon fontSize="sm" color="primary.500">
-                    <LuLayers />
-                  </Icon>
-                  <Select.ValueText placeholder="Select workspace" />
-                </HStack>
-              </Select.Trigger>
-              <Select.IndicatorGroup>
-                <Select.Indicator />
-              </Select.IndicatorGroup>
-            </Select.Control>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content>
-                  {workspacesCollection.items.map((ws) => (
-                    <Select.Item item={ws} key={ws.id}>
-                      <HStack gap={2}>
-                        <Icon fontSize="sm" color="primary.500">
-                          <LuLayers />
-                        </Icon>
-                        <Select.ItemText>{ws.name}</Select.ItemText>
-                      </HStack>
-                      <Select.ItemIndicator />
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
-          </Select.Root>
-
-          {/* New Collection button */}
-          <Button
-            size="sm"
-            onClick={() => setShowCreateCollectionDialog(true)}
-            colorPalette="blue"
-            variant="subtle"
-          >
-            <HStack gap={2}>
-              <Icon>
-                <LuBookmarkPlus />
-              </Icon>
-              <Text>New Collection</Text>
-            </HStack>
-          </Button>
-        </HStack>
-
-        {/* Right side: GitHub link, Sync, Menu */}
-        <HStack gap={2}>
-          {/* GitHub link */}
-          {selectedWorkspace && (
-            <HStack
-              gap={1}
-              cursor="pointer"
-              onClick={() => openGitHubRepo(selectedWorkspace)}
-              px={2}
-              py={1}
-              borderRadius="lg"
-              borderWidth="1px"
+            <Select.Trigger
+              width="100%"
+              bg="transparent"
+              border="none"
+              _focus={{ boxShadow: "none", outline: "none" }}
+              _hover={{ bg: "transparent" }}
+              _active={{ bg: "transparent" }}
               css={{
-                background: 'rgba(255, 255, 255, 0.25)',
-                backdropFilter: 'blur(20px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                borderColor: 'rgba(0, 0, 0, 0.08)',
-                boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                transition: 'none',
-                _dark: {
-                  background: 'rgba(0, 0, 0, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.15)',
-                  boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                },
+                "& button": {
+                  border: "none",
+                  boxShadow: "none"
+                }
               }}
             >
-              <Icon fontSize="sm">
-                <LuGithub />
-              </Icon>
-              <Text fontSize="xs" color="text.secondary">
-                {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
-              </Text>
-              <Icon fontSize="xs">
-                <LuExternalLink />
-              </Icon>
-            </HStack>
-          )}
-
-          {/* Sync button - subtle style */}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleSync}
-            disabled={syncing}
-            _hover={{ bg: 'bg.subtle' }}
-          >
-            <HStack gap={2}>
-              {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
-              <Text>Sync</Text>
-            </HStack>
-          </Button>
-
-          {/* Workspace menu */}
-          {selectedWorkspace && (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label="Workspace options"
-                >
-                  <IoIosMore />
-                </IconButton>
-              </Menu.Trigger>
-              <Portal>
-                <Menu.Positioner>
-                  <Menu.Content>
-                    <Menu.Item
-                      value="edit"
-                      onSelect={handleEditWorkspace}
-                    >
-                      <HStack gap={2}>
-                        <LuPencil />
-                        <Text>Edit Workspace</Text>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item
-                      value="pin"
-                      onSelect={handlePinWorkspace}
-                    >
-                      <HStack gap={2}>
-                        {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
-                        <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Separator />
-                    <Menu.Item
-                      value="delete"
-                      color="red.500"
-                      onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
-                    >
-                      <HStack gap={2}>
-                        <LuTrash2 />
-                        <Text>Delete Workspace</Text>
-                      </HStack>
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Positioner>
-              </Portal>
-            </Menu.Root>
-          )}
-        </HStack>
-      </Flex>
+              <HStack gap={2}>
+                <Icon fontSize="sm" color="primary.500">
+                  <LuLayers />
+                </Icon>
+                <Select.ValueText placeholder="Select workspace" />
+              </HStack>
+            </Select.Trigger>
+            <Select.IndicatorGroup>
+              <Select.Indicator />
+            </Select.IndicatorGroup>
+          </Select.Control>
+          <Portal>
+            <Select.Positioner>
+              <Select.Content
+                borderWidth="1px"
+                borderRadius="lg"
+                css={{
+                  background: 'rgba(255, 255, 255, 0.65)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
+                  _dark: {
+                    background: 'rgba(20, 20, 25, 0.8)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                  },
+                }}
+              >
+                {workspacesCollection.items.map((ws) => (
+                  <Select.Item item={ws} key={ws.id}>
+                    <HStack gap={2}>
+                      <Icon fontSize="sm" color="primary.500">
+                        <LuLayers />
+                      </Icon>
+                      <Select.ItemText>{ws.name}</Select.ItemText>
+                    </HStack>
+                    <Select.ItemIndicator />
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Positioner>
+          </Portal>
+        </Select.Root>,
+        document.getElementById('header-left-actions')!
+      )}
 
       {/* Unified Library Action Bar - hide when collection modal is open */}
       <Portal>
@@ -1632,41 +1553,166 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                   </Box>
                 )}
 
-                {/* Collections Section - only show if collections exist and not loading */}
-                {!collectionsLoading && !catalogsLoading && sortedCollections.length > 0 && (
+                {/* Collections Section - controls always visible if not loading */}
+                {!collectionsLoading && !catalogsLoading && (
                   <Box position="relative">
                     <Flex align="center" justify="space-between" gap={2} mb={4}>
-                      <Flex align="center" gap={2}>
-                        <Icon>
-                          <LuBookmark />
-                        </Icon>
-                        <Heading size="md">Collections</Heading>
-                        <Text fontSize="sm" color="text.muted">
-                          {sortedCollections.length}
-                        </Text>
-                      </Flex>
+                      <HStack gap={4}>
+                        {sortedCollections.length > 0 && (
+                          <Flex align="center" gap={2}>
+                            <Icon>
+                              <LuBookmark />
+                            </Icon>
+                            <Heading size="md">Collections</Heading>
+                            <Text fontSize="sm" color="text.muted">
+                              {sortedCollections.length}
+                            </Text>
+                          </Flex>
+                        )}
+
+                        {/* New Collection button */}
+                        <Button
+                          size="sm"
+                          onClick={() => setShowCreateCollectionDialog(true)}
+                          colorPalette="blue"
+                          variant="subtle"
+                        >
+                          <HStack gap={2}>
+                            <Icon>
+                              <LuBookmarkPlus />
+                            </Icon>
+                            <Text>New Collection</Text>
+                          </HStack>
+                        </Button>
+                      </HStack>
+
+                      {/* Right side: GitHub link, Sync, Menu */}
+                      <HStack gap={2}>
+                        {/* GitHub link */}
+                        {selectedWorkspace && (
+                          <HStack
+                            gap={1}
+                            cursor="pointer"
+                            onClick={() => openGitHubRepo(selectedWorkspace)}
+                            px={2}
+                            py={1}
+                            borderRadius="lg"
+                            borderWidth="1px"
+                            css={{
+                              background: 'rgba(255, 255, 255, 0.25)',
+                              backdropFilter: 'blur(20px) saturate(180%)',
+                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                              borderColor: 'rgba(0, 0, 0, 0.08)',
+                              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                              transition: 'none',
+                              _dark: {
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                borderColor: 'rgba(255, 255, 255, 0.15)',
+                                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                              },
+                            }}
+                          >
+                            <Icon fontSize="sm">
+                              <LuGithub />
+                            </Icon>
+                            <Text fontSize="xs" color="text.secondary">
+                              {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
+                            </Text>
+                            <Icon fontSize="xs">
+                              <LuExternalLink />
+                            </Icon>
+                          </HStack>
+                        )}
+
+                        {/* Sync button - subtle style */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleSync}
+                          disabled={syncing}
+                          _hover={{ bg: 'bg.subtle' }}
+                        >
+                          <HStack gap={2}>
+                            {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
+                            <Text>Sync</Text>
+                          </HStack>
+                        </Button>
+
+                        {/* Workspace menu */}
+                        {selectedWorkspace && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <IconButton
+                                size="sm"
+                                variant="ghost"
+                                aria-label="Workspace options"
+                              >
+                                <IoIosMore />
+                              </IconButton>
+                            </Menu.Trigger>
+                            <Portal>
+                              <Menu.Positioner>
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="edit"
+                                    onSelect={handleEditWorkspace}
+                                  >
+                                    <HStack gap={2}>
+                                      <LuPencil />
+                                      <Text>Edit Workspace</Text>
+                                    </HStack>
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="pin"
+                                    onSelect={handlePinWorkspace}
+                                  >
+                                    <HStack gap={2}>
+                                      {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
+                                      <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
+                                    </HStack>
+                                  </Menu.Item>
+                                  <Menu.Separator />
+                                  <Menu.Item
+                                    value="delete"
+                                    color="red.500"
+                                    onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
+                                  >
+                                    <HStack gap={2}>
+                                      <LuTrash2 />
+                                      <Text>Delete Workspace</Text>
+                                    </HStack>
+                                  </Menu.Item>
+                                </Menu.Content>
+                              </Menu.Positioner>
+                            </Portal>
+                          </Menu.Root>
+                        )}
+                      </HStack>
                     </Flex>
 
-                    <SimpleGrid
-                      columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                      gap={2}
-                      p={1}
-                    >
-                      {sortedCollections.map((collection) => {
-                        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+                    {sortedCollections.length > 0 && (
+                      <SimpleGrid
+                        columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                        gap={2}
+                        p={1}
+                        mb={4}
+                      >
+                        {sortedCollections.map((collection) => {
+                          const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
 
-                        return (
-                          <LibraryCollectionCard
-                            key={collection.id}
-                            collection={collection}
-                            catalogs={collectionCats}
-                            onOpenModal={() => setViewingCollection(collection.id)}
-                            onDeleteCollection={() => handleDeleteCollection(collection.id)}
-                            onEditCollection={() => handleEditCollection(collection.id)}
-                          />
-                        );
-                      })}
-                    </SimpleGrid>
+                          return (
+                            <LibraryCollectionCard
+                              key={collection.id}
+                              collection={collection}
+                              catalogs={collectionCats}
+                              onOpenModal={() => setViewingCollection(collection.id)}
+                              onDeleteCollection={() => handleDeleteCollection(collection.id)}
+                              onEditCollection={() => handleEditCollection(collection.id)}
+                            />
+                          );
+                        })}
+                      </SimpleGrid>
+                    )}
                   </Box>
                 )}
 
@@ -1950,100 +1996,118 @@ function LibraryCollectionCard({
   }
 
   return (
-    <GlassCard
-      intensity="medium"
-      cursor="pointer"
-      onClick={onOpenModal}
-    >
-      <Box
-        position="relative"
-        p={2.5}
-        display="flex"
-        flexDirection="column"
-        justifyContent="center"
-        minH="100px"
+    <Box position="relative">
+      <Icon
+        position="absolute"
+        top="-8px"
+        left="12px"
+        zIndex={2}
+        color="secondary.solid"
+        width="24px"
+        height="32px"
+        filter="drop-shadow(0px 2px 2px rgba(0,0,0,0.2))"
       >
-        {/* Menu button positioned absolutely in top-right corner */}
+        <BsBookmarkFill />
+      </Icon>
+      <GlassCard
+        intensity="medium"
+        cursor="pointer"
+        onClick={onOpenModal}
+        _hover={{
+          borderColor: "secondary.border",
+          transform: "none",
+        }}
+      >
         <Box
-          position="absolute"
-          top={1.5}
-          right={1.5}
-          onClick={(e) => e.stopPropagation()}
+          position="relative"
+          p={2.5}
+          display="flex"
+          flexDirection="column"
+          justifyContent="center"
+          minH="100px"
         >
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <IconButton
-                variant="ghost"
-                size="xs"
-                aria-label="Collection options"
-                onClick={(e) => e.stopPropagation()}
-                bg="transparent"
-                _hover={{ bg: "bg.subtle" }}
-                _active={{ bg: "bg.subtle" }}
-                _focus={{ bg: "bg.subtle" }}
-                _focusVisible={{ bg: "bg.subtle" }}
-              >
-                <Icon fontSize="xs">
-                  <IoIosMore />
-                </Icon>
-              </IconButton>
-            </Menu.Trigger>
-            <Portal>
-              <Menu.Positioner>
-                <Menu.Content>
-                  <Menu.Item value="edit" onSelect={onEditCollection}>
-                    <Icon><LuPencil /></Icon>
-                    Edit Collection
-                  </Menu.Item>
-                  <Menu.Item value="delete" onSelect={onDeleteCollection}>
-                    <Icon><LuTrash2 /></Icon>
-                    Remove Collection
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Positioner>
-            </Portal>
-          </Menu.Root>
-        </Box>
-
-        {/* Centered content */}
-        <VStack align="center" gap={1.5}>
-          <Heading
-            size="md"
-            fontWeight="medium"
-            textAlign="center"
-            css={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              wordBreak: 'break-word',
-              lineHeight: '1.2',
-            }}
+          {/* Menu button positioned absolutely in top-right corner */}
+          <Box
+            position="absolute"
+            top={1.5}
+            right={1.5}
+            onClick={(e) => e.stopPropagation()}
           >
-            {collection.name}
-          </Heading>
-          {resourceSummary.length > 0 && (
-            <HStack gap={1.5} justify="center" wrap="wrap">
-              {resourceSummary.map((part, index) => (
-                <HStack key={index} gap={1}>
-                  {index > 0 && (
-                    <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                      •
-                    </Text>
-                  )}
-                  <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                    {part.count}
-                  </Text>
-                  <Icon fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
-                    {part.icon}
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <IconButton
+                  variant="ghost"
+                  size="xs"
+                  aria-label="Collection options"
+                  onClick={(e) => e.stopPropagation()}
+                  bg="transparent"
+                  _hover={{ bg: "transparent" }}
+                  _active={{ bg: "transparent" }}
+                  _focus={{ bg: "transparent" }}
+                  _focusVisible={{ bg: "transparent" }}
+                >
+                  <Icon fontSize="xs">
+                    <IoIosMore />
                   </Icon>
-                </HStack>
-              ))}
-            </HStack>
-          )}
-        </VStack>
-      </Box>
-    </GlassCard>
+                </IconButton>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <Menu.Content>
+                    <Menu.Item value="edit" onSelect={onEditCollection}>
+                      <Icon><LuPencil /></Icon>
+                      Edit Collection
+                    </Menu.Item>
+                    <Menu.Item value="delete" onSelect={onDeleteCollection}>
+                      <Icon><LuTrash2 /></Icon>
+                      Remove Collection
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </Box>
+
+          {/* Centered content */}
+          <VStack align="center" gap={1.5}>
+            <Heading
+              size="md"
+              fontWeight="medium"
+              textAlign="center"
+              css={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+                lineHeight: '1.2',
+              }}
+            >
+              {collection.name}
+            </Heading>
+            {resourceSummary.length > 0 && (
+              <HStack gap={1.5} justify="center" wrap="wrap">
+                {resourceSummary.map((part, index) => (
+                  <HStack key={index} gap={1}>
+                    {index > 0 && (
+                      <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                        •
+                      </Text>
+                    )}
+                    <Text fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                      {part.count}
+                    </Text>
+                    <Icon fontSize="sm" color="blue.600" _dark={{ color: "blue.300" }}>
+                      {part.icon}
+                    </Icon>
+                  </HStack>
+                ))}
+              </HStack>
+            )}
+          </VStack>
+        </Box>
+      </GlassCard>
+    </Box>
   );
 }
 

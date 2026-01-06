@@ -41,12 +41,12 @@ export default function GradientBackground() {
       bottom={0}
       zIndex={-1}
       overflow="hidden"
-      bg={isDark 
+      bg={isDark
         ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
-        : 'linear-gradient(135deg, #fef3e2 0%, #fce7d6 50%, #f8e1e4 100%)'
+        : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #eef2ff 100%)' // Sky blue to light indigo
       }
     >
-      {/* Primary blob - warm rose/coral */}
+      {/* Primary blob - Blue/Indigo focus for light mode */}
       <Box
         position="absolute"
         top="-20%"
@@ -56,13 +56,13 @@ export default function GradientBackground() {
         borderRadius="50%"
         bg={isDark
           ? 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0) 70%)'
-          : 'radial-gradient(circle, rgba(251, 146, 134, 0.5) 0%, rgba(251, 146, 134, 0) 70%)'
+          : 'radial-gradient(circle, rgba(165, 180, 252, 0.4) 0%, rgba(165, 180, 252, 0) 70%)' // Indigo
         }
         filter="blur(60px)"
         css={{ animation: `${float1} 20s ease-in-out infinite` }}
       />
 
-      {/* Secondary blob - purple/violet */}
+      {/* Secondary blob - Purple/Violet */}
       <Box
         position="absolute"
         bottom="-30%"
@@ -72,13 +72,13 @@ export default function GradientBackground() {
         borderRadius="50%"
         bg={isDark
           ? 'radial-gradient(circle, rgba(79, 70, 229, 0.25) 0%, rgba(79, 70, 229, 0) 70%)'
-          : 'radial-gradient(circle, rgba(196, 181, 253, 0.6) 0%, rgba(196, 181, 253, 0) 70%)'
+          : 'radial-gradient(circle, rgba(196, 181, 253, 0.4) 0%, rgba(196, 181, 253, 0) 70%)' // Violet
         }
         filter="blur(80px)"
         css={{ animation: `${float2} 25s ease-in-out infinite` }}
       />
 
-      {/* Tertiary blob - amber/orange warmth */}
+      {/* Tertiary blob - Retain some warmth (Amber/Orange) but softer */}
       <Box
         position="absolute"
         top="30%"
@@ -88,13 +88,13 @@ export default function GradientBackground() {
         borderRadius="50%"
         bg={isDark
           ? 'radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0) 70%)'
-          : 'radial-gradient(circle, rgba(253, 186, 116, 0.5) 0%, rgba(253, 186, 116, 0) 70%)'
+          : 'radial-gradient(circle, rgba(253, 186, 116, 0.3) 0%, rgba(253, 186, 116, 0) 70%)' // Soft Orange
         }
         filter="blur(70px)"
         css={{ animation: `${float3} 18s ease-in-out infinite` }}
       />
 
-      {/* Fourth blob - teal/cyan accent for depth */}
+      {/* Fourth blob - Cyan/Teal accent */}
       <Box
         position="absolute"
         bottom="10%"
@@ -104,13 +104,13 @@ export default function GradientBackground() {
         borderRadius="50%"
         bg={isDark
           ? 'radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, rgba(20, 184, 166, 0) 70%)'
-          : 'radial-gradient(circle, rgba(153, 246, 228, 0.4) 0%, rgba(153, 246, 228, 0) 70%)'
+          : 'radial-gradient(circle, rgba(103, 232, 249, 0.4) 0%, rgba(103, 232, 249, 0) 70%)' // Cyan
         }
         filter="blur(60px)"
         css={{ animation: `${float1} 22s ease-in-out infinite reverse` }}
       />
 
-      {/* Fifth blob - deep rose for bottom corner warmth */}
+      {/* Fifth blob - Soft Rose/Pink for bottom corner */}
       <Box
         position="absolute"
         bottom="-10%"
@@ -120,7 +120,7 @@ export default function GradientBackground() {
         borderRadius="50%"
         bg={isDark
           ? 'radial-gradient(circle, rgba(244, 63, 94, 0.12) 0%, rgba(244, 63, 94, 0) 70%)'
-          : 'radial-gradient(circle, rgba(253, 164, 175, 0.45) 0%, rgba(253, 164, 175, 0) 70%)'
+          : 'radial-gradient(circle, rgba(253, 164, 175, 0.3) 0%, rgba(253, 164, 175, 0) 70%)' // Soft Pink
         }
         filter="blur(90px)"
         css={{ animation: `${float2} 28s ease-in-out infinite reverse` }}

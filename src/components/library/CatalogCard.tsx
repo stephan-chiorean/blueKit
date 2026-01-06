@@ -51,6 +51,12 @@ export function CatalogCard({
             intensity="medium"
             cursor="pointer"
             onClick={onCardClick}
+            _hover={{
+                borderColor: isSelected ? 'primary.600' : 'rgba(255, 255, 255, 0.4)',
+                _dark: {
+                    borderColor: isSelected ? 'primary.600' : 'rgba(255, 255, 255, 0.1)',
+                }
+            }}
         >
             <Box p={4}>
                 <VStack align="stretch" gap={2}>

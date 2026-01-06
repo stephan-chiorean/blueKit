@@ -35,6 +35,13 @@ export const system = createSystem(defaultConfig, {
     },
     semanticTokens: {
       colors: {
+        secondary: {
+          solid: { value: { _light: '#1A33A3', _dark: '#1A33A3' } },
+          fg: { value: { _light: '#1A33A3', _dark: '#1A33A3' } },
+          border: { value: { _light: '#1A33A3', _dark: '#1A33A3' } },
+          subtle: { value: { _light: '{colors.blue.50}', _dark: 'rgba(26, 51, 163, 0.15)' } },
+          hover: { value: { _light: '{colors.blue.100}', _dark: 'rgba(26, 51, 163, 0.25)' } },
+        },
         primary: {
           solid: { value: '{colors.primary.600}' },
           contrast: { value: '{colors.primary.50}' },
