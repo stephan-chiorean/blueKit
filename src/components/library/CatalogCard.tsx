@@ -79,27 +79,40 @@ export function CatalogCard({
                         <Checkbox.Root
                             checked={isSelected}
                             colorPalette="primary"
-                            variant="outline"
+                            variant="solid"
                             onCheckedChange={onCatalogToggle}
                             onClick={(e) => e.stopPropagation()}
                             cursor="pointer"
+                            css={{
+                                _focus: { boxShadow: 'none', outline: 'none' },
+                                _focusVisible: { boxShadow: 'none', outline: 'none' }
+                            }}
                         >
                             <Checkbox.HiddenInput />
                             <Checkbox.Control
                                 cursor="pointer"
                                 css={{
-                                    borderColor: isSelected ? 'primary.500' : 'border.emphasized',
+                                    borderColor: isSelected ? 'transparent' : 'border.emphasized',
+                                    backgroundColor: isSelected ? 'primary.500' : 'transparent',
                                     _checked: {
-                                        borderColor: 'primary.500',
+                                        borderColor: 'transparent',
+                                        backgroundColor: 'primary.500',
                                     },
+                                    _focus: { boxShadow: 'none', outline: 'none' },
+                                    _focusVisible: { boxShadow: 'none', outline: 'none' },
                                 }}
                             >
                                 <Checkbox.Indicator
                                     css={{
-                                        color: 'primary.500',
+                                        color: 'transparent',
                                         _dark: {
-                                            color: 'primary.500',
+                                            color: 'transparent',
                                         },
+                                        _checked: {
+                                            bg: 'primary.500',
+                                            borderColor: 'primary.500',
+                                            color: 'transparent'
+                                        }
                                     }}
                                 />
                             </Checkbox.Control>

@@ -92,7 +92,7 @@ export function GlassCard({
           // Dark mode
           _dark: {
             background: isSelected
-              ? 'rgba(40, 40, 40, 0.8)'
+              ? 'rgba(30, 30, 30, 0.85)'
               : 'rgba(20, 20, 20, 0.6)',
             borderColor: isSelected
               ? 'var(--chakra-colors-primary-500)'

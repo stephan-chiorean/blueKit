@@ -9,13 +9,12 @@ import {
   Avatar,
   Heading,
   Text,
-  Switch,
   Icon,
   Menu,
   VStack,
+  Switch,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen, LuLogIn } from 'react-icons/lu';
-import { FaMoon, FaSun } from "react-icons/fa";
+import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen } from 'react-icons/lu';
 import { Task } from '../types/task';
 import { Project, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
@@ -27,6 +26,7 @@ import { useNotepad } from '../contexts/NotepadContext';
 import { useTimer } from '../contexts/TimerContext';
 import TimerPopover from './shared/TimerPopover';
 import SignInPopover from './shared/SignInPopover';
+import { FaMoon, FaSun } from "react-icons/fa"
 
 interface HeaderProps {
   currentProject?: Project;
@@ -75,13 +75,13 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
   const headerBorderStyle = colorMode === 'light'
     ? {
-        borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-        boxShadow: '0 1px 0 0 rgba(255, 255, 255, 0.1)',
-      }
+      borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+      boxShadow: '0 1px 0 0 rgba(255, 255, 255, 0.1)',
+    }
     : {
-        borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
-        boxShadow: '0 1px 12px -2px rgba(99, 102, 241, 0.15)',
-      };
+      borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+      boxShadow: '0 1px 12px -2px rgba(99, 102, 241, 0.15)',
+    };
 
   return (
     <Box
@@ -101,8 +101,8 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
         {/* blueKit branding on the left */}
         <Box flex="1">
           <Heading size="lg">
-            <Text 
-              as="span" 
+            <Text
+              as="span"
               color="primary.500"
               css={{
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -113,7 +113,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             >
               blue
             </Text>
-            <Text 
+            <Text
               as="span"
               css={{
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -157,22 +157,17 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
 
           {/* Dark Mode Toggle */}
           <Switch.Root
+            checked={colorMode === 'dark'}
+            onCheckedChange={toggleColorMode}
             colorPalette="blue"
             size="lg"
-            checked={colorMode === 'dark'}
-            onCheckedChange={(e) => {
-              if (e.checked && colorMode === 'light') {
-                toggleColorMode();
-              } else if (!e.checked && colorMode === 'dark') {
-                toggleColorMode();
-              }
-            }}
+            cursor="pointer"
           >
             <Switch.HiddenInput />
             <Switch.Control>
               <Switch.Thumb />
-              <Switch.Indicator fallback={<Icon as={FaSun} color="yellow.400" />}>
-                <Icon as={FaMoon} color="gray.400" />
+              <Switch.Indicator fallback={<Icon as={FaSun} color="orange.400" />}>
+                <Icon as={FaMoon} color="yellow.400" />
               </Switch.Indicator>
             </Switch.Control>
           </Switch.Root>
@@ -192,19 +187,25 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
             onClick={toggleNotepad}
             colorPalette={isNotepadOpen ? 'primary' : undefined}
+            _hover={{ bg: 'transparent' }}
           >
             <LuNotebookPen />
           </IconButton>
 
-          <IconButton variant="ghost" size="sm" aria-label="Notifications">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label="Notifications"
+            _hover={{ bg: 'transparent' }}
+          >
             <LuBell />
           </IconButton>
-          
+
           {/* User Menu */}
           {isAuthenticated && user ? (
             <Menu.Root>
               <Menu.Trigger asChild>
-                <Box as="button" cursor="pointer">
+                <Box as="button" cursor="pointer" _hover={{ bg: 'transparent' }}>
                   <Avatar.Root size="sm">
                     {user.avatar_url ? (
                       <Avatar.Image src={user.avatar_url} alt={user.login || 'User'} />
@@ -228,7 +229,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
                       </Text>
                     </VStack>
                   </Box>
-                  
+
                   {/* Logout */}
                   <Menu.Item
                     value="logout"

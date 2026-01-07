@@ -15,7 +15,7 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
     // Check localStorage first, then system preference
     const stored = localStorage.getItem('chakra-ui-color-mode') as ColorMode | null;
     if (stored) return stored;
-    
+
     // Check system preference
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
