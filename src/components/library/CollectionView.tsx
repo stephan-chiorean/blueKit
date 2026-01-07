@@ -7,6 +7,7 @@ import {
     Button,
     SimpleGrid,
     Portal,
+    VStack,
 } from '@chakra-ui/react';
 import {
     LuArrowLeft,
@@ -18,6 +19,7 @@ import { Project } from '../../ipc';
 import { LibrarySelectionBar } from './LibrarySelectionBar';
 import { CatalogCard } from './CatalogCard';
 import { CatalogDetailModal } from './CatalogDetailModal';
+import { useColorMode } from '../../contexts/ColorModeContext';
 
 // Types for selected items
 interface SelectedVariation {
@@ -29,8 +31,6 @@ interface SelectedCatalog {
     catalog: LibraryCatalog;
     variations: LibraryVariation[];
 }
-
-
 
 interface CollectionViewProps {
     collection: LibraryCollection | null;
@@ -67,6 +67,7 @@ export default function CollectionView({
     onFetchVariationContent,
     onBack,
 }: CollectionViewProps) {
+    const { colorMode } = useColorMode();
     // View state
     const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
     const [lastViewingCatalog, setLastViewingCatalog] = useState<CatalogWithVariations | null>(null);
@@ -89,7 +90,12 @@ export default function CollectionView({
     if (!collection) return null;
 
     return (
-        <Box width="100%" h="100%" overflowY="auto" pb={20}>
+        <Box
+            width="100%"
+            h="100%"
+            overflowY="auto"
+            pb={20}
+        >
             {/* Header / Breadcrumbs */}
             <Box
                 position="sticky"
@@ -98,29 +104,42 @@ export default function CollectionView({
                 bg="transparent"
                 borderBottomWidth="1px"
                 borderColor="border.subtle"
-                px={6}
-                py={3}
+                px={8}
+                py={4}
             >
-                <HStack gap={2} align="center">
+                <HStack gap={4} align="center">
                     {/* Back button */}
                     <Button
                         variant="ghost"
-                        size="sm"
+                        size="md"
                         onClick={onBack}
                         px={2}
-                        _hover={{ bg: 'transparent' }}
+                        borderRadius="full"
+                        _hover={{ bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.100' }}
                     >
-                        <LuArrowLeft />
+                        <LuArrowLeft size={20} />
                     </Button>
 
                     {/* Collection name with bookmark icon */}
-                    <HStack gap={2} align="center">
-                        <Text fontWeight="bold" fontSize="md" color="fg">
-                            {collection.name}
-                        </Text>
-                        <Icon color="secondary.solid" boxSize={4}>
-                            <BsBookmarkFill />
-                        </Icon>
+                    <HStack gap={3} align="center">
+                        <Box
+                            p={2}
+                            borderRadius="lg"
+                            bg={colorMode === 'light' ? 'blue.50' : 'blue.900/30'}
+                            color="blue.500"
+                        >
+                            <Icon boxSize={5}>
+                                <BsBookmarkFill />
+                            </Icon>
+                        </Box>
+                        <VStack align="start" gap={0}>
+                            <Text fontSize="xs" color="fg.muted" fontWeight="medium" textTransform="uppercase" letterSpacing="wider">
+                                Collection
+                            </Text>
+                            <Text fontWeight="bold" fontSize="xl" color="fg">
+                                {collection.name}
+                            </Text>
+                        </VStack>
                     </HStack>
                 </HStack>
             </Box>

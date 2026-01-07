@@ -140,7 +140,7 @@ export function SelectorPopover<T extends SelectorItem>({
                 <Menu.Content
                     width="400px"
                     maxH="500px"
-                    borderRadius="2xl"
+                    borderRadius="xl"
                     pt={0}
                     pb={2}
                     overflow="hidden"
@@ -149,6 +149,7 @@ export function SelectorPopover<T extends SelectorItem>({
                         background: 'rgba(255, 255, 255, 0.85)',
                         backdropFilter: 'blur(20px) saturate(180%)',
                         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderWidth: '1px',
                         borderColor: 'rgba(0, 0, 0, 0.08)',
                         boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
                         _dark: {

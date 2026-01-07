@@ -42,7 +42,7 @@ import {
 } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { open as openShell } from '@tauri-apps/api/shell';
-import { AnimatePresence, motion } from 'framer-motion';
+
 import { LibraryCollectionCard } from './LibraryCollectionCard';
 
 import { toaster } from '../ui/toaster';
@@ -95,13 +95,14 @@ export interface LibraryTabContentRef {
 // Props for LibraryTabContent
 interface LibraryTabContentProps {
   onViewVariation?: (resource: ResourceFile, content: string, resourceType: ResourceType) => void;
+  onViewingCollectionChange?: (isViewing: boolean) => void;
 }
 
 
 
 // Library collection is now imported from IPC - no local interface needed
 
-const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewVariation: _onViewVariation }, ref) {
+const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewingCollectionChange }, ref) {
   const {
     getCachedCatalogs,
     setCachedCatalogs,
@@ -132,6 +133,11 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   // Collection modal state
   const [viewingCollection, setViewingCollection] = useState<string | null>(null);
+
+  // Notify parent component when viewing collection state changes
+  useEffect(() => {
+    onViewingCollectionChange?.(!!viewingCollection);
+  }, [viewingCollection, onViewingCollectionChange]);
 
   // Catalog detail modal state
   const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
@@ -1485,348 +1491,341 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         </Portal>
       </Dialog.Root>
 
-      <Box position="relative" width="100%">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {viewingCollection && sortedCollections.find(c => c.id === viewingCollection) ? (
-            <motion.div
-              key="collection"
-              initial={{ x: 100, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 100, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              style={{ width: "100%" }}
-            >
-              <CollectionView
-                collection={sortedCollections.find(c => c.id === viewingCollection)!}
-                catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
-                selectedVariations={selectedVariations}
-                selectedCatalogs={selectedCatalogsMap}
-                onCatalogToggle={handleCatalogToggle}
-                onVariationToggle={handleVariationToggle}
-                onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
-                onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
-                onBulkPull={handleBulkPull}
-                clearVariationSelection={clearVariationSelection}
-                projects={projects}
-                bulkPulling={bulkPulling}
-                allCollections={sortedCollections}
-                onFetchVariationContent={fetchVariationContent}
-                onBack={() => setViewingCollection(null)}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="library"
-              initial={{ x: -100, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -100, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              style={{ width: "100%" }}
-            >
-              <VStack align="stretch" gap={6} width="100%">
-                {/* Loading state - show when collections or catalogs are loading */}
-                {(collectionsLoading || catalogsLoading) && (
-                  <Box position="relative">
-                    <Flex align="center" justify="space-between" gap={2} mb={4}>
-                      <Flex align="center" gap={2}>
-                        <Heading size="md">
-                          {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
-                        </Heading>
-                      </Flex>
+      <Box width="100%" height="100%" position="relative" display="flex" flexDirection="column">
+        {viewingCollection && sortedCollections.find(c => c.id === viewingCollection) ? (
+          <Box
+            key="collection"
+            width="100%"
+            height="100%"
+          >
+            <CollectionView
+              collection={sortedCollections.find(c => c.id === viewingCollection)!}
+              catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
+              selectedVariations={selectedVariations}
+              selectedCatalogs={selectedCatalogsMap}
+              onCatalogToggle={handleCatalogToggle}
+              onVariationToggle={handleVariationToggle}
+              onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
+              onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
+              onBulkPull={handleBulkPull}
+              clearVariationSelection={clearVariationSelection}
+              projects={projects}
+              bulkPulling={bulkPulling}
+              allCollections={sortedCollections}
+              onFetchVariationContent={fetchVariationContent}
+              onBack={() => setViewingCollection(null)}
+            />
+          </Box>
+        ) : (
+          <Box
+            key="library"
+            width="100%"
+            height="100%"
+            overflowY="auto"
+          >
+            <VStack align="stretch" gap={6} width="100%">
+              {/* Loading state - show when collections or catalogs are loading */}
+              {(collectionsLoading || catalogsLoading) && (
+                <Box position="relative">
+                  <Flex align="center" justify="space-between" gap={2} mb={4}>
+                    <Flex align="center" gap={2}>
+                      <Heading size="md">
+                        {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
+                      </Heading>
                     </Flex>
-                    <Flex justify="center" align="center" py={12}>
-                      <VStack gap={4}>
-                        <Spinner size="lg" />
-                        <Text fontSize="sm" color="text.secondary">
-                          {collectionsLoading && catalogsLoading
-                            ? 'Loading collections and catalogs...'
-                            : collectionsLoading
-                              ? 'Scanning GitHub for collections...'
-                              : 'Loading catalogs...'}
-                        </Text>
-                      </VStack>
-                    </Flex>
-                  </Box>
-                )}
-
-                {/* Collections Section - controls always visible if not loading */}
-                {!collectionsLoading && !catalogsLoading && (
-                  <Box position="relative">
-                    <Flex align="center" justify="space-between" gap={2} mb={4}>
-                      <HStack gap={4}>
-                        {sortedCollections.length > 0 && (
-                          <Flex align="center" gap={2}>
-                            <Icon>
-                              <LuBookmark />
-                            </Icon>
-                            <Heading size="md">Collections</Heading>
-                            <Text fontSize="sm" color="text.muted">
-                              {sortedCollections.length}
-                            </Text>
-                          </Flex>
-                        )}
-
-                        {/* New Collection button */}
-                        <Button
-                          size="sm"
-                          onClick={() => setShowCreateCollectionDialog(true)}
-                          colorPalette="blue"
-                          variant="subtle"
-                        >
-                          <HStack gap={2}>
-                            <Icon>
-                              <LuBookmarkPlus />
-                            </Icon>
-                            <Text>New Collection</Text>
-                          </HStack>
-                        </Button>
-                      </HStack>
-
-                      {/* Right side: GitHub link, Sync, Menu */}
-                      <HStack gap={2}>
-                        {/* GitHub link */}
-                        {selectedWorkspace && (
-                          <HStack
-                            gap={1}
-                            cursor="pointer"
-                            onClick={() => openGitHubRepo(selectedWorkspace)}
-                            px={2}
-                            py={1}
-                            borderRadius="lg"
-                            borderWidth="1px"
-                            css={{
-                              background: 'rgba(255, 255, 255, 0.25)',
-                              backdropFilter: 'blur(20px) saturate(180%)',
-                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                              borderColor: 'rgba(0, 0, 0, 0.08)',
-                              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                              transition: 'none',
-                              _dark: {
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                borderColor: 'rgba(255, 255, 255, 0.15)',
-                                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                              },
-                            }}
-                          >
-                            <Icon fontSize="sm">
-                              <LuGithub />
-                            </Icon>
-                            <Text fontSize="xs" color="text.secondary">
-                              {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
-                            </Text>
-                            <Icon fontSize="xs">
-                              <LuExternalLink />
-                            </Icon>
-                          </HStack>
-                        )}
-
-                        {/* Sync button - subtle style */}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleSync}
-                          disabled={syncing}
-                          _hover={{ bg: 'bg.subtle' }}
-                        >
-                          <HStack gap={2}>
-                            {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
-                            <Text>Sync</Text>
-                          </HStack>
-                        </Button>
-
-                        {/* Workspace menu */}
-                        {selectedWorkspace && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <IconButton
-                                size="sm"
-                                variant="ghost"
-                                aria-label="Workspace options"
-                              >
-                                <IoIosMore />
-                              </IconButton>
-                            </Menu.Trigger>
-                            <Portal>
-                              <Menu.Positioner>
-                                <Menu.Content>
-                                  <Menu.Item
-                                    value="edit"
-                                    onSelect={handleEditWorkspace}
-                                  >
-                                    <HStack gap={2}>
-                                      <LuPencil />
-                                      <Text>Edit Workspace</Text>
-                                    </HStack>
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    value="pin"
-                                    onSelect={handlePinWorkspace}
-                                  >
-                                    <HStack gap={2}>
-                                      {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
-                                      <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
-                                    </HStack>
-                                  </Menu.Item>
-                                  <Menu.Separator />
-                                  <Menu.Item
-                                    value="delete"
-                                    color="red.500"
-                                    onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
-                                  >
-                                    <HStack gap={2}>
-                                      <LuTrash2 />
-                                      <Text>Delete Workspace</Text>
-                                    </HStack>
-                                  </Menu.Item>
-                                </Menu.Content>
-                              </Menu.Positioner>
-                            </Portal>
-                          </Menu.Root>
-                        )}
-                      </HStack>
-                    </Flex>
-
-                    {sortedCollections.length > 0 && (
-                      <SimpleGrid
-                        columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                        gap={4}
-                        p={1}
-                        mb={4}
-                      >
-                        {sortedCollections.map((collection) => {
-                          const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
-
-                          return (
-                            <LibraryCollectionCard
-                              key={collection.id}
-                              collection={collection}
-                              catalogs={collectionCats}
-                              onOpenModal={() => setViewingCollection(collection.id)}
-                              onDeleteCollection={() => handleDeleteCollection(collection.id)}
-                              onEditCollection={() => handleEditCollection(collection.id)}
-                            />
-                          );
-                        })}
-                      </SimpleGrid>
-                    )}
-                  </Box>
-                )}
-
-                {/* Catalogs Section - only show if not loading */}
-                {!collectionsLoading && !catalogsLoading && (
-                  <Box mb={8} position="relative" width="100%" maxW="100%">
-                    <Flex align="center" gap={2} mb={4}>
-                      <Icon>
-                        <LuBookOpen />
-                      </Icon>
-                      <Heading size="md">Catalog</Heading>
-                      <Text fontSize="sm" color="text.muted">
-                        {organizedCatalogs.ungrouped.length}
+                  </Flex>
+                  <Flex justify="center" align="center" py={12}>
+                    <VStack gap={4}>
+                      <Spinner size="lg" />
+                      <Text fontSize="sm" color="text.secondary">
+                        {collectionsLoading && catalogsLoading
+                          ? 'Loading collections and catalogs...'
+                          : collectionsLoading
+                            ? 'Scanning GitHub for collections...'
+                            : 'Loading catalogs...'}
                       </Text>
-                      {/* Filter Button - only show if there are catalogs or collections */}
-                      {(catalogs.length > 0 || customCollections.length > 0) && (
-                        <Box position="relative">
-                          <Button
-                            ref={filterButtonRef}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsFilterOpen(!isFilterOpen)}
-                            borderWidth="1px"
-                            borderRadius="lg"
-                            css={{
-                              background: 'rgba(255, 255, 255, 0.25)',
-                              backdropFilter: 'blur(20px) saturate(180%)',
-                              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                              borderColor: 'rgba(0, 0, 0, 0.08)',
-                              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                              transition: 'none',
-                              _dark: {
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                borderColor: 'rgba(255, 255, 255, 0.15)',
-                                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                              },
-                            }}
-                          >
-                            <HStack gap={2}>
-                              <Icon>
-                                <LuFilter />
-                              </Icon>
-                              <Text>Filter</Text>
-                              {(nameFilter || selectedTags.length > 0) && (
-                                <Badge size="sm" colorPalette="primary" variant="solid">
-                                  {[nameFilter && 1, selectedTags.length]
-                                    .filter(Boolean)
-                                    .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                                </Badge>
-                              )}
-                            </HStack>
-                          </Button>
-                          <FilterPanel
-                            isOpen={isFilterOpen}
-                            onClose={() => setIsFilterOpen(false)}
-                            nameFilter={nameFilter}
-                            onNameFilterChange={setNameFilter}
-                            allTags={allTags}
-                            selectedTags={selectedTags}
-                            onToggleTag={toggleTag}
-                            filterButtonRef={filterButtonRef}
-                          />
-                        </Box>
-                      )}
-                    </Flex>
+                    </VStack>
+                  </Flex>
+                </Box>
+              )}
 
-                    {catalogs.length === 0 && customCollections.length === 0 ? (
-                      <EmptyState.Root>
-                        <EmptyState.Content>
-                          <EmptyState.Indicator>
-                            <Icon size="lg" color="gray.400">
-                              <LuLibrary />
-                            </Icon>
-                          </EmptyState.Indicator>
-                          <EmptyState.Title>No catalogs yet</EmptyState.Title>
-                          <EmptyState.Description>
-                            Sync to fetch catalogs from GitHub, or publish resources to this workspace.
-                          </EmptyState.Description>
-                        </EmptyState.Content>
-                      </EmptyState.Root>
-                    ) : organizedCatalogs.ungrouped.length === 0 ? (
-                      <Box
-                        p={6}
-                        bg="bg.subtle"
-                        borderRadius="md"
-                        borderWidth="1px"
-                        borderColor="border.subtle"
-                        textAlign="center"
+              {/* Collections Section - controls always visible if not loading */}
+              {!collectionsLoading && !catalogsLoading && (
+                <Box position="relative">
+                  <Flex align="center" justify="space-between" gap={2} mb={4}>
+                    <HStack gap={4}>
+                      {sortedCollections.length > 0 && (
+                        <Flex align="center" gap={2}>
+                          <Icon>
+                            <LuBookmark />
+                          </Icon>
+                          <Heading size="md">Collections</Heading>
+                          <Text fontSize="sm" color="text.muted">
+                            {sortedCollections.length}
+                          </Text>
+                        </Flex>
+                      )}
+
+                      {/* New Collection button */}
+                      <Button
+                        size="sm"
+                        onClick={() => setShowCreateCollectionDialog(true)}
+                        colorPalette="blue"
+                        variant="subtle"
                       >
-                        <Text color="text.muted" fontSize="sm">
-                          {(nameFilter || selectedTags.length > 0)
-                            ? 'No catalogs match the current filters'
-                            : 'All catalogs are organized in collections.'}
-                        </Text>
-                      </Box>
-                    ) : (
-                      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
-                        {organizedCatalogs.ungrouped.map((catWithVars) => (
-                          <CatalogCard
-                            key={catWithVars.catalog.id}
-                            catalogWithVariations={catWithVars}
-                            isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
-                            onCatalogToggle={() => handleCatalogToggle(catWithVars)}
-                            onCardClick={() => setViewingCatalog(catWithVars)}
+                        <HStack gap={2}>
+                          <Icon>
+                            <LuBookmarkPlus />
+                          </Icon>
+                          <Text>New Collection</Text>
+                        </HStack>
+                      </Button>
+                    </HStack>
+
+                    {/* Right side: GitHub link, Sync, Menu */}
+                    <HStack gap={2}>
+                      {/* GitHub link */}
+                      {selectedWorkspace && (
+                        <HStack
+                          gap={1}
+                          cursor="pointer"
+                          onClick={() => openGitHubRepo(selectedWorkspace)}
+                          px={2}
+                          py={1}
+                          borderRadius="lg"
+                          borderWidth="1px"
+                          css={{
+                            background: 'rgba(255, 255, 255, 0.25)',
+                            backdropFilter: 'blur(20px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                            borderColor: 'rgba(0, 0, 0, 0.08)',
+                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                            transition: 'none',
+                            _dark: {
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              borderColor: 'rgba(255, 255, 255, 0.15)',
+                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                            },
+                          }}
+                        >
+                          <Icon fontSize="sm">
+                            <LuGithub />
+                          </Icon>
+                          <Text fontSize="xs" color="text.secondary">
+                            {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
+                          </Text>
+                          <Icon fontSize="xs">
+                            <LuExternalLink />
+                          </Icon>
+                        </HStack>
+                      )}
+
+                      {/* Sync button - subtle style */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleSync}
+                        disabled={syncing}
+                        _hover={{ bg: 'bg.subtle' }}
+                      >
+                        <HStack gap={2}>
+                          {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
+                          <Text>Sync</Text>
+                        </HStack>
+                      </Button>
+
+                      {/* Workspace menu */}
+                      {selectedWorkspace && (
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <IconButton
+                              size="sm"
+                              variant="ghost"
+                              aria-label="Workspace options"
+                            >
+                              <IoIosMore />
+                            </IconButton>
+                          </Menu.Trigger>
+                          <Portal>
+                            <Menu.Positioner>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onSelect={handleEditWorkspace}
+                                >
+                                  <HStack gap={2}>
+                                    <LuPencil />
+                                    <Text>Edit Workspace</Text>
+                                  </HStack>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="pin"
+                                  onSelect={handlePinWorkspace}
+                                >
+                                  <HStack gap={2}>
+                                    {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
+                                    <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
+                                  </HStack>
+                                </Menu.Item>
+                                <Menu.Separator />
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.500"
+                                  onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
+                                >
+                                  <HStack gap={2}>
+                                    <LuTrash2 />
+                                    <Text>Delete Workspace</Text>
+                                  </HStack>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Positioner>
+                          </Portal>
+                        </Menu.Root>
+                      )}
+                    </HStack>
+                  </Flex>
+
+                  {sortedCollections.length > 0 && (
+                    <SimpleGrid
+                      columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                      gap={4}
+                      p={1}
+                      mb={4}
+                    >
+                      {sortedCollections.map((collection) => {
+                        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+
+                        return (
+                          <LibraryCollectionCard
+                            key={collection.id}
+                            collection={collection}
+                            catalogs={collectionCats}
+                            onOpenModal={() => setViewingCollection(collection.id)}
+                            onDeleteCollection={() => handleDeleteCollection(collection.id)}
+                            onEditCollection={() => handleEditCollection(collection.id)}
                           />
-                        ))}
-                      </SimpleGrid>
+                        );
+                      })}
+                    </SimpleGrid>
+                  )}
+                </Box>
+              )}
+
+              {/* Catalogs Section - only show if not loading */}
+              {!collectionsLoading && !catalogsLoading && (
+                <Box mb={8} position="relative" width="100%" maxW="100%">
+                  <Flex align="center" gap={2} mb={4}>
+                    <Icon>
+                      <LuBookOpen />
+                    </Icon>
+                    <Heading size="md">Catalog</Heading>
+                    <Text fontSize="sm" color="text.muted">
+                      {organizedCatalogs.ungrouped.length}
+                    </Text>
+                    {/* Filter Button - only show if there are catalogs or collections */}
+                    {(catalogs.length > 0 || customCollections.length > 0) && (
+                      <Box position="relative">
+                        <Button
+                          ref={filterButtonRef}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsFilterOpen(!isFilterOpen)}
+                          borderWidth="1px"
+                          borderRadius="lg"
+                          css={{
+                            background: 'rgba(255, 255, 255, 0.25)',
+                            backdropFilter: 'blur(20px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                            borderColor: 'rgba(0, 0, 0, 0.08)',
+                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                            transition: 'none',
+                            _dark: {
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              borderColor: 'rgba(255, 255, 255, 0.15)',
+                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                            },
+                          }}
+                        >
+                          <HStack gap={2}>
+                            <Icon>
+                              <LuFilter />
+                            </Icon>
+                            <Text>Filter</Text>
+                            {(nameFilter || selectedTags.length > 0) && (
+                              <Badge size="sm" colorPalette="primary" variant="solid">
+                                {[nameFilter && 1, selectedTags.length]
+                                  .filter(Boolean)
+                                  .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                              </Badge>
+                            )}
+                          </HStack>
+                        </Button>
+                        <FilterPanel
+                          isOpen={isFilterOpen}
+                          onClose={() => setIsFilterOpen(false)}
+                          nameFilter={nameFilter}
+                          onNameFilterChange={setNameFilter}
+                          allTags={allTags}
+                          selectedTags={selectedTags}
+                          onToggleTag={toggleTag}
+                          filterButtonRef={filterButtonRef}
+                        />
+                      </Box>
                     )}
-                  </Box>
-                )}
-              </VStack>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Box>
+                  </Flex>
+
+                  {catalogs.length === 0 && customCollections.length === 0 ? (
+                    <EmptyState.Root>
+                      <EmptyState.Content>
+                        <EmptyState.Indicator>
+                          <Icon size="lg" color="gray.400">
+                            <LuLibrary />
+                          </Icon>
+                        </EmptyState.Indicator>
+                        <EmptyState.Title>No catalogs yet</EmptyState.Title>
+                        <EmptyState.Description>
+                          Sync to fetch catalogs from GitHub, or publish resources to this workspace.
+                        </EmptyState.Description>
+                      </EmptyState.Content>
+                    </EmptyState.Root>
+                  ) : organizedCatalogs.ungrouped.length === 0 ? (
+                    <Box
+                      p={6}
+                      bg="bg.subtle"
+                      borderRadius="md"
+                      borderWidth="1px"
+                      borderColor="border.subtle"
+                      textAlign="center"
+                    >
+                      <Text color="text.muted" fontSize="sm">
+                        {(nameFilter || selectedTags.length > 0)
+                          ? 'No catalogs match the current filters'
+                          : 'All catalogs are organized in collections.'}
+                      </Text>
+                    </Box>
+                  ) : (
+                    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
+                      {organizedCatalogs.ungrouped.map((catWithVars) => (
+                        <CatalogCard
+                          key={catWithVars.catalog.id}
+                          catalogWithVariations={catWithVars}
+                          isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
+                          onCatalogToggle={() => handleCatalogToggle(catWithVars)}
+                          onCardClick={() => setViewingCatalog(catWithVars)}
+                        />
+                      ))}
+                    </SimpleGrid>
+                  )}
+                </Box>
+              )}
+            </VStack>
+          </Box>
+        )}
+      </Box >
 
       {/* Dialogs */}
-      <AddWorkspaceDialog
+      < AddWorkspaceDialog
         isOpen={showAddWorkspaceDialog}
         onClose={() => setShowAddWorkspaceDialog(false)}
         githubUser={githubUser}
@@ -2117,3 +2116,4 @@ function EditWorkspaceDialog({ isOpen, onClose, workspace, onUpdate }: EditWorks
 }
 
 export default LibraryTabContent;
+
