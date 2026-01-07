@@ -163,7 +163,7 @@ export default function CollectionView({
             <Portal>
                 <LibrarySelectionBar
                     isOpen={hasSelections} // Show even if drilling down
-                    selectedCount={selectedVariations.size}
+                    selectedVariations={Array.from(selectedVariations.values())}
                     onClearSelection={clearVariationSelection}
                     onRemoveFromCollection={onRemoveFromCollection}
                     onMoveToCollection={onMoveToCollection}

@@ -8,22 +8,45 @@ import {
     Text,
     VStack,
 } from '@chakra-ui/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     LuBookmark,
     LuTrash2,
     LuX,
+    LuPackage,
+    LuBookOpen,
+    LuBot,
+    LuNetwork,
 } from 'react-icons/lu';
 import { CiBookmarkPlus } from 'react-icons/ci';
 import { Project } from '../../ipc';
 import { LibraryCollection } from '../../ipc/library';
 import { PullButton } from './PullButton';
 import { SelectorPopover } from './SelectorPopover';
+import { SelectedVariation } from './CatalogDetailModal';
+
+// Artifact type icon mapping - matches other components
+const artifactTypeIcon: Record<string, React.ReactNode> = {
+    kit: <LuPackage />,
+    walkthrough: <LuBookOpen />,
+    agent: <LuBot />,
+    diagram: <LuNetwork />,
+    implementation_plan: <LuNetwork />,
+};
+
+// Artifact type label mapping for pluralization
+const artifactTypeLabels: Record<string, { singular: string; plural: string }> = {
+    kit: { singular: 'kit', plural: 'kits' },
+    walkthrough: { singular: 'walkthrough', plural: 'walkthroughs' },
+    agent: { singular: 'agent', plural: 'agents' },
+    diagram: { singular: 'diagram', plural: 'diagrams' },
+    implementation_plan: { singular: 'plan', plural: 'plans' },
+};
 
 interface LibrarySelectionBarProps {
     isOpen: boolean;
-    selectedCount: number;
+    selectedVariations: SelectedVariation[];
     onClearSelection: () => void;
     onRemoveFromCollection: () => void;
     onMoveToCollection: (collectionId: string) => void;
@@ -38,7 +61,7 @@ interface LibrarySelectionBarProps {
 
 export function LibrarySelectionBar({
     isOpen,
-    selectedCount,
+    selectedVariations,
     onClearSelection,
     onRemoveFromCollection,
     onMoveToCollection,
@@ -49,6 +72,32 @@ export function LibrarySelectionBar({
     position = 'fixed',
     bottomOffset = '20px',
 }: LibrarySelectionBarProps) {
+    // Build selection summary with icons grouped by artifact type
+    const selectionSummary = useMemo(() => {
+        const typeCounts: Record<string, number> = {};
+        
+        for (const { catalog } of selectedVariations) {
+            const artifactType = catalog.artifact_type || 'kit';
+            typeCounts[artifactType] = (typeCounts[artifactType] || 0) + 1;
+        }
+
+        const parts: { count: number; label: string; icon: React.ReactNode }[] = [];
+
+        // Dynamically handle all artifact types
+        for (const [artifactType, count] of Object.entries(typeCounts)) {
+            const icon = artifactTypeIcon[artifactType] || <LuPackage />;
+            const labels = artifactTypeLabels[artifactType] || { singular: artifactType, plural: `${artifactType}s` };
+            const label = count === 1 ? labels.singular : labels.plural;
+            
+            parts.push({
+                count,
+                label,
+                icon,
+            });
+        }
+
+        return parts;
+    }, [selectedVariations]);
     const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
     const [isPullPopoverOpen, setIsPullPopoverOpen] = useState(false);
     const [shouldShowBlur, setShouldShowBlur] = useState(false);
@@ -209,9 +258,33 @@ export function LibrarySelectionBar({
                         <VStack gap={2} width="100%">
                             {/* Selection summary */}
                             <HStack gap={1.5} justify="center" wrap="wrap">
-                                <Text fontSize="xs" color="text.secondary" fontWeight="medium">
-                                    {selectedCount} item{selectedCount !== 1 ? 's' : ''} selected
-                                </Text>
+                                {selectionSummary.length > 0 ? (
+                                    <>
+                                        {selectionSummary.map((part, index) => (
+                                            <HStack key={index} gap={1}>
+                                                {index > 0 && (
+                                                    <Text fontSize="xs" color="text.secondary">
+                                                        •
+                                                    </Text>
+                                                )}
+                                                <Text fontSize="xs" color="text.secondary">
+                                                    {part.count}
+                                                </Text>
+                                                <Icon fontSize="xs" color="text.secondary">
+                                                    {part.icon}
+                                                </Icon>
+                                            </HStack>
+                                        ))}
+                                        <Text fontSize="xs" color="text.secondary">
+                                            selected
+                                        </Text>
+                                    </>
+                                ) : (
+                                    // Fallback: Show total count if summary is empty
+                                    <Text fontSize="xs" color="text.secondary" fontWeight="medium">
+                                        {selectedVariations.length} item{selectedVariations.length !== 1 ? 's' : ''} selected
+                                    </Text>
+                                )}
                             </HStack>
 
                             {/* Action buttons */}

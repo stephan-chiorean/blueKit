@@ -1384,7 +1384,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       <Portal>
         <LibrarySelectionBar
           isOpen={!viewingCollection && selectedVariations.size > 0}
-          selectedCount={selectedVariations.size}
+          selectedVariations={selectedVariationsArray}
           onClearSelection={clearVariationSelection}
           onRemoveFromCollection={handleRemoveCatalogsFromCollection}
           onMoveToCollection={handleMoveCatalogsToCollection}
