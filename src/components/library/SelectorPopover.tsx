@@ -1,19 +1,15 @@
-import { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import {
     Box,
     Button,
     Flex,
     HStack,
     Icon,
-    Input,
-    InputGroup,
     Menu,
     Text,
-    VStack,
     Spinner,
 } from '@chakra-ui/react';
 import {
-    LuSearch,
     LuCheck,
 } from 'react-icons/lu';
 
@@ -34,16 +30,11 @@ export interface SelectorPopoverProps<T extends SelectorItem> {
 
     // Popover content
     popoverTitle: string;
-    searchPlaceholder?: string;
     emptyStateMessage?: string;
-    noResultsMessage?: string;
     emptyStateIcon?: ReactNode; // Icon to show in empty state
 
     // Item rendering
     renderItem: (item: T, isSelected: boolean) => ReactNode;
-
-    // Search functionality
-    filterItem: (item: T, query: string) => boolean;
 
     // Confirm button
     getConfirmLabel: (selectedCount: number) => string;
@@ -67,13 +58,11 @@ export function SelectorPopover<T extends SelectorItem>({
     triggerVariant = 'solid',
     triggerColorPalette = 'primary',
     popoverTitle,
-    searchPlaceholder = 'Search...',
     emptyStateMessage = 'No items found.',
-    noResultsMessage = 'No items match your search.',
     emptyStateIcon,
     renderItem,
-    filterItem,
-    getConfirmLabel,
+    // filterItem, // Removed
+    // getConfirmLabel, // Unused: User requested static labels
     confirmButtonLabel,
     confirmButtonColorPalette,
     onConfirm,
@@ -82,24 +71,12 @@ export function SelectorPopover<T extends SelectorItem>({
     disabled = false,
 }: SelectorPopoverProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
-    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Reset state when menu closes
     useEffect(() => {
         if (!isOpen) {
-            setSearchQuery('');
             setSelectedItemIds(new Set());
-        }
-    }, [isOpen]);
-
-    // Focus search input when menu opens
-    useEffect(() => {
-        if (isOpen) {
-            setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 100);
         }
     }, [isOpen]);
 
@@ -121,7 +98,8 @@ export function SelectorPopover<T extends SelectorItem>({
         setIsOpen(false);
     };
 
-    const filteredItems = items.filter(item => filterItem(item, searchQuery));
+    // const filteredItems = items.filter(item => filterItem(item, searchQuery));
+    const filteredItems = items; // No filtering
 
     const handleOpenChange = (e: { open: boolean }) => {
         setIsOpen(e.open);
@@ -140,6 +118,9 @@ export function SelectorPopover<T extends SelectorItem>({
                     variant={triggerVariant}
                     colorPalette={triggerColorPalette}
                     size="sm"
+                    width="auto"
+                    rounded="full"
+                    px={4}
                     disabled={disabled || loading}
                 >
                     <HStack gap={2}>
@@ -148,7 +129,7 @@ export function SelectorPopover<T extends SelectorItem>({
                         {showArrow && (
                             <Icon>
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                             </Icon>
                         )}
@@ -156,9 +137,13 @@ export function SelectorPopover<T extends SelectorItem>({
                 </Button>
             </Menu.Trigger>
             <Menu.Positioner zIndex={3000}>
-                <Menu.Content 
-                    width="400px" 
-                    maxH="500px" 
+                <Menu.Content
+                    width="400px"
+                    maxH="500px"
+                    borderRadius="2xl"
+                    pt={0}
+                    pb={2}
+                    overflow="hidden"
                     position="relative"
                     css={{
                         background: 'rgba(255, 255, 255, 0.85)',
@@ -174,7 +159,7 @@ export function SelectorPopover<T extends SelectorItem>({
                     }}
                 >
                     {/* Header with title and confirm button */}
-                    <Flex px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle" align="center" justify="space-between">
+                    <Flex px={2} h="48px" borderBottomWidth="1px" borderColor="border.subtle" align="center" justify="space-between">
                         <Text fontSize="sm" fontWeight="semibold">
                             {popoverTitle}
                         </Text>
@@ -182,7 +167,9 @@ export function SelectorPopover<T extends SelectorItem>({
                             <Button
                                 variant="solid"
                                 colorPalette={confirmButtonColorPalette || triggerColorPalette}
-                                size="sm"
+                                size="xs"
+                                h="31px"
+                                rounded="md"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     handleConfirm();
@@ -198,59 +185,17 @@ export function SelectorPopover<T extends SelectorItem>({
                         )}
                     </Flex>
 
-                    {/* Search Input */}
-                    <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
-                        <InputGroup startElement={<LuSearch />}>
-                            <Input
-                                ref={searchInputRef}
-                                placeholder={searchPlaceholder}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                size="sm"
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                css={{
-                                    borderColor: 'rgba(0, 0, 0, 0.06) !important',
-                                    '&:focus': {
-                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
-                                        boxShadow: 'none !important',
-                                        outline: 'none !important',
-                                    },
-                                    '&:focus-visible': {
-                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
-                                        boxShadow: 'none !important',
-                                        outline: 'none !important',
-                                    },
-                                    '&:focus-within': {
-                                        borderColor: 'rgba(0, 0, 0, 0.06) !important',
-                                        boxShadow: 'none !important',
-                                    },
-                                    _dark: {
-                                        borderColor: 'rgba(255, 255, 255, 0.08) !important',
-                                        '&:focus': {
-                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
-                                        },
-                                        '&:focus-visible': {
-                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
-                                        },
-                                        '&:focus-within': {
-                                            borderColor: 'rgba(255, 255, 255, 0.08) !important',
-                                        },
-                                    },
-                                }}
-                            />
-                        </InputGroup>
-                    </Box>
+                    {/* Search Input Removed */}
 
                     {/* Item List */}
                     <Box maxH="300px" minH="200px" overflowY="auto">
                         {filteredItems.length === 0 ? (
-                            <Box 
-                                display="flex" 
-                                flexDirection="column" 
-                                alignItems="center" 
-                                justifyContent="center" 
-                                py={8} 
+                            <Box
+                                display="flex"
+                                flexDirection="column"
+                                alignItems="center"
+                                justifyContent="center"
+                                py={8}
                                 px={3}
                                 minH="200px"
                             >
@@ -260,7 +205,7 @@ export function SelectorPopover<T extends SelectorItem>({
                                     </Box>
                                 )}
                                 <Text fontSize="sm" color="text.secondary" fontWeight="medium">
-                                    {searchQuery ? noResultsMessage : emptyStateMessage}
+                                    {emptyStateMessage}
                                 </Text>
                             </Box>
                         ) : (

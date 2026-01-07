@@ -34,9 +34,7 @@ export function PullButton({
             triggerVariant="subtle"
             triggerColorPalette="green"
             popoverTitle="Pull to Project"
-            searchPlaceholder="Search projects..."
             emptyStateMessage="No Projects Found"
-            noResultsMessage="No Projects Found"
             emptyStateIcon={
                 <Icon fontSize="2xl" color="blue.500">
                     <LuFolder />
@@ -52,9 +50,6 @@ export function PullButton({
                     </Text>
                 </HStack>
             )}
-            filterItem={(project, query) =>
-                project.name.toLowerCase().includes(query.toLowerCase())
-            }
             getConfirmLabel={(count) =>
                 `Pull to ${count} Project${count !== 1 ? 's' : ''}`
             }
