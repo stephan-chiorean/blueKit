@@ -448,7 +448,19 @@ function KitsTabContent({
       }}
     >
       <Table.Header>
-        <Table.Row bg="transparent">
+        <Table.Row
+          css={{
+            background: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            borderBottomWidth: '1px',
+            borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+            _dark: {
+              background: 'rgba(30, 30, 30, 0.85)',
+              borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+            },
+          }}
+        >
           <Table.ColumnHeader w="6">
               <Checkbox.Root
               size="sm"
@@ -660,7 +672,19 @@ function KitsTabContent({
                 }}
               >
                 <Table.Header>
-                  <Table.Row bg="transparent">
+                  <Table.Row
+                    css={{
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      borderBottomWidth: '1px',
+                      borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+                      _dark: {
+                        background: 'rgba(30, 30, 30, 0.85)',
+                        borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+                      },
+                    }}
+                  >
                     <Table.ColumnHeader w="6"></Table.ColumnHeader>
                     <Table.ColumnHeader>Name</Table.ColumnHeader>
                     <Table.ColumnHeader>Description</Table.ColumnHeader>

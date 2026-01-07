@@ -331,7 +331,19 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
           }}
         >
           <Table.Header>
-            <Table.Row bg="transparent">
+            <Table.Row
+              css={{
+                background: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                borderBottomWidth: '1px',
+                borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+                _dark: {
+                  background: 'rgba(30, 30, 30, 0.85)',
+                  borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+                },
+              }}
+            >
               <Table.ColumnHeader w="30%">Name</Table.ColumnHeader>
               <Table.ColumnHeader w="35%">Description</Table.ColumnHeader>
               <Table.ColumnHeader w="10%">Status</Table.ColumnHeader>
