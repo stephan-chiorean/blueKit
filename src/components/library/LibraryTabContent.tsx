@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useCallback, ReactElement, cloneElement } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Box,
@@ -18,11 +18,10 @@ import {
   Portal,
   Select,
   createListCollection,
-  Input,
-  Textarea,
   Dialog,
   CloseButton,
-  Field,
+  Popover,
+  Input,
 } from '@chakra-ui/react';
 import {
   LuLibrary,
@@ -129,7 +128,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   // Dialog states
   const [showAddWorkspaceDialog, setShowAddWorkspaceDialog] = useState(false);
-  const [showCreateCollectionDialog, setShowCreateCollectionDialog] = useState(false);
+  // showCreateCollectionDialog removed in favor of popover
   const [showDeleteCatalogsDialog, setShowDeleteCatalogsDialog] = useState(false);
   const [showEditWorkspaceDialog, setShowEditWorkspaceDialog] = useState(false);
 
@@ -176,6 +175,36 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Spotlight Popover State (New Collection)
+  const [isCollectionPopoverOpen, setIsCollectionPopoverOpen] = useState(false);
+  const [shouldShowBlur, setShouldShowBlur] = useState(false);
+
+  // Refs for synchronous state tracking (prevent flicker)
+  const isCollectionPopoverOpenRef = useRef(false);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateBlurState = useCallback(() => {
+    if (isCollectionPopoverOpenRef.current) {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+        blurTimeoutRef.current = null;
+      }
+      setShouldShowBlur(true);
+    } else {
+      blurTimeoutRef.current = setTimeout(() => {
+        if (!isCollectionPopoverOpenRef.current) {
+          setShouldShowBlur(false);
+        }
+      }, 100);
+    }
+  }, []);
+
+  const handleCollectionPopoverChange = useCallback((isOpen: boolean) => {
+    isCollectionPopoverOpenRef.current = isOpen;
+    setIsCollectionPopoverOpen(isOpen);
+    updateBlurState();
+  }, [updateBlurState]);
+
   // Portal target ref for workspace selector
   const portalTargetRef = useRef<HTMLElement | null>(null);
   const [isPortalTargetAvailable, setIsPortalTargetAvailable] = useState(false);
@@ -188,7 +217,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         // Check if element is visible (not display: none)
         const style = window.getComputedStyle(element);
         const isVisible = style.display !== 'none';
-        
+
         if (isVisible && element !== portalTargetRef.current) {
           portalTargetRef.current = element;
           setIsPortalTargetAvailable(true);
@@ -805,8 +834,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       return;
     }
 
-    // Close dialog immediately for fluid UX
-    setShowCreateCollectionDialog(false);
+
 
     try {
       // Create collection in database
@@ -1596,52 +1624,58 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         />
       ) : (
         <VStack align="stretch" gap={6} width="100%">
-              {/* Loading state - show when collections or catalogs are loading */}
-              {(collectionsLoading || catalogsLoading) && (
-                <Box position="relative">
-                  <Flex align="center" justify="space-between" gap={2} mb={4}>
+          {/* Loading state - show when collections or catalogs are loading */}
+          {(collectionsLoading || catalogsLoading) && (
+            <Box position="relative">
+              <Flex align="center" justify="space-between" gap={2} mb={4}>
+                <Flex align="center" gap={2}>
+                  <Heading size="md">
+                    {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
+                  </Heading>
+                </Flex>
+              </Flex>
+              <Flex justify="center" align="center" py={12}>
+                <VStack gap={4}>
+                  <Spinner size="lg" />
+                  <Text fontSize="sm" color="text.secondary">
+                    {collectionsLoading && catalogsLoading
+                      ? 'Loading collections and catalogs...'
+                      : collectionsLoading
+                        ? 'Scanning GitHub for collections...'
+                        : 'Loading catalogs...'}
+                  </Text>
+                </VStack>
+              </Flex>
+            </Box>
+          )}
+
+          {/* Collections Section - controls always visible if not loading */}
+          {!collectionsLoading && !catalogsLoading && (
+            <Box position="relative">
+              <Flex align="center" justify="space-between" gap={2} mb={4}>
+                <HStack gap={4}>
+                  {sortedCollections.length > 0 && (
                     <Flex align="center" gap={2}>
-                      <Heading size="md">
-                        {collectionsLoading ? 'Loading Collections...' : catalogsLoading ? 'Loading Catalogs...' : 'Loading...'}
-                      </Heading>
-                    </Flex>
-                  </Flex>
-                  <Flex justify="center" align="center" py={12}>
-                    <VStack gap={4}>
-                      <Spinner size="lg" />
-                      <Text fontSize="sm" color="text.secondary">
-                        {collectionsLoading && catalogsLoading
-                          ? 'Loading collections and catalogs...'
-                          : collectionsLoading
-                            ? 'Scanning GitHub for collections...'
-                            : 'Loading catalogs...'}
+                      <Icon>
+                        <LuBookmark />
+                      </Icon>
+                      <Heading size="md">Collections</Heading>
+                      <Text fontSize="sm" color="text.muted">
+                        {sortedCollections.length}
                       </Text>
-                    </VStack>
-                  </Flex>
-                </Box>
-              )}
+                    </Flex>
+                  )}
 
-              {/* Collections Section - controls always visible if not loading */}
-              {!collectionsLoading && !catalogsLoading && (
-                <Box position="relative">
-                  <Flex align="center" justify="space-between" gap={2} mb={4}>
-                    <HStack gap={4}>
-                      {sortedCollections.length > 0 && (
-                        <Flex align="center" gap={2}>
-                          <Icon>
-                            <LuBookmark />
-                          </Icon>
-                          <Heading size="md">Collections</Heading>
-                          <Text fontSize="sm" color="text.muted">
-                            {sortedCollections.length}
-                          </Text>
-                        </Flex>
-                      )}
-
-                      {/* New Collection button */}
+                  {/* New Collection Popover */}
+                  <AddCollectionPopover
+                    isOpen={isCollectionPopoverOpen}
+                    onOpenChange={handleCollectionPopoverChange}
+                    onConfirm={async (name) => {
+                      await handleCreateCollection(name);
+                    }}
+                    trigger={
                       <Button
                         size="sm"
-                        onClick={() => setShowCreateCollectionDialog(true)}
                         colorPalette="blue"
                         variant="subtle"
                       >
@@ -1652,246 +1686,248 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                           <Text>New Collection</Text>
                         </HStack>
                       </Button>
-                    </HStack>
+                    }
+                  />
+                </HStack>
 
-                    {/* Right side: GitHub link, Sync, Menu */}
-                    <HStack gap={2}>
-                      {/* GitHub link */}
-                      {selectedWorkspace && (
-                        <HStack
-                          gap={1}
-                          cursor="pointer"
-                          onClick={() => openGitHubRepo(selectedWorkspace)}
-                          px={2}
-                          py={1}
-                          borderRadius="lg"
-                          borderWidth="1px"
-                          css={{
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                            transition: 'none',
-                            _dark: {
-                              background: 'rgba(0, 0, 0, 0.2)',
-                              borderColor: 'rgba(255, 255, 255, 0.15)',
-                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                            },
-                          }}
-                        >
-                          <Icon fontSize="sm">
-                            <LuGithub />
-                          </Icon>
-                          <Text fontSize="xs" color="text.secondary">
-                            {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
-                          </Text>
-                          <Icon fontSize="xs">
-                            <LuExternalLink />
-                          </Icon>
-                        </HStack>
-                      )}
-
-                      {/* Sync button - subtle style */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleSync}
-                        disabled={syncing}
-                        _hover={{ bg: 'bg.subtle' }}
-                      >
-                        <HStack gap={2}>
-                          {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
-                          <Text>Sync</Text>
-                        </HStack>
-                      </Button>
-
-                      {/* Workspace menu */}
-                      {selectedWorkspace && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <IconButton
-                              size="sm"
-                              variant="ghost"
-                              aria-label="Workspace options"
-                            >
-                              <IoIosMore />
-                            </IconButton>
-                          </Menu.Trigger>
-                          <Portal>
-                            <Menu.Positioner>
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="edit"
-                                  onSelect={handleEditWorkspace}
-                                >
-                                  <HStack gap={2}>
-                                    <LuPencil />
-                                    <Text>Edit Workspace</Text>
-                                  </HStack>
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="pin"
-                                  onSelect={handlePinWorkspace}
-                                >
-                                  <HStack gap={2}>
-                                    {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
-                                    <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
-                                  </HStack>
-                                </Menu.Item>
-                                <Menu.Separator />
-                                <Menu.Item
-                                  value="delete"
-                                  color="red.500"
-                                  onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
-                                >
-                                  <HStack gap={2}>
-                                    <LuTrash2 />
-                                    <Text>Delete Workspace</Text>
-                                  </HStack>
-                                </Menu.Item>
-                              </Menu.Content>
-                            </Menu.Positioner>
-                          </Portal>
-                        </Menu.Root>
-                      )}
-                    </HStack>
-                  </Flex>
-
-                  {sortedCollections.length > 0 && (
-                    <SimpleGrid
-                      columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                      gap={4}
-                      p={1}
-                      mb={4}
-                    >
-                      {sortedCollections.map((collection) => {
-                        const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
-
-                        return (
-                          <LibraryCollectionCard
-                            key={collection.id}
-                            collection={collection}
-                            catalogs={collectionCats}
-                            onOpenModal={() => setViewingCollection(collection.id)}
-                            onDeleteCollection={() => handleDeleteCollection(collection.id)}
-                            onEditCollection={() => handleEditCollection(collection.id)}
-                          />
-                        );
-                      })}
-                    </SimpleGrid>
-                  )}
-                </Box>
-              )}
-
-              {/* Catalogs Section - only show if not loading */}
-              {!collectionsLoading && !catalogsLoading && (
-                <Box mb={8} position="relative" width="100%" maxW="100%">
-                  <Flex align="center" gap={2} mb={4}>
-                    <Icon>
-                      <LuBookOpen />
-                    </Icon>
-                    <Heading size="md">Catalog</Heading>
-                    <Text fontSize="sm" color="text.muted">
-                      {organizedCatalogs.ungrouped.length}
-                    </Text>
-                    {/* Filter Button - only show if there are catalogs or collections */}
-                    {(catalogs.length > 0 || customCollections.length > 0) && (
-                      <Box position="relative">
-                        <Button
-                          ref={filterButtonRef}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsFilterOpen(!isFilterOpen)}
-                          borderWidth="1px"
-                          borderRadius="lg"
-                          css={{
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            backdropFilter: 'blur(20px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                            borderColor: 'rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                            transition: 'none',
-                            _dark: {
-                              background: 'rgba(0, 0, 0, 0.2)',
-                              borderColor: 'rgba(255, 255, 255, 0.15)',
-                              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                            },
-                          }}
-                        >
-                          <HStack gap={2}>
-                            <Icon>
-                              <LuFilter />
-                            </Icon>
-                            <Text>Filter</Text>
-                            {(nameFilter || selectedTags.length > 0) && (
-                              <Badge size="sm" colorPalette="primary" variant="solid">
-                                {[nameFilter && 1, selectedTags.length]
-                                  .filter(Boolean)
-                                  .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                              </Badge>
-                            )}
-                          </HStack>
-                        </Button>
-                        <FilterPanel
-                          isOpen={isFilterOpen}
-                          onClose={() => setIsFilterOpen(false)}
-                          nameFilter={nameFilter}
-                          onNameFilterChange={setNameFilter}
-                          allTags={allTags}
-                          selectedTags={selectedTags}
-                          onToggleTag={toggleTag}
-                          filterButtonRef={filterButtonRef}
-                        />
-                      </Box>
-                    )}
-                  </Flex>
-
-                  {catalogs.length === 0 && customCollections.length === 0 ? (
-                    <EmptyState.Root>
-                      <EmptyState.Content>
-                        <EmptyState.Indicator>
-                          <Icon size="lg" color="gray.400">
-                            <LuLibrary />
-                          </Icon>
-                        </EmptyState.Indicator>
-                        <EmptyState.Title>No catalogs yet</EmptyState.Title>
-                        <EmptyState.Description>
-                          Sync to fetch catalogs from GitHub, or publish resources to this workspace.
-                        </EmptyState.Description>
-                      </EmptyState.Content>
-                    </EmptyState.Root>
-                  ) : organizedCatalogs.ungrouped.length === 0 ? (
-                    <Box
-                      p={6}
-                      bg="bg.subtle"
-                      borderRadius="md"
+                {/* Right side: GitHub link, Sync, Menu */}
+                <HStack gap={2}>
+                  {/* GitHub link */}
+                  {selectedWorkspace && (
+                    <HStack
+                      gap={1}
+                      cursor="pointer"
+                      onClick={() => openGitHubRepo(selectedWorkspace)}
+                      px={2}
+                      py={1}
+                      borderRadius="lg"
                       borderWidth="1px"
-                      borderColor="border.subtle"
-                      textAlign="center"
+                      css={{
+                        background: 'rgba(255, 255, 255, 0.25)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                        boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                        transition: 'none',
+                        _dark: {
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          borderColor: 'rgba(255, 255, 255, 0.15)',
+                          boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                        },
+                      }}
                     >
-                      <Text color="text.muted" fontSize="sm">
-                        {(nameFilter || selectedTags.length > 0)
-                          ? 'No catalogs match the current filters'
-                          : 'All catalogs are organized in collections.'}
+                      <Icon fontSize="sm">
+                        <LuGithub />
+                      </Icon>
+                      <Text fontSize="xs" color="text.secondary">
+                        {selectedWorkspace.github_owner}/{selectedWorkspace.github_repo}
                       </Text>
-                    </Box>
-                  ) : (
-                    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
-                      {organizedCatalogs.ungrouped.map((catWithVars) => (
-                        <CatalogCard
-                          key={catWithVars.catalog.id}
-                          catalogWithVariations={catWithVars}
-                          isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
-                          onCatalogToggle={() => handleCatalogToggle(catWithVars)}
-                          onCardClick={() => setViewingCatalog(catWithVars)}
-                        />
-                      ))}
-                    </SimpleGrid>
+                      <Icon fontSize="xs">
+                        <LuExternalLink />
+                      </Icon>
+                    </HStack>
                   )}
-                </Box>
+
+                  {/* Sync button - subtle style */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleSync}
+                    disabled={syncing}
+                    _hover={{ bg: 'bg.subtle' }}
+                  >
+                    <HStack gap={2}>
+                      {syncing ? <Spinner size="sm" /> : <LuRefreshCw />}
+                      <Text>Sync</Text>
+                    </HStack>
+                  </Button>
+
+                  {/* Workspace menu */}
+                  {selectedWorkspace && (
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <IconButton
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Workspace options"
+                        >
+                          <IoIosMore />
+                        </IconButton>
+                      </Menu.Trigger>
+                      <Portal>
+                        <Menu.Positioner>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onSelect={handleEditWorkspace}
+                            >
+                              <HStack gap={2}>
+                                <LuPencil />
+                                <Text>Edit Workspace</Text>
+                              </HStack>
+                            </Menu.Item>
+                            <Menu.Item
+                              value="pin"
+                              onSelect={handlePinWorkspace}
+                            >
+                              <HStack gap={2}>
+                                {selectedWorkspace.pinned ? <LuPinOff /> : <LuPin />}
+                                <Text>{selectedWorkspace.pinned ? 'Unpin Workspace' : 'Pin Workspace'}</Text>
+                              </HStack>
+                            </Menu.Item>
+                            <Menu.Separator />
+                            <Menu.Item
+                              value="delete"
+                              color="red.500"
+                              onSelect={() => handleDeleteWorkspace(selectedWorkspace)}
+                            >
+                              <HStack gap={2}>
+                                <LuTrash2 />
+                                <Text>Delete Workspace</Text>
+                              </HStack>
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Positioner>
+                      </Portal>
+                    </Menu.Root>
+                  )}
+                </HStack>
+              </Flex>
+
+              {sortedCollections.length > 0 && (
+                <SimpleGrid
+                  columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                  gap={4}
+                  p={1}
+                  mb={4}
+                >
+                  {sortedCollections.map((collection) => {
+                    const collectionCats = organizedCatalogs.collectionCatalogs.get(collection.id) || [];
+
+                    return (
+                      <LibraryCollectionCard
+                        key={collection.id}
+                        collection={collection}
+                        catalogs={collectionCats}
+                        onOpenModal={() => setViewingCollection(collection.id)}
+                        onDeleteCollection={() => handleDeleteCollection(collection.id)}
+                        onEditCollection={() => handleEditCollection(collection.id)}
+                      />
+                    );
+                  })}
+                </SimpleGrid>
               )}
-            </VStack>
+            </Box>
+          )}
+
+          {/* Catalogs Section - only show if not loading */}
+          {!collectionsLoading && !catalogsLoading && (
+            <Box mb={8} position="relative" width="100%" maxW="100%">
+              <Flex align="center" gap={2} mb={4}>
+                <Icon>
+                  <LuBookOpen />
+                </Icon>
+                <Heading size="md">Catalog</Heading>
+                <Text fontSize="sm" color="text.muted">
+                  {organizedCatalogs.ungrouped.length}
+                </Text>
+                {/* Filter Button - only show if there are catalogs or collections */}
+                {(catalogs.length > 0 || customCollections.length > 0) && (
+                  <Box position="relative">
+                    <Button
+                      ref={filterButtonRef}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsFilterOpen(!isFilterOpen)}
+                      borderWidth="1px"
+                      borderRadius="lg"
+                      css={{
+                        background: 'rgba(255, 255, 255, 0.25)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                        boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                        transition: 'none',
+                        _dark: {
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          borderColor: 'rgba(255, 255, 255, 0.15)',
+                          boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                        },
+                      }}
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuFilter />
+                        </Icon>
+                        <Text>Filter</Text>
+                        {(nameFilter || selectedTags.length > 0) && (
+                          <Badge size="sm" colorPalette="primary" variant="solid">
+                            {[nameFilter && 1, selectedTags.length]
+                              .filter(Boolean)
+                              .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                          </Badge>
+                        )}
+                      </HStack>
+                    </Button>
+                    <FilterPanel
+                      isOpen={isFilterOpen}
+                      onClose={() => setIsFilterOpen(false)}
+                      nameFilter={nameFilter}
+                      onNameFilterChange={setNameFilter}
+                      allTags={allTags}
+                      selectedTags={selectedTags}
+                      onToggleTag={toggleTag}
+                      filterButtonRef={filterButtonRef}
+                    />
+                  </Box>
+                )}
+              </Flex>
+
+              {catalogs.length === 0 && customCollections.length === 0 ? (
+                <EmptyState.Root>
+                  <EmptyState.Content>
+                    <EmptyState.Indicator>
+                      <Icon size="lg" color="gray.400">
+                        <LuLibrary />
+                      </Icon>
+                    </EmptyState.Indicator>
+                    <EmptyState.Title>No catalogs yet</EmptyState.Title>
+                    <EmptyState.Description>
+                      Sync to fetch catalogs from GitHub, or publish resources to this workspace.
+                    </EmptyState.Description>
+                  </EmptyState.Content>
+                </EmptyState.Root>
+              ) : organizedCatalogs.ungrouped.length === 0 ? (
+                <Box
+                  p={6}
+                  bg="bg.subtle"
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  textAlign="center"
+                >
+                  <Text color="text.muted" fontSize="sm">
+                    {(nameFilter || selectedTags.length > 0)
+                      ? 'No catalogs match the current filters'
+                      : 'All catalogs are organized in collections.'}
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
+                  {organizedCatalogs.ungrouped.map((catWithVars) => (
+                    <CatalogCard
+                      key={catWithVars.catalog.id}
+                      catalogWithVariations={catWithVars}
+                      isSelected={selectedCatalogIds.has(catWithVars.catalog.id)}
+                      onCatalogToggle={() => handleCatalogToggle(catWithVars)}
+                      onCardClick={() => setViewingCatalog(catWithVars)}
+                    />
+                  ))}
+                </SimpleGrid>
+              )}
+            </Box>
+          )}
+        </VStack>
       )}
 
       {/* Dialogs */}
@@ -1902,11 +1938,31 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         onWorkspaceCreated={handleWorkspaceCreated}
       />
 
-      <CreateLibraryCollectionDialog
-        isOpen={showCreateCollectionDialog}
-        onClose={() => setShowCreateCollectionDialog(false)}
-        onCreate={handleCreateCollection}
-      />
+      {/* Spotlight Blur Backdrop */}
+      {shouldShowBlur && (
+        <Portal>
+          <Box
+            position="fixed"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            zIndex={1300}
+            css={{
+              backdropFilter: 'blur(8px) saturate(120%)',
+              WebkitBackdropFilter: 'blur(8px) saturate(120%)',
+              background: 'rgba(0, 0, 0, 0.2)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.4)',
+              },
+              pointerEvents: 'auto',
+            }}
+            onClick={() => {
+              setIsCollectionPopoverOpen(false);
+            }}
+          />
+        </Portal>
+      )}
 
       <EditWorkspaceDialog
         isOpen={showEditWorkspaceDialog}
@@ -1949,138 +2005,164 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 LibraryTabContent.displayName = 'LibraryTabContent';
 
 
-// Create collection dialog
-interface CreateLibraryCollectionDialogProps {
+// Spotlight Popover for Adding Collection
+function AddCollectionPopover({
+  isOpen,
+  onOpenChange,
+  onConfirm,
+  trigger
+}: {
   isOpen: boolean;
-  onClose: () => void;
-  onCreate: (name: string, description?: string, tags?: string) => Promise<void>;
-}
-
-function CreateLibraryCollectionDialog({ isOpen, onClose, onCreate }: CreateLibraryCollectionDialogProps) {
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (name: string) => Promise<void>;
+  trigger: ReactElement; // Enforce ReactElement to allow cloning if needed
+}) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [tags, setTags] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const initialFocusRef = useRef<HTMLInputElement>(null);
 
+  // Spotlight logic
+  const triggerContainerRef = useRef<HTMLDivElement>(null);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+
+  // Measure trigger when opening
   useEffect(() => {
-    if (isOpen) {
-      setName('');
-      setDescription('');
-      setTags('');
-      setIsCreating(false);
-      setTimeout(() => {
-        nameInputRef.current?.focus();
-      }, 100);
+    if (isOpen && triggerContainerRef.current) {
+      const rect = triggerContainerRef.current.getBoundingClientRect();
+      setTriggerRect(rect);
     }
   }, [isOpen]);
 
-  const handleSubmit = async () => {
-    if (!name.trim() || isCreating) return;
-    setIsCreating(true);
-    try {
-      // Parse tags: split by comma, trim, filter empty
-      const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
-      const tagsJson = tagsArray.length > 0 ? JSON.stringify(tagsArray) : undefined;
+  // Handle window resize updating the spotlight position
+  useEffect(() => {
+    if (!isOpen) return;
 
-      await onCreate(
-        name.trim(),
-        description.trim() || undefined,
-        tagsJson
-      );
-      onClose();
-    } catch (error) {
-      // Error is already handled in onCreate
-      console.error('Failed to create collection:', error);
+    const updateRect = () => {
+      if (triggerContainerRef.current) {
+        setTriggerRect(triggerContainerRef.current.getBoundingClientRect());
+      }
+    };
+
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      await onConfirm(name);
+      onOpenChange(false);
+      setName('');
     } finally {
-      setIsCreating(false);
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <Portal>
-      <Box
-        position="fixed"
-        inset={0}
-        bg="blackAlpha.600"
-        zIndex={1000}
-        onClick={onClose}
-      />
-      <Box
-        position="fixed"
-        top="50%"
-        left="50%"
-        transform="translate(-50%, -50%)"
-        bg="bg.panel"
-        borderRadius="lg"
-        boxShadow="xl"
-        p={6}
-        w="450px"
-        maxW="90vw"
-        maxH="90vh"
-        overflowY="auto"
-        zIndex={1001}
-        onClick={(e) => e.stopPropagation()}
+    <>
+      {/* Visual Clone of Trigger (Spotlight) */}
+      {isOpen && triggerRect && (
+        <Portal>
+          <Box
+            position="fixed"
+            top={`${triggerRect.top}px`}
+            left={`${triggerRect.left}px`}
+            width={`${triggerRect.width}px`}
+            height={`${triggerRect.height}px`}
+            zIndex={1401} // Above popover (1400) and backdrop (1300)
+            pointerEvents="none" // Click-through to backdrop (closes popover)
+          >
+            {cloneElement(trigger, {
+              'data-state': 'open',
+              'aria-expanded': true,
+            } as any)}
+          </Box>
+        </Portal>
+      )}
+
+      <Popover.Root
+        open={isOpen}
+        onOpenChange={(e) => onOpenChange(e.open)}
+        initialFocusEl={() => initialFocusRef.current}
+        positioning={{ placement: 'bottom-start', gutter: 8 }}
       >
-        <VStack align="stretch" gap={4}>
-          <Heading size="md">Create Collection</Heading>
+        <Popover.Trigger asChild>
+          {cloneElement(trigger, {
+            ref: (node: HTMLElement) => {
+              // Capture ref for our spotlight measurement
+              (triggerContainerRef as any).current = node;
 
-          <Field.Root>
-            <Field.Label>Name</Field.Label>
-            <Input
-              ref={nameInputRef}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Collection name"
-              disabled={isCreating}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isCreating && e.ctrlKey) {
-                  handleSubmit();
-                }
+              // Preserve existing ref if it exists (generic safety)
+              const existingRef = (trigger as any).ref;
+              if (typeof existingRef === 'function') {
+                existingRef(node);
+              } else if (existingRef) {
+                existingRef.current = node;
+              }
+            }
+          } as any)}
+        </Popover.Trigger>
+
+        <Portal>
+          <Popover.Positioner zIndex={1400}>
+            <Popover.Content
+              width="320px"
+              borderRadius="xl"
+              css={{
+                background: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                borderWidth: '1px',
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                _dark: {
+                  background: 'rgba(30, 30, 30, 0.85)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)',
+                },
               }}
-            />
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>Description (optional)</Field.Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what this collection contains..."
-              disabled={isCreating}
-              rows={3}
-            />
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>Tags (optional)</Field.Label>
-            <Input
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="comma, separated, tags"
-              disabled={isCreating}
-            />
-            <Field.HelperText>Separate tags with commas</Field.HelperText>
-          </Field.Root>
-
-          <HStack gap={2} justify="flex-end">
-            <Button variant="ghost" onClick={onClose} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="primary"
-              onClick={handleSubmit}
-              disabled={!name.trim() || isCreating}
-              loading={isCreating}
             >
-              Create
-            </Button>
-          </HStack>
-        </VStack>
-      </Box>
-    </Portal>
+              <Popover.Body p={3}>
+                <VStack align="stretch" gap={3}>
+                  <Text fontSize="sm" fontWeight="semibold">New Collection</Text>
+                  <HStack gap={2}>
+                    <Input
+                      ref={initialFocusRef}
+                      placeholder="Collection Name"
+                      size="sm"
+                      variant="subtle"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSubmit();
+                      }}
+                      disabled={loading}
+                      borderRadius="md"
+                    />
+                    <IconButton
+                      aria-label="Create"
+                      size="sm"
+                      colorPalette="blue"
+                      onClick={handleSubmit}
+                      loading={loading}
+                      disabled={!name.trim()}
+                      rounded="md"
+                    >
+                      <Icon><LuPlus /></Icon>
+                    </IconButton>
+                  </HStack>
+                </VStack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+    </>
   );
 }
 
