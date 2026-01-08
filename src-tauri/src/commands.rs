@@ -4148,6 +4148,81 @@ pub async fn invalidate_commit_cache(
     Ok(())
 }
 
+/// Checkout a commit in a project (either detached HEAD or new branch).
+/// Returns the project path on success.
+#[tauri::command]
+pub async fn checkout_commit_in_project(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+    commit_sha: String,
+    branch_name: Option<String>,
+) -> Result<String, String> {
+    use sea_orm::*;
+    use std::process::Command;
+    use std::path::Path;
+
+    // 1. Get project from database
+    let project = crate::db::entities::project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let project_path = &project.path;
+
+    // 2. Validate project has git repository
+    let git_dir = Path::new(project_path).join(".git");
+    if !git_dir.exists() {
+        return Err("Project does not have a git repository".to_string());
+    }
+
+    // 3. Verify commit exists
+    let verify_output = Command::new("git")
+        .arg("-C")
+        .arg(project_path)
+        .arg("rev-parse")
+        .arg("--verify")
+        .arg(format!("{}", commit_sha))
+        .output()
+        .map_err(|e| format!("Failed to verify commit: {}", e))?;
+
+    if !verify_output.status.success() {
+        let error = String::from_utf8_lossy(&verify_output.stderr);
+        return Err(format!("Invalid commit SHA: {}", error.trim()));
+    }
+
+    // 4. Checkout commit (detached HEAD or new branch)
+    let checkout_result = if let Some(branch) = branch_name {
+        // Create and checkout new branch
+        Command::new("git")
+            .arg("-C")
+            .arg(project_path)
+            .arg("checkout")
+            .arg("-b")
+            .arg(&branch)
+            .arg(&commit_sha)
+            .output()
+            .map_err(|e| format!("Failed to checkout branch: {}", e))?
+    } else {
+        // Checkout in detached HEAD
+        Command::new("git")
+            .arg("-C")
+            .arg(project_path)
+            .arg("checkout")
+            .arg(&commit_sha)
+            .output()
+            .map_err(|e| format!("Failed to checkout commit: {}", e))?
+    };
+
+    if !checkout_result.status.success() {
+        let error = String::from_utf8_lossy(&checkout_result.stderr);
+        return Err(format!("Git checkout failed: {}", error.trim()));
+    }
+
+    // 5. Return project path
+    Ok(project_path.clone())
+}
+
 // ============================================================================
 // CHECKPOINT COMMANDS (Phase 3)
 // ============================================================================

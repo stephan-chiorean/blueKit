@@ -23,6 +23,7 @@ import {
   LuTrash2,
   LuRefreshCw,
   LuFilter,
+  LuRotateCcw,
 } from "react-icons/lu";
 import { TbCopyPlus } from "react-icons/tb";
 import { RiFlag2Fill } from "react-icons/ri";
@@ -46,6 +47,7 @@ import {
 } from "../../utils/checkpointUtils";
 import PinCheckpointModal from "./PinCheckpointModal";
 import BranchOffModal from "./BranchOffModal";
+import RollbackModal from "./RollbackModal";
 import { FilterPanel } from "../shared/FilterPanel";
 
 interface TimelineTabContentProps {
@@ -998,6 +1000,7 @@ function CheckpointsView({
   onAllTagsUpdate,
 }: CheckpointsViewProps) {
   const [branchOffModalOpen, setBranchOffModalOpen] = useState(false);
+  const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null);
 
   // Format date from milliseconds timestamp
@@ -1312,6 +1315,22 @@ function CheckpointsView({
                           variant="ghost"
                           onClick={() => {
                             setSelectedCheckpoint(checkpoint);
+                            setRollbackModalOpen(true);
+                          }}
+                          css={{
+                            color: "#4287f5",
+                            "&:hover": {
+                              bg: "rgba(66, 135, 245, 0.1)",
+                            },
+                          }}
+                        >
+                          <LuRotateCcw />
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedCheckpoint(checkpoint);
                             setBranchOffModalOpen(true);
                           }}
                           css={{
@@ -1384,6 +1403,19 @@ function CheckpointsView({
           onSuccess={() => {
             onCheckpointsUpdated();
           }}
+        />
+      )}
+
+      {/* Rollback Modal */}
+      {selectedCheckpoint && (
+        <RollbackModal
+          isOpen={rollbackModalOpen}
+          onClose={() => {
+            setRollbackModalOpen(false);
+            setSelectedCheckpoint(null);
+          }}
+          checkpoint={selectedCheckpoint}
+          projectId={projectId}
         />
       )}
     </Box>

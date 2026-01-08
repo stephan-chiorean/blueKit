@@ -148,6 +148,7 @@ async fn main() {
             commands::fetch_project_commits, // Fetch commits from GitHub API (Phase 2)
             commands::open_commit_in_github, // Open commit diff in GitHub (Phase 2)
             commands::invalidate_commit_cache, // Invalidate commit cache for a project (Phase 2)
+            commands::checkout_commit_in_project, // Checkout commit in project (detached HEAD or new branch)
             commands::pin_checkpoint, // Pin commit as checkpoint (Phase 3)
             commands::get_project_checkpoints, // Get project checkpoints (Phase 3)
             commands::unpin_checkpoint, // Unpin checkpoint (Phase 3)

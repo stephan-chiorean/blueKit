@@ -122,3 +122,50 @@ export async function invokeInvalidateCommitCache(
     1000 // 1 second timeout for cache operation
   );
 }
+
+/**
+ * Checkout a commit in a project (either detached HEAD or new branch).
+ *
+ * This command:
+ * 1. Gets the project from the database
+ * 2. Validates the project has a git repository
+ * 3. Verifies the commit SHA exists
+ * 4. Checks out the commit (detached HEAD or creates new branch)
+ * 5. Returns the project path on success
+ *
+ * @param projectId - The project ID (from database)
+ * @param commitSha - The commit SHA to checkout
+ * @param branchName - Optional branch name. If provided, creates a new branch from the commit. If not provided, checks out in detached HEAD state.
+ * @returns A promise that resolves to the project path on success
+ *
+ * @example
+ * ```typescript
+ * // Checkout in detached HEAD
+ * const projectPath = await invokeCheckoutCommitInProject(
+ *   'project-id-123',
+ *   'abc123def456'
+ * );
+ *
+ * // Checkout in new branch
+ * const projectPath = await invokeCheckoutCommitInProject(
+ *   'project-id-123',
+ *   'abc123def456',
+ *   'rollback-feature-branch'
+ * );
+ * ```
+ */
+export async function invokeCheckoutCommitInProject(
+  projectId: string,
+  commitSha: string,
+  branchName?: string
+): Promise<string> {
+  return await invokeWithTimeout<string>(
+    'checkout_commit_in_project',
+    {
+      projectId,
+      commitSha,
+      branchName,
+    },
+    30000 // 30 second timeout for git operations
+  );
+}
