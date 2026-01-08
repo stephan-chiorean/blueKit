@@ -25,6 +25,9 @@
         "readDir": true,
         "readFile": true,
         "scope": ["$APPDATA/**", "$HOME/**"]
+      },
+      "clipboard": {
+        "writeText": true
       }
     },
     "bundle": {
