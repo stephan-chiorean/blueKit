@@ -61,7 +61,6 @@ export default function HomePage({
   const { selectedItems } = useSelection();
   const { colorMode } = useColorMode();
   const [activeTab, setActiveTab] = useState("projects");
-  const [isLibraryFullScreen, setIsLibraryFullScreen] = useState(false);
 
   // Library tab exit warning state
   const [showLibraryExitWarning, setShowLibraryExitWarning] = useState(false);
@@ -409,7 +408,7 @@ export default function HomePage({
       <Box flex="1" minH={0} overflow="hidden" style={{ height: '100%', maxHeight: '100%' }} bg="transparent">
         <Box
           h="100%"
-          p={isLibraryFullScreen ? 0 : 6}
+          p={6}
           position="relative"
           overflow="auto"
           style={{ height: '100%', maxHeight: '100%' }}
@@ -427,16 +426,15 @@ export default function HomePage({
               onValueChange={(e) => handleTabChange(e.value as string)}
               style={{ height: "100%", display: "flex", flexDirection: "column" }}
             >
-              {!isLibraryFullScreen && (
-                <Flex
-                  align="center"
-                  gap={4}
-                  mb={6}
-                  mt={3}
-                  position="relative"
-                  w="100%"
-                  flexShrink={0}
-                >
+              <Flex
+                align="center"
+                gap={4}
+                mb={6}
+                mt={3}
+                position="relative"
+                w="100%"
+                flexShrink={0}
+              >
                   <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
                     {({ onOpen }) => (
                       <IconButton
@@ -541,7 +539,6 @@ export default function HomePage({
                     </Box>
                   )}
                 </Flex>
-              )}
 
               <Tabs.Content value="projects">
                 <ProjectsTabContent
@@ -553,7 +550,7 @@ export default function HomePage({
                 />
               </Tabs.Content>
               <Tabs.Content value="library" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                <LibraryTabContent ref={libraryTabRef} onViewVariation={handleViewLibraryVariation} onViewingCollectionChange={setIsLibraryFullScreen} />
+                <LibraryTabContent ref={libraryTabRef} onViewVariation={handleViewLibraryVariation} />
               </Tabs.Content>
               <Tabs.Content value="workflows">
                 <WorkflowsTabContent />

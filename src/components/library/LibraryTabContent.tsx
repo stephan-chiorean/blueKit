@@ -95,19 +95,21 @@ export interface LibraryTabContentRef {
 // Props for LibraryTabContent
 interface LibraryTabContentProps {
   onViewVariation?: (resource: ResourceFile, content: string, resourceType: ResourceType) => void;
-  onViewingCollectionChange?: (isViewing: boolean) => void;
 }
 
 
 
 // Library collection is now imported from IPC - no local interface needed
 
-const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewingCollectionChange }, ref) {
+const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProps>(function LibraryTabContent({ onViewVariation }, ref) {
   const {
     getCachedCatalogs,
     setCachedCatalogs,
     getCachedCollections,
     setCachedCollections,
+    getCachedWorkspaces,
+    setCachedWorkspaces,
+    invalidateWorkspaces,
     invalidateCatalogs,
     invalidateCollections,
     getCachedVariationContent,
@@ -134,21 +136,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   // Collection modal state
   const [viewingCollection, setViewingCollection] = useState<string | null>(null);
 
-  // Notify parent component when viewing collection state changes
-  useEffect(() => {
-    onViewingCollectionChange?.(!!viewingCollection);
-  }, [viewingCollection, onViewingCollectionChange]);
-
   // Catalog detail modal state
   const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
-  const [lastViewingCatalog, setLastViewingCatalog] = useState<CatalogWithVariations | null>(null);
-
-  // Keep track of the last valid catalog to allow exit animations
-  useEffect(() => {
-    if (viewingCatalog) {
-      setLastViewingCatalog(viewingCatalog);
-    }
-  }, [viewingCatalog]);
 
   // Edit collection modal state
   const [editingCollection, setEditingCollection] = useState<LibraryCollection | null>(null);
@@ -186,6 +175,52 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Portal target ref for workspace selector
+  const portalTargetRef = useRef<HTMLElement | null>(null);
+  const [isPortalTargetAvailable, setIsPortalTargetAvailable] = useState(false);
+
+  // Monitor portal target element availability
+  useEffect(() => {
+    const checkPortalTarget = () => {
+      const element = document.getElementById('header-left-actions');
+      if (element) {
+        // Check if element is visible (not display: none)
+        const style = window.getComputedStyle(element);
+        const isVisible = style.display !== 'none';
+        
+        if (isVisible && element !== portalTargetRef.current) {
+          portalTargetRef.current = element;
+          setIsPortalTargetAvailable(true);
+        } else if (!isVisible) {
+          setIsPortalTargetAvailable(false);
+        }
+      } else {
+        portalTargetRef.current = null;
+        setIsPortalTargetAvailable(false);
+      }
+    };
+
+    // Check immediately
+    checkPortalTarget();
+
+    // Set up MutationObserver to watch for changes to the element
+    const observer = new MutationObserver(checkPortalTarget);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+
+    // Also check periodically in case MutationObserver misses something
+    const interval = setInterval(checkPortalTarget, 100);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
 
   // Get selected workspace from ID
   const selectedWorkspace = useMemo(() => {
@@ -293,7 +328,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   // Load collections from database
   const loadCollectionsFromDatabase = useCallback(async (workspaceId: string) => {
     // Check cache first
-    const cachedCollections = getCachedCollections(workspaceId);
+    const cachedCollections = await getCachedCollections(workspaceId);
     let collections: LibraryCollection[];
 
     if (cachedCollections) {
@@ -315,7 +350,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         });
 
         // Cache the collections
-        setCachedCollections(workspaceId, sorted);
+        await setCachedCollections(workspaceId, sorted);
         setCustomCollections(sorted);
         collections = sorted;
       } catch (error) {
@@ -374,9 +409,45 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
   };
 
   const loadWorkspaces = async () => {
+    // Check cache first
+    const cachedWorkspaces = await getCachedWorkspaces();
+    if (cachedWorkspaces) {
+      // Use cached data immediately
+      setWorkspaces(cachedWorkspaces);
+      if (cachedWorkspaces.length === 0) {
+        setViewMode('no-workspaces');
+      } else {
+        // Prefer pinned workspace, otherwise first one
+        const pinnedWorkspace = cachedWorkspaces.find(w => w.pinned);
+        setSelectedWorkspaceId(pinnedWorkspace ? pinnedWorkspace.id : cachedWorkspaces[0].id);
+        setViewMode('browse');
+      }
+
+      // Refresh in background to get latest data
+      try {
+        const ws = await invokeLibraryListWorkspaces();
+        setWorkspaces(ws);
+        await setCachedWorkspaces(ws);
+        if (ws.length === 0) {
+          setViewMode('no-workspaces');
+        } else {
+          // Prefer pinned workspace, otherwise first one
+          const pinnedWorkspace = ws.find(w => w.pinned);
+          setSelectedWorkspaceId(pinnedWorkspace ? pinnedWorkspace.id : ws[0].id);
+          setViewMode('browse');
+        }
+      } catch (error) {
+        console.error('Failed to refresh workspaces (using cached data):', error);
+        // Keep using cached data on error
+      }
+      return;
+    }
+
+    // No cache, load from backend
     try {
       const ws = await invokeLibraryListWorkspaces();
       setWorkspaces(ws);
+      await setCachedWorkspaces(ws);
       if (ws.length === 0) {
         setViewMode('no-workspaces');
       } else {
@@ -419,7 +490,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   const loadCatalogs = async (workspaceId: string) => {
     // Check cache first
-    const cached = getCachedCatalogs(workspaceId);
+    const cached = await getCachedCatalogs(workspaceId);
     if (cached) {
       setCatalogs(cached);
       return;
@@ -429,7 +500,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     try {
       const cats = await invokeListWorkspaceCatalogs(workspaceId);
       setCatalogs(cats);
-      setCachedCatalogs(workspaceId, cats);
+      await setCachedCatalogs(workspaceId, cats);
     } catch (error) {
       console.error('Failed to load catalogs:', error);
       setCatalogs([]);
@@ -449,8 +520,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         description: `Created ${result.catalogs_created} catalogs, ${result.variations_created} variations`,
       });
       // Invalidate cache before reloading
-      invalidateCatalogs(selectedWorkspace.id);
-      invalidateCollections(selectedWorkspace.id);
+      await invalidateCatalogs(selectedWorkspace.id);
+      await invalidateCollections(selectedWorkspace.id);
       // Load both catalogs and collections in parallel
       await Promise.all([
         loadCatalogs(selectedWorkspace.id),
@@ -468,10 +539,14 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     }
   };
 
-  const handleWorkspaceCreated = (workspace: LibraryWorkspace) => {
-    setWorkspaces((prev) => [...prev, workspace]);
+  const handleWorkspaceCreated = async (workspace: LibraryWorkspace) => {
+    const updatedWorkspaces = [...workspaces, workspace];
+    setWorkspaces(updatedWorkspaces);
     setSelectedWorkspaceId(workspace.id);
     setViewMode('browse');
+    // Invalidate and update cache
+    await invalidateWorkspaces();
+    await setCachedWorkspaces(updatedWorkspaces);
   };
 
   const handleDeleteWorkspace = async (workspace: LibraryWorkspace) => {
@@ -480,14 +555,17 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     }
     try {
       await invokeLibraryDeleteWorkspace(workspace.id);
-      setWorkspaces((prev) => prev.filter((w) => w.id !== workspace.id));
+      const updatedWorkspaces = workspaces.filter((w) => w.id !== workspace.id);
+      setWorkspaces(updatedWorkspaces);
       if (selectedWorkspaceId === workspace.id) {
-        const remaining = workspaces.filter((w) => w.id !== workspace.id);
-        setSelectedWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
-        if (remaining.length === 0) {
+        setSelectedWorkspaceId(updatedWorkspaces.length > 0 ? updatedWorkspaces[0].id : null);
+        if (updatedWorkspaces.length === 0) {
           setViewMode('no-workspaces');
         }
       }
+      // Invalidate and update cache
+      await invalidateWorkspaces();
+      await setCachedWorkspaces(updatedWorkspaces);
       toaster.create({
         type: 'success',
         title: 'Workspace deleted',
@@ -634,7 +712,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
       // Invalidate cache to ensure fresh data on next load
       try {
-        invalidateCatalogs(selectedWorkspaceId);
+        await invalidateCatalogs(selectedWorkspaceId);
       } catch (cacheError) {
         console.error('Failed to invalidate cache:', cacheError);
         // Continue anyway
@@ -645,7 +723,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       try {
         const freshCatalogs = await invokeListWorkspaceCatalogs(selectedWorkspaceId);
         setCatalogs(freshCatalogs);
-        setCachedCatalogs(selectedWorkspaceId, freshCatalogs);
+        await setCachedCatalogs(selectedWorkspaceId, freshCatalogs);
       } catch (reloadError) {
         console.error('Failed to reload catalogs after deletion:', reloadError);
         // Don't show error to user since deletion succeeded - UI already updated
@@ -775,7 +853,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         }
         return a.created_at - b.created_at;
       });
-      setCachedCollections(selectedWorkspaceId, updatedCollections);
+      await setCachedCollections(selectedWorkspaceId, updatedCollections);
 
       // Silently refresh in background to get accurate data (without loading state)
       // This ensures we have the correct order_index and timestamps from the database
@@ -805,7 +883,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
-        setCachedCollections(selectedWorkspaceId, sorted);
+        await setCachedCollections(selectedWorkspaceId, sorted);
       } catch (refreshError) {
         console.error('Background refresh failed (using optimistic data):', refreshError);
         // Keep optimistic data - it's good enough
@@ -821,7 +899,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Rollback optimistic update on error
-      invalidateCollections(selectedWorkspaceId);
+      await invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
@@ -882,7 +960,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
-        setCachedCollections(selectedWorkspaceId, sorted);
+        await setCachedCollections(selectedWorkspaceId, sorted);
       } catch (refreshError) {
         console.error('Background refresh failed (using optimistic data):', refreshError);
         // Keep optimistic data - it's good enough
@@ -897,7 +975,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       console.error('Failed to move catalogs to collection:', error);
 
       // Rollback optimistic update on error
-      invalidateCollections(selectedWorkspaceId);
+      await invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
@@ -962,7 +1040,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
-        setCachedCollections(selectedWorkspaceId, sorted);
+        await setCachedCollections(selectedWorkspaceId, sorted);
       } catch (refreshError) {
         console.error('Background refresh failed (using optimistic data):', refreshError);
         // Keep optimistic data - it's good enough
@@ -977,7 +1055,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       console.error('Failed to remove catalogs from collection:', error);
 
       // Rollback optimistic update on error
-      invalidateCollections(selectedWorkspaceId);
+      await invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
@@ -1037,7 +1115,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         description: 'Collection has been updated successfully',
       });
 
-      invalidateCollections(selectedWorkspaceId);
+      await invalidateCollections(selectedWorkspaceId);
     } catch (error) {
       console.error('Failed to update collection:', error);
       toaster.create({
@@ -1101,7 +1179,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         // Update with fresh data silently (preserving order)
         setCustomCollections(sorted);
         setCollectionCatalogMap(freshMap);
-        setCachedCollections(selectedWorkspaceId, sorted);
+        await setCachedCollections(selectedWorkspaceId, sorted);
       } catch (refreshError) {
         console.error('Background refresh failed (using optimistic data):', refreshError);
         // Keep optimistic data - it's good enough
@@ -1116,7 +1194,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       console.error('Failed to delete collection:', error);
 
       // Rollback optimistic update on error
-      invalidateCollections(selectedWorkspaceId);
+      await invalidateCollections(selectedWorkspaceId);
       loadCollectionsFromDatabase(selectedWorkspaceId).catch(err => {
         console.error('Failed to reload after error:', err);
       });
@@ -1146,7 +1224,11 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
     try {
       const updated = await invokeLibraryUpdateWorkspaceName(selectedWorkspaceId, name);
-      setWorkspaces(prev => prev.map(w => w.id === updated.id ? updated : w));
+      const updatedWorkspaces = workspaces.map(w => w.id === updated.id ? updated : w);
+      setWorkspaces(updatedWorkspaces);
+      // Invalidate and update cache
+      await invalidateWorkspaces();
+      await setCachedWorkspaces(updatedWorkspaces);
       toaster.create({
         type: 'success',
         title: 'Workspace updated',
@@ -1173,6 +1255,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       // Reload workspaces to get updated list with correct sorting
       const ws = await invokeLibraryListWorkspaces();
       setWorkspaces(ws);
+      // Invalidate and update cache
+      await invalidateWorkspaces();
+      await setCachedWorkspaces(ws);
       // Keep the same workspace selected
       setSelectedWorkspaceId(updated.id);
       toaster.create({
@@ -1295,9 +1380,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   // Browse catalogs
   return (
-    <>
+    <Box width="100%">
       {/* Workspace Selector Portal - Rendered in top bar next to menu */}
-      {document.getElementById('header-left-actions') && createPortal(
+      {isPortalTargetAvailable && portalTargetRef.current && createPortal(
         <Select.Root
           collection={workspacesCollection}
           value={selectedWorkspaceId ? [selectedWorkspaceId] : []}
@@ -1383,7 +1468,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
             </Select.Positioner>
           </Portal>
         </Select.Root>,
-        document.getElementById('header-left-actions')!
+        portalTargetRef.current
       )}
 
       {/* Unified Library Action Bar - hide when collection modal is open */}
@@ -1491,39 +1576,26 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
         </Portal>
       </Dialog.Root>
 
-      <Box width="100%" height="100%" position="relative" display="flex" flexDirection="column">
-        {viewingCollection && sortedCollections.find(c => c.id === viewingCollection) ? (
-          <Box
-            key="collection"
-            width="100%"
-            height="100%"
-          >
-            <CollectionView
-              collection={sortedCollections.find(c => c.id === viewingCollection)!}
-              catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
-              selectedVariations={selectedVariations}
-              selectedCatalogs={selectedCatalogsMap}
-              onCatalogToggle={handleCatalogToggle}
-              onVariationToggle={handleVariationToggle}
-              onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
-              onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
-              onBulkPull={handleBulkPull}
-              clearVariationSelection={clearVariationSelection}
-              projects={projects}
-              bulkPulling={bulkPulling}
-              allCollections={sortedCollections}
-              onFetchVariationContent={fetchVariationContent}
-              onBack={() => setViewingCollection(null)}
-            />
-          </Box>
-        ) : (
-          <Box
-            key="library"
-            width="100%"
-            height="100%"
-            overflowY="auto"
-          >
-            <VStack align="stretch" gap={6} width="100%">
+      {viewingCollection && sortedCollections.find(c => c.id === viewingCollection) ? (
+        <CollectionView
+          collection={sortedCollections.find(c => c.id === viewingCollection)!}
+          catalogs={organizedCatalogs.collectionCatalogs.get(viewingCollection) || []}
+          selectedVariations={selectedVariations}
+          selectedCatalogs={selectedCatalogsMap}
+          onCatalogToggle={handleCatalogToggle}
+          onVariationToggle={handleVariationToggle}
+          onMoveToCollection={(targetId) => handleMoveCatalogsToCollection(targetId)}
+          onRemoveFromCollection={() => handleRemoveCatalogsFromCollection()}
+          onBulkPull={handleBulkPull}
+          clearVariationSelection={clearVariationSelection}
+          projects={projects}
+          bulkPulling={bulkPulling}
+          allCollections={sortedCollections}
+          onFetchVariationContent={fetchVariationContent}
+          onBack={() => setViewingCollection(null)}
+        />
+      ) : (
+        <VStack align="stretch" gap={6} width="100%">
               {/* Loading state - show when collections or catalogs are loading */}
               {(collectionsLoading || catalogsLoading) && (
                 <Box position="relative">
@@ -1820,9 +1892,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
                 </Box>
               )}
             </VStack>
-          </Box>
-        )}
-      </Box >
+      )}
 
       {/* Dialogs */}
       < AddWorkspaceDialog
@@ -1859,29 +1929,24 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
       />
 
       {/* Catalog Detail Modal */}
-      {/* Catalog Detail Modal - always render if we have a catalog (current or last) to allow exit animations */}
-      {
-        (viewingCatalog || lastViewingCatalog) && (
-          <CatalogDetailModal
-            isOpen={!!viewingCatalog}
-            onClose={() => setViewingCatalog(null)}
-            catalogWithVariations={(viewingCatalog || lastViewingCatalog)!}
-            onFetchVariationContent={fetchVariationContent}
-            selectedVariations={selectedVariations}
-            onVariationToggle={handleVariationToggle}
-            projects={projects}
-            onBulkPull={handleBulkPull}
-            bulkPulling={bulkPulling}
-          />
-        )
-      }
-    </>
+      {viewingCatalog && (
+        <CatalogDetailModal
+          isOpen={!!viewingCatalog}
+          onClose={() => setViewingCatalog(null)}
+          catalogWithVariations={viewingCatalog}
+          onFetchVariationContent={fetchVariationContent}
+          selectedVariations={selectedVariations}
+          onVariationToggle={handleVariationToggle}
+          projects={projects}
+          onBulkPull={handleBulkPull}
+          bulkPulling={bulkPulling}
+        />
+      )}
+    </Box>
   );
 });
 
-
-
-
+LibraryTabContent.displayName = 'LibraryTabContent';
 
 
 // Create collection dialog

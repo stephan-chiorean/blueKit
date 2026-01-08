@@ -9,7 +9,6 @@ import {
     VStack,
 } from '@chakra-ui/react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
     LuBookmark,
     LuTrash2,
@@ -167,6 +166,7 @@ export function LibrarySelectionBar({
         position: 'fixed' as const,
         bottom: bottomOffset,
         left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: 1400, // Higher than most things, lower than heavy modals if needed
     } : {
         position: 'absolute' as const,
@@ -174,13 +174,6 @@ export function LibrarySelectionBar({
         left: 0,
         right: 0,
         zIndex: 10,
-    };
-
-    // Motion props for framer-motion (x transform for centering when fixed)
-    const motionProps = position === 'fixed' ? {
-        x: '-50%',
-    } : {
-        x: 0,
     };
 
     return (
@@ -212,49 +205,35 @@ export function LibrarySelectionBar({
                 </Portal>
             )}
 
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ y: "100%", opacity: 0, ...motionProps }}
-                        animate={{ y: 0, opacity: 1, ...motionProps }}
-                        exit={{ y: "100%", opacity: 0, ...motionProps }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 300,
-                            damping: 30,
-                            mass: 0.8
-                        }}
-                        style={{
-                            ...positionStyles,
-                            width: position === 'absolute' ? '100%' : 'auto',
-                            minWidth: position === 'fixed' ? '400px' : 'auto',
-                            maxWidth: '90vw',
-                            pointerEvents: 'auto', // Ensure selection bar is clickable above backdrop
-                        }}
-                    >
-                        <Box
-                            py={4}
-                            px={6}
-                            borderRadius={position === 'fixed' ? '12px' : '0 0 16px 16px'} // Match modal radius if absolute
-                            css={{
-                                background: 'rgba(255, 255, 255, 0.85)', // More opaque for better readability
-                                backdropFilter: 'blur(20px) saturate(180%)',
-                                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                                borderTopWidth: position === 'absolute' ? '1px' : '0',
-                                borderWidth: position === 'fixed' ? '1px' : '0',
-                                borderColor: 'rgba(0, 0, 0, 0.08)',
-                                boxShadow: position === 'fixed'
-                                    ? '0 10px 40px -10px rgba(0,0,0,0.1)'
-                                    : 'none',
-                                _dark: {
-                                    background: 'rgba(30, 30, 30, 0.85)',
-                                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                                    boxShadow: position === 'fixed'
-                                        ? '0 10px 40px -10px rgba(0,0,0,0.5)'
-                                        : 'none',
-                                },
-                            }}
-                        >
+            {isOpen && (
+                <Box
+                    {...positionStyles}
+                    width={position === 'absolute' ? '100%' : 'auto'}
+                    minWidth={position === 'fixed' ? '400px' : 'auto'}
+                    maxWidth="90vw"
+                    pointerEvents="auto"
+                    py={4}
+                    px={6}
+                    borderRadius={position === 'fixed' ? '12px' : '0 0 16px 16px'}
+                    css={{
+                        background: 'rgba(255, 255, 255, 0.85)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderTopWidth: position === 'absolute' ? '1px' : '0',
+                        borderWidth: position === 'fixed' ? '1px' : '0',
+                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                        boxShadow: position === 'fixed'
+                            ? '0 10px 40px -10px rgba(0,0,0,0.1)'
+                            : 'none',
+                        _dark: {
+                            background: 'rgba(30, 30, 30, 0.85)',
+                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                            boxShadow: position === 'fixed'
+                                ? '0 10px 40px -10px rgba(0,0,0,0.5)'
+                                : 'none',
+                        },
+                    }}
+                >
                             <VStack gap={2} width="100%">
                                 {/* Selection summary */}
                                 <HStack gap={1.5} justify="center" wrap="wrap">
@@ -386,10 +365,8 @@ export function LibrarySelectionBar({
                                     />
                                 </HStack>
                             </VStack>
-                        </Box>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                </Box>
+            )}
         </>
     );
 }

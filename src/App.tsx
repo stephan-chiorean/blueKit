@@ -119,7 +119,12 @@ function AppContent() {
                 <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
               ) : currentView === 'project-detail' && selectedProject ? (
                 <ProjectDetailPage
-                  project={selectedProject}
+                  project={{
+                    id: selectedProject.id,
+                    title: selectedProject.name,
+                    description: selectedProject.description || '',
+                    path: selectedProject.path,
+                  }}
                   onBack={handleBackToHome}
                   onProjectSelect={handleProjectSelect}
                 />

@@ -35,7 +35,6 @@ import {
     LuFolder,
     LuCheck,
 } from 'react-icons/lu';
-import { AnimatePresence, motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CatalogWithVariations, LibraryVariation, LibraryCatalog } from '../../types/github';
@@ -260,49 +259,29 @@ export function CatalogDetailModal({
         return `...${path.slice(-(maxLength - 3))}`;
     };
 
+    if (!isOpen) return null;
+
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <Dialog.Root open={true} onOpenChange={(e) => !e.open && onClose()}>
-                    <Portal>
-                        <Dialog.Backdrop asChild>
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                style={{
-                                    position: 'fixed',
-                                    inset: 0,
-                                    zIndex: 1400,
-                                    backdropFilter: 'blur(12px) saturate(150%)',
-                                    WebkitBackdropFilter: 'blur(12px) saturate(150%)',
-                                    background: backdropBg,
-                                }}
-                            />
-                        </Dialog.Backdrop>
-                        <Dialog.Positioner>
-                            <Dialog.Content asChild>
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.2 }}
-                                    style={{
-                                        maxWidth: '90vw',
-                                        maxHeight: '90vh',
-                                        width: '900px',
-                                        height: '80vh',
-                                        borderRadius: '16px',
-                                        background: contentBg,
-                                        backdropFilter: 'blur(30px) saturate(180%)',
-                                        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                                        border: `1px solid ${contentBorder}`,
-                                        boxShadow: contentShadow,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                    }}
-                                >
+        <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
+            <Portal>
+                <Dialog.Backdrop />
+                <Dialog.Positioner>
+                    <Dialog.Content
+                        maxWidth="90vw"
+                        maxHeight="90vh"
+                        width="900px"
+                        height="80vh"
+                        borderRadius="16px"
+                        css={{
+                            background: contentBg,
+                            backdropFilter: 'blur(30px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                            border: `1px solid ${contentBorder}`,
+                            boxShadow: contentShadow,
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                    >
 
                                     <Dialog.Header
                                         borderBottomWidth="1px"
@@ -931,12 +910,9 @@ export function CatalogDetailModal({
                                             </Box>
                                         )}
                                     </Dialog.Body>
-                                </motion.div>
-                            </Dialog.Content>
-                        </Dialog.Positioner>
-                    </Portal>
-                </Dialog.Root>
-            )}
-        </AnimatePresence>
+                    </Dialog.Content>
+                </Dialog.Positioner>
+            </Portal>
+        </Dialog.Root>
     );
 }

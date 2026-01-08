@@ -70,14 +70,6 @@ export default function CollectionView({
     const { colorMode } = useColorMode();
     // View state
     const [viewingCatalog, setViewingCatalog] = useState<CatalogWithVariations | null>(null);
-    const [lastViewingCatalog, setLastViewingCatalog] = useState<CatalogWithVariations | null>(null);
-
-    // Keep track of the last valid catalog to allow exit animations
-    useEffect(() => {
-        if (viewingCatalog) {
-            setLastViewingCatalog(viewingCatalog);
-        }
-    }, [viewingCatalog]);
 
     // Check if there are any selections
     const hasSelections = selectedVariations.size > 0 || selectedCatalogs.size > 0;
@@ -162,21 +154,19 @@ export default function CollectionView({
             </Box>
 
             {/* Catalog Detail Modal */}
-            {
-                (viewingCatalog || lastViewingCatalog) && (
-                    <CatalogDetailModal
-                        isOpen={!!viewingCatalog}
-                        onClose={() => setViewingCatalog(null)}
-                        catalogWithVariations={(viewingCatalog || lastViewingCatalog)!}
-                        onFetchVariationContent={onFetchVariationContent || (async () => "")}
-                        selectedVariations={selectedVariations}
-                        onVariationToggle={onVariationToggle}
-                        projects={projects}
-                        onBulkPull={onBulkPull}
-                        bulkPulling={bulkPulling}
-                    />
-                )
-            }
+            {viewingCatalog && (
+                <CatalogDetailModal
+                    isOpen={!!viewingCatalog}
+                    onClose={() => setViewingCatalog(null)}
+                    catalogWithVariations={viewingCatalog}
+                    onFetchVariationContent={onFetchVariationContent || (async () => "")}
+                    selectedVariations={selectedVariations}
+                    onVariationToggle={onVariationToggle}
+                    projects={projects}
+                    onBulkPull={onBulkPull}
+                    bulkPulling={bulkPulling}
+                />
+            )}
 
             {/* Floating Action Bar */}
             <Portal>

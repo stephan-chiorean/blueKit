@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { CatalogWithVariations } from '../types/github';
+import { CatalogWithVariations, LibraryWorkspace } from '../types/github';
 import { LibraryCollection } from '../ipc/library';
 import { cacheStorage } from '../utils/cacheStorage';
 
@@ -20,16 +20,21 @@ interface CachedCollections {
 
 interface LibraryCacheContextType {
   // Catalogs cache (for library workspace catalogs)
-  getCachedCatalogs: (workspaceId: string) => CatalogWithVariations[] | null;
-  setCachedCatalogs: (workspaceId: string, catalogs: CatalogWithVariations[]) => void;
+  getCachedCatalogs: (workspaceId: string) => Promise<CatalogWithVariations[] | null>;
+  setCachedCatalogs: (workspaceId: string, catalogs: CatalogWithVariations[]) => Promise<void>;
 
   // Folders cache (for GitHub folder names in library workspaces) - DEPRECATED
   getCachedFolders: (workspaceId: string) => string[] | null;
   setCachedFolders: (workspaceId: string, folders: string[]) => void;
 
   // Collections cache (for SQLite-backed library collections)
-  getCachedCollections: (workspaceId: string) => LibraryCollection[] | null;
-  setCachedCollections: (workspaceId: string, collections: LibraryCollection[]) => void;
+  getCachedCollections: (workspaceId: string) => Promise<LibraryCollection[] | null>;
+  setCachedCollections: (workspaceId: string, collections: LibraryCollection[]) => Promise<void>;
+
+  // Workspaces cache (global list of all workspaces)
+  getCachedWorkspaces: () => Promise<LibraryWorkspace[] | null>;
+  setCachedWorkspaces: (workspaces: LibraryWorkspace[]) => Promise<void>;
+  invalidateWorkspaces: () => Promise<void>;
 
   // Content cache (persistent via IndexedDB)
   getCachedVariationContent: (path: string) => Promise<string | null>;
@@ -37,54 +42,52 @@ interface LibraryCacheContextType {
   invalidateVariationContent: (path?: string) => Promise<void>;
 
   // Cache invalidation
-  invalidateCatalogs: (workspaceId: string) => void;
+  invalidateCatalogs: (workspaceId: string) => Promise<void>;
   invalidateFolders: (workspaceId: string) => void;
-  invalidateCollections: (workspaceId: string) => void;
+  invalidateCollections: (workspaceId: string) => Promise<void>;
   clearAllCache: () => void;
 }
 
 const LibraryCacheContext = createContext<LibraryCacheContextType | undefined>(undefined);
 
 export function LibraryCacheProvider({ children }: { children: ReactNode }) {
-  // Separate caches for different data types
-  const [catalogsCache, setCatalogsCache] = useState<Map<string, CachedCatalogs>>(new Map());
+  // Folders cache (deprecated, kept for backwards compatibility)
   const [foldersCache, setFoldersCache] = useState<Map<string, CachedFolders>>(new Map());
-  const [collectionsCache, setCollectionsCache] = useState<Map<string, CachedCollections>>(new Map());
 
-  // Cache TTL: 5 minutes for lists, 24 hours for content
-  const LIST_CACHE_TTL = 5 * 60 * 1000;
+  // Cache TTL: 24 hours for content (collections/catalogs have no TTL - invalidate on Sync only)
   const CONTENT_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-  // Catalogs cache (library workspace catalogs)
-  const getCachedCatalogs = useCallback((workspaceId: string): CatalogWithVariations[] | null => {
-    const cached = catalogsCache.get(workspaceId);
-
-    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
-      return cached.catalogs;
+  // Catalogs cache (library workspace catalogs) - stored in IndexedDB
+  const getCachedCatalogs = useCallback(async (workspaceId: string): Promise<CatalogWithVariations[] | null> => {
+    try {
+      const key = `catalogs-${workspaceId}`;
+      const cached = await cacheStorage.getJson<CatalogWithVariations[]>(key);
+      if (cached) {
+        return cached.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get cached catalogs:', error);
+      return null;
     }
-
-    return null;
-  }, [catalogsCache]);
-
-  const setCachedCatalogs = useCallback((workspaceId: string, catalogs: CatalogWithVariations[]) => {
-    setCatalogsCache(prev => {
-      const next = new Map(prev);
-      next.set(workspaceId, {
-        catalogs,
-        timestamp: Date.now(),
-      });
-      return next;
-    });
   }, []);
 
-  // Folders cache (GitHub folder names)
+  const setCachedCatalogs = useCallback(async (workspaceId: string, catalogs: CatalogWithVariations[]) => {
+    try {
+      const key = `catalogs-${workspaceId}`;
+      await cacheStorage.setJson(key, catalogs, Date.now());
+    } catch (error) {
+      console.error('Failed to cache catalogs:', error);
+    }
+  }, []);
+
+  // Folders cache (GitHub folder names) - deprecated, kept for backwards compatibility
   const getCachedFolders = useCallback((workspaceId: string): string[] | null => {
     const cached = foldersCache.get(workspaceId);
-
-    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
+    // No TTL check - folders cache is deprecated
+    if (cached) {
       return cached.folders;
     }
-
     return null;
   }, [foldersCache]);
 
@@ -125,12 +128,13 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Cache invalidation
-  const invalidateCatalogs = useCallback((workspaceId: string) => {
-    setCatalogsCache(prev => {
-      const next = new Map(prev);
-      next.delete(workspaceId);
-      return next;
-    });
+  const invalidateCatalogs = useCallback(async (workspaceId: string) => {
+    try {
+      const key = `catalogs-${workspaceId}`;
+      await cacheStorage.delete(key);
+    } catch (error) {
+      console.error('Failed to invalidate catalogs cache:', error);
+    }
   }, []);
 
   const invalidateFolders = useCallback((workspaceId: string) => {
@@ -141,41 +145,75 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Collections cache (SQLite-backed library collections)
-  const getCachedCollections = useCallback((workspaceId: string): LibraryCollection[] | null => {
-    const cached = collectionsCache.get(workspaceId);
-
-    if (cached && Date.now() - cached.timestamp < LIST_CACHE_TTL) {
-      return cached.collections;
+  // Collections cache (SQLite-backed library collections) - stored in IndexedDB
+  const getCachedCollections = useCallback(async (workspaceId: string): Promise<LibraryCollection[] | null> => {
+    try {
+      const key = `collections-${workspaceId}`;
+      const cached = await cacheStorage.getJson<LibraryCollection[]>(key);
+      if (cached) {
+        return cached.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get cached collections:', error);
+      return null;
     }
-
-    return null;
-  }, [collectionsCache]);
-
-  const setCachedCollections = useCallback((workspaceId: string, collections: LibraryCollection[]) => {
-    setCollectionsCache(prev => {
-      const next = new Map(prev);
-      next.set(workspaceId, {
-        collections,
-        timestamp: Date.now(),
-      });
-      return next;
-    });
   }, []);
 
-  const invalidateCollections = useCallback((workspaceId: string) => {
-    setCollectionsCache(prev => {
-      const next = new Map(prev);
-      next.delete(workspaceId);
-      return next;
-    });
+  const setCachedCollections = useCallback(async (workspaceId: string, collections: LibraryCollection[]) => {
+    try {
+      const key = `collections-${workspaceId}`;
+      await cacheStorage.setJson(key, collections, Date.now());
+    } catch (error) {
+      console.error('Failed to cache collections:', error);
+    }
+  }, []);
+
+  const invalidateCollections = useCallback(async (workspaceId: string) => {
+    try {
+      const key = `collections-${workspaceId}`;
+      await cacheStorage.delete(key);
+    } catch (error) {
+      console.error('Failed to invalidate collections cache:', error);
+    }
+  }, []);
+
+  // Workspaces cache (global list) - stored in IndexedDB
+  const getCachedWorkspaces = useCallback(async (): Promise<LibraryWorkspace[] | null> => {
+    try {
+      const key = 'workspaces';
+      const cached = await cacheStorage.getJson<LibraryWorkspace[]>(key);
+      if (cached) {
+        return cached.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get cached workspaces:', error);
+      return null;
+    }
+  }, []);
+
+  const setCachedWorkspaces = useCallback(async (workspaces: LibraryWorkspace[]) => {
+    try {
+      const key = 'workspaces';
+      await cacheStorage.setJson(key, workspaces, Date.now());
+    } catch (error) {
+      console.error('Failed to cache workspaces:', error);
+    }
+  }, []);
+
+  const invalidateWorkspaces = useCallback(async () => {
+    try {
+      const key = 'workspaces';
+      await cacheStorage.delete(key);
+    } catch (error) {
+      console.error('Failed to invalidate workspaces cache:', error);
+    }
   }, []);
 
   const clearAllCache = useCallback(async () => {
-    setCatalogsCache(new Map());
     setFoldersCache(new Map());
-    setCollectionsCache(new Map());
-    // Also clear persistent cache
+    // Clear all IndexedDB cache (including catalogs, collections, workspaces, and variation content)
     await cacheStorage.clear();
   }, []);
 
@@ -188,6 +226,9 @@ export function LibraryCacheProvider({ children }: { children: ReactNode }) {
         setCachedFolders,
         getCachedCollections,
         setCachedCollections,
+        getCachedWorkspaces,
+        setCachedWorkspaces,
+        invalidateWorkspaces,
         getCachedVariationContent,
         setCachedVariationContent,
         invalidateVariationContent,
