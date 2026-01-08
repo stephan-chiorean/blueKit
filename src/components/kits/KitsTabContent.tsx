@@ -22,6 +22,7 @@ import { LuFilter, LuFolderPlus, LuChevronRight, LuFolder } from 'react-icons/lu
 import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
 import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { LiquidViewModeSwitcher } from './LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { FolderCard } from '../shared/FolderCard';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
@@ -111,17 +112,17 @@ function KitsTabContent({
   const filteredRootKits = useMemo(() => {
     return rootKitsUnfiltered.filter(kit => {
       const displayName = kit.frontMatter?.alias || kit.name;
-      const matchesName = !nameFilter || 
+      const matchesName = !nameFilter ||
         displayName.toLowerCase().includes(nameFilter.toLowerCase()) ||
         kit.name.toLowerCase().includes(nameFilter.toLowerCase());
-      
-      const matchesTags = selectedTags.length === 0 || 
+
+      const matchesTags = selectedTags.length === 0 ||
         selectedTags.some(selectedTag =>
-          kit.frontMatter?.tags?.some(tag => 
+          kit.frontMatter?.tags?.some(tag =>
             tag.toLowerCase() === selectedTag.toLowerCase()
           )
         );
-      
+
       return matchesName && matchesTags;
     });
   }, [rootKitsUnfiltered, nameFilter, selectedTags]);
@@ -462,7 +463,7 @@ function KitsTabContent({
           }}
         >
           <Table.ColumnHeader w="6">
-              <Checkbox.Root
+            <Checkbox.Root
               size="sm"
               colorPalette="blue"
               checked={rootKits.length > 0 && rootKits.every(kit => isSelected(kit.path))}
@@ -598,7 +599,7 @@ function KitsTabContent({
                 </Button>
               </Flex>
               {/* View Mode Switcher */}
-              <ViewModeSwitcher
+              <LiquidViewModeSwitcher
                 value={viewMode}
                 onChange={(mode) => setViewMode(mode as ViewMode)}
                 modes={[
@@ -610,10 +611,10 @@ function KitsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <SimpleGrid 
-                columns={{ base: 1, md: 2, lg: 3 }} 
-                gap={4} 
-                width="100%" 
+              <SimpleGrid
+                columns={{ base: 1, md: 2, lg: 3 }}
+                gap={4}
+                width="100%"
                 maxW="100%"
                 overflow="visible"
                 css={{
@@ -698,7 +699,7 @@ function KitsTabContent({
                     const folderDescription = node.folder.config?.description || '';
                     const totalResources = node.artifacts.length;
                     const isExpanded = expandedFolders.has(node.folder.path);
-                    
+
                     return (
                       <>
                         <Table.Row
@@ -900,10 +901,10 @@ function KitsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid 
-              columns={{ base: 1, md: 2, lg: 3 }} 
-              gap={4} 
-              width="100%" 
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3 }}
+              gap={4}
+              width="100%"
               maxW="100%"
               overflow="visible"
               css={{
