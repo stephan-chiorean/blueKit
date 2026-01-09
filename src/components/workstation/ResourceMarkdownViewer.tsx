@@ -16,6 +16,7 @@ import {
   List,
   Alert,
   Flex,
+  Portal,
 } from '@chakra-ui/react';
 import { open } from '@tauri-apps/api/shell';
 import { ResourceFile } from '../../types/resource';
@@ -23,6 +24,8 @@ import { getResourceDisplayName } from '../../types/resource';
 import ShikiCodeBlock from './ShikiCodeBlock';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { FaEye, FaCode } from 'react-icons/fa';
+import SearchInMarkdown from './SearchInMarkdown';
+import { useWorkstation } from '../../contexts/WorkstationContext';
 
 interface ResourceMarkdownViewerProps {
   resource: ResourceFile;
@@ -133,6 +136,20 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
   const contentWithoutFrontMatter = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
   const displayName = getResourceDisplayName(resource);
   const [viewMode, setViewMode] = useState<string>('preview');
+  const { isSearchOpen, setIsSearchOpen } = useWorkstation();
+
+  // Keyboard shortcut for opening search (cmd+F / ctrl+F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [setIsSearchOpen]);
 
   return (
     <Box
@@ -217,9 +234,12 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
 
         {/* Content */}
         {viewMode === 'source' ? (
-          <ShikiCodeBlock code={content} language="markdown" />
+          <Box id="markdown-content-source">
+            <ShikiCodeBlock code={content} language="markdown" />
+          </Box>
         ) : (
           <Box
+            id="markdown-content-preview"
             css={{
               '& > *': {
                 mb: 4,
@@ -565,6 +585,18 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
           </Box>
         )}
       </VStack>
+
+      {/* Search Component */}
+      <Portal>
+        {isSearchOpen && (
+          <SearchInMarkdown
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            containerId={viewMode === 'source' ? 'markdown-content-source' : 'markdown-content-preview'}
+            viewMode={viewMode}
+          />
+        )}
+      </Portal>
     </Box>
   );
 }

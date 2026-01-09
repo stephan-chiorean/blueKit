@@ -6,6 +6,10 @@ interface WorkstationContextType {
   kitContent: string | null;
   setSelectedKit: (kit: ArtifactFile | null, content: string | null) => void;
   clearSelectedKit: () => void;
+  searchQuery: string;
+  isSearchOpen: boolean;
+  setSearchQuery: (query: string) => void;
+  setIsSearchOpen: (open: boolean) => void;
 }
 
 const WorkstationContext = createContext<WorkstationContextType | undefined>(undefined);
@@ -17,6 +21,8 @@ interface WorkstationProviderProps {
 export function WorkstationProvider({ children }: WorkstationProviderProps) {
   const [selectedKit, setSelectedKitState] = useState<ArtifactFile | null>(null);
   const [kitContent, setKitContent] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
   const setSelectedKit = (kit: ArtifactFile | null, content: string | null) => {
     setSelectedKitState(kit);
@@ -29,7 +35,18 @@ export function WorkstationProvider({ children }: WorkstationProviderProps) {
   };
 
   return (
-    <WorkstationContext.Provider value={{ selectedKit, kitContent, setSelectedKit, clearSelectedKit }}>
+    <WorkstationContext.Provider
+      value={{
+        selectedKit,
+        kitContent,
+        setSelectedKit,
+        clearSelectedKit,
+        searchQuery,
+        isSearchOpen,
+        setSearchQuery,
+        setIsSearchOpen,
+      }}
+    >
       {children}
     </WorkstationContext.Provider>
   );

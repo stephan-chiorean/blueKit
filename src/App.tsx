@@ -12,6 +12,7 @@ import { ResourceProvider } from './contexts/ResourceContext';
 import { NotepadProvider } from './contexts/NotepadContext';
 import { TimerProvider } from './contexts/TimerContext';
 import { LibraryCacheProvider } from './contexts/LibraryCacheContext';
+import { WorkstationProvider } from './contexts/WorkstationContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { Project } from './ipc';
 
@@ -155,7 +156,9 @@ function App() {
     <GitHubAuthProvider>
       <NotepadProvider>
         <TimerProvider>
-          <AppContent />
+          <WorkstationProvider>
+            <AppContent />
+          </WorkstationProvider>
         </TimerProvider>
       </NotepadProvider>
     </GitHubAuthProvider>
