@@ -408,10 +408,21 @@ function KitsTabContent({
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsKitsFilterOpen(!isKitsFilterOpen)}
-                bg={isKitsFilterOpen ? "bg.subtle" : "bg.subtle"}
                 borderWidth="1px"
-                borderColor="border.subtle"
-                _hover={{ bg: "bg.subtle" }}
+                borderRadius="lg"
+                css={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                  transition: 'none',
+                  _dark: {
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                  },
+                }}
               >
                 <HStack gap={2}>
                   <Icon>
