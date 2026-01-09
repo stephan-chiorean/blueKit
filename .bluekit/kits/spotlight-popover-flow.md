@@ -54,6 +54,41 @@ After generation, verify:
 - ✓ Clicking the blurred background closes the active popover and removes the blur.
 - ✓ The blur effect works correctly in both light and dark modes (appropriate overlay opacity).
 
+## Adjacent Context Spotlight (Menu → Popover Flow)
+
+When a popover is triggered from a context menu (e.g., "Rename Folder" from a folder card menu), additional elements must remain visible and unblurred:
+
+**Elements to Keep Visible:**
+1. **The parent card/container** - The folder card itself must remain visible
+2. **The context menu** - The menu that triggered the popover stays open
+3. **The popover** - Positioned relative to the triggering menu item
+
+**Implementation Pattern:**
+1. When the popover opens, measure bounding rects of both the card AND the menu item
+2. Render the blur backdrop (Z-Index: 1300)
+3. Clone the entire card and portal it above the blur (Z-Index: 1401)
+4. Keep the menu open with elevated z-index (Z-Index: 1405)
+5. Position the popover above/below the menu item (Z-Index: 1410)
+
+**Popover Positioning:**
+- For "above menu item" placement: `top: ${menuItemRect.top - 8}px; transform: translateY(-100%)`
+- For "below menu item" placement: `top: ${menuItemRect.bottom + 8}px`
+- Align left edge with menu item: `left: ${menuItemRect.left}px`
+
+**Z-Index Hierarchy:**
+```
+1410 - Rename/Action Popover
+1405 - Context Menu (elevated)
+1401 - Cloned Card/Trigger
+1400 - (reserved for standard popovers)
+1300 - Blur Backdrop
+```
+
+**Closure Conditions:**
+- Click outside popover (on blur backdrop) → Close popover
+- Submit action (Enter key or confirm button) → Close on success
+- Escape key → Close popover
+
 ## Interface Contracts
 
 **Provides:**

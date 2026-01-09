@@ -1,24 +1,17 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
   Heading,
   Flex,
   Text,
   Icon,
   HStack,
-  Checkbox,
-  Tag,
-  Table,
   VStack,
   Button,
   Badge,
   SimpleGrid,
 } from '@chakra-ui/react';
-import { ImTree } from 'react-icons/im';
-import { LuFilter, LuFolderPlus, LuChevronRight, LuFolder } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus } from 'react-icons/lu';
 import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
 import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
@@ -26,9 +19,11 @@ import { LiquidViewModeSwitcher } from './LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
-import { CreateFolderDialog } from '../shared/CreateFolderDialog';
+import { CreateFolderPopover } from '../shared/CreateFolderPopover';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { KitContextMenu } from './KitContextMenu';
+import { ResourceCard } from '../shared/ResourceCard';
+import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import { FilterPanel } from '../shared/FilterPanel';
 import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
@@ -47,7 +42,7 @@ interface KitsTabContentProps {
   movingArtifacts?: Set<string>;
 }
 
-type ViewMode = 'card' | 'table' | 'blueprints';
+type ViewMode = 'card' | 'blueprints';
 
 function KitsTabContent({
   kits,
@@ -204,10 +199,9 @@ function KitsTabContent({
   };
 
 
-  // Handle rename folder (prompts for new name)
-  const handleRenameFolder = async (folder: ArtifactFolder) => {
-    const newName = prompt('Enter new folder name:', folder.name);
-    if (!newName || newName === folder.name) return;
+  // Handle rename folder (receives new name from popover)
+  const handleRenameFolder = async (folder: ArtifactFolder, newName: string) => {
+    if (!newName) return;
 
     try {
       await invokeRenameArtifactFolder(folder.path, newName);
@@ -304,148 +298,6 @@ function KitsTabContent({
     );
   }
 
-  const renderKitsTableView = () => (
-    <Table.Root
-      size="sm"
-      variant="outline"
-      borderRadius="16px"
-      overflow="hidden"
-      css={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-        _dark: {
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        },
-      }}
-    >
-      <Table.Header>
-        <Table.Row
-          css={{
-            background: 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(20px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-            borderBottomWidth: '1px',
-            borderBottomColor: 'rgba(0, 0, 0, 0.08)',
-            _dark: {
-              background: 'rgba(30, 30, 30, 0.85)',
-              borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-            },
-          }}
-        >
-          <Table.ColumnHeader w="6">
-            <Checkbox.Root
-              size="sm"
-              colorPalette="blue"
-              checked={rootKits.length > 0 && rootKits.every(kit => isSelected(kit.path))}
-              onCheckedChange={(changes) => {
-                rootKits.forEach(kit => {
-                  if (changes.checked && !isSelected(kit.path)) {
-                    handleKitToggle(kit);
-                  } else if (!changes.checked && isSelected(kit.path)) {
-                    handleKitToggle(kit);
-                  }
-                });
-              }}
-              cursor="pointer"
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control cursor="pointer">
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-            </Checkbox.Root>
-          </Table.ColumnHeader>
-          <Table.ColumnHeader>Name</Table.ColumnHeader>
-          <Table.ColumnHeader>Description</Table.ColumnHeader>
-          <Table.ColumnHeader>Tags</Table.ColumnHeader>
-          <Table.ColumnHeader>Base</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {rootKits.map((kit) => {
-          const kitSelected = isSelected(kit.path);
-          const displayName = kit.frontMatter?.alias || kit.name;
-          const description = kit.frontMatter?.description || kit.path;
-          const isBase = kit.frontMatter?.is_base === true;
-          return (
-            <Table.Row
-              key={kit.path}
-              cursor="pointer"
-              onClick={() => handleViewKit(kit)}
-              onContextMenu={(e) => handleContextMenu(e, kit)}
-              bg="transparent"
-              _hover={{ bg: "rgba(255, 255, 255, 0.1)" }}
-              data-selected={kitSelected ? "" : undefined}
-            >
-              <Table.Cell>
-                <Checkbox.Root
-                  size="sm"
-                  colorPalette="blue"
-                  checked={kitSelected}
-                  onCheckedChange={() => {
-                    handleKitToggle(kit);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  cursor="pointer"
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control cursor="pointer">
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                </Checkbox.Root>
-              </Table.Cell>
-              <Table.Cell>
-                <HStack gap={2}>
-                  <Text fontWeight="medium">{displayName}</Text>
-                  {isBase && (
-                    <Icon
-                      as={ImTree}
-                      boxSize={4}
-                      color="primary.500"
-                    />
-                  )}
-                </HStack>
-              </Table.Cell>
-              <Table.Cell>
-                <Text fontSize="sm" color="text.secondary" lineClamp={1}>
-                  {description}
-                </Text>
-              </Table.Cell>
-              <Table.Cell>
-                {kit.frontMatter?.tags && kit.frontMatter.tags.length > 0 ? (
-                  <HStack gap={1} flexWrap="wrap">
-                    {kit.frontMatter.tags.map((tag) => (
-                      <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                        <Tag.Label>#{tag}</Tag.Label>
-                      </Tag.Root>
-                    ))}
-                  </HStack>
-                ) : (
-                  <Text fontSize="sm" color="text.tertiary">—</Text>
-                )}
-              </Table.Cell>
-              <Table.Cell>
-                {isBase ? (
-                  <Tag.Root size="sm" variant="solid" colorPalette="primary">
-                    <Tag.Label>Base</Tag.Label>
-                  </Tag.Root>
-                ) : (
-                  <Text fontSize="sm" color="text.tertiary">—</Text>
-                )}
-              </Table.Cell>
-            </Table.Row>
-          );
-        })}
-      </Table.Body>
-    </Table.Root>
-  );
-
   // If viewing a folder, show the FolderView component
   if (viewingFolder) {
     return (
@@ -473,20 +325,26 @@ function KitsTabContent({
                 <Text fontSize="sm" color="text.muted">
                   {folders.length}
                 </Text>
-                {/* New Folder Button - subtle blue style */}
-                <Button
-                  size="sm"
-                  onClick={() => setIsCreateFolderOpen(true)}
-                  colorPalette="blue"
-                  variant="subtle"
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFolderPlus />
-                    </Icon>
-                    <Text>New Folder</Text>
-                  </HStack>
-                </Button>
+                {/* New Folder Button with Spotlight Popover */}
+                <CreateFolderPopover
+                  isOpen={isCreateFolderOpen}
+                  onOpenChange={setIsCreateFolderOpen}
+                  onConfirm={(name) => handleCreateFolder(name, {})}
+                  trigger={
+                    <Button
+                      size="sm"
+                      colorPalette="blue"
+                      variant="subtle"
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuFolderPlus />
+                        </Icon>
+                        <Text>New Folder</Text>
+                      </HStack>
+                    </Button>
+                  }
+                />
               </Flex>
               {/* View Mode Switcher */}
               <LiquidViewModeSwitcher
@@ -494,7 +352,6 @@ function KitsTabContent({
                 onChange={(mode) => setViewMode(mode as ViewMode)}
                 modes={[
                   STANDARD_VIEW_MODES.card,
-                  STANDARD_VIEW_MODES.table,
                   { id: 'blueprints', label: 'Blueprints', icon: BsBoxes },
                 ]}
               />
@@ -502,27 +359,25 @@ function KitsTabContent({
 
             {viewMode === 'card' ? (
               <SimpleGrid
-                columns={{ base: 2, md: 3, lg: 4, xl: 5 }}
+                columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
                 gap={4}
+                p={1}
                 width="100%"
                 maxW="100%"
                 overflow="visible"
-                css={{
-                  alignItems: 'start',
-                }}
               >
-                {folders.map((folder) => (
+                {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder) => (
                   <SimpleFolderCard
                     key={folder.path}
                     folder={folder}
                     artifacts={getFolderArtifacts(folder.path)}
                     onOpenFolder={() => setViewingFolder(folder)}
-                    onEditFolder={() => handleRenameFolder(folder)}
+                    onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
                     onDeleteFolder={() => handleDeleteFolder(folder)}
                   />
                 ))}
               </SimpleGrid>
-            ) : viewMode === 'blueprints' ? (
+            ) : (
               <Box
                 p={6}
                 bg="bg.subtle"
@@ -535,88 +390,6 @@ function KitsTabContent({
                   Blueprints view coming soon
                 </Text>
               </Box>
-            ) : (
-              <Table.Root
-                size="sm"
-                variant="outline"
-                borderRadius="16px"
-                overflow="hidden"
-                css={{
-                  background: 'rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(30px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                  },
-                }}
-              >
-                <Table.Header>
-                  <Table.Row
-                    css={{
-                      background: 'rgba(255, 255, 255, 0.85)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                      borderBottomWidth: '1px',
-                      borderBottomColor: 'rgba(0, 0, 0, 0.08)',
-                      _dark: {
-                        background: 'rgba(30, 30, 30, 0.85)',
-                        borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-                      },
-                    }}
-                  >
-                    <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Description</Table.ColumnHeader>
-                    <Table.ColumnHeader>Tags</Table.ColumnHeader>
-                    <Table.ColumnHeader>Resources</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {folders.map((folder) => {
-                    const folderArtifacts = getFolderArtifacts(folder.path);
-                    const totalResources = folderArtifacts.length;
-
-                    return (
-                      <Table.Row
-                        key={folder.path}
-                        cursor="pointer"
-                        onClick={() => setViewingFolder(folder)}
-                        bg="transparent"
-                        _hover={{ bg: "rgba(255, 255, 255, 0.1)" }}
-                      >
-                        <Table.Cell>
-                          <Icon>
-                            <LuChevronRight />
-                          </Icon>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Icon boxSize={4} color="blue.500">
-                              <LuFolder />
-                            </Icon>
-                            <Text fontWeight="medium">{folder.name}</Text>
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" color="text.secondary">
-                            {totalResources} resource{totalResources !== 1 ? 's' : ''}
-                          </Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
-                </Table.Body>
-              </Table.Root>
             )}
           </Box>
         )}
@@ -702,81 +475,21 @@ function KitsTabContent({
             <SimpleGrid
               columns={{ base: 1, md: 2, lg: 3 }}
               gap={4}
+              p={1}
               width="100%"
               maxW="100%"
               overflow="visible"
-              css={{
-                alignItems: 'start',
-              }}
             >
               {rootKits.map((kit) => (
-                <Card.Root
+                <ResourceCard
                   key={kit.path}
-                  borderWidth={isSelected(kit.path) ? "2px" : "1px"}
-                  borderRadius="16px"
-                  position="relative"
-                  cursor="pointer"
+                  resource={kit}
+                  isSelected={isSelected(kit.path)}
+                  onToggle={() => handleKitToggle(kit)}
                   onClick={() => handleViewKit(kit)}
                   onContextMenu={(e) => handleContextMenu(e, kit)}
-                  transition="all 0.2s ease-in-out"
-                  height="100%"
-                  display="flex"
-                  flexDirection="column"
-                  css={{
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(30px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                    borderColor: isSelected(kit.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: isSelected(kit.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                    },
-                    _hover: {
-                      transform: 'scale(1.02)',
-                      borderColor: 'var(--chakra-colors-primary-400)',
-                      zIndex: 10,
-                    },
-                  }}
-                >
-                  <CardHeader>
-                    <Flex align="center" justify="space-between" gap={4}>
-                      <HStack gap={2} align="center">
-                        <Heading size="md">{kit.frontMatter?.alias || kit.name}</Heading>
-                        {kit.frontMatter?.is_base && (
-                          <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
-                        )}
-                      </HStack>
-                      <Checkbox.Root
-                        checked={isSelected(kit.path)}
-                        colorPalette="blue"
-                        onCheckedChange={() => handleKitToggle(kit)}
-                        onClick={(e) => e.stopPropagation()}
-                        cursor="pointer"
-                      >
-                        <Checkbox.HiddenInput />
-                        <Checkbox.Control cursor="pointer">
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                      </Checkbox.Root>
-                    </Flex>
-                  </CardHeader>
-                  <CardBody display="flex" flexDirection="column" flex="1">
-                    <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                      {kit.frontMatter?.description || kit.path}
-                    </Text>
-                    {kit.frontMatter?.tags && kit.frontMatter.tags.length > 0 && (
-                      <HStack gap={2} flexWrap="wrap" mt="auto">
-                        {kit.frontMatter.tags.map((tag) => (
-                          <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                            <Tag.Label>#{tag}</Tag.Label>
-                          </Tag.Root>
-                        ))}
-                      </HStack>
-                    )}
-                  </CardBody>
-                </Card.Root>
+                  resourceType="kit"
+                />
               ))}
             </SimpleGrid>
           ) : viewMode === 'blueprints' ? (
@@ -792,16 +505,21 @@ function KitsTabContent({
                 Blueprints view coming soon
               </Text>
             </Box>
-          ) : viewMode === 'table' ? (
-            renderKitsTableView()
           ) : null}
         </Box>
       </VStack>
 
-      <CreateFolderDialog
-        isOpen={isCreateFolderOpen}
-        onClose={() => setIsCreateFolderOpen(false)}
-        onCreate={handleCreateFolder}
+      {/* Selection Bar */}
+      <ResourceSelectionBar
+        isOpen={selectedItems.length > 0}
+        selectedItems={selectedItems}
+        onClearSelection={clearSelection}
+        onMoveToFolder={(folderPath) => {
+          // TODO: Implement move to folder
+          console.log('Move to folder:', folderPath, selectedItems);
+          clearSelection();
+        }}
+        folders={folders}
       />
 
       <DeleteFolderDialog

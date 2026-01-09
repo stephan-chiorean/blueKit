@@ -2598,7 +2598,10 @@ pub async fn rename_artifact_folder(
     // Create new path with new name
     let new_path = parent.join(&new_name);
 
-    if new_path.exists() {
+    // Check if it's a case-only rename
+    let is_case_rename = path.to_string_lossy().to_lowercase() == new_path.to_string_lossy().to_lowercase();
+
+    if new_path.exists() && !is_case_rename {
         return Err(format!("A folder named '{}' already exists", new_name));
     }
 

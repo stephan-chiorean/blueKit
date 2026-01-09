@@ -79,7 +79,7 @@ export function GlassCard({
           background: isSelected ? settings.bgSelected : settings.bg,
           backdropFilter: `blur(${settings.blur}) saturate(180%)`,
           WebkitBackdropFilter: `blur(${settings.blur}) saturate(180%)`,
-          borderWidth: '1.5px',
+          borderWidth: isSelected ? '2px' : '1.5px',
           borderStyle: 'solid',
           borderColor: isSelected
             ? 'var(--chakra-colors-primary-500)'

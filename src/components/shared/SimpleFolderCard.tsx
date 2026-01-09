@@ -4,17 +4,19 @@ import {
   HStack,
   Icon,
   IconButton,
+  Input,
   Menu,
   Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { MdFolder } from "react-icons/md";
 import { IoIosMore } from "react-icons/io";
 import {
   LuBookOpen,
   LuBot,
+  LuCheck,
   LuPackage,
   LuPencil,
   LuTrash2,
@@ -27,7 +29,7 @@ interface SimpleFolderCardProps {
   artifacts: ArtifactFile[];
   onOpenFolder: () => void;
   onDeleteFolder: () => void;
-  onEditFolder: () => void;
+  onRenameFolder: (newName: string) => Promise<void>;
 }
 
 export function SimpleFolderCard({
@@ -35,9 +37,62 @@ export function SimpleFolderCard({
   artifacts,
   onOpenFolder,
   onDeleteFolder,
-  onEditFolder,
+  onRenameFolder,
 }: SimpleFolderCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState(folder.name);
+  const [renameLoading, setRenameLoading] = useState(false);
+
+  // Refs for positioning and input selection
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [menuButtonRect, setMenuButtonRect] = useState<DOMRect | null>(null);
+
+  // Reset name and measure position when opening
+  useEffect(() => {
+    if (isRenameOpen) {
+      setRenameName(folder.name);
+      if (menuButtonRef.current) {
+        setMenuButtonRect(menuButtonRef.current.getBoundingClientRect());
+      }
+      // Select all text after a brief delay to ensure input is mounted
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.select();
+        }
+      }, 50);
+    }
+  }, [isRenameOpen, folder.name]);
+
+  // Update popover position on resize/scroll
+  useEffect(() => {
+    if (!isRenameOpen) return;
+
+    const updateRect = () => {
+      if (menuButtonRef.current) {
+        setMenuButtonRect(menuButtonRef.current.getBoundingClientRect());
+      }
+    };
+
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [isRenameOpen]);
+
+  const handleRenameSubmit = async () => {
+    if (!renameName.trim()) return;
+    setRenameLoading(true);
+    try {
+      await onRenameFolder(renameName);
+      setIsRenameOpen(false);
+    } finally {
+      setRenameLoading(false);
+    }
+  };
 
   // Count artifacts by type
   const typeCounts = artifacts.reduce((acc, artifact) => {
@@ -47,7 +102,6 @@ export function SimpleFolderCard({
     } else if (type === 'agent') {
       acc.agent = (acc.agent || 0) + 1;
     } else {
-      // Default to kit for anything else
       acc.kit = (acc.kit || 0) + 1;
     }
     return acc;
@@ -65,7 +119,6 @@ export function SimpleFolderCard({
     resourceSummary.push({ count: typeCounts.agent, icon: <LuBot /> });
   }
 
-  // If we have artifacts but couldn't determine types, show total count
   if (resourceSummary.length === 0 && artifacts.length > 0) {
     resourceSummary.push({ count: artifacts.length, icon: <LuPackage /> });
   }
@@ -124,6 +177,7 @@ export function SimpleFolderCard({
             <Menu.Root>
               <Menu.Trigger asChild>
                 <IconButton
+                  ref={menuButtonRef}
                   variant="ghost"
                   size="xs"
                   aria-label="Folder options"
@@ -141,8 +195,22 @@ export function SimpleFolderCard({
               </Menu.Trigger>
               <Portal>
                 <Menu.Positioner>
-                  <Menu.Content>
-                    <Menu.Item value="edit" onSelect={onEditFolder}>
+                  <Menu.Content
+                    css={{
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      borderWidth: '1px',
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                      _dark: {
+                        background: 'rgba(30, 30, 30, 0.85)',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)',
+                      },
+                    }}
+                  >
+                    <Menu.Item value="edit" onSelect={() => setIsRenameOpen(true)}>
                       <Icon>
                         <LuPencil />
                       </Icon>
@@ -226,12 +294,97 @@ export function SimpleFolderCard({
                 }}
                 transition="color 0.2s"
               >
-                Empty
+                —
               </Text>
             )}
           </VStack>
         </Box>
       </GlassCard>
+
+      {/* Rename Popover (positioned below menu button) */}
+      {isRenameOpen && menuButtonRect && (
+        <Portal>
+          {/* Click-outside handler */}
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={1399}
+            onClick={() => setIsRenameOpen(false)}
+          />
+
+          {/* Popover positioned below the menu button */}
+          <Box
+            position="fixed"
+            top={`${menuButtonRect.bottom + 8}px`}
+            right={`${window.innerWidth - menuButtonRect.right}px`}
+            zIndex={1400}
+          >
+            <Box
+              width="260px"
+              borderRadius="xl"
+              p={3}
+              css={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                borderWidth: '1px',
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)',
+                _dark: {
+                  background: 'rgba(30, 30, 30, 0.95)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)',
+                },
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <VStack align="stretch" gap={3}>
+                <Text fontSize="sm" fontWeight="semibold">Rename Folder</Text>
+                <HStack gap={2}>
+                  <Input
+                    ref={inputRef}
+                    placeholder="Folder Name"
+                    size="sm"
+                    variant="subtle"
+                    value={renameName}
+                    onChange={(e) => setRenameName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRenameSubmit();
+                      if (e.key === 'Escape') setIsRenameOpen(false);
+                    }}
+                    disabled={renameLoading}
+                    borderRadius="md"
+                    css={{
+                      border: 'none',
+                      '&:focus': {
+                        outline: 'none',
+                        boxShadow: 'none',
+                        border: 'none',
+                      },
+                      '&:focus-visible': {
+                        outline: 'none',
+                        boxShadow: 'none',
+                        border: 'none',
+                      },
+                    }}
+                  />
+                  <IconButton
+                    aria-label="Confirm rename"
+                    size="sm"
+                    colorPalette="blue"
+                    onClick={handleRenameSubmit}
+                    loading={renameLoading}
+                    disabled={!renameName.trim()}
+                    rounded="md"
+                  >
+                    <Icon><LuCheck /></Icon>
+                  </IconButton>
+                </HStack>
+              </VStack>
+            </Box>
+          </Box>
+        </Portal>
+      )}
     </Box>
   );
 }

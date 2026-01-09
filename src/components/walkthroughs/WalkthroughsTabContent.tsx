@@ -1,34 +1,30 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
   Heading,
   Flex,
   Text,
   Icon,
   HStack,
-  Checkbox,
-  Tag,
-  Table,
   VStack,
   Button,
   Badge,
   SimpleGrid,
 } from '@chakra-ui/react';
-import { ImTree } from 'react-icons/im';
-import { LuFilter, LuFolderPlus, LuChevronRight, LuFolder, LuBookOpen } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuBookOpen } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
-import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
-import { CreateFolderDialog } from '../shared/CreateFolderDialog';
+import { CreateFolderPopover } from '../shared/CreateFolderPopover';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { FilterPanel } from '../shared/FilterPanel';
 import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
+import { ResourceCard } from '../shared/ResourceCard';
+import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 
 interface WalkthroughsTabContentProps {
   kits: ArtifactFile[];
@@ -44,7 +40,7 @@ interface WalkthroughsTabContentProps {
   movingArtifacts?: Set<string>;
 }
 
-type ViewMode = 'card' | 'table' | 'walkthroughs';
+type ViewMode = 'card' | 'walkthroughs';
 
 function WalkthroughsTabContent({
   kits,
@@ -103,17 +99,17 @@ function WalkthroughsTabContent({
   const filteredWalkthroughs = useMemo(() => {
     return walkthroughs.filter(walkthrough => {
       const displayName = walkthrough.frontMatter?.alias || walkthrough.name;
-      const matchesName = !nameFilter || 
+      const matchesName = !nameFilter ||
         displayName.toLowerCase().includes(nameFilter.toLowerCase()) ||
         walkthrough.name.toLowerCase().includes(nameFilter.toLowerCase());
-      
-      const matchesTags = selectedTags.length === 0 || 
+
+      const matchesTags = selectedTags.length === 0 ||
         selectedTags.some(selectedTag =>
-          walkthrough.frontMatter?.tags?.some(tag => 
+          walkthrough.frontMatter?.tags?.some(tag =>
             tag.toLowerCase() === selectedTag.toLowerCase()
           )
         );
-      
+
       return matchesName && matchesTags;
     });
   }, [walkthroughs, nameFilter, selectedTags]);
@@ -179,10 +175,9 @@ function WalkthroughsTabContent({
     }
   };
 
-  // Handle rename folder (prompts for new name)
-  const handleRenameFolder = async (folder: ArtifactFolder) => {
-    const newName = prompt('Enter new folder name:', folder.name);
-    if (!newName || newName === folder.name) return;
+  // Handle rename folder (receives new name from popover)
+  const handleRenameFolder = async (folder: ArtifactFolder, newName: string) => {
+    if (!newName) return;
 
     try {
       await invokeRenameArtifactFolder(folder.path, newName);
@@ -243,139 +238,6 @@ function WalkthroughsTabContent({
   const rootWalkthroughs = useMemo(() => {
     return getRootArtifacts(filteredWalkthroughs, folders, 'walkthroughs', projectPath);
   }, [filteredWalkthroughs, folders, projectPath]);
-
-  const renderWalkthroughsTableView = () => (
-    <Table.Root
-      size="sm"
-      variant="outline"
-      borderRadius="16px"
-      overflow="hidden"
-      css={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-        _dark: {
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        },
-      }}
-    >
-      <Table.Header>
-        <Table.Row bg="transparent">
-          <Table.ColumnHeader w="6">
-            <Checkbox.Root
-              size="sm"
-              colorPalette="blue"
-              checked={rootWalkthroughs.length > 0 && rootWalkthroughs.every(walkthrough => isSelected(walkthrough.path))}
-              onCheckedChange={(changes) => {
-                rootWalkthroughs.forEach(walkthrough => {
-                  if (changes.checked && !isSelected(walkthrough.path)) {
-                    handleWalkthroughToggle(walkthrough);
-                  } else if (!changes.checked && isSelected(walkthrough.path)) {
-                    handleWalkthroughToggle(walkthrough);
-                  }
-                });
-              }}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-            </Checkbox.Root>
-          </Table.ColumnHeader>
-          <Table.ColumnHeader>Name</Table.ColumnHeader>
-          <Table.ColumnHeader>Description</Table.ColumnHeader>
-          <Table.ColumnHeader>Tags</Table.ColumnHeader>
-          <Table.ColumnHeader>Base</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {rootWalkthroughs.map((walkthrough) => {
-          const walkthroughSelected = isSelected(walkthrough.path);
-          const displayName = walkthrough.frontMatter?.alias || walkthrough.name;
-          const description = walkthrough.frontMatter?.description || walkthrough.path;
-          const isBase = walkthrough.frontMatter?.is_base === true;
-          return (
-            <Table.Row
-              key={walkthrough.path}
-              cursor="pointer"
-              onClick={() => handleViewWalkthrough(walkthrough)}
-              bg="transparent"
-              borderBottomWidth="1px"
-              borderBottomColor="transparent"
-              _hover={{ 
-                bg: "rgba(255, 255, 255, 0.05)",
-                borderBottomColor: "primary.500",
-              }}
-              data-selected={walkthroughSelected ? "" : undefined}
-            >
-              <Table.Cell>
-                <Checkbox.Root
-                  size="sm"
-                  colorPalette="blue"
-                  checked={walkthroughSelected}
-                  onCheckedChange={() => {
-                    handleWalkthroughToggle(walkthrough);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  cursor="pointer"
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control cursor="pointer">
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                </Checkbox.Root>
-              </Table.Cell>
-              <Table.Cell>
-                <HStack gap={2}>
-                  <Text fontWeight="medium">{displayName}</Text>
-                  {isBase && (
-                    <Icon
-                      as={ImTree}
-                      boxSize={4}
-                      color="primary.500"
-                    />
-                  )}
-                </HStack>
-              </Table.Cell>
-              <Table.Cell>
-                <Text fontSize="sm" color="text.secondary" lineClamp={1}>
-                  {description}
-                </Text>
-              </Table.Cell>
-              <Table.Cell>
-                {walkthrough.frontMatter?.tags && walkthrough.frontMatter.tags.length > 0 ? (
-                  <HStack gap={1} flexWrap="wrap">
-                    {walkthrough.frontMatter.tags.map((tag) => (
-                      <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                        <Tag.Label>{tag}</Tag.Label>
-                      </Tag.Root>
-                    ))}
-                  </HStack>
-                ) : (
-                  <Text fontSize="sm" color="text.tertiary">—</Text>
-                )}
-              </Table.Cell>
-              <Table.Cell>
-                {isBase ? (
-                  <Tag.Root size="sm" variant="solid" colorPalette="primary">
-                    <Tag.Label>Base</Tag.Label>
-                  </Tag.Root>
-                ) : (
-                  <Text fontSize="sm" color="text.tertiary">—</Text>
-                )}
-              </Table.Cell>
-            </Table.Row>
-          );
-        })}
-      </Table.Body>
-    </Table.Root>
-  );
 
   if (kitsLoading) {
     return (
@@ -471,28 +333,33 @@ function WalkthroughsTabContent({
                   filterButtonRef={filterButtonRef}
                 />
               </Box>
-              {/* New Folder Button - subtle blue style */}
-              <Button
-                size="sm"
-                onClick={() => setIsCreateFolderOpen(true)}
-                colorPalette="blue"
-                variant="subtle"
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFolderPlus />
-                  </Icon>
-                  <Text>New Folder</Text>
-                </HStack>
-              </Button>
+              {/* New Folder Button with Spotlight Popover */}
+              <CreateFolderPopover
+                isOpen={isCreateFolderOpen}
+                onOpenChange={setIsCreateFolderOpen}
+                onConfirm={(name) => handleCreateFolder(name, {})}
+                trigger={
+                  <Button
+                    size="sm"
+                    colorPalette="blue"
+                    variant="subtle"
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuFolderPlus />
+                      </Icon>
+                      <Text>New Folder</Text>
+                    </HStack>
+                  </Button>
+                }
+              />
             </Flex>
             {/* View Mode Switcher */}
-            <ViewModeSwitcher
+            <LiquidViewModeSwitcher
               value={viewMode}
               onChange={(mode) => setViewMode(mode as ViewMode)}
               modes={[
                 STANDARD_VIEW_MODES.card,
-                STANDARD_VIEW_MODES.table,
                 { id: 'walkthroughs', label: 'Walkthroughs', icon: LuBookOpen },
               ]}
             />
@@ -513,100 +380,23 @@ function WalkthroughsTabContent({
             </Box>
           ) : viewMode === 'card' ? (
             <SimpleGrid
-              columns={{ base: 2, md: 3, lg: 4, xl: 5 }}
+              columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
               gap={4}
+              p={1}
               overflow="visible"
-              css={{
-                alignItems: 'start',
-              }}
             >
-              {folders.map((folder) => (
+              {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder) => (
                 <SimpleFolderCard
                   key={folder.path}
                   folder={folder}
                   artifacts={getFolderArtifacts(folder.path)}
                   onOpenFolder={() => setViewingFolder(folder)}
-                  onEditFolder={() => handleRenameFolder(folder)}
+                  onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
                   onDeleteFolder={() => handleDeleteFolder(folder)}
                 />
               ))}
             </SimpleGrid>
-          ) : (
-            <Table.Root
-              size="sm"
-              variant="outline"
-              borderRadius="16px"
-              overflow="hidden"
-              css={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                backdropFilter: 'blur(30px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                _dark: {
-                  background: 'rgba(0, 0, 0, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.15)',
-                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                },
-              }}
-            >
-              <Table.Header>
-                <Table.Row bg="transparent">
-                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Description</Table.ColumnHeader>
-                  <Table.ColumnHeader>Tags</Table.ColumnHeader>
-                  <Table.ColumnHeader>Resources</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {folders.map((folder) => {
-                  const folderArtifacts = getFolderArtifacts(folder.path);
-                  const totalResources = folderArtifacts.length;
-
-                  return (
-                    <Table.Row
-                      key={folder.path}
-                      cursor="pointer"
-                      onClick={() => setViewingFolder(folder)}
-                      bg="transparent"
-                      borderBottomWidth="1px"
-                      borderBottomColor="transparent"
-                      _hover={{
-                        bg: "rgba(255, 255, 255, 0.05)",
-                        borderBottomColor: "primary.500",
-                      }}
-                    >
-                      <Table.Cell>
-                        <Icon>
-                          <LuChevronRight />
-                        </Icon>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack gap={2}>
-                          <Icon boxSize={4} color="blue.500">
-                            <LuFolder />
-                          </Icon>
-                          <Text fontWeight="medium">{folder.name}</Text>
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="text.secondary">
-                          {totalResources} resource{totalResources !== 1 ? 's' : ''}
-                        </Text>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          )}
+          ) : null}
         </Box>
 
         {/* Walkthroughs Section */}
@@ -634,74 +424,16 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1} overflow="visible">
               {rootWalkthroughs.map((walkthrough) => (
-                <Card.Root
+                <ResourceCard
                   key={walkthrough.path}
-                  borderWidth={isSelected(walkthrough.path) ? "2px" : "1px"}
-                  borderRadius="16px"
-                  position="relative"
-                  cursor="pointer"
+                  resource={walkthrough}
+                  isSelected={isSelected(walkthrough.path)}
+                  onToggle={() => handleWalkthroughToggle(walkthrough)}
                   onClick={() => handleViewWalkthrough(walkthrough)}
-                  transition="all 0.2s ease-in-out"
-                  height="100%"
-                  display="flex"
-                  flexDirection="column"
-                  css={{
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(30px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                    borderColor: isSelected(walkthrough.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: isSelected(walkthrough.path) ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                    },
-                    _hover: {
-                      transform: 'scale(1.02)',
-                      borderColor: 'var(--chakra-colors-primary-400)',
-                      zIndex: 10,
-                    },
-                  }}
-                >
-                  <CardHeader>
-                    <Flex align="center" justify="space-between" gap={4}>
-                      <HStack gap={2} align="center">
-                        <Heading size="md">{walkthrough.frontMatter?.alias || walkthrough.name}</Heading>
-                        {walkthrough.frontMatter?.is_base && (
-                          <Icon as={ImTree} boxSize={5} color="primary.500" flexShrink={0} />
-                        )}
-                      </HStack>
-                      <Checkbox.Root
-                        checked={isSelected(walkthrough.path)}
-                        colorPalette="blue"
-                        onCheckedChange={() => handleWalkthroughToggle(walkthrough)}
-                        onClick={(e) => e.stopPropagation()}
-                        cursor="pointer"
-                      >
-                        <Checkbox.HiddenInput />
-                        <Checkbox.Control cursor="pointer">
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                      </Checkbox.Root>
-                    </Flex>
-                  </CardHeader>
-                  <CardBody display="flex" flexDirection="column" flex="1">
-                    <Text fontSize="sm" color="text.secondary" mb={4} flex="1">
-                      {walkthrough.frontMatter?.description || walkthrough.path}
-                    </Text>
-                    {walkthrough.frontMatter?.tags && walkthrough.frontMatter.tags.length > 0 && (
-                      <HStack gap={2} flexWrap="wrap" mt="auto">
-                        {walkthrough.frontMatter.tags.map((tag) => (
-                          <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                            <Tag.Label>{tag}</Tag.Label>
-                          </Tag.Root>
-                        ))}
-                      </HStack>
-                    )}
-                  </CardBody>
-                </Card.Root>
+                  resourceType="walkthrough"
+                />
               ))}
             </SimpleGrid>
           ) : viewMode === 'walkthroughs' ? (
@@ -717,16 +449,21 @@ function WalkthroughsTabContent({
                 Walkthroughs view coming soon
               </Text>
             </Box>
-          ) : viewMode === 'table' ? (
-            renderWalkthroughsTableView()
           ) : null}
         </Box>
       </VStack>
 
-      <CreateFolderDialog
-        isOpen={isCreateFolderOpen}
-        onClose={() => setIsCreateFolderOpen(false)}
-        onCreate={handleCreateFolder}
+      {/* Selection Bar */}
+      <ResourceSelectionBar
+        isOpen={selectedItems.length > 0}
+        selectedItems={selectedItems}
+        onClearSelection={clearSelection}
+        onMoveToFolder={(folderPath) => {
+          // TODO: Implement move to folder
+          console.log('Move to folder:', folderPath, selectedItems);
+          clearSelection();
+        }}
+        folders={folders}
       />
 
       <DeleteFolderDialog
