@@ -558,7 +558,18 @@ export default function TimelineTabContent({
       groups.get(dateKey)!.commits.push(commit);
     });
 
-    return Array.from(groups.values());
+    // Sort commits within each group by timestamp (newest first)
+    groups.forEach(group => {
+      group.commits.sort((a, b) =>
+        new Date(b.commit.author.date).getTime() -
+        new Date(a.commit.author.date).getTime()
+      );
+    });
+
+    // Sort groups by date (newest first)
+    return Array.from(groups.values()).sort((a, b) =>
+      b.date.getTime() - a.date.getTime()
+    );
   };
 
   // Empty state: not connected to git
@@ -1135,7 +1146,15 @@ function CheckpointsView({
       groups.get(dateKey)!.checkpoints.push(checkpoint);
     });
 
-    return Array.from(groups.values());
+    // Sort checkpoints within each group by timestamp (newest first)
+    groups.forEach(group => {
+      group.checkpoints.sort((a, b) => b.createdAt - a.createdAt);
+    });
+
+    // Sort groups by date (newest first)
+    return Array.from(groups.values()).sort((a, b) =>
+      b.date.getTime() - a.date.getTime()
+    );
   }, [filteredCheckpoints]);
 
   const handleUnpin = async (checkpointId: string) => {

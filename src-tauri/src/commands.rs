@@ -4073,7 +4073,7 @@ pub async fn fetch_project_commits(
         commits.len()
     );
 
-    let enriched_commits: Vec<GitHubCommit> = stream::iter(commits.into_iter().map(|commit| {
+    let mut enriched_commits: Vec<GitHubCommit> = stream::iter(commits.into_iter().map(|commit| {
         let client = &client;
         let owner = owner.clone();
         let repo = repo.clone();
@@ -4093,6 +4093,11 @@ pub async fn fetch_project_commits(
     .buffer_unordered(3) // Fetch up to 3 commits in parallel (conservative to respect rate limits)
     .collect()
     .await;
+
+    // Sort commits by date (newest first) to restore chronological order after parallel enrichment
+    enriched_commits.sort_by(|a, b| {
+        b.commit.author.date.cmp(&a.commit.author.date)
+    });
 
     tracing::info!("Successfully enriched {} commits with file details", enriched_commits.len());
 
