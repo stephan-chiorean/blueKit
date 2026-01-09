@@ -41,6 +41,9 @@ import remarkGfm from 'remark-gfm';
 import { CatalogWithVariations, LibraryVariation, LibraryCatalog } from '../../types/github';
 import { Project } from '../../ipc';
 import { artifactTypeIcon } from './CatalogCard';
+import ShikiCodeBlock from '../workstation/ShikiCodeBlock';
+import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
+import { FaEye, FaCode } from 'react-icons/fa';
 
 // Selected variation interface (copied from LibraryTabContent for self-containment)
 export interface SelectedVariation {
@@ -99,6 +102,7 @@ export function CatalogDetailModal({
     const [previewVariation, setPreviewVariation] = useState<LibraryVariation | null>(null);
     const [previewContent, setPreviewContent] = useState<string>('');
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
 
     // Dynamic styles for glassmorphism
     const isDark = colorMode === 'dark';
@@ -200,6 +204,16 @@ export function CatalogDetailModal({
 
     const contentWithoutFrontMatter = previewContent.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
     const displayName = frontMatter.title || frontMatter.name || catalog.name;
+
+    const catalogTags = useMemo(() => {
+        try {
+            return catalog.tags ? JSON.parse(catalog.tags) : [];
+        } catch (e) {
+            return [];
+        }
+    }, [catalog.tags]);
+
+    const displayTags = (frontMatter.tags && frontMatter.tags.length > 0) ? frontMatter.tags : catalogTags;
 
     // Get selected variations for action bar
     const selectedVariationsArray = useMemo(() => {
@@ -754,25 +768,11 @@ export function CatalogDetailModal({
                                                     >
                                                         <Box p={6}>
                                                             <VStack align="stretch" gap={6}>
-                                                                {/* Header */}
-                                                                <Box>
-                                                                    <Heading
-                                                                        size="xl"
-                                                                        mb={2}
-                                                                        css={{
-                                                                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                                                                            _dark: {
-                                                                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                                                                            },
-                                                                        }}
-                                                                    >
-                                                                        {displayName}
-                                                                    </Heading>
-                                                                    {frontMatter.description && (
-                                                                        <Text
-                                                                            fontSize="lg"
-                                                                            color="text.secondary"
-                                                                            mb={4}
+                                                                <Flex justify="space-between" align="flex-start" wrap="wrap" gap={4}>
+                                                                    <Box>
+                                                                        <Heading
+                                                                            size="xl"
+                                                                            mb={2}
                                                                             css={{
                                                                                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                                                                                 _dark: {
@@ -780,150 +780,199 @@ export function CatalogDetailModal({
                                                                                 },
                                                                             }}
                                                                         >
-                                                                            {frontMatter.description}
-                                                                        </Text>
-                                                                    )}
-
-                                                                    {/* Metadata Tags */}
-                                                                    <HStack gap={2} flexWrap="wrap" mt={4}>
-                                                                        {frontMatter.tags && frontMatter.tags.map((tag: string) => (
-                                                                            <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                                                                <Tag.Label>#{tag}</Tag.Label>
-                                                                            </Tag.Root>
-                                                                        ))}
-                                                                        {frontMatter.version && (
-                                                                            <Tag.Root size="sm" variant="outline">
-                                                                                <Tag.Label>v{frontMatter.version}</Tag.Label>
-                                                                            </Tag.Root>
+                                                                            {displayName}
+                                                                        </Heading>
+                                                                        {frontMatter.description && (
+                                                                            <Text
+                                                                                fontSize="lg"
+                                                                                color="text.secondary"
+                                                                                mb={4}
+                                                                                css={{
+                                                                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                                                                                    _dark: {
+                                                                                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                                                                                    },
+                                                                                }}
+                                                                            >
+                                                                                {frontMatter.description}
+                                                                            </Text>
                                                                         )}
-                                                                    </HStack>
-                                                                </Box>
+
+                                                                        <HStack gap={2} flexWrap="wrap" mt={4}>
+                                                                            {displayTags && displayTags.map((tag: string) => (
+                                                                                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
+                                                                                    <Tag.Label>{tag}</Tag.Label>
+                                                                                </Tag.Root>
+                                                                            ))}
+                                                                            {frontMatter.version && (
+                                                                                <Tag.Root size="sm" variant="outline">
+                                                                                    <Tag.Label>v{frontMatter.version}</Tag.Label>
+                                                                                </Tag.Root>
+                                                                            )}
+                                                                        </HStack>
+
+                                                                        <Box mt={4} width="fit-content">
+                                                                            <LiquidViewModeSwitcher
+                                                                                value={viewMode}
+                                                                                onChange={(mode) => setViewMode(mode as 'preview' | 'source')}
+                                                                                modes={[
+                                                                                    { id: 'preview', label: 'Preview', icon: FaEye },
+                                                                                    { id: 'source', label: 'Source', icon: FaCode },
+                                                                                ]}
+                                                                            />
+                                                                        </Box>
+                                                                    </Box>
+                                                                </Flex>
 
                                                                 <Separator />
 
-                                                                {/* Markdown Content */}
-                                                                <Box
-                                                                    css={{
-                                                                        '& > *': { mb: 4 },
-                                                                        '& > *:last-child': { mb: 0 },
-                                                                        '& h1': { fontSize: '2xl', fontWeight: 'bold', mt: 6, mb: 4 },
-                                                                        '& h2': { fontSize: '2xl', fontWeight: 'semibold', mt: 5, mb: 3, color: 'primary.500' },
-                                                                        '& h3': { fontSize: 'lg', fontWeight: 'semibold', mt: 4, mb: 2 },
-                                                                        '& h4, & h5, & h6': { fontSize: 'md', fontWeight: 'semibold', mt: 3, mb: 2 },
-                                                                        '& p': { lineHeight: '1.75', color: 'text.primary' },
-                                                                        '& ul, & ol': { pl: 4, mb: 4 },
-                                                                        '& li': { mb: 2 },
-                                                                        '& pre': { mb: 4 },
-                                                                        '& code': { fontSize: '0.9em' },
-                                                                        '& a': { color: 'primary.500', textDecoration: 'underline' },
-                                                                        '& a:hover': { color: 'primary.600' },
-                                                                        '& blockquote': { borderLeft: '4px solid', borderColor: 'border.emphasized', pl: 4, py: 2, my: 4, fontStyle: 'italic' },
-                                                                        '& table': { width: '100%', borderCollapse: 'collapse', mb: 4 },
-                                                                        '& th, & td': { border: '1px solid', borderColor: 'border.subtle', px: 3, py: 2 },
-                                                                        '& th': { fontWeight: 'semibold' },
-                                                                    }}
-                                                                >
-                                                                    <ReactMarkdown
-                                                                        remarkPlugins={[remarkGfm]}
-                                                                        components={{
-                                                                            h1: ({ children }) => (
-                                                                                <Heading as="h1" size="2xl" mt={6} mb={4}>
-                                                                                    {children}
-                                                                                </Heading>
-                                                                            ),
-                                                                            h2: ({ children }) => (
-                                                                                <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">
-                                                                                    {children}
-                                                                                </Heading>
-                                                                            ),
-                                                                            h3: ({ children }) => (
-                                                                                <Heading as="h3" size="lg" mt={4} mb={2}>
-                                                                                    {children}
-                                                                                </Heading>
-                                                                            ),
-                                                                            h4: ({ children }) => (
-                                                                                <Heading as="h4" size="md" mt={3} mb={2}>
-                                                                                    {children}
-                                                                                </Heading>
-                                                                            ),
-                                                                            p: ({ children }) => (
-                                                                                <Text mb={4} lineHeight="1.75" color="text.primary">
-                                                                                    {children}
-                                                                                </Text>
-                                                                            ),
-                                                                            ul: ({ children }) => (
-                                                                                <List.Root mb={4} pl={4}>
-                                                                                    {children}
-                                                                                </List.Root>
-                                                                            ),
-                                                                            ol: ({ children }) => (
-                                                                                <List.Root as="ol" mb={4} pl={4}>
-                                                                                    {children}
-                                                                                </List.Root>
-                                                                            ),
-                                                                            li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
-                                                                            code: ({ className, children, ...props }) => {
-                                                                                const match = /language-(.+)/.exec(className || '');
-                                                                                const isInline = !match;
-                                                                                const codeString = String(children).replace(/\n$/, '');
-
-                                                                                if (isInline) {
-                                                                                    return (
-                                                                                        <Code px={1.5} py={0.5} borderRadius="sm" fontSize="0.9em" {...props}>
-                                                                                            {children}
-                                                                                        </Code>
-                                                                                    );
-                                                                                }
-
-                                                                                return (
-                                                                                    <Box
-                                                                                        as="pre"
-                                                                                        p={4}
-                                                                                        borderRadius="md"
-                                                                                        overflow="auto"
-                                                                                        mb={4}
-                                                                                        css={{
-                                                                                            background: 'rgba(0, 0, 0, 0.1)',
-                                                                                            _dark: {
-                                                                                                background: 'rgba(0, 0, 0, 0.3)',
-                                                                                            },
-                                                                                        }}
-                                                                                    >
-                                                                                        <Code display="block" whiteSpace="pre" fontSize="sm">
-                                                                                            {codeString}
-                                                                                        </Code>
-                                                                                    </Box>
-                                                                                );
-                                                                            },
-                                                                            a: ({ href, children }) => (
-                                                                                <Link
-                                                                                    href={href}
-                                                                                    color="primary.500"
-                                                                                    textDecoration="underline"
-                                                                                    _hover={{ color: 'primary.600' }}
-                                                                                >
-                                                                                    {children}
-                                                                                </Link>
-                                                                            ),
-                                                                            blockquote: ({ children }) => (
-                                                                                <Box
-                                                                                    as="blockquote"
-                                                                                    borderLeft="4px solid"
-                                                                                    borderColor="border.emphasized"
-                                                                                    pl={4}
-                                                                                    py={2}
-                                                                                    my={4}
-                                                                                    fontStyle="italic"
-                                                                                >
-                                                                                    {children}
-                                                                                </Box>
-                                                                            ),
-                                                                            hr: () => <Separator my={6} />,
+                                                                {/* Content */}
+                                                                {viewMode === 'source' ? (
+                                                                    <Box mt={6} flex="1" overflow="hidden">
+                                                                        <ShikiCodeBlock
+                                                                            code={contentWithoutFrontMatter}
+                                                                            language="markdown"
+                                                                        />
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box
+                                                                        css={{
+                                                                            '& > *': { mb: 4 },
+                                                                            '& > *:last-child': { mb: 0 },
+                                                                            '& h1': { fontSize: '2xl', fontWeight: 'bold', mt: 6, mb: 4 },
+                                                                            '& h2': { fontSize: '2xl', fontWeight: 'semibold', mt: 5, mb: 3, color: 'primary.500' },
+                                                                            '& h3': { fontSize: 'lg', fontWeight: 'semibold', mt: 4, mb: 2 },
+                                                                            '& h4, & h5, & h6': { fontSize: 'md', fontWeight: 'semibold', mt: 3, mb: 2 },
+                                                                            '& p': { lineHeight: '1.75', color: 'text.primary' },
+                                                                            '& ul, & ol': { pl: 4, mb: 4 },
+                                                                            '& li': { mb: 2 },
+                                                                            '& pre': { mb: 4 },
+                                                                            '& code': { fontSize: '0.9em' },
+                                                                            '& a': { color: 'primary.500', textDecoration: 'underline' },
+                                                                            '& a:hover': { color: 'primary.600' },
+                                                                            '& blockquote': { borderLeft: '4px solid', borderColor: 'border.emphasized', pl: 4, py: 2, my: 4, fontStyle: 'italic' },
+                                                                            '& table': { width: '100%', borderCollapse: 'collapse', mb: 4 },
+                                                                            '& th, & td': { border: '1px solid', borderColor: 'border.subtle', px: 3, py: 2 },
+                                                                            '& th': { fontWeight: 'semibold' },
                                                                         }}
                                                                     >
-                                                                        {contentWithoutFrontMatter}
-                                                                    </ReactMarkdown>
-                                                                </Box>
+                                                                        <ReactMarkdown
+                                                                            remarkPlugins={[remarkGfm]}
+                                                                            components={{
+                                                                                h1: ({ children }) => (
+                                                                                    <Heading as="h1" size="2xl" mt={6} mb={4}>
+                                                                                        {children}
+                                                                                    </Heading>
+                                                                                ),
+                                                                                h2: ({ children }) => (
+                                                                                    <Heading as="h2" size="2xl" mt={5} mb={3} color="primary.500">
+                                                                                        {children}
+                                                                                    </Heading>
+                                                                                ),
+                                                                                h3: ({ children }) => (
+                                                                                    <Heading as="h3" size="lg" mt={4} mb={2}>
+                                                                                        {children}
+                                                                                    </Heading>
+                                                                                ),
+                                                                                h4: ({ children }) => (
+                                                                                    <Heading as="h4" size="md" mt={3} mb={2}>
+                                                                                        {children}
+                                                                                    </Heading>
+                                                                                ),
+                                                                                p: ({ children }) => (
+                                                                                    <Text mb={4} lineHeight="1.75" color="text.primary">
+                                                                                        {children}
+                                                                                    </Text>
+                                                                                ),
+                                                                                ul: ({ children }) => (
+                                                                                    <List.Root mb={4} pl={4}>
+                                                                                        {children}
+                                                                                    </List.Root>
+                                                                                ),
+                                                                                ol: ({ children }) => (
+                                                                                    <List.Root as="ol" mb={4} pl={4}>
+                                                                                        {children}
+                                                                                    </List.Root>
+                                                                                ),
+                                                                                li: ({ children }) => <List.Item mb={2}>{children}</List.Item>,
+                                                                                code: ({ className, children, ...props }) => {
+                                                                                    const match = /language-(.+)/.exec(className || '');
+                                                                                    const isInline = !match;
+                                                                                    const codeString = String(children).replace(/\n$/, '');
+                                                                                    let language = match ? match[1] : '';
+
+                                                                                    // Handle file reference format (e.g., "78:93:src-tauri/src/main.rs")
+                                                                                    // Extract file extension to infer language
+                                                                                    if (language.includes(':') || language.includes('/') || language.includes('.')) {
+                                                                                        const fileExtMatch = language.match(/\.(\w+)$/);
+                                                                                        if (fileExtMatch) {
+                                                                                            const ext = fileExtMatch[1];
+                                                                                            // Map common extensions to languages
+                                                                                            const extToLang: Record<string, string> = {
+                                                                                                'rs': 'rust',
+                                                                                                'ts': 'typescript',
+                                                                                                'tsx': 'typescript',
+                                                                                                'js': 'javascript',
+                                                                                                'jsx': 'javascript',
+                                                                                                'py': 'python',
+                                                                                                'sh': 'bash',
+                                                                                                'yml': 'yaml',
+                                                                                                'yaml': 'yaml',
+                                                                                                'json': 'json',
+                                                                                                'md': 'markdown',
+                                                                                            };
+                                                                                            language = extToLang[ext] || ext;
+                                                                                        } else {
+                                                                                            // No file extension found, default to text
+                                                                                            language = 'text';
+                                                                                        }
+                                                                                    }
+
+                                                                                    if (isInline) {
+                                                                                        return (
+                                                                                            <Code px={1.5} py={0.5} borderRadius="sm" fontSize="0.9em" {...props}>
+                                                                                                {children}
+                                                                                            </Code>
+                                                                                        );
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <ShikiCodeBlock
+                                                                                            code={codeString}
+                                                                                            language={language}
+                                                                                        />
+                                                                                    );
+                                                                                },
+                                                                                a: ({ href, children }) => (
+                                                                                    <Link
+                                                                                        href={href}
+                                                                                        color="primary.500"
+                                                                                        textDecoration="underline"
+                                                                                        _hover={{ color: 'primary.600' }}
+                                                                                    >
+                                                                                        {children}
+                                                                                    </Link>
+                                                                                ),
+                                                                                blockquote: ({ children }) => (
+                                                                                    <Box
+                                                                                        as="blockquote"
+                                                                                        borderLeft="4px solid"
+                                                                                        borderColor="border.emphasized"
+                                                                                        pl={4}
+                                                                                        py={2}
+                                                                                        my={4}
+                                                                                        fontStyle="italic"
+                                                                                    >
+                                                                                        {children}
+                                                                                    </Box>
+                                                                                ),
+                                                                                hr: () => <Separator my={6} />,
+                                                                            }}
+                                                                        >
+                                                                            {contentWithoutFrontMatter}
+                                                                        </ReactMarkdown>
+                                                                    </Box>
+                                                                )}
                                                             </VStack>
                                                         </Box>
                                                     </Box>
@@ -935,8 +984,8 @@ export function CatalogDetailModal({
                             </Dialog.Content>
                         </Dialog.Positioner>
                     </Portal>
-                </Dialog.Root>
+                </Dialog.Root >
             )}
-        </AnimatePresence>
+        </AnimatePresence >
     );
 }

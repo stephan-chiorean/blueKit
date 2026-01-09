@@ -93,6 +93,7 @@ async fn main() {
             commands::create_artifact_folder, // Create new folder with config.json
             commands::update_folder_config, // Update folder config.json
             commands::delete_artifact_folder, // Delete folder and contents
+            commands::rename_artifact_folder, // Rename folder
             commands::move_artifact_to_folder, // Move artifact into folder
             commands::move_folder_to_folder, // Move folder into folder (nesting)
             commands::open_project_in_editor, // Open project in Cursor or VSCode

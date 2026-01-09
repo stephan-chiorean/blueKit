@@ -9,16 +9,17 @@ import type { ArtifactFolder, FolderConfig } from './types';
  * Gets all folders in a specific artifact type directory.
  *
  * Scans the specified artifact directory (kits, walkthroughs, diagrams)
- * and returns all folders found, including their config.json metadata.
+ * and returns all folders found. Folders are flat (no nesting) and
+ * contain only basic metadata: name, path, and artifact count.
  *
  * @param projectPath - Path to the project root
  * @param artifactType - Type directory to scan ('kits', 'walkthroughs', 'diagrams')
- * @returns Promise resolving to array of folders
+ * @returns Promise resolving to array of folders (config is always undefined)
  *
  * @example
  * ```typescript
  * const folders = await invokeGetArtifactFolders('/path/to/project', 'kits');
- * console.log(folders); // [{ name: 'ui-components', path: '...', config: {...} }]
+ * console.log(folders); // [{ name: 'ui-components', path: '...', artifactCount: 5 }]
  * ```
  */
 export async function invokeGetArtifactFolders(
@@ -36,26 +37,29 @@ export async function invokeGetArtifactFolders(
 }
 
 /**
- * Creates a new folder with config.json in an artifact directory.
+ * Creates a new empty folder in an artifact directory.
+ *
+ * Folders are flat (always created at root level) and no config.json is created.
+ * The folder name is the only metadata.
  *
  * @param projectPath - Path to the project root
  * @param artifactType - Type directory ('kits', 'walkthroughs', 'diagrams')
- * @param parentPath - Optional parent folder path (null for root level)
+ * @param parentPath - Ignored (kept for backward compatibility)
  * @param folderName - Name of the new folder
- * @param config - Folder configuration
+ * @param config - Ignored (kept for backward compatibility, no config.json created)
  * @returns Promise resolving to the path of the created folder
  *
  * @example
  * ```typescript
- * const config: FolderConfig = {
- *   id: 'ui-components-20251207',
- *   name: 'UI Components',
- *   description: 'Reusable UI patterns',
- *   tags: ['ui', 'components'],
- *   createdAt: new Date().toISOString(),
- *   updatedAt: new Date().toISOString(),
+ * // Config is required for backward compatibility but ignored
+ * const dummyConfig: FolderConfig = {
+ *   id: '',
+ *   name: folderName,
+ *   tags: [],
+ *   createdAt: '',
+ *   updatedAt: '',
  * };
- * const path = await invokeCreateArtifactFolder('/path/to/project', 'kits', null, 'ui-components', config);
+ * const path = await invokeCreateArtifactFolder('/path/to/project', 'kits', null, 'my-folder', dummyConfig);
  * ```
  */
 export async function invokeCreateArtifactFolder(
@@ -79,25 +83,20 @@ export async function invokeCreateArtifactFolder(
 }
 
 /**
+ * @deprecated Folders no longer use config.json. This function does nothing.
+ *
  * Updates a folder's config.json file.
  *
  * @param folderPath - Full path to the folder
- * @param config - Updated folder configuration
- * @returns Promise resolving when update is complete
- *
- * @example
- * ```typescript
- * const updatedConfig: FolderConfig = {
- *   ...existingConfig,
- *   description: 'Updated description',
- * };
- * await invokeUpdateFolderConfig('/path/to/folder', updatedConfig);
- * ```
+ * @param config - Updated folder configuration (ignored)
+ * @returns Promise resolving immediately (no-op)
  */
 export async function invokeUpdateFolderConfig(
   folderPath: string,
   config: FolderConfig
 ): Promise<void> {
+  // DEPRECATED: Folders no longer use config.json
+  // This function is kept for backward compatibility but does nothing
   return await invokeWithTimeout<void>(
     'update_folder_config',
     {
@@ -164,25 +163,49 @@ export async function invokeMoveArtifactToFolder(
 }
 
 /**
+ * Renames a folder.
+ *
+ * @param folderPath - Full path to the folder to rename
+ * @param newName - New name for the folder
+ * @returns Promise resolving to the new path of the renamed folder
+ *
+ * @example
+ * ```typescript
+ * const newPath = await invokeRenameArtifactFolder(
+ *   '/path/to/project/.bluekit/kits/old-name',
+ *   'new-name'
+ * );
+ * console.log(newPath); // '/path/to/project/.bluekit/kits/new-name'
+ * ```
+ */
+export async function invokeRenameArtifactFolder(
+  folderPath: string,
+  newName: string
+): Promise<string> {
+  return await invokeWithTimeout<string>(
+    'rename_artifact_folder',
+    {
+      folderPath,
+      newName,
+    },
+    5000
+  );
+}
+
+/**
+ * @deprecated Folders are now flat (no nesting). This function should not be used.
+ *
  * Moves a folder into another folder (creating nesting).
  *
  * @param sourceFolderPath - Full path to the folder being moved
  * @param targetFolderPath - Full path to the destination folder
  * @returns Promise resolving to the new path of the moved folder
- *
- * @example
- * ```typescript
- * const newPath = await invokeMoveFolderToFolder(
- *   '/path/to/project/.bluekit/kits/ui',
- *   '/path/to/project/.bluekit/kits/components'
- * );
- * console.log(newPath); // '/path/to/project/.bluekit/kits/components/ui'
- * ```
  */
 export async function invokeMoveFolderToFolder(
   sourceFolderPath: string,
   targetFolderPath: string
 ): Promise<string> {
+  // DEPRECATED: Folders are now flat (no nesting)
   return await invokeWithTimeout<string>(
     'move_folder_to_folder',
     {

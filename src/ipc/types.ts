@@ -127,7 +127,7 @@ export interface FolderConfig {
  * Folder information for artifact organization.
  *
  * Represents a folder within an artifact type directory (kits, walkthroughs, diagrams).
- * Folders can contain artifacts and other folders (nested).
+ * Folders are flat (no nesting) and contain only the folder name as metadata.
  *
  * This interface must match the `ArtifactFolder` struct in `src-tauri/src/commands.rs`.
  */
@@ -136,26 +136,26 @@ export interface ArtifactFolder {
   name: string;
   /** Full path to the folder */
   path: string;
-  /** Parent folder path (if nested), undefined if root level */
+  /** @deprecated Always undefined - flat folder structure */
   parentPath?: string;
-  /** Parsed config.json if exists */
+  /** @deprecated Always undefined - no config.json used */
   config?: FolderConfig;
   /** Number of direct child artifacts */
   artifactCount: number;
-  /** Number of direct child folders */
+  /** @deprecated Always 0 - flat folder structure */
   folderCount: number;
 }
 
 /**
- * Tree node for hierarchical folder display.
+ * @deprecated Use flat folder structure instead.
  *
- * Built on the frontend from flat ArtifactFolder and ArtifactFile arrays.
- * Used for rendering nested folder structures in the UI.
+ * Tree node for hierarchical folder display.
+ * This is kept for backward compatibility but folders are now flat.
  */
 export interface FolderTreeNode {
   /** Folder information */
   folder: ArtifactFolder;
-  /** Child folder nodes */
+  /** @deprecated Always empty - flat folder structure */
   children: FolderTreeNode[];
   /** Artifacts directly in this folder */
   artifacts: ArtifactFile[];

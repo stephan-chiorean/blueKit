@@ -199,17 +199,17 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                 </Tag.Root>
               )}
             </HStack>
-          </Box>
 
-          <Box>
-            <LiquidViewModeSwitcher
-              value={viewMode}
-              onChange={setViewMode}
-              modes={[
-                { id: 'preview', label: 'Preview', icon: FaEye },
-                { id: 'source', label: 'Source', icon: FaCode },
-              ]}
-            />
+            <Box mt={4} width="fit-content">
+              <LiquidViewModeSwitcher
+                value={viewMode}
+                onChange={setViewMode}
+                modes={[
+                  { id: 'preview', label: 'Preview', icon: FaEye },
+                  { id: 'source', label: 'Source', icon: FaCode },
+                ]}
+              />
+            </Box>
           </Box>
         </Flex>
 

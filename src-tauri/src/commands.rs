@@ -2365,10 +2365,11 @@ pub async fn update_resource_metadata(
     Ok(())
 }
 
-/// Gets all folders in a specific artifact type directory with their metadata.
+/// Gets all folders in a specific artifact type directory.
 ///
 /// This command scans a specific subdirectory (kits, walkthroughs, diagrams) and
-/// returns all folders found, including their config.json if present.
+/// returns all folders found. Folders are flat (no nesting) and only contain
+/// basic metadata: name, path, and child counts.
 ///
 /// # Arguments
 ///
@@ -2395,85 +2396,18 @@ pub async fn get_artifact_folders(
 
     let mut folders = Vec::new();
 
-    // Recursive helper to scan folder tree
-    fn scan_folders(
-        dir: &PathBuf,
-        base_path: &PathBuf,
-        parent_path: Option<String>,
-        folders: &mut Vec<ArtifactFolder>,
-    ) -> Result<(), String> {
-        let entries = fs::read_dir(dir)
-            .map_err(|e| format!("Failed to read directory: {}", e))?;
-
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-            let path = entry.path();
-
-            if path.is_dir() {
-                let folder_name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                // Skip hidden directories
-                if folder_name.starts_with('.') {
-                    continue;
-                }
-
-                // Read config.json if exists
-                let config_path = path.join("config.json");
-                let config = if config_path.exists() {
-                    match fs::read_to_string(&config_path) {
-                        Ok(content) => serde_json::from_str::<FolderConfig>(&content).ok(),
-                        Err(_) => None,
-                    }
-                } else {
-                    None
-                };
-
-                // Count direct children
-                let (artifact_count, folder_count) = count_children(&path)?;
-
-                folders.push(ArtifactFolder {
-                    name: folder_name,
-                    path: path.to_str().unwrap_or("").to_string(),
-                    parent_path: parent_path.clone(),
-                    config,
-                    artifact_count,
-                    folder_count,
-                });
-
-                // Recursively scan subdirectories
-                scan_folders(
-                    &path,
-                    base_path,
-                    Some(path.to_str().unwrap_or("").to_string()),
-                    folders,
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn count_children(dir: &PathBuf) -> Result<(usize, usize), String> {
+    // Helper to count direct children (artifacts only, no subfolder count since flat structure)
+    fn count_artifacts(dir: &PathBuf) -> Result<usize, String> {
         let entries = fs::read_dir(dir)
             .map_err(|e| format!("Failed to read directory: {}", e))?;
 
         let mut artifact_count = 0;
-        let mut folder_count = 0;
 
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
             let path = entry.path();
 
-            if path.is_dir() && !path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .starts_with('.')
-            {
-                folder_count += 1;
-            } else if path.is_file() {
+            if path.is_file() {
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                     if matches!(ext, "md" | "mmd" | "mermaid") {
                         artifact_count += 1;
@@ -2482,23 +2416,57 @@ pub async fn get_artifact_folders(
             }
         }
 
-        Ok((artifact_count, folder_count))
+        Ok(artifact_count)
     }
 
-    scan_folders(&artifact_dir, &artifact_dir, None, &mut folders)?;
+    // Flat folder structure - only scan root level, no recursion
+    let entries = fs::read_dir(&artifact_dir)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            let folder_name = path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            // Skip hidden directories
+            if folder_name.starts_with('.') {
+                continue;
+            }
+
+            // Count direct artifacts only (no config.json reading, no nesting)
+            let artifact_count = count_artifacts(&path)?;
+
+            folders.push(ArtifactFolder {
+                name: folder_name,
+                path: path.to_str().unwrap_or("").to_string(),
+                parent_path: None, // Flat structure - no parents
+                config: None,      // No config.json dependency
+                artifact_count,
+                folder_count: 0,   // Flat structure - no subfolders
+            });
+        }
+    }
 
     Ok(folders)
 }
 
-/// Creates a new folder with config.json in an artifact directory.
+/// Creates a new empty folder in an artifact directory.
+///
+/// Folders are flat (no nesting) and contain only artifacts.
+/// No config.json is created - the folder name is the only metadata.
 ///
 /// # Arguments
 ///
 /// * `project_path` - Path to project root
 /// * `artifact_type` - Type directory ("kits", "walkthroughs", "diagrams")
-/// * `parent_path` - Optional parent folder path (None for root)
+/// * `parent_path` - Ignored (kept for backward compatibility, flat structure only)
 /// * `folder_name` - Name of the new folder
-/// * `config` - Initial folder configuration
+/// * `config` - Ignored (kept for backward compatibility, no config.json created)
 ///
 /// # Returns
 ///
@@ -2507,19 +2475,16 @@ pub async fn get_artifact_folders(
 pub async fn create_artifact_folder(
     project_path: String,
     artifact_type: String,
-    parent_path: Option<String>,
+    _parent_path: Option<String>,  // Ignored - flat structure
     folder_name: String,
-    config: FolderConfig,
+    _config: FolderConfig,          // Ignored - no config.json
 ) -> Result<String, String> {
     use std::fs;
 
-    let base_dir = if let Some(parent) = parent_path {
-        PathBuf::from(parent)
-    } else {
-        PathBuf::from(&project_path)
-            .join(".bluekit")
-            .join(&artifact_type)
-    };
+    // Always create at root level (flat structure)
+    let base_dir = PathBuf::from(&project_path)
+        .join(".bluekit")
+        .join(&artifact_type);
 
     let folder_path = base_dir.join(&folder_name);
 
@@ -2527,48 +2492,33 @@ pub async fn create_artifact_folder(
         return Err(format!("Folder already exists: {}", folder_name));
     }
 
-    // Create folder
+    // Just create the folder, no config.json
     fs::create_dir_all(&folder_path)
         .map_err(|e| format!("Failed to create folder: {}", e))?;
-
-    // Write config.json
-    let config_path = folder_path.join("config.json");
-    let config_json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(&config_path, config_json)
-        .map_err(|e| format!("Failed to write config.json: {}", e))?;
 
     Ok(folder_path.to_str().unwrap_or("").to_string())
 }
 
-/// Updates a folder's config.json file.
+/// DEPRECATED: Updates a folder's config.json file.
+///
+/// This function is deprecated as folders no longer use config.json.
+/// It is kept for backward compatibility but does nothing.
 ///
 /// # Arguments
 ///
 /// * `folder_path` - Full path to the folder
-/// * `config` - Updated folder configuration
+/// * `config` - Updated folder configuration (ignored)
 ///
 /// # Returns
 ///
-/// Success or error
+/// Always returns Ok(())
 #[tauri::command]
 pub async fn update_folder_config(
-    folder_path: String,
-    config: FolderConfig,
+    _folder_path: String,
+    _config: FolderConfig,
 ) -> Result<(), String> {
-    use std::fs;
-
-    let config_path = PathBuf::from(&folder_path).join("config.json");
-
-    // Update timestamp
-    let mut updated_config = config;
-    updated_config.updated_at = chrono::Utc::now().to_rfc3339();
-
-    let config_json = serde_json::to_string_pretty(&updated_config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(&config_path, config_json)
-        .map_err(|e| format!("Failed to write config.json: {}", e))?;
-
+    // DEPRECATED: Folders no longer use config.json
+    // This function is kept for backward compatibility but does nothing
     Ok(())
 }
 
@@ -2606,6 +2556,57 @@ pub async fn delete_artifact_folder(
         .map_err(|e| format!("Failed to delete folder: {}", e))?;
 
     Ok(())
+}
+
+/// Renames a folder.
+///
+/// # Arguments
+///
+/// * `folder_path` - Full path to the folder to rename
+/// * `new_name` - New name for the folder
+///
+/// # Returns
+///
+/// New path of the renamed folder
+///
+/// # Safety
+///
+/// - Validates path is within .bluekit directory
+/// - Returns error if new name already exists
+#[tauri::command]
+pub async fn rename_artifact_folder(
+    folder_path: String,
+    new_name: String,
+) -> Result<String, String> {
+    use std::fs;
+
+    let path = PathBuf::from(&folder_path);
+
+    // Validate path is within .bluekit
+    if !path.to_string_lossy().contains(".bluekit") {
+        return Err("Path must be within .bluekit directory".to_string());
+    }
+
+    if !path.exists() {
+        return Err("Folder does not exist".to_string());
+    }
+
+    // Get parent directory
+    let parent = path.parent()
+        .ok_or_else(|| "Invalid folder path".to_string())?;
+
+    // Create new path with new name
+    let new_path = parent.join(&new_name);
+
+    if new_path.exists() {
+        return Err(format!("A folder named '{}' already exists", new_name));
+    }
+
+    // Rename folder
+    fs::rename(&path, &new_path)
+        .map_err(|e| format!("Failed to rename folder: {}", e))?;
+
+    Ok(new_path.to_str().unwrap_or("").to_string())
 }
 
 /// Moves an artifact file into a folder.

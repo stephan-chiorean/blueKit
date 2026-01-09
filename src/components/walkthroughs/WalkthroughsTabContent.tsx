@@ -19,15 +19,15 @@ import {
 } from '@chakra-ui/react';
 import { ImTree } from 'react-icons/im';
 import { LuFilter, LuFolderPlus, LuChevronRight, LuFolder, LuBookOpen } from 'react-icons/lu';
-import { ArtifactFile, ArtifactFolder, FolderConfig, FolderTreeNode, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeMoveArtifactToFolder, invokeDeleteArtifactFolder } from '../../ipc';
+import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
 import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
-import { FolderCard } from '../shared/FolderCard';
+import { SimpleFolderCard } from '../shared/SimpleFolderCard';
+import FolderView from '../shared/FolderView';
 import { CreateFolderDialog } from '../shared/CreateFolderDialog';
-import EditFolderDialog from '../shared/EditFolderDialog';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { FilterPanel } from '../shared/FilterPanel';
-import { buildFolderTree, getRootArtifacts } from '../../utils/buildFolderTree';
+import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 
 interface WalkthroughsTabContentProps {
@@ -67,9 +67,8 @@ function WalkthroughsTabContent({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
-  const [editingFolder, setEditingFolder] = useState<ArtifactFolder | null>(null);
+  const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
 
   const isSelected = (walkthroughId: string) => isSelectedInContext(walkthroughId);
@@ -150,125 +149,13 @@ function WalkthroughsTabContent({
     };
   }, [projectPath, walkthroughs]); // Reload when walkthroughs change (from file watcher)
 
-  // Build folder tree when folders or walkthroughs change (memoized for performance)
-  const folderTree = useMemo(() => {
-    const tree = buildFolderTree(folders, filteredWalkthroughs, 'walkthroughs', projectPath);
-    return tree.map(node => ({
-      ...node,
-      isExpanded: expandedFolders.has(node.folder.path),
-    }));
-  }, [folders, filteredWalkthroughs, projectPath, expandedFolders]);
+  // Get artifacts for a specific folder
+  const getFolderArtifacts = (folderPath: string): ArtifactFile[] => {
+    return walkthroughs.filter(w => w.path.startsWith(folderPath + '/'));
+  };
 
   const handleViewWalkthrough = (walkthrough: ArtifactFile) => {
     onViewKit(walkthrough);
-  };
-
-  // Handle adding selected items to folder
-  const handleAddToFolder = async (folder: ArtifactFolder) => {
-    const selectedWalkthroughs = selectedItems.filter(item => item.type === 'Walkthrough');
-
-    if (selectedWalkthroughs.length === 0) return;
-
-    const rollbacks: (() => void)[] = [];
-
-    try {
-      // Optimistically update UI immediately for each item
-      for (const item of selectedWalkthroughs) {
-        if (item.path && onOptimisticMove) {
-          const rollback = onOptimisticMove(item.path, folder.path);
-          rollbacks.push(rollback);
-        }
-      }
-
-      // Expand folder so user can see the item being added
-      if (!expandedFolders.has(folder.path)) {
-        setExpandedFolders(prev => new Set(prev).add(folder.path));
-      }
-
-      // Move all selected walkthroughs to the folder (backend operation)
-      for (const item of selectedWalkthroughs) {
-        if (item.path) {
-          try {
-            const newPath = await invokeMoveArtifactToFolder(item.path, folder.path);
-            // Confirm the move with actual path from backend
-            if (onConfirmMove) {
-              onConfirmMove(item.path, newPath);
-            }
-          } catch (err) {
-            console.error(`Failed to move ${item.path}:`, err);
-            // Rollback this specific item
-            const rollback = rollbacks.find((_, idx) => selectedWalkthroughs[idx].path === item.path);
-            if (rollback) rollback();
-            throw err;
-          }
-        }
-      }
-
-      // Don't reload folders here - it causes state mismatch with useDeferredValue
-      // The file watcher will update both artifacts and folders via incremental updates
-      // Optimistic updates already show the correct UI state immediately
-
-      // Clear selection
-      clearSelection();
-    } catch (err) {
-      console.error('Failed to move artifacts to folder:', err);
-      // Rollback all optimistic updates on error
-      rollbacks.forEach(rollback => rollback());
-      throw err;
-    }
-  };
-
-  // Handle removing selected items from folder
-  const handleRemoveFromFolder = async (folder: ArtifactFolder) => {
-    const selectedWalkthroughs = selectedItems.filter(item => item.type === 'Walkthrough');
-
-    if (selectedWalkthroughs.length === 0) return;
-
-    // Calculate artifact type root directory
-    const artifactTypeRoot = `${projectPath}/.bluekit/walkthroughs`;
-    const rollbacks: (() => void)[] = [];
-
-    try {
-      // Optimistically update UI immediately for each item
-      for (const item of selectedWalkthroughs) {
-        if (item.path && onOptimisticMove) {
-          const rollback = onOptimisticMove(item.path, artifactTypeRoot);
-          rollbacks.push(rollback);
-        }
-      }
-
-      // Move all selected walkthroughs back to the artifact type root directory
-      for (const item of selectedWalkthroughs) {
-        if (item.path) {
-          try {
-            const newPath = await invokeMoveArtifactToFolder(item.path, artifactTypeRoot);
-            // Confirm the move with actual path from backend
-            if (onConfirmMove) {
-              onConfirmMove(item.path, newPath);
-            }
-          } catch (err) {
-            console.error(`Failed to remove ${item.path}:`, err);
-            // Rollback this specific item
-            const rollback = rollbacks.find((_, idx) => selectedWalkthroughs[idx].path === item.path);
-            if (rollback) rollback();
-            throw err;
-          }
-        }
-      }
-
-      // Clear selection
-      clearSelection();
-    } catch (err) {
-      console.error('Failed to remove artifacts from folder:', err);
-      // Rollback all optimistic updates on error
-      rollbacks.forEach(rollback => rollback());
-      toaster.create({
-        type: 'error',
-        title: 'Failed to remove artifacts',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        closable: true,
-      });
-    }
   };
 
   // Handle create folder
@@ -292,34 +179,30 @@ function WalkthroughsTabContent({
     }
   };
 
-  const toggleFolderExpanded = (folderPath: string) => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderPath)) {
-        next.delete(folderPath);
-      } else {
-        next.add(folderPath);
-      }
-      return next;
-    });
-  };
+  // Handle rename folder (prompts for new name)
+  const handleRenameFolder = async (folder: ArtifactFolder) => {
+    const newName = prompt('Enter new folder name:', folder.name);
+    if (!newName || newName === folder.name) return;
 
-  // Handle nested folder expansion (for subfolders within folders)
-  const toggleNestedFolder = (folderPath: string) => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderPath)) {
-        next.delete(folderPath);
-      } else {
-        next.add(folderPath);
-      }
-      return next;
-    });
-  };
-
-  // Handle edit folder
-  const handleEditFolder = (folder: ArtifactFolder) => {
-    setEditingFolder(folder);
+    try {
+      await invokeRenameArtifactFolder(folder.path, newName);
+      toaster.create({
+        type: 'success',
+        title: 'Folder renamed',
+        description: `Renamed to ${newName}`,
+      });
+      // Reload folders to reflect the change
+      const newFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
+      setFolders(newFolders);
+    } catch (error) {
+      console.error('Failed to rename folder:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to rename folder',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        closable: true,
+      });
+    }
   };
 
   // Handle delete folder
@@ -336,7 +219,7 @@ function WalkthroughsTabContent({
       toaster.create({
         type: 'success',
         title: 'Folder deleted',
-        description: `Deleted ${deletingFolder.config?.name || deletingFolder.name}`,
+        description: `Deleted ${deletingFolder.name}`,
       });
 
       // Don't reload folders here - file watcher will update artifacts first,
@@ -351,13 +234,6 @@ function WalkthroughsTabContent({
         closable: true,
       });
     }
-  };
-
-  // Handle folder updated (after edit)
-  const handleFolderUpdated = async () => {
-    // Don't reload folders here - if artifacts moved, file watcher will update them first,
-    // then the folder reload effect (with walkthroughs dependency) will sync folders
-    // For metadata-only changes (name, color), folders will reload from effect anyway
   };
 
   // Ref for filter button (used by FilterPanel for click-outside detection)
@@ -533,6 +409,20 @@ function WalkthroughsTabContent({
     );
   }
 
+  // If viewing a folder, show the FolderView component
+  if (viewingFolder) {
+    return (
+      <FolderView
+        folder={viewingFolder}
+        artifacts={getFolderArtifacts(viewingFolder.path)}
+        isSelected={(path) => isSelected(path)}
+        onArtifactToggle={handleWalkthroughToggle}
+        onViewArtifact={handleViewWalkthrough}
+        onBack={() => setViewingFolder(null)}
+      />
+    );
+  }
+
   return (
     <Box position="relative">
       <VStack align="stretch" gap={6}>
@@ -542,7 +432,7 @@ function WalkthroughsTabContent({
             <Flex align="center" gap={2}>
               <Heading size="md">Folders</Heading>
               <Text fontSize="sm" color="text.muted">
-                {folderTree.length}
+                {folders.length}
               </Text>
               {/* Filter Button */}
               <Box position="relative" overflow="visible">
@@ -608,7 +498,7 @@ function WalkthroughsTabContent({
             />
           </Flex>
 
-          {folderTree.length === 0 ? (
+          {folders.length === 0 ? (
             <Box
               p={6}
               bg="bg.subtle"
@@ -622,30 +512,22 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid 
-              columns={{ base: 1, md: 2, lg: 3 }} 
+            <SimpleGrid
+              columns={{ base: 2, md: 3, lg: 4, xl: 5 }}
               gap={4}
               overflow="visible"
               css={{
                 alignItems: 'start',
               }}
             >
-              {folderTree.map((node) => (
-                <FolderCard
-                  key={node.folder.path}
-                  node={node}
-                  artifactType="walkthroughs"
-                  onToggleExpand={() => toggleFolderExpanded(node.folder.path)}
-                  onViewArtifact={handleViewWalkthrough}
-                  onAddToFolder={handleAddToFolder}
-                  onRemoveFromFolder={handleRemoveFromFolder}
-                  onEdit={handleEditFolder}
-                  onDelete={handleDeleteFolder}
-                  hasCompatibleSelection={selectedItems.some(item => item.type === 'Walkthrough')}
-                  renderArtifactCard={(artifact) => <Box key={artifact.path}></Box>}
-                  movingArtifacts={movingArtifacts}
-                  expandedNestedFolders={expandedFolders}
-                  onToggleNestedFolder={toggleNestedFolder}
+              {folders.map((folder) => (
+                <SimpleFolderCard
+                  key={folder.path}
+                  folder={folder}
+                  artifacts={getFolderArtifacts(folder.path)}
+                  onOpenFolder={() => setViewingFolder(folder)}
+                  onEditFolder={() => handleRenameFolder(folder)}
+                  onDeleteFolder={() => handleDeleteFolder(folder)}
                 />
               ))}
             </SimpleGrid>
@@ -678,133 +560,48 @@ function WalkthroughsTabContent({
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {folderTree.map((node) => {
-                  const folderName = node.folder.config?.name || node.folder.name;
-                  const folderDescription = node.folder.config?.description || '';
-                  const totalResources = node.artifacts.length;
-                  const isExpanded = expandedFolders.has(node.folder.path);
-                  
+                {folders.map((folder) => {
+                  const folderArtifacts = getFolderArtifacts(folder.path);
+                  const totalResources = folderArtifacts.length;
+
                   return (
-                    <>
-                      <Table.Row
-                        key={node.folder.path}
-                        cursor="pointer"
-                        onClick={() => toggleFolderExpanded(node.folder.path)}
-                        bg="transparent"
-                        borderBottomWidth="1px"
-                        borderBottomColor="transparent"
-                        _hover={{ 
-                          bg: "rgba(255, 255, 255, 0.05)",
-                          borderBottomColor: "primary.500",
-                        }}
-                      >
-                        <Table.Cell>
-                          <Icon
-                            transform={isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}
-                            transition='transform 0.2s'
-                          >
-                            <LuChevronRight />
+                    <Table.Row
+                      key={folder.path}
+                      cursor="pointer"
+                      onClick={() => setViewingFolder(folder)}
+                      bg="transparent"
+                      borderBottomWidth="1px"
+                      borderBottomColor="transparent"
+                      _hover={{
+                        bg: "rgba(255, 255, 255, 0.05)",
+                        borderBottomColor: "primary.500",
+                      }}
+                    >
+                      <Table.Cell>
+                        <Icon>
+                          <LuChevronRight />
+                        </Icon>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Icon boxSize={4} color="blue.500">
+                            <LuFolder />
                           </Icon>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Icon boxSize={4} color="blue.500">
-                              <LuFolder />
-                            </Icon>
-                            <Text fontWeight="medium">{folderName}</Text>
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" color="text.secondary" lineClamp={1}>
-                            {folderDescription || '—'}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {node.folder.config?.tags && node.folder.config.tags.length > 0 ? (
-                            <HStack gap={1} flexWrap="wrap">
-                              {node.folder.config.tags.map((tag) => (
-                                <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                  <Tag.Label>{tag}</Tag.Label>
-                                </Tag.Root>
-                              ))}
-                            </HStack>
-                          ) : (
-                            <Text fontSize="sm" color="text.tertiary">—</Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" color="text.secondary">
-                            {totalResources} resource{totalResources !== 1 ? 's' : ''}
-                          </Text>
-                        </Table.Cell>
-                      </Table.Row>
-                      {isExpanded && node.artifacts.map((artifact) => {
-                        const artifactSelected = isSelected(artifact.path);
-                        const displayName = artifact.frontMatter?.alias || artifact.name;
-                        return (
-                          <Table.Row
-                            key={artifact.path}
-                            cursor="pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewWalkthrough(artifact);
-                            }}
-                            bg="rgba(255, 255, 255, 0.05)"
-                            borderBottomWidth="1px"
-                            borderBottomColor="transparent"
-                            _hover={{ 
-                              bg: "rgba(255, 255, 255, 0.08)",
-                              borderBottomColor: "primary.500",
-                            }}
-                            data-selected={artifactSelected ? "" : undefined}
-                          >
-                            <Table.Cell>
-                              <Checkbox.Root
-                                size="sm"
-                                colorPalette="blue"
-                                checked={artifactSelected}
-                                onCheckedChange={() => {
-                                  handleWalkthroughToggle(artifact);
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                                cursor="pointer"
-                              >
-                                <Checkbox.HiddenInput />
-                                <Checkbox.Control cursor="pointer">
-                                  <Checkbox.Indicator />
-                                </Checkbox.Control>
-                              </Checkbox.Root>
-                            </Table.Cell>
-                            <Table.Cell pl={8}>
-                              <Text>{displayName}</Text>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Text fontSize="sm" color="text.secondary" lineClamp={1}>
-                                {artifact.frontMatter?.description || '—'}
-                              </Text>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {artifact.frontMatter?.tags && artifact.frontMatter.tags.length > 0 ? (
-                                <HStack gap={1} flexWrap="wrap">
-                                  {artifact.frontMatter.tags.map((tag) => (
-                                    <Tag.Root key={tag} size="sm" variant="subtle" colorPalette="primary">
-                                      <Tag.Label>{tag}</Tag.Label>
-                                    </Tag.Root>
-                                  ))}
-                                </HStack>
-                              ) : (
-                                <Text fontSize="sm" color="text.tertiary">—</Text>
-                              )}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Text fontSize="sm" color="text.tertiary">—</Text>
-                            </Table.Cell>
-                          </Table.Row>
-                        );
-                      })}
-                    </>
+                          <Text fontWeight="medium">{folder.name}</Text>
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.tertiary">—</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.secondary">
+                          {totalResources} resource{totalResources !== 1 ? 's' : ''}
+                        </Text>
+                      </Table.Cell>
+                    </Table.Row>
                   );
                 })}
               </Table.Body>
@@ -930,18 +727,6 @@ function WalkthroughsTabContent({
         isOpen={isCreateFolderOpen}
         onClose={() => setIsCreateFolderOpen(false)}
         onCreate={handleCreateFolder}
-      />
-
-      <EditFolderDialog
-        isOpen={!!editingFolder}
-        onClose={() => setEditingFolder(null)}
-        folder={editingFolder}
-        artifacts={walkthroughs}
-        artifactType="walkthroughs"
-        projectPath={projectPath}
-        onUpdated={handleFolderUpdated}
-        onOptimisticMove={onOptimisticMove}
-        onConfirmMove={onConfirmMove}
       />
 
       <DeleteFolderDialog
