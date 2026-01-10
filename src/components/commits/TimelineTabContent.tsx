@@ -49,6 +49,7 @@ import PinCheckpointModal from "./PinCheckpointModal";
 import BranchOffModal from "./BranchOffModal";
 import RollbackModal from "./RollbackModal";
 import { FilterPanel } from "../shared/FilterPanel";
+import { LiquidViewModeSwitcher } from "../kits/LiquidViewModeSwitcher";
 
 interface TimelineTabContentProps {
   projectId: string;
@@ -635,38 +636,72 @@ export default function TimelineTabContent({
 
   // View mode switcher
   const renderViewModeSwitcher = () => (
-    <Flex justify="space-between" align="center" mb={4}>
+    <Flex justify="space-between" align="center" mb={2}>
       {viewMode === "commits" && (
-        <Button
-          onClick={handleSync}
-          variant="ghost"
-          size="sm"
-          loading={loading}
-          loadingText="Syncing..."
-          bg="bg.subtle"
-          borderWidth="1px"
-          borderColor="border.subtle"
-          _hover={{ bg: "bg.subtle" }}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuRefreshCw />
-            </Icon>
-            <Text>Sync</Text>
-          </HStack>
-        </Button>
+        <Box position="relative" overflow="visible">
+          <Button
+            onClick={handleSync}
+            variant="ghost"
+            size="sm"
+            loading={loading}
+            loadingText="Syncing..."
+            borderRadius="lg"
+            borderWidth="1px"
+            css={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              borderColor: 'rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+              },
+              _hover: {
+                background: 'rgba(255, 255, 255, 0.35)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.3)',
+                },
+              },
+            }}
+          >
+            <HStack gap={2}>
+              <Icon>
+                <LuRefreshCw />
+              </Icon>
+              <Text>Sync</Text>
+            </HStack>
+          </Button>
+        </Box>
       )}
       {viewMode === "checkpoints" && (
-        <Box position="relative">
+        <Box position="relative" overflow="visible">
           <Button
             ref={checkpointFilterButtonRef}
             variant="ghost"
             size="sm"
             onClick={() => setIsCheckpointFilterOpen(!isCheckpointFilterOpen)}
-            bg={isCheckpointFilterOpen ? "bg.subtle" : "bg.subtle"}
+            borderRadius="lg"
             borderWidth="1px"
-            borderColor="border.subtle"
-            _hover={{ bg: "bg.subtle" }}
+            css={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              borderColor: 'rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+              },
+              _hover: {
+                background: 'rgba(255, 255, 255, 0.35)',
+                _dark: {
+                  background: 'rgba(0, 0, 0, 0.3)',
+                },
+              },
+            }}
           >
             <HStack gap={2}>
               <Icon>
@@ -682,82 +717,44 @@ export default function TimelineTabContent({
               )}
             </HStack>
           </Button>
+          {/* FilterPanel positioned absolutely relative to filter button */}
+          {isCheckpointFilterOpen && (
+            <FilterPanel
+              isOpen={isCheckpointFilterOpen}
+              onClose={() => setIsCheckpointFilterOpen(false)}
+              nameFilter={checkpointNameFilter}
+              onNameFilterChange={setCheckpointNameFilter}
+              allTags={checkpointAllTags}
+              selectedTags={checkpointSelectedTags}
+              onToggleTag={(tag) => {
+                setCheckpointSelectedTags((prev) => {
+                  if (prev.includes(tag)) {
+                    return prev.filter((t) => t !== tag);
+                  } else {
+                    return [...prev, tag];
+                  }
+                });
+              }}
+              filterButtonRef={checkpointFilterButtonRef}
+            />
+          )}
         </Box>
       )}
-      <HStack
-        gap={0}
-        borderRadius="md"
-        overflow="hidden"
-        bg="bg.subtle"
-        shadow="sm"
-        ml="auto"
-      >
-        <Button
-          onClick={() => setViewMode("commits")}
-          variant="ghost"
-          borderRadius={0}
-          borderRightWidth="1px"
-          borderRightColor="border.subtle"
-          bg={viewMode === "commits" ? "bg.surface" : "transparent"}
-          color={viewMode === "commits" ? "text.primary" : "text.secondary"}
-          _hover={{ bg: viewMode === "commits" ? "bg.surface" : "bg.subtle" }}
-          size="sm"
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuGitBranch />
-            </Icon>
-            <Text>Commits</Text>
-          </HStack>
-        </Button>
-        <Button
-          onClick={() => setViewMode("checkpoints")}
-          variant="ghost"
-          borderRadius={0}
-          bg={viewMode === "checkpoints" ? "bg.surface" : "transparent"}
-          color={viewMode === "checkpoints" ? "text.primary" : "text.secondary"}
-          _hover={{
-            bg: viewMode === "checkpoints" ? "bg.surface" : "bg.subtle",
-          }}
-          size="sm"
-        >
-          <HStack gap={2}>
-            <Icon>
-              <RiFlag2Fill />
-            </Icon>
-            <Text>Checkpoints</Text>
-          </HStack>
-        </Button>
-      </HStack>
+      <LiquidViewModeSwitcher
+        value={viewMode}
+        onChange={(mode) => setViewMode(mode as ViewMode)}
+        modes={[
+          { id: "commits", label: "Commits", icon: LuGitBranch },
+          { id: "checkpoints", label: "Checkpoints", icon: RiFlag2Fill },
+        ]}
+      />
     </Flex>
   );
 
   // Commit timeline
   return (
-    <VStack align="stretch" gap={4} py={4}>
+    <VStack align="stretch" gap={2} pt={2} pb={4}>
       {renderViewModeSwitcher()}
-
-      {/* FilterPanel for Checkpoints - positioned absolutely relative to filter button */}
-      {viewMode === "checkpoints" && (
-        <FilterPanel
-          isOpen={isCheckpointFilterOpen}
-          onClose={() => setIsCheckpointFilterOpen(false)}
-          nameFilter={checkpointNameFilter}
-          onNameFilterChange={setCheckpointNameFilter}
-          allTags={checkpointAllTags}
-          selectedTags={checkpointSelectedTags}
-          onToggleTag={(tag) => {
-            setCheckpointSelectedTags((prev) => {
-              if (prev.includes(tag)) {
-                return prev.filter((t) => t !== tag);
-              } else {
-                return [...prev, tag];
-              }
-            });
-          }}
-          filterButtonRef={checkpointFilterButtonRef}
-        />
-      )}
 
       {viewMode === "commits" ? (
         <>
