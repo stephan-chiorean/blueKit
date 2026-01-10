@@ -23,6 +23,7 @@ import {
   IconButton,
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
+import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { Task, TaskPriority, TaskType } from '../../types/task';
 import { ProjectEntry, Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
@@ -547,17 +548,33 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             <Text fontSize="sm" color="text.muted">
               {inProgressTasks.length}
             </Text>
-            {/* Filter Button - with gray subtle background */}
+            {/* Filter Button - with liquid glass styling */}
             <Box position="relative" overflow="visible">
               <Button
                 ref={filterButtonRef}
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                bg={isFilterOpen ? "bg.subtle" : "bg.subtle"}
+                borderRadius="lg"
                 borderWidth="1px"
-                borderColor="border.subtle"
-                _hover={{ bg: "bg.subtle" }}
+                css={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                  _dark: {
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                  },
+                  _hover: {
+                    background: 'rgba(255, 255, 255, 0.35)',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.3)',
+                    },
+                  },
+                }}
               >
                 <HStack gap={2}>
                   <Icon>
@@ -722,53 +739,14 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
             </Box>
           </Flex>
           {/* View Mode Switcher */}
-          <HStack 
-            gap={0} 
-            overflow="hidden"
-            css={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(30px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-              _dark: {
-                background: 'rgba(0, 0, 0, 0.2)',
-              },
-            }}
-          >
-            <Button
-              onClick={() => setViewMode('card')}
-              variant="ghost"
-              borderRadius={0}
-              borderRightWidth="1px"
-              borderRightColor="border.subtle"
-              bg={viewMode === 'card' ? 'bg.surface' : 'transparent'}
-              color={viewMode === 'card' ? 'text.primary' : 'text.secondary'}
-              _hover={{ bg: viewMode === 'card' ? 'bg.surface' : 'bg.subtle' }}
-              size="sm"
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuLayoutGrid />
-                </Icon>
-                <Text>Cards</Text>
-              </HStack>
-            </Button>
-            <Button
-              onClick={() => setViewMode('table')}
-              variant="ghost"
-              borderRadius={0}
-              bg={viewMode === 'table' ? 'bg.surface' : 'transparent'}
-              color={viewMode === 'table' ? 'text.primary' : 'text.secondary'}
-              _hover={{ bg: viewMode === 'table' ? 'bg.surface' : 'bg.subtle' }}
-              size="sm"
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuTable />
-                </Icon>
-                <Text>Table</Text>
-              </HStack>
-            </Button>
-          </HStack>
+          <LiquidViewModeSwitcher
+            value={viewMode}
+            onChange={setViewMode}
+            modes={[
+              { id: 'card', label: 'Cards', icon: LuLayoutGrid },
+              { id: 'table', label: 'Table', icon: LuTable },
+            ]}
+          />
         </Flex>
 
         {inProgressTasks.length === 0 ? (

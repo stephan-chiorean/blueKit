@@ -274,7 +274,7 @@ export default function SearchInMarkdown({
               borderColor: 'rgba(255, 255, 255, 0.1)',
             },
           }}
-          borderRadius="full"
+          borderRadius="lg"
           px={4}
           py={2}
         >

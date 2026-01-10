@@ -595,6 +595,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
+                  css={{
+                    _hover: {
+                      background: 'transparent',
+                    },
+                  }}
                 >
                   <HStack gap={2}>
                     <Icon>

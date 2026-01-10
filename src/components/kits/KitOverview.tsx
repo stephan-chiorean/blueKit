@@ -119,6 +119,11 @@ export default function KitOverview({ kit, onBack }: KitOverviewProps) {
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
+                  css={{
+                    _hover: {
+                      background: 'transparent',
+                    },
+                  }}
                 >
                   <HStack gap={2}>
                     <Icon>
