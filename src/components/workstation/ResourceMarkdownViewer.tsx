@@ -26,6 +26,7 @@ import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { FaEye, FaCode } from 'react-icons/fa';
 import SearchInMarkdown from './SearchInMarkdown';
 import { useWorkstation } from '../../contexts/WorkstationContext';
+import { useResource } from '../../contexts/ResourceContext';
 import { invokeReadFile, ArtifactFile } from '../../ipc';
 import { toaster } from '../ui/toaster';
 import { parseFrontMatter } from '../../utils/parseFrontMatter';
@@ -140,7 +141,8 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
   const contentWithoutFrontMatter = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
   const displayName = getResourceDisplayName(resource);
   const [viewMode, setViewMode] = useState<string>('preview');
-  const { isSearchOpen, setIsSearchOpen, setSelectedKit } = useWorkstation();
+  const { isSearchOpen, setIsSearchOpen } = useWorkstation();
+  const { setSelectedResource } = useResource();
 
   // Resolve relative paths for internal markdown links
   const resolveInternalPath = (href: string): string => {
@@ -549,19 +551,33 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                     }
 
                     // Internal markdown file links - navigate within BlueKit
-                    if (href.endsWith('.md') || href.endsWith('.mmd')) {
+                    if (href.endsWith('.md') || href.endsWith('.mmd') || href.endsWith('.mermaid')) {
+                      console.log('[Link Navigation] Clicked internal link:', href);
+                      console.log('[Link Navigation] Current resource path:', resource.path);
+
                       try {
                         // Resolve the path relative to current resource
                         const targetPath = resolveInternalPath(href);
+                        console.log('[Link Navigation] Resolved target path:', targetPath);
 
                         // Load the target file content
+                        console.log('[Link Navigation] Loading file...');
                         const targetContent = await invokeReadFile(targetPath);
+                        console.log('[Link Navigation] File loaded, length:', targetContent.length);
 
                         // Parse front matter from the content
                         const frontMatter = parseFrontMatter(targetContent);
+                        console.log('[Link Navigation] Parsed front matter:', frontMatter);
 
                         // Extract file name without extension
                         const fileName = path.basename(targetPath, path.extname(targetPath));
+                        console.log('[Link Navigation] File name:', fileName);
+
+                        // Determine resource type based on file extension
+                        const resourceType = targetPath.endsWith('.mmd') || targetPath.endsWith('.mermaid')
+                          ? 'diagram'
+                          : 'kit';
+                        console.log('[Link Navigation] Resource type:', resourceType);
 
                         // Construct the artifact file object
                         const targetResource: ArtifactFile = {
@@ -571,14 +587,16 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                           frontMatter: frontMatter,
                         };
 
-                        // Navigate to the new resource
-                        setSelectedKit(targetResource, targetContent);
+                        console.log('[Link Navigation] Calling setSelectedResource with:', targetResource);
+                        // Navigate to the new resource using ResourceContext
+                        setSelectedResource(targetResource, targetContent, resourceType);
+                        console.log('[Link Navigation] Navigation complete');
                       } catch (error) {
-                        console.error('Failed to load linked file:', error);
+                        console.error('[Link Navigation] ERROR:', error);
                         toaster.create({
                           type: 'error',
                           title: 'Failed to open file',
-                          description: `Could not load ${href}`,
+                          description: `Could not load ${href}: ${error}`,
                         });
                       }
                       return;
