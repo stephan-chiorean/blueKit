@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  
+
   // Tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
@@ -12,6 +12,13 @@ export default defineConfig({
     watch: {
       // Tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
+    },
+  },
+
+  // Node polyfills for browser
+  resolve: {
+    alias: {
+      path: 'path-browserify',
     },
   },
 })

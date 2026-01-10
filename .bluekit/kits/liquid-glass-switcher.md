@@ -30,7 +30,7 @@ export interface LiquidViewModeSwitcherProps {
 ## Implementation Principles
 
 -   **Shared Layout Animation**: Use `framer-motion`'s `layoutId` prop on the active background element. This allows Framer Motion to automatically animate the layout changes (position and size) when the active item changes, creating the "liquid" effect.
--   **Glassmorphism**: Apply `backdrop-filter: blur()` along with semi-transparent backgrounds and borders. Ensure high contrast for text and icons against the blurred background.
+-   **Glassmorphism**: Apply `backdrop-filter: blur()` along with semi-transparent backgrounds and borders. Ensure high contrast for text and icons against the blurred background. This component follows the visual patterns defined in the [Glassmorphism Design System](./glassmorphism-design-system.md).
 -   **Semantics**: Use standard HTML button elements (or `Box as="button"` in Chakra UI) to ensure accessibility.
 -   **Composition**: The component should be data-driven, accepting an array of `modes` to render, making it reusable for any segmented control use case (not just view modes).
 

@@ -26,6 +26,10 @@ import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { FaEye, FaCode } from 'react-icons/fa';
 import SearchInMarkdown from './SearchInMarkdown';
 import { useWorkstation } from '../../contexts/WorkstationContext';
+import { invokeReadFile, ArtifactFile } from '../../ipc';
+import { toaster } from '../ui/toaster';
+import { parseFrontMatter } from '../../utils/parseFrontMatter';
+import path from 'path';
 
 interface ResourceMarkdownViewerProps {
   resource: ResourceFile;
@@ -136,7 +140,18 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
   const contentWithoutFrontMatter = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
   const displayName = getResourceDisplayName(resource);
   const [viewMode, setViewMode] = useState<string>('preview');
-  const { isSearchOpen, setIsSearchOpen } = useWorkstation();
+  const { isSearchOpen, setIsSearchOpen, setSelectedKit } = useWorkstation();
+
+  // Resolve relative paths for internal markdown links
+  const resolveInternalPath = (href: string): string => {
+    // Get the directory of the current resource
+    const currentDir = path.dirname(resource.path);
+
+    // Resolve the relative path
+    const resolvedPath = path.resolve(currentDir, href);
+
+    return resolvedPath;
+  };
 
   // Keyboard shortcut for opening search (cmd+F / ctrl+F)
   useEffect(() => {
@@ -516,21 +531,61 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                 a: ({ href, children }) => {
                   const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
                     e.preventDefault();
-                    if (href) {
-                      // Check if it's an external link (http/https)
-                      if (href.startsWith('http://') || href.startsWith('https://')) {
-                        // Open in system browser
-                        try {
-                          await open(href);
-                        } catch (error) {
-                          console.error('Failed to open link:', error);
-                        }
-                      } else {
-                        // For relative/internal links, you might want to handle them differently
-                        // For now, we'll just prevent navigation
-                        console.log('Internal link clicked:', href);
+                    if (!href) return;
+
+                    // External links - open in browser
+                    if (href.startsWith('http://') || href.startsWith('https://')) {
+                      try {
+                        await open(href);
+                      } catch (error) {
+                        console.error('Failed to open link:', error);
+                        toaster.create({
+                          type: 'error',
+                          title: 'Failed to open link',
+                          description: String(error),
+                        });
                       }
+                      return;
                     }
+
+                    // Internal markdown file links - navigate within BlueKit
+                    if (href.endsWith('.md') || href.endsWith('.mmd')) {
+                      try {
+                        // Resolve the path relative to current resource
+                        const targetPath = resolveInternalPath(href);
+
+                        // Load the target file content
+                        const targetContent = await invokeReadFile(targetPath);
+
+                        // Parse front matter from the content
+                        const frontMatter = parseFrontMatter(targetContent);
+
+                        // Extract file name without extension
+                        const fileName = path.basename(targetPath, path.extname(targetPath));
+
+                        // Construct the artifact file object
+                        const targetResource: ArtifactFile = {
+                          name: fileName,
+                          path: targetPath,
+                          content: targetContent,
+                          frontMatter: frontMatter,
+                        };
+
+                        // Navigate to the new resource
+                        setSelectedKit(targetResource, targetContent);
+                      } catch (error) {
+                        console.error('Failed to load linked file:', error);
+                        toaster.create({
+                          type: 'error',
+                          title: 'Failed to open file',
+                          description: `Could not load ${href}`,
+                        });
+                      }
+                      return;
+                    }
+
+                    // Other internal links - log for now
+                    console.log('Internal link clicked:', href);
                   };
 
                   return (
