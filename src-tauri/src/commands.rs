@@ -4838,6 +4838,10 @@ pub async fn get_bluekit_file_tree(project_path: String) -> Result<Vec<FileTreeN
                     if !child_nodes.is_empty() {
                         children = Some(child_nodes);
                     }
+                    // Mark essential directories (kits, walkthroughs, diagrams)
+                    if name == "kits" || name == "walkthroughs" || name == "diagrams" {
+                        is_essential = true;
+                    }
                 } else {
                     // Check file extension
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -4845,7 +4849,6 @@ pub async fn get_bluekit_file_tree(project_path: String) -> Result<Vec<FileTreeN
                         // Detect type
                         if ext == "mmd" || ext == "mermaid" {
                             artifact_type = Some("diagram".to_string());
-                            is_essential = true;
                         } else {
                             // Read front matter to determine type
                             if let Ok(content) = fs::read_to_string(&path) {
@@ -4853,14 +4856,10 @@ pub async fn get_bluekit_file_tree(project_path: String) -> Result<Vec<FileTreeN
                                     front_matter = Some(fm.clone());
                                     if let Some(type_val) = fm.get("type").and_then(|v| v.as_str()) {
                                         artifact_type = Some(type_val.to_string());
-                                        if type_val == "walkthrough" || type_val == "kit" {
-                                            is_essential = true;
-                                        }
                                     } else {
                                         // Infer from parent folder
                                         if path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) == Some("kits") {
                                             artifact_type = Some("kit".to_string());
-                                            is_essential = true;
                                         }
                                     }
                                 }
