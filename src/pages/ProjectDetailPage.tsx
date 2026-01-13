@@ -1,21 +1,15 @@
 import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue } from 'react';
 import {
   Box,
-  Tabs,
-  Flex,
   VStack,
   Text,
   Icon,
   HStack,
   Button,
-  Select,
-  Portal,
-  createListCollection,
+  Splitter,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuArrowLeft, LuPackage, LuFolder, LuBot, LuNotebook, LuNetwork, LuListTodo, LuPlus, LuGitBranch, LuMap } from 'react-icons/lu';
-import { BsStack } from 'react-icons/bs';
-import { AiOutlineFileText } from 'react-icons/ai';
+import { LuPlus } from 'react-icons/lu';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
@@ -27,11 +21,13 @@ import TimelineTabContent from '../components/commits/TimelineTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError } from '../ipc';
+import NoteViewPage from './NoteViewPage';
+import ProjectSidebar from '../components/sidebar/ProjectSidebar';
+import { ViewType } from '../components/sidebar/SidebarContent';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { useColorMode } from '../contexts/ColorModeContext';
 import { useProjectArtifacts } from '../contexts/ProjectArtifactsContext';
 
 interface ProjectDetailPageProps {
@@ -43,20 +39,21 @@ interface ProjectDetailPageProps {
 export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
   // Feature flags
   const { flags } = useFeatureFlags();
-  const { colorMode } = useColorMode();
   const { setArtifacts: setGlobalArtifacts } = useProjectArtifacts();
-  
-  // Glass styling for light/dark mode
-  const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
-  const tabsBorder = colorMode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)';
-  const indicatorBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.15)';
-  
+
+  // Sidebar state
+  const [activeView, setActiveView] = useState<ViewType>('tasks');
+  const [fileTreeVersion, setFileTreeVersion] = useState(0);
+  const [splitSizes, setSplitSizes] = useState<[number, number]>([15, 85]);
+
+  const handleTreeRefresh = () => setFileTreeVersion(v => v + 1);
+
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
   const [artifactsLoading, setArtifactsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
-  const [currentTab, setCurrentTab] = useState<string>("tasks");
+
   const tasksTabRef = useRef<TasksTabContentRef>(null);
   const plansTabRef = useRef<PlansTabContentRef>(null);
 
@@ -69,7 +66,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
   // Use transition for non-urgent updates (file watching updates)
   const [, startTransition] = useTransition();
-  
+
   // Defer artifact updates to prevent blocking UI
   const deferredArtifacts = useDeferredValue(artifacts);
 
@@ -77,6 +74,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
   const [resourceContent, setResourceContent] = useState<string | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType | null>(null);
+
+  // Notebook file selection - separate from resource view to avoid ResourceViewPage
+  const [notebookFile, setNotebookFile] = useState<{
+    resource: ResourceFile;
+    content: string;
+  } | null>(null);
 
   // Duplicate detection: Track last load timestamp to prevent rapid duplicate calls
   const lastLoadTimestampRef = useRef(0);
@@ -129,18 +132,18 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     loadPlans();
   }, [project.id]);
 
-  // Switch to a default tab if current tab is disabled by feature flags
+  // Handle restricted views
   useEffect(() => {
-    if (currentTab === 'blueprints' && !flags.blueprints) {
-      setCurrentTab('tasks');
-    } else if (currentTab === 'scrapbook' && !flags.scrapbook) {
-      setCurrentTab('tasks');
-    } else if (currentTab === 'diagrams' && !flags.diagrams) {
-      setCurrentTab('tasks');
-    } else if (currentTab === 'agents' && !flags.agents) {
-      setCurrentTab('tasks');
+    if (activeView === 'blueprints' && !flags.blueprints) {
+      setActiveView('tasks');
+    } else if (activeView === 'scrapbook' && !flags.scrapbook) {
+      setActiveView('tasks');
+    } else if (activeView === 'diagrams' && !flags.diagrams) {
+      setActiveView('tasks');
+    } else if (activeView === 'agents' && !flags.agents) {
+      setActiveView('tasks');
     }
-  }, [currentTab, flags.blueprints, flags.scrapbook, flags.diagrams, flags.agents]);
+  }, [activeView, flags.blueprints, flags.scrapbook, flags.diagrams, flags.agents]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -163,7 +166,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       // Atomic update: set both artifacts and loading in one state update
       setArtifacts(projectArtifacts);
       setArtifactsLoading(false);
-      
+      setFileTreeVersion(v => v + 1);
+
       // Also update the global context for link resolution
       setGlobalArtifacts(projectArtifacts);
     } catch (err) {
@@ -187,24 +191,24 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         // Merge into existing state - update existing, add new, remove deleted
         setArtifacts(prev => {
           const updated = new Map(prev.map(a => [a.path, a]));
-          
+
           // Track which paths we've seen in the results
           const seenPaths = new Set<string>();
-          
+
           // Process changed artifacts
           changedArtifacts.forEach(newArtifact => {
             seenPaths.add(newArtifact.path);
-            
+
             // Check if this is a moved file (same name, different path)
             // First, try to find by old path in changedPaths (standard move detection)
             let oldPath = Array.from(updated.keys()).find(oldPath => {
               const oldArtifact = updated.get(oldPath);
-              return oldArtifact && 
-                     oldArtifact.name === newArtifact.name && 
-                     oldPath !== newArtifact.path &&
-                     changedPaths.includes(oldPath);
+              return oldArtifact &&
+                oldArtifact.name === newArtifact.name &&
+                oldPath !== newArtifact.path &&
+                changedPaths.includes(oldPath);
             });
-            
+
             // If not found, check if there's an artifact with predicted path (from optimistic update)
             // The predicted path would be: folderPath + "/" + fileName
             // We can detect this by matching filename and checking if current path doesn't match newPath
@@ -216,16 +220,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 }
                 // Check if this is a predicted path (same filename, different full path)
                 // and the newPath is the actual path we want
-                return currentPath !== newArtifact.path && 
-                       currentPath.endsWith(`/${newArtifact.name}`);
+                return currentPath !== newArtifact.path &&
+                  currentPath.endsWith(`/${newArtifact.name}`);
               });
             }
-            
+
             if (oldPath) {
               // File was moved - remove old path (or predicted path)
               updated.delete(oldPath);
             }
-            
+
             // Add/update with new artifact data (includes full frontMatter)
             updated.set(newArtifact.path, newArtifact);
           });
@@ -235,10 +239,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             if (!seenPaths.has(path) && updated.has(path)) {
               // Check if this file was moved (exists with same name but different path)
               const oldArtifact = updated.get(path);
-              const wasMoved = oldArtifact && changedArtifacts.some(a => 
+              const wasMoved = oldArtifact && changedArtifacts.some(a =>
                 a.name === oldArtifact.name && a.path !== path
               );
-              
+
               if (!wasMoved) {
                 // File was actually deleted, not moved
                 updated.delete(path);
@@ -247,10 +251,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           });
 
           const finalArtifacts = Array.from(updated.values());
-          
+
           // Also update the global context with the same artifacts
           setGlobalArtifacts(finalArtifacts);
-          
+          setFileTreeVersion(v => v + 1);
+
           return finalArtifacts;
         });
         // No loading state for incremental updates - they happen silently
@@ -333,7 +338,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       // Find the artifact
       const artifact = artifacts.find(a => a.path === artifactPath);
       if (!artifact) {
-        return () => {}; // No-op rollback
+        return () => { }; // No-op rollback
       }
 
       // Calculate new path (backend will do this, but we need to predict it)
@@ -352,7 +357,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         setArtifacts(prev => {
           // Remove from old location
           const filtered = prev.filter(a => a.path !== artifactPath);
-          
+
           // Add to new location with predicted path
           filtered.push({
             ...artifact,
@@ -414,7 +419,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       const type = artifact.frontMatter?.type;
       // Only include .md files that aren't other types
       return artifact.path.endsWith('.md') &&
-             (!type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task'));
+        (!type || (type !== 'walkthrough' && type !== 'blueprint' && type !== 'agent' && type !== 'task'));
     });
   }, [deferredArtifacts]);
 
@@ -508,6 +513,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     setViewingResource(null);
     setResourceContent(null);
     setResourceType(null);
+    // When returning from resource view, we might need to reset activeView?
+    // No, keep current active view
   };
 
   // Find matching Project for Header (use dbProject if available, otherwise find from allProjects)
@@ -518,21 +525,48 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     return allProjects.find(p => p.id === project.id || p.path === project.path);
   }, [dbProject, allProjects, project.id, project.path]);
 
-  // Create collection for Select component
-  const projectsCollection = useMemo(() => {
-    return createListCollection({
-      items: allProjects,
-      itemToString: (item) => item.name,
-      itemToValue: (item) => item.id,
-    });
-  }, [allProjects]);
+  // Handler to clear resource view
+  const handleClearResourceView = () => {
+    setViewingResource(null);
+    setResourceContent(null);
+    setResourceType(null);
+    setNotebookFile(null);
+  };
 
-  // Handler for project selection from dropdown
-  const handleProjectChange = (details: { value: string[] }) => {
-    const selectedProjectId = details.value[0];
-    const selectedProject = allProjects.find(p => p.id === selectedProjectId);
-    if (selectedProject && onProjectSelect) {
-      onProjectSelect(selectedProject);
+  const handleFileSelect = async (node: FileTreeNode) => {
+    try {
+      const content = await invokeReadFile(node.path);
+      const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
+
+      if (isDiagram) {
+        // Diagrams use existing ResourceViewPage flow for MermaidDiagramViewer
+        setViewingResource({
+          name: node.name,
+          path: node.path,
+          resourceType: 'diagram',
+          frontMatter: node.frontMatter
+        });
+        setResourceContent(content);
+        setResourceType('diagram');
+        setNotebookFile(null);
+      } else {
+        // Markdown files render directly in content area
+        setNotebookFile({
+          resource: {
+            name: node.name,
+            path: node.path,
+            resourceType: (node.artifactType as ResourceType) || 'file',
+            frontMatter: node.frontMatter
+          },
+          content
+        });
+        // Clear the main resource view if any
+        setViewingResource(null);
+        setResourceContent(null);
+        setResourceType(null);
+      }
+    } catch (e) {
+      console.error("Failed to read file", e);
     }
   };
 
@@ -557,431 +591,261 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     }
   }
 
+  // Render content based on active view
+  const renderContent = () => {
+    // If a notebook file is selected, show it directly
+    if (notebookFile) {
+      return (
+        <NoteViewPage
+          resource={notebookFile.resource}
+          content={notebookFile.content}
+        />
+      );
+    }
+
+    switch (activeView) {
+      case 'tasks':
+        return (
+          <>
+            <Box position="absolute" right={6} top={6} zIndex={5}>
+              <Button
+                colorPalette="primary"
+                onClick={() => tasksTabRef.current?.openCreateDialog()}
+                size="sm"
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuPlus />
+                  </Icon>
+                  <Text>Add Task</Text>
+                </HStack>
+              </Button>
+            </Box>
+            <TasksTabContent
+              ref={tasksTabRef}
+              context={project}
+              projects={allProjects}
+            />
+          </>
+        );
+      case 'plans':
+        return (
+          <>
+            <Box position="absolute" right={6} top={6} zIndex={5}>
+              <Button
+                colorPalette="primary"
+                onClick={() => plansTabRef.current?.openCreateDialog()}
+                size="sm"
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuPlus />
+                  </Icon>
+                  <Text>Add Plan</Text>
+                </HStack>
+              </Button>
+            </Box>
+            <PlansTabContent
+              ref={plansTabRef}
+              plans={plans}
+              plansLoading={plansLoading}
+              onViewPlan={handleViewPlan}
+              projectId={project.id}
+              projectPath={project.path}
+              onPlansChanged={loadPlans}
+            />
+          </>
+        );
+      case 'kits':
+        return (
+          <KitsTabContent
+            kits={kitsOnly}
+            kitsLoading={artifactsLoading}
+            error={error}
+            projectsCount={1}
+            projectPath={project.path}
+            projectId={project.id}
+            onViewKit={handleViewKit}
+            onReload={loadProjectArtifacts}
+            onOptimisticMove={handleOptimisticMove}
+            onConfirmMove={handleConfirmMove}
+            movingArtifacts={movingArtifacts}
+          />
+        );
+      case 'walkthroughs':
+        return (
+          <WalkthroughsTabContent
+            kits={walkthroughs}
+            kitsLoading={artifactsLoading}
+            error={error}
+            projectsCount={1}
+            projectPath={project.path}
+            projectId={project.id}
+            onViewKit={handleViewKit}
+            onReload={loadProjectArtifacts}
+            onOptimisticMove={handleOptimisticMove}
+            onConfirmMove={handleConfirmMove}
+            movingArtifacts={movingArtifacts}
+          />
+        );
+      case 'diagrams':
+        return (
+          <DiagramsTabContent
+            diagrams={diagrams}
+            diagramsLoading={artifactsLoading}
+            error={error}
+            projectPath={project.path}
+            projectId={project.id}
+            onViewDiagram={handleViewDiagram}
+            onReload={loadProjectArtifacts}
+            onOptimisticMove={handleOptimisticMove}
+            onConfirmMove={handleConfirmMove}
+            movingArtifacts={movingArtifacts}
+          />
+        );
+      case 'timeline':
+        return (
+          <TimelineTabContent
+            projectId={dbProject?.id || ''}
+            gitUrl={dbProject?.gitUrl}
+            gitConnected={dbProject?.gitConnected || false}
+            onGitConnected={() => {
+              // Reload database project to get updated git metadata
+              invokeDbGetProjects().then(projects => {
+                const matchingProject = projects.find(p => p.path === project.path);
+                setDbProject(matchingProject || null);
+              });
+            }}
+          />
+        );
+      case 'scrapbook':
+        return (
+          <ScrapbookTabContent
+            projectPath={project.path}
+            onViewKit={handleViewKit}
+          />
+        );
+      case 'blueprints':
+        return (
+          <BlueprintsTabContent
+            projectPath={project.path}
+            projectsCount={1}
+            onViewTask={handleViewTask}
+          />
+        );
+      case 'agents':
+        return (
+          <AgentsTabContent
+            kits={agents}
+            kitsLoading={artifactsLoading}
+            error={error}
+            projectsCount={1}
+            projectPath={project.path}
+            projectId={project.id}
+            onViewKit={handleViewKit}
+          />
+        );
+      case 'file':
+        // Placeholder for file view when selected from tree
+        return (
+          <Box p={4} textAlign="center" color="gray.500">
+            Select a file from the notebook to view contents
+          </Box>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
       {/* Header above everything */}
       <Box flexShrink={0} bg="transparent">
-        <Header 
+        <Header
           currentProject={currentProjectForHeader}
-          onNavigateToTasks={() => setCurrentTab('tasks')}
+          onNavigateToTasks={() => setActiveView('tasks')}
         />
       </Box>
-      
-      {/* Full screen content area */}
-      <Box flex="1" minH={0} overflow="hidden" width="100%" bg="transparent">
-        <Box 
-          h="100%" 
-          p={6} 
-          position="relative" 
-          overflow="auto" 
-          width="100%" 
-          maxW="100%"
-          css={{
-            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-            backdropFilter: 'blur(30px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-          }}
-        >
-          <Box position="relative" zIndex={1} width="100%" maxW="100%">
-          <Tabs.Root
-            value={currentTab}
-            onValueChange={(details) => setCurrentTab(details.value)}
-            variant="plain"
-          >
-            {/* Back button, project title, and tabs all on the same row */}
-            <Flex 
-              align="center" 
-              gap={4} 
-              mb={6} 
-              mt={3} 
-              position="relative" 
-              w="100%" 
-              maxW="100%"
-            >
-              {/* Left side: Back button and project title */}
-              <Flex align="center" gap={4}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onBack}
-                  css={{
-                    _hover: {
-                      background: 'transparent',
-                    },
-                  }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuArrowLeft />
-                    </Icon>
-                    <Text>Back</Text>
-                  </HStack>
-                </Button>
-                <Select.Root
-                  collection={projectsCollection}
-                  value={[project.id]}
-                  onValueChange={handleProjectChange}
-                  size="sm"
-                  width="auto"
-                  minW="180px"
-                >
-                  <Select.HiddenSelect />
-                  <Select.Control
-                    cursor="pointer"
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    px={2}
-                    css={{
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                      borderColor: 'rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                      transition: 'none',
-                      _dark: {
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                      },
-                    }}
-                  >
-                    <Select.Trigger
-                      width="100%"
-                      bg="transparent"
-                      border="none"
-                      _focus={{ boxShadow: "none", outline: "none" }}
-                      _hover={{ bg: "transparent" }}
-                      _active={{ bg: "transparent" }}
-                      css={{
-                        "& button": {
-                          border: "none",
-                          boxShadow: "none"
-                        }
-                      }}
-                    >
-                      <HStack gap={2} align="center">
-                        <Icon boxSize={4} color="primary.500">
-                          <LuFolder />
-                        </Icon>
-                        <Select.ValueText />
-                      </HStack>
-                    </Select.Trigger>
-                    <Select.IndicatorGroup>
-                      <Select.Indicator />
-                    </Select.IndicatorGroup>
-                  </Select.Control>
-                  <Portal>
-                    <Select.Positioner>
-                      <Select.Content
-                        borderWidth="1px"
-                        borderRadius="lg"
-                        css={{
-                          background: 'rgba(255, 255, 255, 0.65)',
-                          backdropFilter: 'blur(20px) saturate(180%)',
-                          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                          borderColor: 'rgba(0, 0, 0, 0.08)',
-                          boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
-                          _dark: {
-                            background: 'rgba(20, 20, 25, 0.8)',
-                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                          },
-                        }}
-                      >
-                        {projectsCollection.items.map((item) => (
-                          <Select.Item item={item} key={item.id}>
-                            <HStack gap={2} align="center">
-                              <Icon boxSize={4} color="primary.500">
-                                <LuFolder />
-                              </Icon>
-                              <Select.ItemText>{item.name}</Select.ItemText>
-                            </HStack>
-                            <Select.ItemIndicator />
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
-                  </Portal>
-                </Select.Root>
-              </Flex>
-              
-              {/* Centered: Tabs with horizontal scroll */}
-              <Box 
-                position="absolute" 
-                left="50%" 
-                maxW="min(700px, calc(100vw - 450px))"
-                overflowX="auto"
-                overflowY="hidden"
-                borderRadius="lg"
-                p={2}
-                style={{
-                  transform: 'translateX(-50%)',
-                  background: tabsBg,
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: tabsBorder,
-                }}
-                css={{
-                  '&::-webkit-scrollbar': {
-                    height: '4px',
-                  },
-                  '&::-webkit-scrollbar-track': {
-                    background: 'transparent',
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: 'colors.gray.300',
-                    borderRadius: '2px',
-                  },
-                  '&::-webkit-scrollbar-thumb:hover': {
-                    background: 'colors.gray.400',
-                  },
-                  // Enable momentum scrolling on iOS
-                  WebkitOverflowScrolling: 'touch',
-                  // Smooth scrolling
-                  scrollBehavior: 'smooth',
-                }}
-              >
-                <Tabs.List
-                  display="flex"
-                  flexWrap="nowrap"
-                  gap={0}
-                  minW="fit-content"
-                >
-                  <Tabs.Trigger value="tasks" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuListTodo />
-                      </Icon>
-                      <Text>Tasks</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="plans" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuMap />
-                      </Icon>
-                      <Text>Plans</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  {flags.scrapbook && (
-                    <Tabs.Trigger value="scrapbook" flexShrink={0}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuNotebook />
-                        </Icon>
-                        <Text>Scrapbook</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  )}
-                  {flags.diagrams && (
-                    <Tabs.Trigger value="diagrams" flexShrink={0}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuNetwork />
-                        </Icon>
-                        <Text>Diagrams</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  )}
-                  <Tabs.Trigger value="walkthroughs" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <AiOutlineFileText />
-                      </Icon>
-                      <Text>Docs</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="kits" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPackage />
-                      </Icon>
-                      <Text>Kits</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  {flags.blueprints && (
-                    <Tabs.Trigger value="blueprints" flexShrink={0}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <BsStack />
-                        </Icon>
-                        <Text>Blueprints</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  )}
-                  {flags.agents && (
-                    <Tabs.Trigger value="agents" flexShrink={0}>
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuBot />
-                        </Icon>
-                        <Text>Agents</Text>
-                      </HStack>
-                    </Tabs.Trigger>
-                  )}
-                  <Tabs.Trigger value="timeline" flexShrink={0}>
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuGitBranch />
-                      </Icon>
-                      <Text>Timeline</Text>
-                    </HStack>
-                  </Tabs.Trigger>
-                  <Tabs.Indicator
-                    rounded="md"
-                    style={{
-                      background: indicatorBg,
-                      backdropFilter: 'blur(8px)',
-                      WebkitBackdropFilter: 'blur(8px)',
-                    }}
-                  />
-                </Tabs.List>
-              </Box>
-              {currentTab === 'tasks' && (
-                <Box position="absolute" right={0}>
-                  <Button
-                    colorPalette="primary"
-                    onClick={() => tasksTabRef.current?.openCreateDialog()}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPlus />
-                      </Icon>
-                      <Text>Add Task</Text>
-                    </HStack>
-                  </Button>
-                </Box>
-              )}
-              {currentTab === 'plans' && (
-                <Box position="absolute" right={0}>
-                  <Button
-                    colorPalette="primary"
-                    onClick={() => plansTabRef.current?.openCreateDialog()}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuPlus />
-                      </Icon>
-                      <Text>Add Plan</Text>
-                    </HStack>
-                  </Button>
-                </Box>
-              )}
-            </Flex>
 
-            <Tabs.Content value="kits" key="kits">
-              <KitsTabContent
-                kits={kitsOnly}
-                kitsLoading={artifactsLoading}
-                error={error}
-                projectsCount={1}
-                projectPath={project.path}
-                projectId={project.id}
-                onViewKit={handleViewKit}
-                onReload={loadProjectArtifacts}
-                onOptimisticMove={handleOptimisticMove}
-                onConfirmMove={handleConfirmMove}
-                movingArtifacts={movingArtifacts}
-              />
-            </Tabs.Content>
-            {flags.blueprints && (
-              <Tabs.Content value="blueprints">
-                <BlueprintsTabContent
-                  projectPath={project.path}
-                  projectsCount={1}
-                  onViewTask={handleViewTask}
-                />
-              </Tabs.Content>
-            )}
-            <Tabs.Content value="walkthroughs" key="walkthroughs">
-              <WalkthroughsTabContent
-                kits={walkthroughs}
-                kitsLoading={artifactsLoading}
-                error={error}
-                projectsCount={1}
-                projectPath={project.path}
-                projectId={project.id}
-                onViewKit={handleViewKit}
-                onReload={loadProjectArtifacts}
-                onOptimisticMove={handleOptimisticMove}
-                onConfirmMove={handleConfirmMove}
-                movingArtifacts={movingArtifacts}
-              />
-            </Tabs.Content>
-            {flags.agents && (
-              <Tabs.Content value="agents" key="agents">
-                <AgentsTabContent
-                  kits={agents}
-                  kitsLoading={artifactsLoading}
-                  error={error}
-                  projectsCount={1}
-                  projectPath={project.path}
-                  projectId={project.id}
-                  onViewKit={handleViewKit}
-                />
-              </Tabs.Content>
-            )}
-            {flags.scrapbook && (
-              <Tabs.Content value="scrapbook">
-                <ScrapbookTabContent
-                  projectPath={project.path}
-                  onViewKit={handleViewKit}
-                />
-              </Tabs.Content>
-            )}
-            {flags.diagrams && (
-              <Tabs.Content value="diagrams" key="diagrams">
-                <DiagramsTabContent
-                  diagrams={diagrams}
-                  diagramsLoading={artifactsLoading}
-                  error={error}
-                  projectPath={project.path}
-                  projectId={project.id}
-                  onViewDiagram={handleViewDiagram}
-                  onReload={loadProjectArtifacts}
-                  onOptimisticMove={handleOptimisticMove}
-                  onConfirmMove={handleConfirmMove}
-                  movingArtifacts={movingArtifacts}
-                />
-              </Tabs.Content>
-            )}
-            <Tabs.Content value="timeline">
-              <TimelineTabContent
-                projectId={dbProject?.id || ''}
-                gitUrl={dbProject?.gitUrl}
-                gitConnected={dbProject?.gitConnected || false}
-                onGitConnected={() => {
-                  // Reload database project to get updated git metadata
-                  invokeDbGetProjects().then(projects => {
-                    const matchingProject = projects.find(p => p.path === project.path);
-                    setDbProject(matchingProject || null);
-                  });
-                }}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="tasks">
-              <TasksTabContent
-                ref={tasksTabRef}
-                context={project}
-                projects={allProjects}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="plans">
-              <PlansTabContent
-                ref={plansTabRef}
-                plans={plans}
-                plansLoading={plansLoading}
-                onViewPlan={handleViewPlan}
-                projectId={project.id}
-                projectPath={project.path}
-                onPlansChanged={loadPlans}
-              />
-            </Tabs.Content>
-          </Tabs.Root>
-          </Box>
-        </Box>
+      {/* Full screen content area with Splitter */}
+      <Box
+        flex="1"
+        minH={0}
+        overflow="hidden"
+        bg="transparent"
+        css={{
+          background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        }}
+      >
+        <Splitter.Root
+          defaultSize={[15, 85]}
+          size={splitSizes}
+          onResize={(details) => {
+            if (details.size && details.size.length >= 2) {
+              const [sidebar, content] = details.size;
+
+              // Snap between 0-15% to either 0 or 15
+              if (sidebar > 0 && sidebar < 15) {
+                const snapped = sidebar < 7.5 ? 0 : 15;
+                setSplitSizes([snapped, 100 - snapped]);
+              } else {
+                setSplitSizes([sidebar, content]);
+              }
+            }
+          }}
+          panels={[
+            { id: 'sidebar', minSize: 0, maxSize: 40 },
+            { id: 'content', minSize: 30 },
+          ]}
+          h="100%"
+          orientation="horizontal"
+        >
+          {/* Sidebar Panel */}
+          <Splitter.Panel
+            id="sidebar"
+            css={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(30px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.2)',
+              },
+            }}
+          >
+            <ProjectSidebar
+              project={project}
+              allProjects={allProjects}
+              activeView={activeView}
+              onBack={onBack}
+              onProjectSelect={onProjectSelect}
+              onViewChange={setActiveView}
+              projectPath={project.path}
+              onFileSelect={handleFileSelect}
+              selectedFileId={notebookFile?.resource.path || viewingResource?.path}
+              fileTreeVersion={fileTreeVersion}
+              onTreeRefresh={handleTreeRefresh}
+              onClearResourceView={handleClearResourceView}
+            />
+          </Splitter.Panel>
+
+          {/* Resize Trigger */}
+          <Splitter.ResizeTrigger id="sidebar:content" />
+
+          {/* Main Content Panel */}
+          <Splitter.Panel id="content">
+            <Box 
+              h="100%" 
+              position="relative" 
+              bg="transparent"
+              p={notebookFile ? 0 : 6}
+            >
+              {renderContent()}
+            </Box>
+          </Splitter.Panel>
+        </Splitter.Root>
       </Box>
     </VStack>
   );
 }
-

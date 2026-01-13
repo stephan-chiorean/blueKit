@@ -1,0 +1,75 @@
+import { Box, HStack, Text, Icon, Badge } from '@chakra-ui/react';
+import { ElementType } from 'react';
+import { useColorMode } from '../../contexts/ColorModeContext';
+
+interface SidebarMenuItemProps {
+    icon: ElementType;
+    label: string;
+    isActive?: boolean;
+    onClick: () => void;
+    badge?: string | number;
+    collapsed?: boolean;
+}
+
+export default function SidebarMenuItem({
+    icon,
+    label,
+    isActive = false,
+    onClick,
+    badge,
+    collapsed = false
+}: SidebarMenuItemProps) {
+    const { colorMode } = useColorMode();
+
+    const activeBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)';
+    const hoverBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.05)';
+    const activeColor = colorMode === 'light' ? 'black' : 'white';
+    const inactiveColor = colorMode === 'light' ? 'gray.600' : 'gray.400';
+
+    return (
+        <Box
+            as="button"
+            onClick={onClick}
+            w="100%"
+            py={2}
+            px={3}
+            borderRadius="md"
+            bg={isActive ? activeBg : 'transparent'}
+            color={isActive ? activeColor : inactiveColor}
+            transition="all 0.2s"
+            _hover={{
+                bg: isActive ? activeBg : hoverBg,
+                color: activeColor,
+            }}
+            textAlign="left"
+            title={collapsed ? label : undefined}
+        >
+            <HStack gap={3} justify={collapsed ? 'center' : 'flex-start'}>
+                <Icon as={icon} boxSize={5} />
+
+                {!collapsed && (
+                    <HStack flex="1" justify="space-between" overflow="hidden">
+                        <Text
+                            fontSize="sm"
+                            fontWeight={isActive ? "medium" : "normal"}
+                            truncate
+                        >
+                            {label}
+                        </Text>
+
+                        {badge && (
+                            <Badge
+                                size="sm"
+                                variant="subtle"
+                                colorScheme="blue"
+                                borderRadius="full"
+                            >
+                                {badge}
+                            </Badge>
+                        )}
+                    </HStack>
+                )}
+            </HStack>
+        </Box>
+    );
+}

@@ -61,6 +61,8 @@ async fn main() {
             commands::get_app_info,      // Returns app metadata
             commands::example_error,      // Demonstrates error handling
             commands::get_project_artifacts,  // Get all artifacts from .bluekit directory
+            commands::get_bluekit_file_tree, // Get recursive file tree of .bluekit directory
+            commands::create_folder, // Create folder
             commands::get_changed_artifacts, // Get only changed artifacts (incremental updates)
             commands::watch_project_artifacts, // Watch project .bluekit directory for artifact changes
             commands::watch_projects_database, // Watch projects database for changes

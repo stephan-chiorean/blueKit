@@ -4771,3 +4771,141 @@ pub async fn watch_plan_folder(
     crate::core::watcher::watch_directory(app, path, event_name)
 }
 
+/// File tree node structure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileTreeNode {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    #[serde(rename = "isFolder")]
+    pub is_folder: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<FileTreeNode>>,
+    #[serde(rename = "artifactType", skip_serializing_if = "Option::is_none")]
+    pub artifact_type: Option<String>,
+    #[serde(rename = "isEssential")]
+    pub is_essential: bool,
+    #[serde(rename = "frontMatter", skip_serializing_if = "Option::is_none")]
+    pub front_matter: Option<serde_yaml::Value>,
+}
+
+/// Recursively scans .bluekit directory and returns a tree structure.
+#[tauri::command]
+pub async fn get_bluekit_file_tree(project_path: String) -> Result<Vec<FileTreeNode>, String> {
+    use std::fs;
+
+    let bluekit_path = PathBuf::from(&project_path).join(".bluekit");
+    if !bluekit_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    // Helper to recursively build tree
+    fn build_tree(dir: PathBuf, root_path: &PathBuf) -> Result<Vec<FileTreeNode>, String> {
+        let mut nodes = Vec::new();
+
+        if dir.exists() && dir.is_dir() {
+            let entries = fs::read_dir(&dir)
+                .map_err(|e| format!("Failed to read dir: {}", e))?;
+
+            for entry in entries {
+                let entry = entry.map_err(|e| format!("Error reading entry: {}", e))?;
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                
+                // Skip hidden files/folders (except .bluekit itself if we were scanning root, but we are inside .bluekit)
+                if name.starts_with('.') {
+                    continue;
+                }
+
+                let path_str = path.to_string_lossy().to_string();
+                // Generate a stable ID based on relative path from bluekit root
+                let relative_path = path.strip_prefix(root_path)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                let id = format!("node-{}", relative_path.replace(['/', '\\'], "-"));
+
+                let is_folder = path.is_dir();
+                
+                let mut children = None;
+                let mut artifact_type = None;
+                let mut front_matter = None;
+                let mut is_essential = false;
+
+                if is_folder {
+                    // Recursive call
+                    let child_nodes = build_tree(path.clone(), root_path)?;
+                    if !child_nodes.is_empty() {
+                        children = Some(child_nodes);
+                    }
+                } else {
+                    // Check file extension
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    if ext == "md" || ext == "mmd" || ext == "mermaid" {
+                        // Detect type
+                        if ext == "mmd" || ext == "mermaid" {
+                            artifact_type = Some("diagram".to_string());
+                            is_essential = true;
+                        } else {
+                            // Read front matter to determine type
+                            if let Ok(content) = fs::read_to_string(&path) {
+                                if let Some(fm) = parse_front_matter(&content) {
+                                    front_matter = Some(fm.clone());
+                                    if let Some(type_val) = fm.get("type").and_then(|v| v.as_str()) {
+                                        artifact_type = Some(type_val.to_string());
+                                        if type_val == "walkthrough" || type_val == "kit" {
+                                            is_essential = true;
+                                        }
+                                    } else {
+                                        // Infer from parent folder
+                                        if path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) == Some("kits") {
+                                            artifact_type = Some("kit".to_string());
+                                            is_essential = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Skip non-supported files? or include them allowing simple view?
+                        // For now include them as 'file'
+                        artifact_type = Some("file".to_string());
+                    }
+                }
+
+                nodes.push(FileTreeNode {
+                    id,
+                    name,
+                    path: path_str,
+                    is_folder,
+                    children,
+                    artifact_type,
+                    is_essential,
+                    front_matter,
+                });
+            }
+        }
+        
+        // Sort folders first, then files
+        nodes.sort_by(|a, b| {
+            if a.is_folder && !b.is_folder {
+                std::cmp::Ordering::Less
+            } else if !a.is_folder && b.is_folder {
+                std::cmp::Ordering::Greater
+            } else {
+                a.name.to_lowercase().cmp(&b.name.to_lowercase())
+            }
+        });
+
+        Ok(nodes)
+    }
+
+    build_tree(bluekit_path.clone(), &bluekit_path)
+}
+
+/// Creates a folder at the specified path.
+#[tauri::command]
+pub async fn create_folder(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(path).map_err(|e| format!("Failed to create folder: {}", e))
+}
+

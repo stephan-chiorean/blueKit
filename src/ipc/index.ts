@@ -91,3 +91,7 @@ export * from './checkpoints';
 // Re-export Plan commands
 export * from './plans';
 
+// Re-export File Tree commands
+export * from './fileTree';
+
+

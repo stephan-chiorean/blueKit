@@ -9,7 +9,7 @@ import { ArtifactFile } from '../ipc';
 /**
  * Resource type discriminator
  */
-export type ResourceType = 'kit' | 'walkthrough' | 'agent' | 'blueprint' | 'task' | 'diagram' | 'scrapbook' | 'plan';
+export type ResourceType = 'kit' | 'walkthrough' | 'agent' | 'blueprint' | 'task' | 'diagram' | 'scrapbook' | 'plan' | 'file';
 
 /**
  * Resource view mode - determines the layout and features shown in ResourceViewPage
@@ -81,6 +81,7 @@ export function getResourceTypeLabel(type: ResourceType): string {
     diagram: 'Diagram',
     scrapbook: 'Scrapbook',
     plan: 'Plan',
+    file: 'File',
   };
   return labels[type];
 }
