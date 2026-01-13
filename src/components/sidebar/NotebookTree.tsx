@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { LuFile, LuFolder, LuFolderOpen, LuStar } from 'react-icons/lu';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
@@ -13,6 +13,43 @@ interface NotebookTreeProps {
     version?: number;
 }
 
+// Helper function to find a node by ID in the tree
+function findNodeById(nodes: FileTreeNode[], id: string): FileTreeNode | null {
+    for (const node of nodes) {
+        if (node.id === id) {
+            return node;
+        }
+        if (node.children) {
+            const found = findNodeById(node.children, id);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+// Helper function to find all parent folder paths for a given file node
+// Returns null if target not found, or array of parent folder paths if found
+function findParentFolderPaths(nodes: FileTreeNode[], targetPath: string, parentPaths: string[] = []): string[] | null {
+    for (const node of nodes) {
+        if (node.path === targetPath) {
+            // Found the target node, return all parent folder paths
+            return parentPaths;
+        }
+        if (node.isFolder && node.children) {
+            // Add current folder to parent list if it's a folder
+            const newParentPaths = [...parentPaths, node.path];
+            // Recursively search in children
+            const found = findParentFolderPaths(node.children, targetPath, newParentPaths);
+            if (found !== null) {
+                // Found the target in this branch, return the path
+                return found;
+            }
+        }
+    }
+    // Target not found in this branch
+    return null;
+}
+
 export default function NotebookTree({
     projectPath,
     onFileSelect,
@@ -21,10 +58,8 @@ export default function NotebookTree({
     version
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const { colorMode } = useColorMode();
-
-    // Custom tree view implementation if Chakra TreeView is not available
-    // But trusting design doc for now. If this fails, we will need a recursive component.
 
     useEffect(() => {
         loadTree();
@@ -39,14 +74,57 @@ export default function NotebookTree({
         }
     };
 
+    // Find parent folder paths when a file is selected
+    const parentFolderPaths = useMemo(() => {
+        if (!selectedFileId || nodes.length === 0) {
+            return new Set<string>();
+        }
+        const parentPaths = findParentFolderPaths(nodes, selectedFileId);
+        return new Set(parentPaths || []);
+    }, [selectedFileId, nodes]);
 
+    // Auto-expand parent folders when a file is selected
+    // We need to find folder IDs from paths to expand them
+    useEffect(() => {
+        if (parentFolderPaths.size > 0 && nodes.length > 0) {
+            // Helper to find folder ID by path
+            const findFolderIdByPath = (nodes: FileTreeNode[], targetPath: string): string | null => {
+                for (const node of nodes) {
+                    if (node.path === targetPath && node.isFolder) {
+                        return node.id;
+                    }
+                    if (node.children) {
+                        const found = findFolderIdByPath(node.children, targetPath);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            };
 
-    // Note: Since I can't be 100% sure about TreeView API in this environment without checking types,
-    // I'll create a simple recursive fallback component structure to be safe, 
-    // or I can try to use a generic custom implementation to avoid dependency issues.
+            setExpandedFolders(prev => {
+                const next = new Set(prev);
+                parentFolderPaths.forEach(path => {
+                    const folderId = findFolderIdByPath(nodes, path);
+                    if (folderId) {
+                        next.add(folderId);
+                    }
+                });
+                return next;
+            });
+        }
+    }, [parentFolderPaths, nodes]);
 
-    // Let's implement a simple custom recursive tree for safety given I didn't find TreeView in grep.
-    // This is safer than relying on an import that might not exist.
+    const handleToggleExpand = (folderId: string) => {
+        setExpandedFolders(prev => {
+            const next = new Set(prev);
+            if (next.has(folderId)) {
+                next.delete(folderId);
+            } else {
+                next.add(folderId);
+            }
+            return next;
+        });
+    };
 
     return (
         <Box className={className} w="100%">
@@ -54,6 +132,9 @@ export default function NotebookTree({
                 nodes={nodes}
                 onNodeClick={onFileSelect}
                 selectedId={selectedFileId}
+                parentFolderPaths={parentFolderPaths}
+                expandedFolders={expandedFolders}
+                onToggleExpand={handleToggleExpand}
                 colorMode={colorMode}
             />
         </Box>
@@ -65,11 +146,23 @@ interface CustomTreeProps {
     nodes: FileTreeNode[];
     onNodeClick: (node: FileTreeNode) => void;
     selectedId?: string;
+    parentFolderPaths: Set<string>;
+    expandedFolders: Set<string>;
+    onToggleExpand: (folderId: string) => void;
     level?: number;
     colorMode: string;
 }
 
-function CustomTree({ nodes, onNodeClick, selectedId, level = 0, colorMode }: CustomTreeProps) {
+function CustomTree({ 
+    nodes, 
+    onNodeClick, 
+    selectedId, 
+    parentFolderPaths,
+    expandedFolders,
+    onToggleExpand,
+    level = 0, 
+    colorMode 
+}: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
             {nodes.map(node => (
@@ -78,6 +171,10 @@ function CustomTree({ nodes, onNodeClick, selectedId, level = 0, colorMode }: Cu
                     node={node}
                     onNodeClick={onNodeClick}
                     selectedId={selectedId}
+                    parentFolderPaths={parentFolderPaths}
+                    expandedFolders={expandedFolders}
+                    isExpanded={expandedFolders.has(node.id)}
+                    onToggleExpand={onToggleExpand}
                     level={level}
                     colorMode={colorMode}
                 />
@@ -86,26 +183,37 @@ function CustomTree({ nodes, onNodeClick, selectedId, level = 0, colorMode }: Cu
     );
 }
 
-function TreeNode({ node, onNodeClick, selectedId, level, colorMode }: {
+function TreeNode({ 
+    node, 
+    onNodeClick, 
+    selectedId, 
+    parentFolderPaths,
+    expandedFolders,
+    isExpanded,
+    onToggleExpand,
+    level, 
+    colorMode 
+}: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
     selectedId?: string,
+    parentFolderPaths: Set<string>,
+    expandedFolders: Set<string>,
+    isExpanded: boolean,
+    onToggleExpand: (folderId: string) => void,
     level: number,
     colorMode: string
 }) {
-    const [isExpanded, setIsExpanded] = useState(false);
-
-    // Auto-expand if child selected? (Can be added later)
-
     const handleClick = () => {
         if (node.isFolder) {
-            setIsExpanded(!isExpanded);
+            onToggleExpand(node.id);
         } else {
             onNodeClick(node);
         }
     };
 
-    const isSelected = selectedId === node.id;
+    const isSelected = selectedId === node.path;
+    
     const hoverBg = colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.100';
     const selectedBg = colorMode === 'light' ? 'blue.50' : 'whiteAlpha.200';
     const selectedColor = colorMode === 'light' ? 'blue.600' : 'blue.200';
@@ -143,6 +251,9 @@ function TreeNode({ node, onNodeClick, selectedId, level, colorMode }: {
                     nodes={node.children}
                     onNodeClick={onNodeClick}
                     selectedId={selectedId}
+                    parentFolderPaths={parentFolderPaths}
+                    expandedFolders={expandedFolders}
+                    onToggleExpand={onToggleExpand}
                     level={level + 1}
                     colorMode={colorMode}
                 />

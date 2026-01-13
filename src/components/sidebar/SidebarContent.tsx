@@ -58,28 +58,28 @@ export default function SidebarContent({
                 <SidebarMenuItem
                     icon={LuListTodo}
                     label="Tasks"
-                    isActive={activeView === 'tasks'}
+                    isActive={activeView !== 'file' && activeView === 'tasks'}
                     onClick={() => onViewChange('tasks')}
                     collapsed={collapsed}
                 />
                 <SidebarMenuItem
                     icon={LuMap}
                     label="Plans"
-                    isActive={activeView === 'plans'}
+                    isActive={activeView !== 'file' && activeView === 'plans'}
                     onClick={() => onViewChange('plans')}
                     collapsed={collapsed}
                 />
                 <SidebarMenuItem
                     icon={LuPackage}
                     label="Kits"
-                    isActive={activeView === 'kits'}
+                    isActive={activeView !== 'file' && activeView === 'kits'}
                     onClick={() => onViewChange('kits')}
                     collapsed={collapsed}
                 />
                 <SidebarMenuItem
                     icon={AiOutlineFileText}
                     label="Docs"
-                    isActive={activeView === 'walkthroughs'}
+                    isActive={activeView !== 'file' && activeView === 'walkthroughs'}
                     onClick={() => onViewChange('walkthroughs')}
                     collapsed={collapsed}
                 />
@@ -88,7 +88,7 @@ export default function SidebarContent({
                     <SidebarMenuItem
                         icon={LuNetwork}
                         label="Diagrams"
-                        isActive={activeView === 'diagrams'}
+                        isActive={activeView !== 'file' && activeView === 'diagrams'}
                         onClick={() => onViewChange('diagrams')}
                         collapsed={collapsed}
                     />
@@ -97,7 +97,7 @@ export default function SidebarContent({
                 <SidebarMenuItem
                     icon={LuGitBranch}
                     label="Timeline"
-                    isActive={activeView === 'timeline'}
+                    isActive={activeView !== 'file' && activeView === 'timeline'}
                     onClick={() => onViewChange('timeline')}
                     collapsed={collapsed}
                 />
@@ -108,7 +108,7 @@ export default function SidebarContent({
                             <SidebarMenuItem
                                 icon={LuNotebook}
                                 label="Scrapbook"
-                                isActive={activeView === 'scrapbook'}
+                                isActive={activeView !== 'file' && activeView === 'scrapbook'}
                                 onClick={() => onViewChange('scrapbook')}
                             />
                         )}
@@ -116,7 +116,7 @@ export default function SidebarContent({
                             <SidebarMenuItem
                                 icon={BsStack}
                                 label="Blueprints"
-                                isActive={activeView === 'blueprints'}
+                                isActive={activeView !== 'file' && activeView === 'blueprints'}
                                 onClick={() => onViewChange('blueprints')}
                             />
                         )}
@@ -124,7 +124,7 @@ export default function SidebarContent({
                             <SidebarMenuItem
                                 icon={LuBot}
                                 label="Agents"
-                                isActive={activeView === 'agents'}
+                                isActive={activeView !== 'file' && activeView === 'agents'}
                                 onClick={() => onViewChange('agents')}
                             />
                         )}

@@ -59,9 +59,9 @@ export default function ProjectSidebar({
   };
 
   return (
-    <Flex direction="column" h="100%" pt={2}>
+    <Flex direction="column" h="100%">
       {/* Back button and project selector */}
-      <Box px={3} py={4}>
+      <Box px={3} pb={4} pt={0}>
         <VStack gap={3} align="stretch">
           <HStack>
             <Box as="button" onClick={onBack} title="Back to Projects" cursor="pointer">

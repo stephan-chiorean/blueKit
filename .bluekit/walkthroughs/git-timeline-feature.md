@@ -43,7 +43,7 @@ interface TimelineTabContentProps {
 
 ### Supporting Components
 
-1. **`CheckpointsView`** - Separate component for the checkpoints-only view with filtering
+1. **`CheckpointsView`** - Separate component the checkpoints-only view with filtering
 2. **`PinCheckpointModal`** - Modal for creating new checkpoints
 3. **`BranchOffModal`** - Modal for creating branches from checkpoints
 4. **`RollbackModal`** - Modal for rolling back to a checkpoint

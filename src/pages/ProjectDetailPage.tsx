@@ -552,6 +552,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       const content = await invokeReadFile(node.path);
       const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
 
+      // Set activeView to 'file' to indicate we're viewing a notebook file
+      setActiveView('file');
+
       if (isDiagram) {
         // Diagrams use existing ResourceViewPage flow for MermaidDiagramViewer
         setViewingResource({
