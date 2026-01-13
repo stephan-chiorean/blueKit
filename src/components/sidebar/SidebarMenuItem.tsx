@@ -37,6 +37,7 @@ export default function SidebarMenuItem({
             bg={isActive ? activeBg : 'transparent'}
             color={isActive ? activeColor : inactiveColor}
             transition="all 0.2s"
+            cursor="pointer"
             _hover={{
                 bg: isActive ? activeBg : hoverBg,
                 color: activeColor,

@@ -6,9 +6,9 @@ import {
     LuNetwork,
     LuGitBranch,
     LuNotebook,
-    LuBot
+    LuBot,
+    LuBookOpen
 } from 'react-icons/lu';
-import { AiOutlineFileText } from 'react-icons/ai';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import SidebarSection from './SidebarSection';
 import SidebarMenuItem from './SidebarMenuItem';
@@ -77,8 +77,8 @@ export default function SidebarContent({
                     collapsed={collapsed}
                 />
                 <SidebarMenuItem
-                    icon={AiOutlineFileText}
-                    label="Docs"
+                    icon={LuBookOpen}
+                    label="Walkthroughs"
                     isActive={activeView !== 'file' && activeView === 'walkthroughs'}
                     onClick={() => onViewChange('walkthroughs')}
                     collapsed={collapsed}

@@ -2,6 +2,7 @@ import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 
 import { useEffect, useState, useMemo } from 'react';
 import { LuFile, LuFolder, LuFolderOpen, LuStar } from 'react-icons/lu';
+import { AiOutlineFileText } from 'react-icons/ai';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
 
@@ -214,9 +215,20 @@ function TreeNode({
 
     const isSelected = selectedId === node.path;
     
+    // Check if file is a markdown file
+    const isMarkdownFile = !node.isFolder && (node.name.endsWith('.md') || node.name.endsWith('.markdown'));
+    
     const hoverBg = colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.100';
     const selectedBg = colorMode === 'light' ? 'blue.50' : 'whiteAlpha.200';
     const selectedColor = colorMode === 'light' ? 'blue.600' : 'blue.200';
+
+    // Determine the icon to use
+    const getFileIcon = () => {
+        if (node.isFolder) {
+            return isExpanded ? LuFolderOpen : LuFolder;
+        }
+        return isMarkdownFile ? AiOutlineFileText : LuFile;
+    };
 
     return (
         <Box>
@@ -233,7 +245,7 @@ function TreeNode({
                 transition="all 0.1s"
             >
                 <Icon
-                    as={node.isFolder ? (isExpanded ? LuFolderOpen : LuFolder) : LuFile}
+                    as={getFileIcon()}
                     color={node.isFolder ? "blue.400" : (isSelected ? "currentColor" : "gray.500")}
                     boxSize={4}
                     flexShrink={0}
