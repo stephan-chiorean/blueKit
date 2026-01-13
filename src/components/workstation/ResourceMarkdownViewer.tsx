@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import mermaid from 'mermaid';
 
 import {
@@ -17,19 +17,24 @@ import {
   Alert,
   Flex,
   Portal,
+  Button,
+  Icon,
+  Badge,
 } from '@chakra-ui/react';
 import { open } from '@tauri-apps/api/shell';
-import { ResourceFile } from '../../types/resource';
-import { getResourceDisplayName } from '../../types/resource';
+import { ResourceFile, ResourceType, getResourceDisplayName } from '../../types/resource';
 import ShikiCodeBlock from './ShikiCodeBlock';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { FaEye, FaCode } from 'react-icons/fa';
+import { LuChevronDown, LuChevronUp, LuLink } from 'react-icons/lu';
 import SearchInMarkdown from './SearchInMarkdown';
 import { useWorkstation } from '../../contexts/WorkstationContext';
 import { useResource } from '../../contexts/ResourceContext';
+import { useProjectArtifacts } from '../../contexts/ProjectArtifactsContext';
 import { invokeReadFile, ArtifactFile } from '../../ipc';
 import { toaster } from '../ui/toaster';
 import { parseFrontMatter } from '../../utils/parseFrontMatter';
+import { extractOutboundLinks, findBacklinks, resolveOutboundLinks } from '../../utils/extractMarkdownLinks';
 import path from 'path';
 
 interface ResourceMarkdownViewerProps {
@@ -141,8 +146,33 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
   const contentWithoutFrontMatter = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
   const displayName = getResourceDisplayName(resource);
   const [viewMode, setViewMode] = useState<string>('preview');
+  const [linksExpanded, setLinksExpanded] = useState(false);
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const { setSelectedResource } = useResource();
+  const { artifacts: allArtifacts } = useProjectArtifacts();
+
+  // Compute outbound links from this resource
+  const outboundLinks = useMemo(() => {
+    const links = extractOutboundLinks(content);
+    return resolveOutboundLinks(resource.path, links);
+  }, [content, resource.path]);
+
+  // Compute backlinks to this resource
+  const backlinks = useMemo(() => {
+    if (!allArtifacts || allArtifacts.length === 0) return [];
+    return findBacklinks(resource.path, allArtifacts);
+  }, [resource.path, allArtifacts]);
+
+  // Group backlinks by type for organized display
+  const groupedBacklinks = useMemo(() => {
+    const groups: Record<string, typeof backlinks> = {};
+    backlinks.forEach(backlink => {
+      const type = backlink.resourceType;
+      if (!groups[type]) groups[type] = [];
+      groups[type].push(backlink);
+    });
+    return groups;
+  }, [backlinks]);
 
   // Resolve relative paths for internal markdown links
   const resolveInternalPath = (href: string): string => {
@@ -244,10 +274,163 @@ export default function ResourceMarkdownViewer({ resource, content }: ResourceMa
                 ]}
               />
             </Box>
+
+            {/* Links Button - matches filter button styling */}
+            {(outboundLinks.length > 0 || backlinks.length > 0) && (
+              <Box mt={4} width="fit-content">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLinksExpanded(!linksExpanded)}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                    borderColor: 'rgba(0, 0, 0, 0.08)',
+                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                    transition: 'none',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                    },
+                  }}
+                >
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuLink />
+                    </Icon>
+                    <Text>Links</Text>
+                    <Badge size="sm" colorPalette="primary" variant="solid">
+                      {outboundLinks.length + backlinks.length}
+                    </Badge>
+                    <Icon>
+                      {linksExpanded ? <LuChevronUp /> : <LuChevronDown />}
+                    </Icon>
+                  </HStack>
+                </Button>
+              </Box>
+            )}
           </Box>
         </Flex>
 
         <Separator />
+
+        {/* Links Section - Collapsible */}
+        {linksExpanded && (outboundLinks.length > 0 || backlinks.length > 0) && (
+          <>
+            <Box>
+              <Heading size="sm" mb={3} color="text.secondary">
+                Links
+              </Heading>
+
+              <VStack align="stretch" gap={4}>
+                {/* Outbound Links */}
+                {outboundLinks.length > 0 && (
+                  <Box>
+                    <Text fontSize="xs" color="text.tertiary" mb={2} fontWeight="semibold">
+                      Links from this {resource.resourceType || 'kit'}
+                    </Text>
+                    <HStack gap={2} flexWrap="wrap">
+                      {outboundLinks.map((link, index) => (
+                        <Link
+                          key={index}
+                          onClick={async () => {
+                            try {
+                              // Load and navigate to target
+                              const targetContent = await invokeReadFile(link.absolutePath);
+                              const frontMatter = parseFrontMatter(targetContent);
+                              const fileName = path.basename(link.absolutePath, path.extname(link.absolutePath));
+                              const resourceType: ResourceType = link.absolutePath.endsWith('.mmd') || link.absolutePath.endsWith('.mermaid')
+                                ? 'diagram'
+                                : (frontMatter?.type as ResourceType) || 'kit';
+
+                              const targetResource: ArtifactFile = {
+                                name: fileName,
+                                path: link.absolutePath,
+                                content: targetContent,
+                                frontMatter,
+                              };
+
+                              setSelectedResource(targetResource, targetContent, resourceType);
+                            } catch (error) {
+                              console.error('Failed to navigate:', error);
+                              toaster.create({
+                                type: 'error',
+                                title: 'Failed to open file',
+                                description: `Could not load ${link.path}: ${error}`,
+                              });
+                            }
+                          }}
+                          cursor="pointer"
+                          color="primary.500"
+                          fontSize="sm"
+                          textDecoration="underline"
+                          _hover={{ color: 'primary.600' }}
+                        >
+                          {link.text}
+                        </Link>
+                      ))}
+                    </HStack>
+                  </Box>
+                )}
+
+                {/* Backlinks */}
+                {backlinks.length > 0 && (
+                  <Box>
+                    <Text fontSize="xs" color="text.tertiary" mb={2} fontWeight="semibold">
+                      Linked by {backlinks.length} other {backlinks.length === 1 ? 'resource' : 'resources'}
+                    </Text>
+
+                    {/* Group by type */}
+                    {Object.entries(groupedBacklinks).map(([type, links]) => (
+                      <Box key={type} mb={2}>
+                        <Text fontSize="xs" color="text.muted" mb={1}>
+                          {type}s
+                        </Text>
+                        <HStack gap={2} flexWrap="wrap">
+                          {links.map((backlink, index) => {
+                            const displayName = backlink.source.frontMatter?.alias || backlink.source.name;
+                            return (
+                              <Link
+                                key={index}
+                                onClick={async () => {
+                                  try {
+                                    // Navigate to source resource
+                                    const sourceContent = backlink.source.content || await invokeReadFile(backlink.source.path);
+                                    setSelectedResource(backlink.source, sourceContent, backlink.resourceType);
+                                  } catch (error) {
+                                    console.error('Failed to navigate:', error);
+                                    toaster.create({
+                                      type: 'error',
+                                      title: 'Failed to open file',
+                                      description: `Could not load ${backlink.source.name}: ${error}`,
+                                    });
+                                  }
+                                }}
+                                cursor="pointer"
+                                color="primary.500"
+                                fontSize="sm"
+                                textDecoration="underline"
+                                _hover={{ color: 'primary.600' }}
+                              >
+                                {displayName}
+                              </Link>
+                            );
+                          })}
+                        </HStack>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </VStack>
+            </Box>
+
+            <Separator />
+          </>
+        )}
 
         {/* Content */}
         {viewMode === 'source' ? (

@@ -13,6 +13,7 @@ import { NotepadProvider } from './contexts/NotepadContext';
 import { TimerProvider } from './contexts/TimerContext';
 import { LibraryCacheProvider } from './contexts/LibraryCacheContext';
 import { WorkstationProvider } from './contexts/WorkstationContext';
+import { ProjectArtifactsProvider } from './contexts/ProjectArtifactsContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { Project } from './ipc';
 
@@ -75,10 +76,12 @@ function AppContent() {
         <FeatureFlagsProvider>
           <LibraryCacheProvider>
             <ResourceProvider>
-              <GradientBackground />
-              <Box position="relative" zIndex={1}>
-                <PreviewWindowPage />
-              </Box>
+              <ProjectArtifactsProvider>
+                <GradientBackground />
+                <Box position="relative" zIndex={1}>
+                  <PreviewWindowPage />
+                </Box>
+              </ProjectArtifactsProvider>
             </ResourceProvider>
           </LibraryCacheProvider>
         </FeatureFlagsProvider>
@@ -93,12 +96,14 @@ function AppContent() {
         <FeatureFlagsProvider>
           <LibraryCacheProvider>
             <ResourceProvider>
-              <SelectionProvider>
-                <GradientBackground />
-                <Box display="flex" justifyContent="center" alignItems="center" h="100vh" position="relative" zIndex={1}>
-                  <Spinner size="xl" />
-                </Box>
-              </SelectionProvider>
+              <ProjectArtifactsProvider>
+                <SelectionProvider>
+                  <GradientBackground />
+                  <Box display="flex" justifyContent="center" alignItems="center" h="100vh" position="relative" zIndex={1}>
+                    <Spinner size="xl" />
+                  </Box>
+                </SelectionProvider>
+              </ProjectArtifactsProvider>
             </ResourceProvider>
           </LibraryCacheProvider>
         </FeatureFlagsProvider>
@@ -111,39 +116,41 @@ function AppContent() {
       <FeatureFlagsProvider>
         <LibraryCacheProvider>
           <ResourceProvider>
-            <SelectionProvider>
-              <GradientBackground />
-              <Box position="relative" zIndex={1}>
-                {currentView === 'welcome' ? (
-                  <WelcomeScreen onGetStarted={handleGetStarted} />
-                ) : currentView === 'github-auth' ? (
-                  <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
-                ) : currentView === 'project-detail' && selectedProject ? (
-                  <ProjectDetailPage
-                    project={{
-                      id: selectedProject.id,
-                      title: selectedProject.name,
-                      description: selectedProject.description || '',
-                      path: selectedProject.path,
-                    }}
-                    onBack={handleBackToHome}
-                    onProjectSelect={handleProjectSelect}
-                  />
-                ) : currentView === 'plans' && plansSource ? (
-                  <EditorPlansPage
-                    plansSource={plansSource}
-                    onBack={handleBackFromPlans}
-                  />
-                ) : (
-                  <HomePage onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
-                )}
+            <ProjectArtifactsProvider>
+              <SelectionProvider>
+                <GradientBackground />
+                <Box position="relative" zIndex={1}>
+                  {currentView === 'welcome' ? (
+                    <WelcomeScreen onGetStarted={handleGetStarted} />
+                  ) : currentView === 'github-auth' ? (
+                    <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
+                  ) : currentView === 'project-detail' && selectedProject ? (
+                    <ProjectDetailPage
+                      project={{
+                        id: selectedProject.id,
+                        title: selectedProject.name,
+                        description: selectedProject.description || '',
+                        path: selectedProject.path,
+                      }}
+                      onBack={handleBackToHome}
+                      onProjectSelect={handleProjectSelect}
+                    />
+                  ) : currentView === 'plans' && plansSource ? (
+                    <EditorPlansPage
+                      plansSource={plansSource}
+                      onBack={handleBackFromPlans}
+                    />
+                  ) : (
+                    <HomePage onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
+                  )}
 
-                <DraggableNotepad
-                  isOpen={isNotepadOpen}
-                  onClose={toggleNotepad}
-                />
-              </Box>
-            </SelectionProvider>
+                  <DraggableNotepad
+                    isOpen={isNotepadOpen}
+                    onClose={toggleNotepad}
+                  />
+                </Box>
+              </SelectionProvider>
+            </ProjectArtifactsProvider>
           </ResourceProvider>
         </LibraryCacheProvider>
       </FeatureFlagsProvider>

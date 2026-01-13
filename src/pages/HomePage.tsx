@@ -24,6 +24,7 @@ import {
 import NavigationMenu from "../components/NavigationDrawer";
 import Header from "../components/Header";
 import ProjectsTabContent from "../components/projects/ProjectsTabContent";
+import AddProjectDialog from "../components/projects/AddProjectDialog";
 import LibraryTabContent, { LibraryTabContentRef } from "../components/library/LibraryTabContent";
 import WorkflowsTabContent from "../components/workflows/WorkflowsTabContent";
 import TasksTabContent, {
@@ -65,6 +66,9 @@ export default function HomePage({
   // Library tab exit warning state
   const [showLibraryExitWarning, setShowLibraryExitWarning] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  // Add Project dialog state
+  const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
 
   // Glass styling for light/dark mode
   const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
@@ -538,6 +542,21 @@ export default function HomePage({
                       </Button>
                     </Box>
                   )}
+                  {activeTab === "projects" && (
+                    <Box position="absolute" right={0}>
+                      <Button
+                        colorPalette="primary"
+                        onClick={() => setShowAddProjectDialog(true)}
+                      >
+                        <HStack gap={2}>
+                          <Icon>
+                            <LuPlus />
+                          </Icon>
+                          <Text>Add Project</Text>
+                        </HStack>
+                      </Button>
+                    </Box>
+                  )}
                 </Flex>
 
               <Tabs.Content value="projects">
@@ -599,6 +618,15 @@ export default function HomePage({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
+
+      {/* Add Project Dialog */}
+      <AddProjectDialog
+        isOpen={showAddProjectDialog}
+        onClose={() => setShowAddProjectDialog(false)}
+        onProjectCreated={() => {
+          loadProjects();
+        }}
+      />
     </VStack>
   );
 }

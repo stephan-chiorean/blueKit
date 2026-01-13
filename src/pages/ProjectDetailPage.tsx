@@ -32,6 +32,7 @@ import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useColorMode } from '../contexts/ColorModeContext';
+import { useProjectArtifacts } from '../contexts/ProjectArtifactsContext';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -43,6 +44,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // Feature flags
   const { flags } = useFeatureFlags();
   const { colorMode } = useColorMode();
+  const { setArtifacts: setGlobalArtifacts } = useProjectArtifacts();
   
   // Glass styling for light/dark mode
   const tabsBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
@@ -161,6 +163,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       // Atomic update: set both artifacts and loading in one state update
       setArtifacts(projectArtifacts);
       setArtifactsLoading(false);
+      
+      // Also update the global context for link resolution
+      setGlobalArtifacts(projectArtifacts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load artifacts');
       setArtifactsLoading(false);
@@ -242,6 +247,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           });
 
           const finalArtifacts = Array.from(updated.values());
+          
+          // Also update the global context with the same artifacts
+          setGlobalArtifacts(finalArtifacts);
+          
           return finalArtifacts;
         });
         // No loading state for incremental updates - they happen silently

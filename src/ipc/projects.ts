@@ -216,12 +216,11 @@ export async function invokeCreateProjectFromClone(
  * 1. Creates a new project directory at the specified path
  * 2. Creates .bluekit directory structure
  * 3. Copies source files to appropriate subdirectories based on file type
- * 4. Optionally registers the project in the registry
+ * 4. Registers the project in the database
  *
  * @param targetPath - The absolute path where the new project should be created
  * @param projectTitle - Title for the new project
  * @param sourceFiles - Array of tuples containing (filePath, fileType) where fileType is "kit", "walkthrough", or "diagram"
- * @param registerProject - Whether to automatically register the new project (default: true)
  * @returns A promise that resolves to the project path
  *
  * @example
@@ -232,22 +231,19 @@ export async function invokeCreateProjectFromClone(
  *   [
  *     ['/path/to/kit.md', 'kit'],
  *     ['/path/to/walkthrough.md', 'walkthrough']
- *   ],
- *   true
+ *   ]
  * );
  * ```
  */
 export async function invokeCreateNewProject(
   targetPath: string,
   projectTitle: string,
-  sourceFiles: Array<[string, string]>,
-  registerProject: boolean = true
+  sourceFiles: Array<[string, string]>
 ): Promise<string> {
   return await invokeWithTimeout<string>('create_new_project', {
     targetPath,
     projectTitle,
     sourceFiles,
-    registerProject,
   });
 }
 

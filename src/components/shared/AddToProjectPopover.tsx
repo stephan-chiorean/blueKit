@@ -207,12 +207,11 @@ export default function AddToProjectPopover({
         file.type
       ]);
 
-      // Create new project
+      // Create new project (automatically registered in database)
       const createdPath = await invokeCreateNewProject(
         projectPath,
         projectName,
-        filesWithTypes,
-        true // Register project automatically
+        filesWithTypes
       );
 
       toaster.create({

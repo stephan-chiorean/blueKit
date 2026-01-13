@@ -18,7 +18,7 @@ import {
 } from '@chakra-ui/react';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { Project, invokeOpenProjectInEditor, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
-import { LuFolder, LuChevronRight, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { LuFolder, LuChevronRight, LuPencil, LuTrash2, LuCopy } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
 import { toaster } from '../ui/toaster';
@@ -167,6 +167,26 @@ export default function ProjectsTabContent({
       await invokeOpenProjectInEditor(project.path, editor);
     } catch (error) {
       console.error(`Failed to open project in ${editor}:`, error);
+    }
+  };
+
+  const handleCopyPath = async (project: Project) => {
+    try {
+      await navigator.clipboard.writeText(project.path);
+      toaster.create({
+        title: 'Path copied',
+        description: `Copied ${project.path} to clipboard`,
+        type: 'success',
+        duration: 2000,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to copy path';
+      toaster.create({
+        title: 'Failed to copy path',
+        description: errorMessage,
+        type: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -397,6 +417,13 @@ export default function ProjectsTabContent({
                               </Portal>
                             </Menu.Root>
                             <Menu.Separator />
+                            <Menu.Item
+                              value="copy-path"
+                              onSelect={() => handleCopyPath(project)}
+                            >
+                              <Icon><LuCopy /></Icon>
+                              Copy Path
+                            </Menu.Item>
                             <Menu.Item
                               value="edit"
                               onSelect={() => handleEditProject(project)}

@@ -1869,14 +1869,13 @@ pub async fn create_project_from_clone(
 /// 1. Creates a new project directory at the specified path
 /// 2. Creates .bluekit directory structure
 /// 3. Copies source files to appropriate subdirectories based on file type
-/// 4. Optionally registers the project in the registry
+/// 4. Registers the project in the database
 /// 
 /// # Arguments
 /// 
 /// * `target_path` - The absolute path where the new project should be created
 /// * `project_title` - Title for the new project
 /// * `source_files` - Array of source file paths with their types
-/// * `register_project` - Whether to automatically register the new project
 /// 
 /// # Returns
 /// 
@@ -1889,7 +1888,6 @@ pub async fn create_new_project(
     target_path: String,
     project_title: String,
     source_files: Vec<(String, String)>, // (file_path, file_type) where file_type is "kit", "walkthrough", or "diagram"
-    register_project: bool,
 ) -> Result<String, String> {
     use std::fs;
     
@@ -1966,35 +1964,33 @@ pub async fn create_new_project(
             .map_err(|e| format!("Failed to write target file {}: {}", target_file_path.display(), e))?;
     }
     
-    // Register project in database (optional)
-    if register_project {
-        use sea_orm::*;
-        use chrono::Utc;
-        use uuid::Uuid;
+    // Register project in database
+    use sea_orm::*;
+    use chrono::Utc;
+    use uuid::Uuid;
 
-        let now = Utc::now().timestamp_millis();
-        let id = Uuid::new_v4().to_string();
+    let now = Utc::now().timestamp_millis();
+    let id = Uuid::new_v4().to_string();
 
-        let project = crate::db::entities::project::ActiveModel {
-            id: Set(id),
-            name: Set(project_title),
-            path: Set(target_path.clone()),
-            description: Set(Some(format!("Created with {} file{}", file_count, if file_count != 1 { "s" } else { "" }))),
-            tags: Set(None),
-            git_connected: Set(false),
-            git_url: Set(None),
-            git_branch: Set(None),
-            git_remote: Set(None),
-            last_commit_sha: Set(None),
-            last_synced_at: Set(None),
-            created_at: Set(now),
-            updated_at: Set(now),
-            last_opened_at: Set(None),
-        };
+    let project = crate::db::entities::project::ActiveModel {
+        id: Set(id),
+        name: Set(project_title),
+        path: Set(target_path.clone()),
+        description: Set(Some(format!("Created with {} file{}", file_count, if file_count != 1 { "s" } else { "" }))),
+        tags: Set(None),
+        git_connected: Set(false),
+        git_url: Set(None),
+        git_branch: Set(None),
+        git_remote: Set(None),
+        last_commit_sha: Set(None),
+        last_synced_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_opened_at: Set(None),
+    };
 
-        project.insert(&*db).await
-            .map_err(|e| format!("Failed to register project in database: {}", e))?;
-    }
+    project.insert(&*db).await
+        .map_err(|e| format!("Failed to register project in database: {}", e))?;
     
     Ok(target_path)
 }
