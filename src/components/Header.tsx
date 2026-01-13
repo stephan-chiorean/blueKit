@@ -73,15 +73,6 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
 
   // Glass styling for light/dark mode
   const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
-  const headerBorderStyle = colorMode === 'light'
-    ? {
-      borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-      boxShadow: '0 1px 0 0 rgba(255, 255, 255, 0.1)',
-    }
-    : {
-      borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
-      boxShadow: '0 1px 12px -2px rgba(99, 102, 241, 0.15)',
-    };
 
   return (
     <Box
@@ -94,7 +85,6 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
         background: headerBg,
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        ...headerBorderStyle,
       }}
     >
       <Flex align="center" justify="space-between" gap={4}>

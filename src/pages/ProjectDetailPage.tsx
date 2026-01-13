@@ -29,6 +29,7 @@ import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useProjectArtifacts } from '../contexts/ProjectArtifactsContext';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
@@ -40,6 +41,19 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // Feature flags
   const { flags } = useFeatureFlags();
   const { setArtifacts: setGlobalArtifacts } = useProjectArtifacts();
+  const { colorMode } = useColorMode();
+
+  // Glass styling for sidebar to match header
+  const sidebarBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
+  
+  // Border styling for main content area (left border is the ResizeTrigger)
+  const contentBorderStyle = colorMode === 'light'
+    ? {
+      borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+    }
+    : {
+      borderTop: '1px solid rgba(99, 102, 241, 0.2)',
+    };
 
   // Sidebar state
   const [activeView, setActiveView] = useState<ViewType>('tasks');
@@ -773,11 +787,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         minH={0}
         overflow="hidden"
         bg="transparent"
-        css={{
-          background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-          backdropFilter: 'blur(30px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-        }}
       >
         <Splitter.Root
           defaultSize={[15, 85]}
@@ -805,13 +814,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           {/* Sidebar Panel */}
           <Splitter.Panel
             id="sidebar"
-            css={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(30px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-              _dark: {
-                background: 'rgba(0, 0, 0, 0.2)',
-              },
+            bg="transparent"
+            style={{
+              background: sidebarBg,
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
             }}
           >
             <ProjectSidebar
@@ -830,8 +837,25 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             />
           </Splitter.Panel>
 
-          {/* Resize Trigger */}
-          <Splitter.ResizeTrigger id="sidebar:content" />
+          {/* Resize Trigger - single 1px border with handle */}
+          <Splitter.ResizeTrigger
+            id="sidebar:content"
+            w="1px"
+            minW="1px"
+            maxW="1px"
+            p={0}
+            m={0}
+            bg={colorMode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(99, 102, 241, 0.2)'}
+            cursor="col-resize"
+            border="none"
+            outline="none"
+            boxShadow="none"
+            css={{
+              '&::before': { display: 'none' },
+              '&::after': { display: 'none' },
+              '& > *': { display: 'none' },
+            }}
+          />
 
           {/* Main Content Panel */}
           <Splitter.Panel id="content">
@@ -840,6 +864,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               position="relative" 
               bg="transparent"
               p={notebookFile ? 0 : 6}
+              style={contentBorderStyle}
             >
               {renderContent()}
             </Box>
