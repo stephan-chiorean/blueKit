@@ -54,7 +54,7 @@ export default function SidebarContent({
 
     return (
         <Flex direction="column" width="100%" h="100%" gap={4} pb={4}>
-            <SidebarSection title="Views" collapsed={collapsed}>
+            <SidebarSection title="Toolkit" collapsed={collapsed}>
                 <SidebarMenuItem
                     icon={LuListTodo}
                     label="Tasks"
