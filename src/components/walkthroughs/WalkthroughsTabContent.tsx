@@ -14,6 +14,7 @@ import {
 import { LuFilter, LuFolderPlus, LuBookOpen } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
 import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
@@ -288,6 +289,9 @@ function WalkthroughsTabContent({
   return (
     <Box position="relative">
       <VStack align="stretch" gap={6}>
+        {/* Toolkit Header */}
+        <ToolkitHeader title="Walkthroughs" />
+
         {/* Folders Section */}
         <Box position="relative">
           <Flex align="center" justify="space-between" gap={2} mb={4}>

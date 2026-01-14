@@ -30,6 +30,7 @@ import { GrNavigate } from 'react-icons/gr';
 import { Plan } from '../../types/plan';
 import CreatePlanDialog from './CreatePlanDialog';
 import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 
 interface PlansTabContentProps {
   plans: Plan[];
@@ -231,12 +232,20 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
         projectPath={projectPath}
       />
 
+      {/* Toolkit Header */}
+      <ToolkitHeader
+        title="Plans"
+        action={{
+          label: "Create Plan",
+          onClick: handleOpenCreateDialog,
+        }}
+      />
+
       {/* Header with filter and view mode toggle */}
       <Flex align="center" justify="space-between" gap={2} mb={4} position="relative">
         <Flex align="center" gap={2} flex="1">
-          <Heading size="md">Plans</Heading>
           <Text fontSize="sm" color="text.muted">
-            {filteredPlans.length}
+            {filteredPlans.length} plans
           </Text>
           {/* Filter input */}
           <Box w="300px">
@@ -360,7 +369,7 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
                 bg="transparent"
                 borderBottomWidth="1px"
                 borderBottomColor="transparent"
-                _hover={{ 
+                _hover={{
                   bg: "rgba(255, 255, 255, 0.05)",
                   borderBottomColor: "primary.500",
                 }}

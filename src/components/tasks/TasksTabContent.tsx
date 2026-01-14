@@ -24,6 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { Task, TaskPriority, TaskType } from '../../types/task';
 import { ProjectEntry, Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
@@ -51,18 +52,18 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   // Local state for tasks (loaded from database)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Local state for selected tasks
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-  
+
   // Dialog state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Sort state
-  const [sortBy, setSortBy] = useState<SortOption>('time');
-  
+  const [sortBy] = useState<SortOption>('time');
+
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('card');
 
@@ -271,7 +272,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   const filteredTasks = useMemo(() => {
     return sortedTasks.filter(task => {
       // Title filter
-      const matchesTitle = !titleFilter || 
+      const matchesTitle = !titleFilter ||
         task.title.toLowerCase().includes(titleFilter.toLowerCase()) ||
         (task.description && task.description.toLowerCase().includes(titleFilter.toLowerCase()));
 
@@ -497,9 +498,9 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
           {task.tags && task.tags.length > 0 && (
             <HStack gap={1} flexWrap="wrap">
               {task.tags.map((tag) => (
-                <Tag.Root 
-                  key={tag} 
-                  size="sm" 
+                <Tag.Root
+                  key={tag}
+                  size="sm"
                   variant="subtle"
                   colorPalette={getPriorityColorPalette(task.priority)}
                 >
@@ -538,6 +539,15 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         hasSelection={selectedTaskIds.size > 0}
         clearSelection={clearSelection}
         onTasksUpdated={loadTasks}
+      />
+
+      {/* Toolkit Header */}
+      <ToolkitHeader
+        title="Tasks"
+        action={{
+          label: "Add Task",
+          onClick: handleAddTask,
+        }}
       />
 
       {/* In Progress Section */}
@@ -741,7 +751,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
           {/* View Mode Switcher */}
           <LiquidViewModeSwitcher
             value={viewMode}
-            onChange={setViewMode}
+            onChange={(mode) => setViewMode(mode as ViewMode)}
             modes={[
               { id: 'card', label: 'Cards', icon: LuLayoutGrid },
               { id: 'table', label: 'Table', icon: LuTable },
@@ -762,8 +772,8 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
               {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
                 ? 'No tasks in progress match the current filters'
                 : context === 'workspace'
-                ? 'No tasks in progress'
-                : `No tasks in progress for ${(context as ProjectEntry).title}`
+                  ? 'No tasks in progress'
+                  : `No tasks in progress for ${(context as ProjectEntry).title}`
               }
             </Text>
           </Box>

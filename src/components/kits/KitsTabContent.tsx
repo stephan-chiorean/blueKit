@@ -15,6 +15,7 @@ import { LuFilter, LuFolderPlus } from 'react-icons/lu';
 import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
 import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { LiquidViewModeSwitcher } from './LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
@@ -316,6 +317,9 @@ function KitsTabContent({
   return (
     <Box position="relative" width="100%" maxW="100%">
       <VStack align="stretch" gap={6} width="100%">
+        {/* Toolkit Header */}
+        <ToolkitHeader title="Kits" />
+
         {/* Folders Section - only show if folders exist */}
         {folders.length > 0 && (
           <Box position="relative">

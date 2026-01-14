@@ -2,14 +2,9 @@ import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue }
 import {
   Box,
   VStack,
-  Text,
-  Icon,
-  HStack,
-  Button,
   Splitter,
 } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
-import { LuPlus } from 'react-icons/lu';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
@@ -630,55 +625,23 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     switch (activeView) {
       case 'tasks':
         return (
-          <>
-            <Box position="absolute" right={6} top={6} zIndex={5}>
-              <Button
-                colorPalette="primary"
-                onClick={() => tasksTabRef.current?.openCreateDialog()}
-                size="sm"
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuPlus />
-                  </Icon>
-                  <Text>Add Task</Text>
-                </HStack>
-              </Button>
-            </Box>
-            <TasksTabContent
-              ref={tasksTabRef}
-              context={project}
-              projects={allProjects}
-            />
-          </>
+          <TasksTabContent
+            ref={tasksTabRef}
+            context={project}
+            projects={allProjects}
+          />
         );
       case 'plans':
         return (
-          <>
-            <Box position="absolute" right={6} top={6} zIndex={5}>
-              <Button
-                colorPalette="primary"
-                onClick={() => plansTabRef.current?.openCreateDialog()}
-                size="sm"
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuPlus />
-                  </Icon>
-                  <Text>Add Plan</Text>
-                </HStack>
-              </Button>
-            </Box>
-            <PlansTabContent
-              ref={plansTabRef}
-              plans={plans}
-              plansLoading={plansLoading}
-              onViewPlan={handleViewPlan}
-              projectId={project.id}
-              projectPath={project.path}
-              onPlansChanged={loadPlans}
-            />
-          </>
+          <PlansTabContent
+            ref={plansTabRef}
+            plans={plans}
+            plansLoading={plansLoading}
+            onViewPlan={handleViewPlan}
+            projectId={project.id}
+            projectPath={project.path}
+            onPlansChanged={loadPlans}
+          />
         );
       case 'kits':
         return (

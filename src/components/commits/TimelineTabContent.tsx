@@ -50,6 +50,7 @@ import BranchOffModal from "./BranchOffModal";
 import RollbackModal from "./RollbackModal";
 import { FilterPanel } from "../shared/FilterPanel";
 import { LiquidViewModeSwitcher } from "../kits/LiquidViewModeSwitcher";
+import { ToolkitHeader } from "../shared/ToolkitHeader";
 
 interface TimelineTabContentProps {
   projectId: string;
@@ -754,6 +755,9 @@ export default function TimelineTabContent({
   // Commit timeline
   return (
     <VStack align="stretch" gap={2} pt={2} pb={4}>
+      {/* Toolkit Header */}
+      <ToolkitHeader title="Timeline" />
+
       {renderViewModeSwitcher()}
 
       {viewMode === "commits" ? (
@@ -763,175 +767,175 @@ export default function TimelineTabContent({
             const stats = getCommitStats(group.commits);
 
             return (
-            <Box key={`group-${_groupIndex}`}>
-              <DateHeader
-                dateString={group.dateString}
-                activityScore={activityScore}
-                count={stats.count}
-                itemType="commits"
-                additions={stats.additions}
-                deletions={stats.deletions}
-              />
-              <Box
-                css={{
-                  // Target all possible connector selectors with maximum specificity
-                  '& [data-part="connector"]': {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                  '& [data-part="connector-line"]': {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                  // Target by class if Chakra uses classes
-                  "& .chakra-timeline__connector": {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                  // More generic selector for any connector element
-                  '& [class*="connector"]': {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                  // Target any element that might be the connector line
-                  '& [class*="timeline"] [class*="connector"]': {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                }}
-              >
-                <Timeline.Root variant="subtle" colorPalette="blue">
-                  {group.commits.map((commit) => {
-                const commitMessage = commit.commit.message.split("\n")[0]; // First line only
-                const commitBody = commit.commit.message
-                  .split("\n")
-                  .slice(1)
-                  .join("\n")
-                  .trim();
-                const pinnedCheckpoint = getCheckpointForCommit(commit.sha);
-                const isPinned = !!pinnedCheckpoint;
-                const checkpointTypeColor = pinnedCheckpoint
-                  ? getCheckpointTypeColor(pinnedCheckpoint.checkpointType)
-                  : undefined;
+              <Box key={`group-${_groupIndex}`}>
+                <DateHeader
+                  dateString={group.dateString}
+                  activityScore={activityScore}
+                  count={stats.count}
+                  itemType="commits"
+                  additions={stats.additions}
+                  deletions={stats.deletions}
+                />
+                <Box
+                  css={{
+                    // Target all possible connector selectors with maximum specificity
+                    '& [data-part="connector"]': {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
+                    },
+                    '& [data-part="connector-line"]': {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
+                    },
+                    // Target by class if Chakra uses classes
+                    "& .chakra-timeline__connector": {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
+                    },
+                    // More generic selector for any connector element
+                    '& [class*="connector"]': {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
+                    },
+                    // Target any element that might be the connector line
+                    '& [class*="timeline"] [class*="connector"]': {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
+                    },
+                  }}
+                >
+                  <Timeline.Root variant="subtle" colorPalette="blue">
+                    {group.commits.map((commit) => {
+                      const commitMessage = commit.commit.message.split("\n")[0]; // First line only
+                      const commitBody = commit.commit.message
+                        .split("\n")
+                        .slice(1)
+                        .join("\n")
+                        .trim();
+                      const pinnedCheckpoint = getCheckpointForCommit(commit.sha);
+                      const isPinned = !!pinnedCheckpoint;
+                      const checkpointTypeColor = pinnedCheckpoint
+                        ? getCheckpointTypeColor(pinnedCheckpoint.checkpointType)
+                        : undefined;
 
-                return (
-                  <Timeline.Item key={commit.sha}>
-                    <Timeline.Indicator
-                      bg={checkpointTypeColor || undefined}
-                      color={isPinned ? "white" : undefined}
-                    >
-                      {isPinned ? <RiFlag2Fill /> : <LuGitBranch />}
-                    </Timeline.Indicator>
-                    <Timeline.Content>
-                      <Card.Root
-                        borderRadius="16px"
-                        borderWidth="1px"
-                        transition="all 0.2s ease-in-out"
-                        css={{
-                          background: 'rgba(255, 255, 255, 0.15)',
-                          backdropFilter: 'blur(30px) saturate(180%)',
-                          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                          borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.2)',
-                          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                          _dark: {
-                            background: 'rgba(0, 0, 0, 0.2)',
-                            borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.15)',
-                            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                          },
-                          _hover: {
-                            transform: 'scale(1.005)',
-                          },
-                        }}
-                      >
-                        <CardHeader pb={2}>
-                          <HStack justify="space-between" align="start">
-                            <VStack align="start" gap={1} flex={1}>
-                              <Text
-                                fontWeight="semibold"
-                                fontSize="sm"
-                                color="blue.700"
-                                _dark={{ color: "inherit" }}
-                              >
-                                {commitMessage}
-                              </Text>
-                              <HStack gap={2} fontSize="xs" color="fg.muted">
-                                <Text>{commit.commit.author.name}</Text>
-                                <Text>•</Text>
-                                <Text>
-                                  {formatDate(commit.commit.author.date)}
-                                </Text>
-                              </HStack>
-                            </VStack>
-                            <HStack gap={2}>
-                              {!isPinned && (
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => handlePinCheckpoint(commit)}
-                                >
-                                  <RiFlag2Fill />
-                                  Pin
-                                </Button>
-                              )}
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                onClick={() => handleViewDiff(commit)}
-                              >
-                                <LuExternalLink />
-                                View Diff
-                              </Button>
-                            </HStack>
-                          </HStack>
-                        </CardHeader>
-                        <CardBody pt={2}>
-                          {commitBody && (
-                            <Text
-                              fontSize="xs"
-                              mb={2}
-                              whiteSpace="pre-wrap"
-                              _dark={{ color: "blue.300" }}
-                            >
-                              {commitBody}
-                            </Text>
-                          )}
-                          <Text
-                            fontSize="xs"
-                            fontFamily="mono"
-                            color="blue.700"
-                            _dark={{ color: "inherit" }}
+                      return (
+                        <Timeline.Item key={commit.sha}>
+                          <Timeline.Indicator
+                            bg={checkpointTypeColor || undefined}
+                            color={isPinned ? "white" : undefined}
                           >
-                            {commit.sha.substring(0, 7)}
-                          </Text>
-                        </CardBody>
-                      </Card.Root>
-                    </Timeline.Content>
-                  </Timeline.Item>
-                );
-                  })}
-                </Timeline.Root>
+                            {isPinned ? <RiFlag2Fill /> : <LuGitBranch />}
+                          </Timeline.Indicator>
+                          <Timeline.Content>
+                            <Card.Root
+                              borderRadius="16px"
+                              borderWidth="1px"
+                              transition="all 0.2s ease-in-out"
+                              css={{
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(30px) saturate(180%)',
+                                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                                borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.2)',
+                                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                                _dark: {
+                                  background: 'rgba(0, 0, 0, 0.2)',
+                                  borderColor: isPinned && checkpointTypeColor ? checkpointTypeColor : 'rgba(255, 255, 255, 0.15)',
+                                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                                },
+                                _hover: {
+                                  transform: 'scale(1.005)',
+                                },
+                              }}
+                            >
+                              <CardHeader pb={2}>
+                                <HStack justify="space-between" align="start">
+                                  <VStack align="start" gap={1} flex={1}>
+                                    <Text
+                                      fontWeight="semibold"
+                                      fontSize="sm"
+                                      color="blue.700"
+                                      _dark={{ color: "inherit" }}
+                                    >
+                                      {commitMessage}
+                                    </Text>
+                                    <HStack gap={2} fontSize="xs" color="fg.muted">
+                                      <Text>{commit.commit.author.name}</Text>
+                                      <Text>•</Text>
+                                      <Text>
+                                        {formatDate(commit.commit.author.date)}
+                                      </Text>
+                                    </HStack>
+                                  </VStack>
+                                  <HStack gap={2}>
+                                    {!isPinned && (
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        onClick={() => handlePinCheckpoint(commit)}
+                                      >
+                                        <RiFlag2Fill />
+                                        Pin
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      onClick={() => handleViewDiff(commit)}
+                                    >
+                                      <LuExternalLink />
+                                      View Diff
+                                    </Button>
+                                  </HStack>
+                                </HStack>
+                              </CardHeader>
+                              <CardBody pt={2}>
+                                {commitBody && (
+                                  <Text
+                                    fontSize="xs"
+                                    mb={2}
+                                    whiteSpace="pre-wrap"
+                                    _dark={{ color: "blue.300" }}
+                                  >
+                                    {commitBody}
+                                  </Text>
+                                )}
+                                <Text
+                                  fontSize="xs"
+                                  fontFamily="mono"
+                                  color="blue.700"
+                                  _dark={{ color: "inherit" }}
+                                >
+                                  {commit.sha.substring(0, 7)}
+                                </Text>
+                              </CardBody>
+                            </Card.Root>
+                          </Timeline.Content>
+                        </Timeline.Item>
+                      );
+                    })}
+                  </Timeline.Root>
+                </Box>
               </Box>
-            </Box>
             );
           })}
 
@@ -1220,187 +1224,187 @@ function CheckpointsView({
             const activityScore = calculateCheckpointActivity(group.checkpoints);
 
             return (
-            <Box key={`group-${_groupIndex}`}>
-              <DateHeader
-                dateString={group.dateString}
-                activityScore={activityScore}
-                count={group.checkpoints.length}
-                itemType="checkpoints"
-              />
-              <Box
-                css={{
-                  '& [data-part="connector"]': {
-                    borderColor: "#4287f5 !important",
-                    borderWidth: "2px !important",
-                    borderStyle: "solid !important",
-                    opacity: "1 !important",
-                    display: "block !important",
-                    visibility: "visible !important",
-                  },
-                }}
-              >
-                <Timeline.Root variant="subtle" colorPalette="blue">
-                  {group.checkpoints.map((checkpoint) => {
-          const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
-          return (
-            <Timeline.Item key={checkpoint.id}>
-              <Timeline.Indicator bg={`${typeColor}`} color="white">
-                <RiFlag2Fill />
-              </Timeline.Indicator>
-              <Timeline.Content>
-                <Card.Root
-                  borderRadius="16px"
-                  borderWidth="1px"
-                  transition="all 0.2s ease-in-out"
+              <Box key={`group-${_groupIndex}`}>
+                <DateHeader
+                  dateString={group.dateString}
+                  activityScore={activityScore}
+                  count={group.checkpoints.length}
+                  itemType="checkpoints"
+                />
+                <Box
                   css={{
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(30px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-                    },
-                    _hover: {
-                      transform: 'scale(1.005)',
+                    '& [data-part="connector"]': {
+                      borderColor: "#4287f5 !important",
+                      borderWidth: "2px !important",
+                      borderStyle: "solid !important",
+                      opacity: "1 !important",
+                      display: "block !important",
+                      visibility: "visible !important",
                     },
                   }}
                 >
-                  <CardHeader pb={2}>
-                    <HStack justify="space-between" align="start">
-                      <VStack align="start" gap={1} flex={1}>
-                        <HStack gap={2} flexWrap="wrap">
-                          <Text fontWeight="semibold" fontSize="sm">
-                            {checkpoint.name}
-                          </Text>
-                          {(() => {
-                            const typeIcon = getCheckpointTypeIcon(
-                              checkpoint.checkpointType
-                            );
-                            const typeLabel = getCheckpointTypeLabel(
-                              checkpoint.checkpointType
-                            );
-                            const typeColorPalette =
-                              getCheckpointTypeColorPalette(
-                                checkpoint.checkpointType
-                              );
-                            return typeIcon && typeLabel && typeColorPalette ? (
-                              <Badge
-                                size="sm"
-                                variant="outline"
-                                colorPalette={typeColorPalette}
-                              >
-                                <HStack gap={1}>
-                                  <Icon color={typeIcon.color} boxSize={3}>
-                                    <typeIcon.icon />
-                                  </Icon>
-                                  <Text>{typeLabel}</Text>
+                  <Timeline.Root variant="subtle" colorPalette="blue">
+                    {group.checkpoints.map((checkpoint) => {
+                      const typeColor = getCheckpointTypeColor(checkpoint.checkpointType);
+                      return (
+                        <Timeline.Item key={checkpoint.id}>
+                          <Timeline.Indicator bg={`${typeColor}`} color="white">
+                            <RiFlag2Fill />
+                          </Timeline.Indicator>
+                          <Timeline.Content>
+                            <Card.Root
+                              borderRadius="16px"
+                              borderWidth="1px"
+                              transition="all 0.2s ease-in-out"
+                              css={{
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(30px) saturate(180%)',
+                                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                                borderColor: 'rgba(255, 255, 255, 0.2)',
+                                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                                _dark: {
+                                  background: 'rgba(0, 0, 0, 0.2)',
+                                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+                                },
+                                _hover: {
+                                  transform: 'scale(1.005)',
+                                },
+                              }}
+                            >
+                              <CardHeader pb={2}>
+                                <HStack justify="space-between" align="start">
+                                  <VStack align="start" gap={1} flex={1}>
+                                    <HStack gap={2} flexWrap="wrap">
+                                      <Text fontWeight="semibold" fontSize="sm">
+                                        {checkpoint.name}
+                                      </Text>
+                                      {(() => {
+                                        const typeIcon = getCheckpointTypeIcon(
+                                          checkpoint.checkpointType
+                                        );
+                                        const typeLabel = getCheckpointTypeLabel(
+                                          checkpoint.checkpointType
+                                        );
+                                        const typeColorPalette =
+                                          getCheckpointTypeColorPalette(
+                                            checkpoint.checkpointType
+                                          );
+                                        return typeIcon && typeLabel && typeColorPalette ? (
+                                          <Badge
+                                            size="sm"
+                                            variant="outline"
+                                            colorPalette={typeColorPalette}
+                                          >
+                                            <HStack gap={1}>
+                                              <Icon color={typeIcon.color} boxSize={3}>
+                                                <typeIcon.icon />
+                                              </Icon>
+                                              <Text>{typeLabel}</Text>
+                                            </HStack>
+                                          </Badge>
+                                        ) : null;
+                                      })()}
+                                    </HStack>
+                                    {checkpoint.description && (
+                                      <Text fontSize="xs" color="fg.muted">
+                                        {checkpoint.description}
+                                      </Text>
+                                    )}
+                                    <Text fontSize="xs" color="fg.muted">
+                                      Created {formatDateFromMs(checkpoint.createdAt)}
+                                    </Text>
+                                  </VStack>
+                                  <HStack gap={2}>
+                                    {gitUrl && (
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          invokeOpenCommitInGitHub(
+                                            gitUrl,
+                                            checkpoint.gitCommitSha
+                                          ).catch(console.error);
+                                        }}
+                                      >
+                                        <LuExternalLink />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setSelectedCheckpoint(checkpoint);
+                                        setRollbackModalOpen(true);
+                                      }}
+                                      css={{
+                                        color: "#4287f5",
+                                        "&:hover": {
+                                          bg: "rgba(66, 135, 245, 0.1)",
+                                        },
+                                      }}
+                                    >
+                                      <LuRotateCcw />
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setSelectedCheckpoint(checkpoint);
+                                        setBranchOffModalOpen(true);
+                                      }}
+                                      css={{
+                                        color: "#F28333",
+                                        "&:hover": {
+                                          bg: "rgba(242, 131, 51, 0.1)",
+                                        },
+                                      }}
+                                    >
+                                      <TbCopyPlus />
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      colorPalette="red"
+                                      onClick={() => handleUnpin(checkpoint.id)}
+                                    >
+                                      <LuTrash2 />
+                                    </Button>
+                                  </HStack>
                                 </HStack>
-                              </Badge>
-                            ) : null;
-                          })()}
-                        </HStack>
-                        {checkpoint.description && (
-                          <Text fontSize="xs" color="fg.muted">
-                            {checkpoint.description}
-                          </Text>
-                        )}
-                        <Text fontSize="xs" color="fg.muted">
-                          Created {formatDateFromMs(checkpoint.createdAt)}
-                        </Text>
-                      </VStack>
-                      <HStack gap={2}>
-                        {gitUrl && (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => {
-                              invokeOpenCommitInGitHub(
-                                gitUrl,
-                                checkpoint.gitCommitSha
-                              ).catch(console.error);
-                            }}
-                          >
-                            <LuExternalLink />
-                          </Button>
-                        )}
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedCheckpoint(checkpoint);
-                            setRollbackModalOpen(true);
-                          }}
-                          css={{
-                            color: "#4287f5",
-                            "&:hover": {
-                              bg: "rgba(66, 135, 245, 0.1)",
-                            },
-                          }}
-                        >
-                          <LuRotateCcw />
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedCheckpoint(checkpoint);
-                            setBranchOffModalOpen(true);
-                          }}
-                          css={{
-                            color: "#F28333",
-                            "&:hover": {
-                              bg: "rgba(242, 131, 51, 0.1)",
-                            },
-                          }}
-                        >
-                          <TbCopyPlus />
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="red"
-                          onClick={() => handleUnpin(checkpoint.id)}
-                        >
-                          <LuTrash2 />
-                        </Button>
-                      </HStack>
-                    </HStack>
-                  </CardHeader>
-                  <CardBody pt={2}>
-                    <VStack align="start" gap={2}>
-                      <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
-                        {checkpoint.gitCommitSha.substring(0, 7)}
-                      </Text>
-                      {(() => {
-                        const tags = parseCheckpointTags(checkpoint.tags);
-                        return tags.length > 0 ? (
-                          <HStack gap={1} flexWrap="wrap">
-                            {tags.map((tag) => (
-                              <Tag.Root
-                                key={tag}
-                                size="sm"
-                                variant="subtle"
-                                colorPalette="gray"
-                              >
-                                <Tag.Label>{tag}</Tag.Label>
-                              </Tag.Root>
-                            ))}
-                          </HStack>
-                        ) : null;
-                      })()}
-                    </VStack>
-                  </CardBody>
-                </Card.Root>
-              </Timeline.Content>
-            </Timeline.Item>
-          );
-                  })}
-                </Timeline.Root>
+                              </CardHeader>
+                              <CardBody pt={2}>
+                                <VStack align="start" gap={2}>
+                                  <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
+                                    {checkpoint.gitCommitSha.substring(0, 7)}
+                                  </Text>
+                                  {(() => {
+                                    const tags = parseCheckpointTags(checkpoint.tags);
+                                    return tags.length > 0 ? (
+                                      <HStack gap={1} flexWrap="wrap">
+                                        {tags.map((tag) => (
+                                          <Tag.Root
+                                            key={tag}
+                                            size="sm"
+                                            variant="subtle"
+                                            colorPalette="gray"
+                                          >
+                                            <Tag.Label>{tag}</Tag.Label>
+                                          </Tag.Root>
+                                        ))}
+                                      </HStack>
+                                    ) : null;
+                                  })()}
+                                </VStack>
+                              </CardBody>
+                            </Card.Root>
+                          </Timeline.Content>
+                        </Timeline.Item>
+                      );
+                    })}
+                  </Timeline.Root>
+                </Box>
               </Box>
-            </Box>
             );
           })}
         </>
