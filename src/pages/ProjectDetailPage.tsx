@@ -857,7 +857,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             <Box
               h="100%"
               minH={0}
-              overflow="hidden"
+              overflowY="auto"
+              overflowX="hidden"
               position="relative"
               bg="transparent"
               p={notebookFile ? 0 : 6}
