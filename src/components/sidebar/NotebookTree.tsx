@@ -231,7 +231,7 @@ function TreeNode({
     };
 
     return (
-        <Box>
+        <Box mb={0.5}>
             <HStack
                 py={1}
                 px={2}

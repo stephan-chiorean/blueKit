@@ -33,6 +33,7 @@ export default function SidebarMenuItem({
             w="100%"
             py={2}
             px={3}
+            mb={0.5}
             borderRadius="md"
             bg={isActive ? activeBg : 'transparent'}
             color={isActive ? activeColor : inactiveColor}
