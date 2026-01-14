@@ -21,9 +21,12 @@ export default function SidebarMenuItem({
 }: SidebarMenuItemProps) {
     const { colorMode } = useColorMode();
 
-    const activeBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)';
+    // Match the exact styling of the subtle blue button (colorPalette="blue" variant="subtle")
+    // Light mode: subtle blue background (blue.100 for more visibility), darker navy text (blue.700)
+    // Dark mode: blue background (blue.900), light blue text (blue.200)
+    const activeBg = colorMode === 'light' ? 'blue.100' : 'blue.900';
     const hoverBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.05)';
-    const activeColor = colorMode === 'light' ? 'black' : 'white';
+    const activeColor = colorMode === 'light' ? 'blue.700' : 'blue.200';
     const inactiveColor = colorMode === 'light' ? 'gray.600' : 'gray.400';
 
     return (

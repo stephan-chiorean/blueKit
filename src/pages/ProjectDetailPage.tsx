@@ -45,7 +45,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
   // Glass styling for sidebar to match header
   const sidebarBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
-  
+
   // Border styling for main content area (left border is the ResizeTrigger)
   const contentBorderStyle = colorMode === 'light'
     ? {
@@ -59,6 +59,13 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const [activeView, setActiveView] = useState<ViewType>('tasks');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const [splitSizes, setSplitSizes] = useState<[number, number]>([15, 85]);
+
+  // Pixel-based minimum sidebar width (280px is a good default for sidebar content)
+  const SIDEBAR_MIN_PX = 280;
+  const SIDEBAR_MAX_PX = 500;
+
+  // Ref to track splitter container width
+  const splitterContainerRef = useRef<HTMLDivElement>(null);
 
   const handleTreeRefresh = () => setFileTreeVersion(v => v + 1);
 
@@ -786,6 +793,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
       {/* Full screen content area with Splitter */}
       <Box
+        ref={splitterContainerRef}
         flex="1"
         minH={0}
         overflow="hidden"
@@ -798,17 +806,38 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             if (details.size && details.size.length >= 2) {
               const [sidebar, content] = details.size;
 
-              // Snap between 0-15% to either 0 or 15
-              if (sidebar > 0 && sidebar < 15) {
-                const snapped = sidebar < 7.5 ? 0 : 15;
-                setSplitSizes([snapped, 100 - snapped]);
-              } else {
-                setSplitSizes([sidebar, content]);
+              // Get container width to calculate pixel-based minimums
+              const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+
+              // Calculate minimum and maximum sidebar sizes as percentages
+              const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+              const maxSidebarPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
+
+              let newSidebar = sidebar;
+              let newContent = content;
+
+              // Enforce pixel-based minimum (convert to percentage)
+              if (sidebar > 0 && sidebar < minSidebarPercent) {
+                // Snap to either 0 (collapsed) or minimum pixel width
+                newSidebar = sidebar < minSidebarPercent / 2 ? 0 : minSidebarPercent;
+                newContent = 100 - newSidebar;
               }
+              // Enforce pixel-based maximum
+              else if (sidebar > maxSidebarPercent) {
+                newSidebar = maxSidebarPercent;
+                newContent = 100 - newSidebar;
+              }
+              // Normal resize within bounds
+              else {
+                newSidebar = sidebar;
+                newContent = content;
+              }
+
+              setSplitSizes([newSidebar, newContent]);
             }
           }}
           panels={[
-            { id: 'sidebar', minSize: 0, maxSize: 40 },
+            { id: 'sidebar', minSize: 0, maxSize: 100 },
             { id: 'content', minSize: 30 },
           ]}
           h="100%"
@@ -862,9 +891,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
           {/* Main Content Panel */}
           <Splitter.Panel id="content">
-            <Box 
-              h="100%" 
-              position="relative" 
+            <Box
+              h="100%"
+              minH={0}
+              overflow="hidden"
+              position="relative"
               bg="transparent"
               p={notebookFile ? 0 : 6}
               style={contentBorderStyle}

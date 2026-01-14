@@ -193,6 +193,7 @@ export default function SidebarContent({
                             onFileSelect={onFileSelect}
                             selectedFileId={selectedFileId}
                             version={fileTreeVersion}
+                            onTreeRefresh={onTreeRefresh}
                         />
                     </Box>
                 </SidebarSection>

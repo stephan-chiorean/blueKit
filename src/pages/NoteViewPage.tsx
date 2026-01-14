@@ -27,7 +27,6 @@ export default function NoteViewPage({
     <Box
       h="100%"
       w="100%"
-      overflow="hidden"
       style={{
         background: cardBg,
         backdropFilter: 'blur(12px)',

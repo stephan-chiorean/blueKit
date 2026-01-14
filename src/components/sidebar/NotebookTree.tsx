@@ -1,10 +1,16 @@
-import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Text, Popover, Input, Button, VStack } from '@chakra-ui/react';
 
 import { useEffect, useState, useMemo } from 'react';
 import { LuFile, LuFolder, LuFolderOpen, LuStar } from 'react-icons/lu';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
+import { NotebookContextMenu } from './NotebookContextMenu';
+import { invokeWriteFile, invokeReadFile } from '../../ipc';
+import { invokeCreateFolder } from '../../ipc/fileTree';
+import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder } from '../../ipc/folders';
+import { deleteResources } from '../../ipc/artifacts';
+import { toaster } from '../ui/toaster';
 
 interface NotebookTreeProps {
     projectPath: string;
@@ -12,6 +18,7 @@ interface NotebookTreeProps {
     selectedFileId?: string;
     className?: string;
     version?: number;
+    onTreeRefresh?: () => void;
 }
 
 // Helper function to find a node by ID in the tree
@@ -56,11 +63,23 @@ export default function NotebookTree({
     onFileSelect,
     selectedFileId,
     className,
-    version
+    version,
+    onTreeRefresh
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const { colorMode } = useColorMode();
+    const [contextMenu, setContextMenu] = useState<{
+        isOpen: boolean;
+        x: number;
+        y: number;
+        node: FileTreeNode | null;
+    }>({ isOpen: false, x: 0, y: 0, node: null });
+    const [renameState, setRenameState] = useState<{
+        isOpen: boolean;
+        node: FileTreeNode | null;
+        newName: string;
+    }>({ isOpen: false, node: null, newName: '' });
 
     useEffect(() => {
         loadTree();
@@ -127,18 +146,307 @@ export default function NotebookTree({
         });
     };
 
+    const refreshTree = () => {
+        loadTree();
+        if (onTreeRefresh) {
+            onTreeRefresh();
+        }
+    };
+
+    // Context menu handlers
+    const handleContextMenu = (e: React.MouseEvent, node: FileTreeNode) => {
+        if (!node.isFolder) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            isOpen: true,
+            x: e.clientX,
+            y: e.clientY,
+            node,
+        });
+    };
+
+    const closeContextMenu = () => {
+        setContextMenu({ isOpen: false, x: 0, y: 0, node: null });
+    };
+
+    const handleNewFile = async (folderPath: string) => {
+        try {
+            const fileName = prompt('Enter file name (e.g., new-file.md):');
+            if (!fileName) return;
+
+            let finalFileName = fileName.trim();
+            if (!finalFileName.includes('.')) {
+                finalFileName += '.md';
+            }
+
+            // Use path separator that works cross-platform (backend handles normalization)
+            const separator = folderPath.includes('\\') ? '\\' : '/';
+            const filePath = `${folderPath}${separator}${finalFileName}`;
+            await invokeWriteFile(filePath, '');
+            
+            toaster.create({
+                type: 'success',
+                title: 'File created',
+                description: `${finalFileName} created successfully`,
+            });
+
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to create file:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to create file',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const handleNewFolder = async (folderPath: string) => {
+        try {
+            const folderName = prompt('Enter folder name:');
+            if (!folderName) return;
+
+            // Use path separator that works cross-platform (backend handles normalization)
+            const separator = folderPath.includes('\\') ? '\\' : '/';
+            const newFolderPath = `${folderPath}${separator}${folderName.trim()}`;
+            await invokeCreateFolder(newFolderPath);
+            
+            toaster.create({
+                type: 'success',
+                title: 'Folder created',
+                description: `${folderName} created successfully`,
+            });
+
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to create folder:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to create folder',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const handleCopyPath = async (filePath: string) => {
+        try {
+            await navigator.clipboard.writeText(filePath);
+            toaster.create({
+                type: 'success',
+                title: 'Path copied',
+                description: 'Absolute path copied to clipboard',
+            });
+        } catch (error) {
+            console.error('Failed to copy path:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to copy',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const handleCopyRelativePath = async (relativePath: string) => {
+        try {
+            await navigator.clipboard.writeText(relativePath);
+            toaster.create({
+                type: 'success',
+                title: 'Relative path copied',
+                description: 'Relative path copied to clipboard',
+            });
+        } catch (error) {
+            console.error('Failed to copy relative path:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to copy',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const handleRename = (node: FileTreeNode) => {
+        setRenameState({
+            isOpen: true,
+            node,
+            newName: node.name,
+        });
+    };
+
+    const handleRenameConfirm = async () => {
+        if (!renameState.node || !renameState.newName.trim()) {
+            setRenameState({ isOpen: false, node: null, newName: '' });
+            return;
+        }
+
+        const { node, newName } = renameState;
+        try {
+            if (node.isFolder) {
+                await invokeRenameArtifactFolder(node.path, newName.trim());
+                toaster.create({
+                    type: 'success',
+                    title: 'Folder renamed',
+                    description: `Renamed to ${newName.trim()}`,
+                });
+            } else {
+                // For files: read, write to new path, delete old
+                const content = await invokeReadFile(node.path);
+                // Extract parent directory from path
+                const lastSeparator = node.path.lastIndexOf('/') > node.path.lastIndexOf('\\') 
+                    ? node.path.lastIndexOf('/') 
+                    : node.path.lastIndexOf('\\');
+                const parentDir = lastSeparator > 0 ? node.path.slice(0, lastSeparator) : node.path;
+                const separator = node.path.includes('\\') ? '\\' : '/';
+                const newPath = `${parentDir}${separator}${newName.trim()}`;
+                await invokeWriteFile(newPath, content);
+                await deleteResources([node.path]);
+                toaster.create({
+                    type: 'success',
+                    title: 'File renamed',
+                    description: `Renamed to ${newName.trim()}`,
+                });
+            }
+
+            setRenameState({ isOpen: false, node: null, newName: '' });
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to rename:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to rename',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const handleDelete = async (node: FileTreeNode) => {
+        if (!confirm(`Are you sure you want to delete "${node.name}"?`)) {
+            return;
+        }
+
+        try {
+            if (node.isFolder) {
+                await invokeDeleteArtifactFolder(node.path);
+                toaster.create({
+                    type: 'success',
+                    title: 'Folder deleted',
+                    description: `${node.name} deleted successfully`,
+                });
+            } else {
+                await deleteResources([node.path]);
+                toaster.create({
+                    type: 'success',
+                    title: 'File deleted',
+                    description: `${node.name} deleted successfully`,
+                });
+            }
+
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to delete:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to delete',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    // Calculate relative path helper
+    const getRelativePath = (nodePath: string): string => {
+        if (nodePath.startsWith(projectPath)) {
+            return nodePath.slice(projectPath.length).replace(/^[/\\]/, '');
+        }
+        return nodePath;
+    };
+
     return (
-        <Box className={className} w="100%">
-            <CustomTree
-                nodes={nodes}
-                onNodeClick={onFileSelect}
-                selectedId={selectedFileId}
-                parentFolderPaths={parentFolderPaths}
-                expandedFolders={expandedFolders}
-                onToggleExpand={handleToggleExpand}
-                colorMode={colorMode}
+        <>
+            <Box className={className} w="100%">
+                <CustomTree
+                    nodes={nodes}
+                    onNodeClick={onFileSelect}
+                    selectedId={selectedFileId}
+                    parentFolderPaths={parentFolderPaths}
+                    expandedFolders={expandedFolders}
+                    onToggleExpand={handleToggleExpand}
+                    colorMode={colorMode}
+                    onContextMenu={handleContextMenu}
+                />
+            </Box>
+
+            <NotebookContextMenu
+                isOpen={contextMenu.isOpen}
+                x={contextMenu.x}
+                y={contextMenu.y}
+                node={contextMenu.node}
+                projectPath={projectPath}
+                onClose={closeContextMenu}
+                onNewFile={handleNewFile}
+                onNewFolder={handleNewFolder}
+                onCopyPath={handleCopyPath}
+                onCopyRelativePath={(nodePath) => {
+                    handleCopyRelativePath(getRelativePath(nodePath));
+                }}
+                onRename={handleRename}
+                onDelete={handleDelete}
             />
-        </Box>
+
+            {/* Rename Popover */}
+            <Popover.Root
+                open={renameState.isOpen}
+                onOpenChange={(e) => {
+                    if (!e.open) {
+                        setRenameState({ isOpen: false, node: null, newName: '' });
+                    }
+                }}
+            >
+                <Popover.Positioner>
+                    <Popover.Content width="280px">
+                        <Popover.Arrow />
+                        <Popover.Body p={3}>
+                            <VStack gap={3} align="stretch">
+                                <Text fontSize="sm" fontWeight="medium">
+                                    Rename {renameState.node?.isFolder ? 'Folder' : 'File'}
+                                </Text>
+                                <Input
+                                    size="sm"
+                                    value={renameState.newName}
+                                    onChange={(e) =>
+                                        setRenameState((prev) => ({ ...prev, newName: e.target.value }))
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleRenameConfirm();
+                                        } else if (e.key === 'Escape') {
+                                            setRenameState({ isOpen: false, node: null, newName: '' });
+                                        }
+                                    }}
+                                    autoFocus
+                                />
+                                <HStack justify="flex-end">
+                                    <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        onClick={() => setRenameState({ isOpen: false, node: null, newName: '' })}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="xs"
+                                        colorPalette="primary"
+                                        onClick={handleRenameConfirm}
+                                        disabled={!renameState.newName.trim()}
+                                    >
+                                        Rename
+                                    </Button>
+                                </HStack>
+                            </VStack>
+                        </Popover.Body>
+                    </Popover.Content>
+                </Popover.Positioner>
+            </Popover.Root>
+        </>
     );
 }
 
@@ -152,6 +460,7 @@ interface CustomTreeProps {
     onToggleExpand: (folderId: string) => void;
     level?: number;
     colorMode: string;
+    onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void;
 }
 
 function CustomTree({ 
@@ -162,7 +471,8 @@ function CustomTree({
     expandedFolders,
     onToggleExpand,
     level = 0, 
-    colorMode 
+    colorMode,
+    onContextMenu
 }: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
@@ -178,6 +488,7 @@ function CustomTree({
                     onToggleExpand={onToggleExpand}
                     level={level}
                     colorMode={colorMode}
+                    onContextMenu={onContextMenu}
                 />
             ))}
         </Box>
@@ -193,7 +504,8 @@ function TreeNode({
     isExpanded,
     onToggleExpand,
     level, 
-    colorMode 
+    colorMode,
+    onContextMenu
 }: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
@@ -203,7 +515,8 @@ function TreeNode({
     isExpanded: boolean,
     onToggleExpand: (folderId: string) => void,
     level: number,
-    colorMode: string
+    colorMode: string,
+    onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void
 }) {
     const handleClick = () => {
         if (node.isFolder) {
@@ -218,9 +531,12 @@ function TreeNode({
     // Check if file is a markdown file
     const isMarkdownFile = !node.isFolder && (node.name.endsWith('.md') || node.name.endsWith('.markdown'));
     
+    // Match the sidebar menu item styling (subtle blue button style) for light mode
+    // Light mode: subtle blue background (blue.100), darker navy text (blue.700)
+    // Dark mode: keep original styling (whiteAlpha.200 background, blue.200 text)
     const hoverBg = colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.100';
-    const selectedBg = colorMode === 'light' ? 'blue.50' : 'whiteAlpha.200';
-    const selectedColor = colorMode === 'light' ? 'blue.600' : 'blue.200';
+    const selectedBg = colorMode === 'light' ? 'blue.100' : 'whiteAlpha.200';
+    const selectedColor = colorMode === 'light' ? 'blue.700' : 'blue.200';
 
     // Determine the icon to use
     const getFileIcon = () => {
@@ -237,6 +553,7 @@ function TreeNode({
                 px={2}
                 cursor="pointer"
                 onClick={handleClick}
+                onContextMenu={(e) => onContextMenu(e, node)}
                 bg={isSelected ? selectedBg : 'transparent'}
                 color={isSelected ? selectedColor : 'inherit'}
                 _hover={{ bg: isSelected ? selectedBg : hoverBg }}
@@ -268,6 +585,7 @@ function TreeNode({
                     onToggleExpand={onToggleExpand}
                     level={level + 1}
                     colorMode={colorMode}
+                    onContextMenu={onContextMenu}
                 />
             )}
         </Box>

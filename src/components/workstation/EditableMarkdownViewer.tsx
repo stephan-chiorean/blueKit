@@ -358,15 +358,15 @@ export default function EditableMarkdownViewer({
       h="100%"
       overflow={viewMode === 'edit' ? 'hidden' : 'auto'}
       css={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        background: 'rgba(255, 255, 255, 0.45)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         _dark: {
-          background: 'rgba(0, 0, 0, 0.2)',
+          background: 'rgba(20, 20, 25, 0.5)',
         },
       }}
     >
-      <VStack align="stretch" gap={6} h="100%">
+      <VStack align="stretch" gap={6} h={viewMode === 'edit' ? '100%' : 'auto'}>
         {/* Header */}
         <Flex justify="space-between" align="flex-start" wrap="wrap" gap={4}>
           <Box>
@@ -585,7 +585,7 @@ export default function EditableMarkdownViewer({
         )}
 
         {/* Content Area */}
-        <Box flex={1} overflow={viewMode === 'edit' ? 'hidden' : 'auto'}>
+        <Box flex={viewMode === 'edit' ? 1 : undefined}>
           {viewMode === 'edit' ? (
             <MarkdownEditor
               ref={editorRef}
