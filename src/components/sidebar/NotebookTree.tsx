@@ -3,6 +3,7 @@ import { Box, HStack, Icon, Text, Popover, Input, Button, VStack } from '@chakra
 import { useEffect, useState, useMemo } from 'react';
 import { LuFile, LuFolder, LuFolderOpen, LuStar } from 'react-icons/lu';
 import { AiOutlineFileText } from 'react-icons/ai';
+import { BsDiagram2 } from 'react-icons/bs';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { NotebookContextMenu } from './NotebookContextMenu';
@@ -530,6 +531,19 @@ function TreeNode({
     
     // Check if file is a markdown file
     const isMarkdownFile = !node.isFolder && (node.name.endsWith('.md') || node.name.endsWith('.markdown'));
+    // Check if file is a mermaid diagram file
+    const isMermaidFile = !node.isFolder && node.name.endsWith('.mmd');
+    
+    // Helper function to strip file extension (.mmd or .md) from display name
+    const getDisplayName = (fileName: string): string => {
+        if (fileName.endsWith('.mmd')) {
+            return fileName.slice(0, -4);
+        }
+        if (fileName.endsWith('.md') || fileName.endsWith('.markdown')) {
+            return fileName.replace(/\.(md|markdown)$/, '');
+        }
+        return fileName;
+    };
     
     // Match the sidebar menu item styling (subtle blue button style) for light mode
     // Light mode: subtle blue background (blue.100), darker navy text (blue.700)
@@ -542,6 +556,9 @@ function TreeNode({
     const getFileIcon = () => {
         if (node.isFolder) {
             return isExpanded ? LuFolderOpen : LuFolder;
+        }
+        if (isMermaidFile) {
+            return BsDiagram2;
         }
         return isMarkdownFile ? AiOutlineFileText : LuFile;
     };
@@ -568,7 +585,7 @@ function TreeNode({
                     flexShrink={0}
                 />
                 <Text fontSize="sm" truncate flex={1}>
-                    {node.name}
+                    {node.isFolder ? node.name : getDisplayName(node.name)}
                 </Text>
                 {node.isEssential && (
                     <Icon as={LuStar} color="yellow.400" boxSize={3} />
