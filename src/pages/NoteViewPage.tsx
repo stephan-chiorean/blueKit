@@ -22,6 +22,10 @@ interface NoteViewPageProps {
   onContentChange?: (newContent: string) => void;
   /** Callback when navigating to a different file in the same directory */
   onNavigate?: (resource: ResourceFile, content: string) => void;
+  /** Initial view mode (default: 'preview') */
+  initialViewMode?: ViewMode;
+  /** Override title for editing mode (synced from editor H1) */
+  editingTitle?: string;
 }
 
 type ViewMode = 'preview' | 'source' | 'edit';
@@ -32,9 +36,11 @@ export default function NoteViewPage({
   editable = true,
   onContentChange,
   onNavigate,
+  initialViewMode = 'preview',
+  editingTitle,
 }: NoteViewPageProps) {
   const { colorMode } = useColorMode();
-  const [viewMode, setViewMode] = useState<ViewMode>('preview');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [content, setContent] = useState(initialContent);
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const editorRef = useRef<MarkdownEditorRef>(null);
@@ -63,13 +69,34 @@ export default function NoteViewPage({
     },
   });
 
-  // Update content when prop changes (external file change)
-  // Only update if not in edit mode to avoid overwriting user edits
+  // Track previous resource path to detect file change
+  const prevResourcePathRef = useRef(resource.path);
+
+  // Update content when navigating to a different file
   useEffect(() => {
-    if (initialContent !== content && viewMode !== 'edit') {
+    const isNewFile = prevResourcePathRef.current !== resource.path;
+    prevResourcePathRef.current = resource.path;
+
+    // Always update on file change, or when not editing
+    if (isNewFile || viewMode !== 'edit') {
       setContent(initialContent);
+      // Reset view mode to initial when switching files
+      if (isNewFile) {
+        setViewMode(initialViewMode);
+      }
     }
-  }, [initialContent, viewMode]);
+  }, [initialContent, resource.path, viewMode, initialViewMode]);
+
+  // Select H1 title when opening a new file in edit mode
+  useEffect(() => {
+    if (initialViewMode === 'edit' && editorRef.current) {
+      // Small delay to ensure editor is fully mounted
+      const timer = setTimeout(() => {
+        editorRef.current?.selectH1Title();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [initialViewMode, resource.path]);
 
   // Fetch sibling files in the same directory
   useEffect(() => {
@@ -204,6 +231,7 @@ export default function NoteViewPage({
         onNavigateNext={handleNavigateNext}
         canNavigatePrev={canNavigatePrev}
         canNavigateNext={canNavigateNext}
+        editingTitle={editingTitle}
       />
 
       <Box flex={1} overflow={viewMode === 'edit' ? 'hidden' : 'auto'} p={6}>

@@ -21,20 +21,42 @@ interface NotebookTreeProps {
     className?: string;
     version?: number;
     onTreeRefresh?: () => void;
+    /** Called when a new file is created (for opening in edit mode) */
+    onNewFileCreated?: (node: FileTreeNode) => void;
+    /** Path of node in title-edit mode (visual highlight only, no input capture) */
+    titleEditPath?: string | null;
+    /** External title to display for the titleEditPath node (synced from editor) */
+    editingTitle?: string;
 }
 
-// Helper function to find a node by ID in the tree
-function findNodeById(nodes: FileTreeNode[], id: string): FileTreeNode | null {
+// Inline edit state for Obsidian-style creation
+interface InlineEditState {
+    nodeId: string | null;
+    path: string | null;  // Path of the node being edited
+    isNew: boolean;       // true if this is a newly created item
+    isFolder: boolean;
+    value: string;
+}
+
+
+// Helper function to find a node by path in the tree
+function findNodeByPath(nodes: FileTreeNode[], path: string): FileTreeNode | null {
     for (const node of nodes) {
-        if (node.id === id) {
+        if (node.path === path) {
             return node;
         }
         if (node.children) {
-            const found = findNodeById(node.children, id);
+            const found = findNodeByPath(node.children, path);
             if (found) return found;
         }
     }
     return null;
+}
+
+// Sanitize filename by removing invalid characters
+function sanitizeFileName(name: string): string {
+    // Remove characters that are invalid in filenames across platforms
+    return name.replace(/[/\\:*?"<>|]/g, '-').trim();
 }
 
 // Helper function to find all parent folder paths for a given file node
@@ -66,7 +88,10 @@ export default function NotebookTree({
     selectedFileId,
     className,
     version,
-    onTreeRefresh
+    onTreeRefresh,
+    onNewFileCreated,
+    titleEditPath,
+    editingTitle
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -82,6 +107,15 @@ export default function NotebookTree({
         node: FileTreeNode | null;
         newName: string;
     }>({ isOpen: false, node: null, newName: '' });
+
+    // Inline edit state for Obsidian-style creation
+    const [inlineEdit, setInlineEdit] = useState<InlineEditState>({
+        nodeId: null,
+        path: null,
+        isNew: false,
+        isFolder: false,
+        value: ''
+    });
 
     useEffect(() => {
         loadTree();
@@ -174,26 +208,34 @@ export default function NotebookTree({
 
     const handleNewFile = async (folderPath: string) => {
         try {
-            const fileName = prompt('Enter file name (e.g., new-file.md):');
-            if (!fileName) return;
-
-            let finalFileName = fileName.trim();
-            if (!finalFileName.includes('.')) {
-                finalFileName += '.md';
-            }
-
+            const tempName = 'Untitled.md';
             // Use path separator that works cross-platform (backend handles normalization)
             const separator = folderPath.includes('\\') ? '\\' : '/';
-            const filePath = `${folderPath}${separator}${finalFileName}`;
-            await invokeWriteFile(filePath, '');
+            const filePath = `${folderPath}${separator}${tempName}`;
 
-            toaster.create({
-                type: 'success',
-                title: 'File created',
-                description: `${finalFileName} created successfully`,
-            });
+            // Create file with placeholder content
+            await invokeWriteFile(filePath, '# Untitled\n\n');
 
-            refreshTree();
+            // Expand the parent folder to show new file
+            const parentNode = findNodeByPath(nodes, folderPath);
+            if (parentNode) {
+                setExpandedFolders(prev => new Set([...prev, parentNode.id]));
+            }
+
+            // Refresh tree to show new file
+            const tree = await invokeGetBlueKitFileTree(projectPath);
+            setNodes(tree);
+
+            // Find the new node and enter inline edit mode
+            const newNode = findNodeByPath(tree, filePath);
+            if (newNode) {
+                // For files, don't enter inline edit in tree - editor will have focus
+                // Parent component manages titleEditPath for visual sync
+                // Just notify parent that a new file was created
+                if (onNewFileCreated) {
+                    onNewFileCreated(newNode);
+                }
+            }
         } catch (error) {
             console.error('Failed to create file:', error);
             toaster.create({
@@ -206,21 +248,33 @@ export default function NotebookTree({
 
     const handleNewFolder = async (folderPath: string) => {
         try {
-            const folderName = prompt('Enter folder name:');
-            if (!folderName) return;
-
+            const tempName = 'Untitled';
             // Use path separator that works cross-platform (backend handles normalization)
             const separator = folderPath.includes('\\') ? '\\' : '/';
-            const newFolderPath = `${folderPath}${separator}${folderName.trim()}`;
+            const newFolderPath = `${folderPath}${separator}${tempName}`;
             await invokeCreateFolder(newFolderPath);
 
-            toaster.create({
-                type: 'success',
-                title: 'Folder created',
-                description: `${folderName} created successfully`,
-            });
+            // Expand the parent folder to show new folder
+            const parentNode = findNodeByPath(nodes, folderPath);
+            if (parentNode) {
+                setExpandedFolders(prev => new Set([...prev, parentNode.id]));
+            }
 
-            refreshTree();
+            // Refresh tree to show new folder
+            const tree = await invokeGetBlueKitFileTree(projectPath);
+            setNodes(tree);
+
+            // Find the new node and enter inline edit mode
+            const newNode = findNodeByPath(tree, newFolderPath);
+            if (newNode) {
+                setInlineEdit({
+                    nodeId: newNode.id,
+                    path: newNode.path,
+                    isNew: true,
+                    isFolder: true,
+                    value: tempName
+                });
+            }
         } catch (error) {
             console.error('Failed to create folder:', error);
             toaster.create({
@@ -229,6 +283,103 @@ export default function NotebookTree({
                 description: error instanceof Error ? error.message : 'Unknown error',
             });
         }
+    };
+
+    // Handler for inline edit value changes
+    const handleInlineEditChange = (value: string) => {
+        setInlineEdit(prev => ({ ...prev, value }));
+    };
+
+    // Handler for completing inline edit (blur or Enter)
+    const handleInlineEditComplete = async () => {
+        if (!inlineEdit.nodeId || !inlineEdit.path) return;
+
+        const node = findNodeByPath(nodes, inlineEdit.path);
+        if (!node) {
+            setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
+            return;
+        }
+
+        // Sanitize and prepare name
+        let newName = sanitizeFileName(inlineEdit.value) || 'Untitled';
+
+        // For files, ensure .md extension
+        if (!inlineEdit.isFolder && !newName.includes('.')) {
+            newName += '.md';
+        }
+
+        const currentName = node.name;
+
+        // Only rename if name changed
+        if (currentName !== newName) {
+            try {
+                if (inlineEdit.isFolder) {
+                    await invokeRenameArtifactFolder(node.path, newName);
+                } else {
+                    // For files: read content, write to new path, delete old
+                    const content = await invokeReadFile(node.path);
+                    const lastSeparator = node.path.lastIndexOf('/') > node.path.lastIndexOf('\\')
+                        ? node.path.lastIndexOf('/')
+                        : node.path.lastIndexOf('\\');
+                    const parentDir = lastSeparator > 0 ? node.path.slice(0, lastSeparator) : node.path;
+                    const separator = node.path.includes('\\') ? '\\' : '/';
+                    const newPath = `${parentDir}${separator}${newName}`;
+
+                    // Update the first line (H1) to match new name
+                    const nameWithoutExt = newName.replace(/\.(md|markdown)$/, '');
+                    let updatedContent = content;
+                    if (content.startsWith('# ')) {
+                        updatedContent = content.replace(/^# .+/, `# ${nameWithoutExt}`);
+                    }
+
+                    await invokeWriteFile(newPath, updatedContent);
+                    if (node.path !== newPath) {
+                        await deleteResources([node.path]);
+                    }
+                }
+
+                toaster.create({
+                    type: 'success',
+                    title: inlineEdit.isFolder ? 'Folder renamed' : 'File renamed',
+                    description: `Renamed to ${newName}`,
+                });
+            } catch (error) {
+                console.error('Failed to rename:', error);
+                toaster.create({
+                    type: 'error',
+                    title: 'Failed to rename',
+                    description: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        // Clear inline edit state and refresh tree
+        setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
+        refreshTree();
+    };
+
+    // Handler for canceling inline edit (Escape key)
+    const handleInlineEditCancel = async () => {
+        if (!inlineEdit.path) {
+            setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
+            return;
+        }
+
+        // If this was a newly created item, delete it
+        if (inlineEdit.isNew) {
+            try {
+                if (inlineEdit.isFolder) {
+                    await invokeDeleteArtifactFolder(inlineEdit.path);
+                } else {
+                    await deleteResources([inlineEdit.path]);
+                }
+            } catch (error) {
+                console.error('Failed to delete cancelled item:', error);
+            }
+            refreshTree();
+        }
+
+        setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
     };
 
     const handleCopyPath = async (filePath: string) => {
@@ -374,6 +525,13 @@ export default function NotebookTree({
                     onToggleExpand={handleToggleExpand}
                     colorMode={colorMode}
                     onContextMenu={handleContextMenu}
+                    inlineEditNodeId={inlineEdit.nodeId}
+                    inlineEditValue={inlineEdit.value}
+                    onInlineEditChange={handleInlineEditChange}
+                    onInlineEditComplete={handleInlineEditComplete}
+                    onInlineEditCancel={handleInlineEditCancel}
+                    titleEditPath={titleEditPath}
+                    editingTitle={editingTitle}
                 />
             </Box>
 
@@ -463,6 +621,15 @@ interface CustomTreeProps {
     level?: number;
     colorMode: string;
     onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void;
+    // Inline edit props (for folders)
+    inlineEditNodeId: string | null;
+    inlineEditValue: string;
+    onInlineEditChange: (value: string) => void;
+    onInlineEditComplete: () => void;
+    onInlineEditCancel: () => void;
+    // Title edit props (for files - visual only, no input capture)
+    titleEditPath: string | null | undefined;
+    editingTitle: string | undefined;
 }
 
 function CustomTree({
@@ -474,7 +641,14 @@ function CustomTree({
     onToggleExpand,
     level = 0,
     colorMode,
-    onContextMenu
+    onContextMenu,
+    inlineEditNodeId,
+    inlineEditValue,
+    onInlineEditChange,
+    onInlineEditComplete,
+    onInlineEditCancel,
+    titleEditPath,
+    editingTitle
 }: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
@@ -491,6 +665,14 @@ function CustomTree({
                     level={level}
                     colorMode={colorMode}
                     onContextMenu={onContextMenu}
+                    isEditing={inlineEditNodeId === node.id}
+                    editValue={inlineEditValue}
+                    onEditChange={onInlineEditChange}
+                    onEditComplete={onInlineEditComplete}
+                    onEditCancel={onInlineEditCancel}
+                    inlineEditNodeId={inlineEditNodeId}
+                    titleEditPath={titleEditPath}
+                    editingTitle={editingTitle}
                 />
             ))}
         </Box>
@@ -507,7 +689,15 @@ function TreeNode({
     onToggleExpand,
     level,
     colorMode,
-    onContextMenu
+    onContextMenu,
+    isEditing,
+    editValue,
+    onEditChange,
+    onEditComplete,
+    onEditCancel,
+    inlineEditNodeId,
+    titleEditPath,
+    editingTitle
 }: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
@@ -518,9 +708,25 @@ function TreeNode({
     onToggleExpand: (folderId: string) => void,
     level: number,
     colorMode: string,
-    onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void
+    onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void,
+    // Inline edit props (for folders)
+    isEditing: boolean,
+    editValue: string,
+    onEditChange: (value: string) => void,
+    onEditComplete: () => void,
+    onEditCancel: () => void,
+    inlineEditNodeId: string | null,
+    // Title edit props (for files - visual only sync)
+    titleEditPath: string | null | undefined,
+    editingTitle: string | undefined
 }) {
+    // Check if this node is in title-edit mode (visual only, for files)
+    const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
+
     const handleClick = () => {
+        // Don't handle clicks when editing
+        if (isEditing) return;
+
         if (node.isFolder) {
             onToggleExpand(node.id);
         } else {
@@ -564,17 +770,28 @@ function TreeNode({
         return isMarkdownFile ? AiOutlineFileText : LuFile;
     };
 
+    // Handle input key events
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            onEditComplete();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onEditCancel();
+        }
+    };
+
     return (
         <Box mb={0.5}>
             <HStack
                 py={1}
                 px={2}
-                cursor="pointer"
+                cursor={isEditing ? 'default' : 'pointer'}
                 onClick={handleClick}
                 onContextMenu={(e) => onContextMenu(e, node)}
-                bg={isSelected ? selectedBg : 'transparent'}
-                color={isSelected ? selectedColor : 'inherit'}
-                _hover={{ bg: isSelected ? selectedBg : hoverBg }}
+                bg={isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent'}
+                color={isSelected || isEditing || isInTitleEditMode ? selectedColor : 'inherit'}
+                _hover={{ bg: isSelected || isEditing || isInTitleEditMode ? selectedBg : hoverBg }}
                 borderRadius="sm"
                 gap={2}
                 transition="all 0.1s"
@@ -585,29 +802,68 @@ function TreeNode({
                     boxSize={4}
                     flexShrink={0}
                 />
-                <Text fontSize="sm" truncate flex={1}>
-                    {node.isFolder ? node.name : getDisplayName(node.name)}
-                </Text>
+                {isEditing ? (
+                    <Input
+                        size="xs"
+                        value={editValue}
+                        onChange={(e) => onEditChange(e.target.value)}
+                        onBlur={onEditComplete}
+                        onKeyDown={handleKeyDown}
+                        autoFocus
+                        flex={1}
+                        fontSize="sm"
+                        py={0}
+                        px={1}
+                        h="auto"
+                        minH="unset"
+                        border="none"
+                        bg="transparent"
+                        _focus={{
+                            boxShadow: 'none',
+                            outline: 'none',
+                            bg: colorMode === 'light' ? 'white' : 'whiteAlpha.100'
+                        }}
+                        ref={(input) => {
+                            // Auto-select text when input is focused
+                            if (input) {
+                                setTimeout(() => input.select(), 0);
+                            }
+                        }}
+                    />
+                ) : (
+                    <Text fontSize="sm" truncate flex={1}>
+                        {isInTitleEditMode && editingTitle ? editingTitle : (node.isFolder ? node.name : getDisplayName(node.name))}
+                    </Text>
+                )}
                 {node.isEssential && (
                     <Icon as={FaStar} color="blue.500" boxSize={3} />
                 )}
             </HStack>
 
-            {node.isFolder && isExpanded && node.children && (
-                <Box mt={0.5}>
-                    <CustomTree
-                        nodes={node.children}
-                        onNodeClick={onNodeClick}
-                        selectedId={selectedId}
-                        parentFolderPaths={parentFolderPaths}
-                        expandedFolders={expandedFolders}
-                        onToggleExpand={onToggleExpand}
-                        level={level + 1}
-                        colorMode={colorMode}
-                        onContextMenu={onContextMenu}
-                    />
-                </Box>
-            )}
-        </Box>
+            {
+                node.isFolder && isExpanded && node.children && (
+                    <Box mt={0.5}>
+                        <CustomTree
+                            nodes={node.children}
+                            onNodeClick={onNodeClick}
+                            selectedId={selectedId}
+                            parentFolderPaths={parentFolderPaths}
+                            expandedFolders={expandedFolders}
+                            onToggleExpand={onToggleExpand}
+                            level={level + 1}
+                            colorMode={colorMode}
+                            onContextMenu={onContextMenu}
+                            inlineEditNodeId={inlineEditNodeId}
+                            inlineEditValue={editValue}
+                            onInlineEditChange={onEditChange}
+                            onInlineEditComplete={onEditComplete}
+                            onInlineEditCancel={onEditCancel}
+                            titleEditPath={titleEditPath}
+                            editingTitle={editingTitle}
+                        />
+                    </Box>
+                )
+            }
+        </Box >
     );
 }

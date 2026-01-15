@@ -49,6 +49,8 @@ export interface MarkdownEditorRef {
   setScrollPosition: (position: { top: number; left: number }) => void;
   /** Get the EditorView instance */
   getView: () => EditorView | null;
+  /** Select the H1 title text (after # ) and focus the editor */
+  selectH1Title: () => void;
 }
 
 // Create compartments for dynamic reconfiguration
@@ -168,8 +170,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
         view.destroy();
         viewRef.current = null;
       };
-    // Recreate editor when static extensions change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // Recreate editor when static extensions change
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [staticExtensions]);
 
     // Update theme when color mode changes
@@ -252,6 +254,21 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
         scrollDOM.scrollLeft = position.left;
       },
       getView: () => viewRef.current,
+      selectH1Title: () => {
+        if (!viewRef.current) return;
+        const content = viewRef.current.state.doc.toString();
+        // Find the H1 heading: # Title
+        const h1Match = content.match(/^#\s+(.+)$/m);
+        if (h1Match) {
+          const titleStart = content.indexOf(h1Match[1]);
+          const titleEnd = titleStart + h1Match[1].length;
+          // Set selection and focus
+          viewRef.current.dispatch({
+            selection: { anchor: titleStart, head: titleEnd },
+          });
+          viewRef.current.focus();
+        }
+      },
     }), []);
 
     return (

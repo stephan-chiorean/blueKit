@@ -18,6 +18,12 @@ interface ProjectSidebarProps {
   fileTreeVersion: number;
   onTreeRefresh: () => void;
   onClearResourceView: () => void;
+  /** Called when a new file is created (for opening in edit mode) */
+  onNewFileCreated?: (node: FileTreeNode) => void;
+  /** Path of node in title-edit mode (visual highlight only) */
+  titleEditPath?: string | null;
+  /** External title to display for titleEditPath node (synced from editor) */
+  editingTitle?: string;
 }
 
 export default function ProjectSidebar({
@@ -33,6 +39,9 @@ export default function ProjectSidebar({
   fileTreeVersion,
   onTreeRefresh,
   onClearResourceView,
+  onNewFileCreated,
+  titleEditPath,
+  editingTitle,
 }: ProjectSidebarProps) {
   const { colorMode } = useColorMode();
 
@@ -170,6 +179,9 @@ export default function ProjectSidebar({
           selectedFileId={selectedFileId}
           fileTreeVersion={fileTreeVersion}
           onTreeRefresh={onTreeRefresh}
+          onNewFileCreated={onNewFileCreated}
+          titleEditPath={titleEditPath}
+          editingTitle={editingTitle}
         />
       </Box>
     </Flex>

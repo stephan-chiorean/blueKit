@@ -19,7 +19,8 @@ import ResourceViewPage from './ResourceViewPage';
 import NoteViewPage from './NoteViewPage';
 import ProjectSidebar from '../components/sidebar/ProjectSidebar';
 import { ViewType } from '../components/sidebar/SidebarContent';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
+import { deleteResources } from '../ipc/artifacts';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -96,6 +97,22 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     resource: ResourceFile;
     content: string;
   } | null>(null);
+
+  // Track if current file is newly created (to open in edit mode)
+  const [isNewFile, setIsNewFile] = useState(false);
+
+  // Key to force NoteViewPage remount on new file creation
+  const [newFileKey, setNewFileKey] = useState(0);
+
+  // Title edit mode: path being edited and current editing title (synced from editor H1)
+  const [titleEditPath, setTitleEditPath] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>('Untitled');
+
+  // Debounce timer for real-time file rename during title edit
+  const renameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref to track when we're creating a new file (prevents race condition in handleFileSelect)
+  const isCreatingNewFileRef = useRef(false);
 
   // Duplicate detection: Track last load timestamp to prevent rapid duplicate calls
   const lastLoadTimestampRef = useRef(0);
@@ -551,6 +568,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
 
   const handleFileSelect = async (node: FileTreeNode) => {
     try {
+      // Skip finalize check if we're in the middle of creating a new file (prevents race condition)
+      if (!isCreatingNewFileRef.current && titleEditPath && node.path !== titleEditPath) {
+        await finalizeTitleEdit();
+        setIsNewFile(false);
+      }
+
       const content = await invokeReadFile(node.path);
       const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
 
@@ -588,6 +611,54 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       console.error("Failed to read file", e);
     }
   };
+  // Finalize title edit: clear debounce timer, save content, and clear state
+  // Note: File rename already happens in real-time via debounced handler
+  const finalizeTitleEdit = async () => {
+    // Clear any pending debounced rename
+    if (renameDebounceRef.current) {
+      clearTimeout(renameDebounceRef.current);
+      renameDebounceRef.current = null;
+    }
+
+    if (!titleEditPath || !notebookFile) {
+      setTitleEditPath(null);
+      setEditingTitle('Untitled');
+      return;
+    }
+
+    try {
+      // Save the current content to the current path (may have been renamed)
+      await invokeWriteFile(notebookFile.resource.path, notebookFile.content);
+      // Refresh tree to ensure it's up to date
+      handleTreeRefresh();
+    } catch (error) {
+      console.error('Failed to finalize title edit:', error);
+    }
+
+    // Clear title edit state
+    setTitleEditPath(null);
+    setEditingTitle('Untitled');
+  };
+
+  // Handler for when a new file is created in NotebookTree
+  // Opens the file immediately in edit mode with title sync enabled
+  const handleNewFileCreated = async (node: FileTreeNode) => {
+    // Set ref FIRST to prevent race condition in handleFileSelect
+    isCreatingNewFileRef.current = true;
+
+    // Finalize any previous title edit
+    await finalizeTitleEdit();
+
+    // Now set up the new file's state
+    setIsNewFile(true);
+    setNewFileKey(k => k + 1); // Force NoteViewPage remount
+    setTitleEditPath(node.path);
+    setEditingTitle('Untitled');
+    await handleFileSelect(node);
+
+    // Clear the ref after file is loaded
+    isCreatingNewFileRef.current = false;
+  };
 
   // If viewing any resource, show the generic resource view page
   // For plans, resourceContent can be empty (plans load their own data)
@@ -616,12 +687,63 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     if (notebookFile) {
       return (
         <NoteViewPage
+          key={`${notebookFile.resource.path}-${newFileKey}`}
           resource={notebookFile.resource}
           content={notebookFile.content}
+          initialViewMode={isNewFile ? 'edit' : undefined}
+          editingTitle={titleEditPath ? editingTitle : undefined}
           onContentChange={(newContent) => {
             setNotebookFile(prev => prev ? { ...prev, content: newContent } : null);
+            // Extract H1 title from content and sync to tree if in title edit mode
+            if (titleEditPath) {
+              const h1Match = newContent.match(/^#\s+(.+)$/m);
+              if (h1Match) {
+                const newTitle = h1Match[1];
+                setEditingTitle(newTitle);
+
+                // Debounced real-time file rename
+                if (renameDebounceRef.current) {
+                  clearTimeout(renameDebounceRef.current);
+                }
+                renameDebounceRef.current = setTimeout(async () => {
+                  const sanitizedTitle = newTitle.trim().replace(/[/\\:*?"<>|]/g, '-') || 'Untitled';
+                  const oldPath = titleEditPath;
+                  const dirPath = oldPath.substring(0, oldPath.lastIndexOf('/') + 1) || oldPath.substring(0, oldPath.lastIndexOf('\\') + 1);
+                  const newPath = `${dirPath}${sanitizedTitle}.md`;
+
+                  if (newPath !== oldPath) {
+                    try {
+                      // Save content to new path
+                      await invokeWriteFile(newPath, newContent);
+                      // Delete old file
+                      await deleteResources([oldPath]);
+                      // Update titleEditPath to new path
+                      setTitleEditPath(newPath);
+                      // Update notebookFile state with new path
+                      setNotebookFile(prev => prev ? {
+                        ...prev,
+                        resource: {
+                          ...prev.resource,
+                          name: `${sanitizedTitle}.md`,
+                          path: newPath,
+                        }
+                      } : null);
+                      // Refresh tree
+                      handleTreeRefresh();
+                    } catch (error) {
+                      console.error('Real-time rename failed:', error);
+                    }
+                  }
+                }, 800); // 800ms debounce for rename
+              }
+            }
           }}
-          onNavigate={(newResource, newContent) => {
+          onNavigate={async (newResource, newContent) => {
+            // Finalize title edit before navigating (saves and renames file)
+            if (titleEditPath) {
+              await finalizeTitleEdit();
+            }
+            setIsNewFile(false); // Reset when navigating
             setNotebookFile({
               resource: newResource,
               content: newContent,
@@ -838,6 +960,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               fileTreeVersion={fileTreeVersion}
               onTreeRefresh={handleTreeRefresh}
               onClearResourceView={handleClearResourceView}
+              onNewFileCreated={handleNewFileCreated}
+              titleEditPath={titleEditPath}
+              editingTitle={editingTitle}
             />
           </Splitter.Panel>
 

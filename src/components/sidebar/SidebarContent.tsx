@@ -38,6 +38,12 @@ interface SidebarContentProps {
     selectedFileId?: string;
     fileTreeVersion?: number;
     onTreeRefresh?: () => void;
+    /** Called when a new file is created (for opening in edit mode) */
+    onNewFileCreated?: (node: FileTreeNode) => void;
+    /** Path of node in title-edit mode (visual highlight only) */
+    titleEditPath?: string | null;
+    /** External title to display for titleEditPath node (synced from editor) */
+    editingTitle?: string;
 }
 
 export default function SidebarContent({
@@ -48,7 +54,10 @@ export default function SidebarContent({
     onFileSelect,
     selectedFileId,
     fileTreeVersion,
-    onTreeRefresh
+    onTreeRefresh,
+    onNewFileCreated,
+    titleEditPath,
+    editingTitle
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
 
@@ -144,7 +153,7 @@ export default function SidebarContent({
                         />
                     }
                 >
-                    <Box 
+                    <Box
                         pl={2}
                         flex="1"
                         minH={0}
@@ -194,6 +203,9 @@ export default function SidebarContent({
                             selectedFileId={selectedFileId}
                             version={fileTreeVersion}
                             onTreeRefresh={onTreeRefresh}
+                            onNewFileCreated={onNewFileCreated}
+                            titleEditPath={titleEditPath}
+                            editingTitle={editingTitle}
                         />
                     </Box>
                 </SidebarSection>
