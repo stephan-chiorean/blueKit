@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, Text, Popover, Input, Button, VStack } from '@chakra-ui/react';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { LuFile, LuFolder, LuFolderOpen } from 'react-icons/lu';
 import { FaStar } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
@@ -723,6 +723,16 @@ function TreeNode({
     // Check if this node is in title-edit mode (visual only, for files)
     const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
 
+    // Track if text has been selected to prevent re-selecting on every render
+    const hasSelectedTextRef = useRef<boolean>(false);
+
+    // Reset selection state when exiting edit mode
+    useEffect(() => {
+        if (!isEditing) {
+            hasSelectedTextRef.current = false;
+        }
+    }, [isEditing]);
+
     const handleClick = () => {
         // Don't handle clicks when editing
         if (isEditing) return;
@@ -824,9 +834,12 @@ function TreeNode({
                             bg: colorMode === 'light' ? 'white' : 'whiteAlpha.100'
                         }}
                         ref={(input) => {
-                            // Auto-select text when input is focused
-                            if (input) {
-                                setTimeout(() => input.select(), 0);
+                            // Auto-select text when input is first focused (only once)
+                            if (input && !hasSelectedTextRef.current) {
+                                setTimeout(() => {
+                                    input.select();
+                                    hasSelectedTextRef.current = true;
+                                }, 0);
                             }
                         }}
                     />

@@ -25,11 +25,12 @@ The Notebook is the central file browsing and editing feature of BlueKit. It pro
 3. [Architecture Layers](#architecture-layers)
 4. [Data Flow: Loading the File Tree](#data-flow-loading-the-file-tree)
 5. [Data Flow: Selecting a Document](#data-flow-selecting-a-document)
-6. [Data Flow: Editing with Auto-Save](#data-flow-editing-with-auto-save)
-7. [Data Flow: View Mode Switching](#data-flow-view-mode-switching)
-8. [Component Deep Dives](#component-deep-dives)
-9. [State Management](#state-management)
-10. [Key Patterns](#key-patterns)
+6. [Data Flow: Creating New Files and Folders](#data-flow-creating-new-files-and-folders)
+7. [Data Flow: Editing with Auto-Save](#data-flow-editing-with-auto-save)
+8. [Data Flow: View Mode Switching](#data-flow-view-mode-switching)
+9. [Component Deep Dives](#component-deep-dives)
+10. [State Management](#state-management)
+11. [Key Patterns](#key-patterns)
 
 ---
 
@@ -95,9 +96,10 @@ The Notebook is the central file browsing and editing feature of BlueKit. It pro
 | **Browse Files** | Navigate the hierarchical file tree in the sidebar | NotebookTree |
 | **Expand/Collapse Folders** | Toggle folder visibility with click | TreeNode.handleClick |
 | **Auto-Expand Parents** | Selected file's parents auto-expand | NotebookTree useEffect |
-| **Create Files** | Create new .md files in any folder | NotebookToolbar, NotebookContextMenu |
-| **Create Folders** | Create new subfolders | NotebookToolbar, NotebookContextMenu |
-| **Rename** | Rename files and folders | NotebookContextMenu |
+| **Create Files** | Create new .md files, opens immediately in editor with title sync | NotebookToolbar, NotebookContextMenu → handleNewFile |
+| **Create Folders** | Create new subfolders with inline rename in tree | NotebookToolbar, NotebookContextMenu → handleNewFolder |
+| **Inline Rename Folders** | Rename folders directly in tree (Enter/blur to confirm, Escape to cancel) | TreeNode inline edit mode |
+| **Rename** | Rename files and folders via context menu | NotebookContextMenu |
 | **Delete** | Remove files and folders | NotebookContextMenu |
 | **Copy Paths** | Copy absolute or relative paths | NotebookContextMenu |
 | **View Preview** | Rendered markdown with styling | NoteViewPage (viewMode='preview') |
@@ -327,6 +329,282 @@ useEffect(() => {
 
 ---
 
+## Data Flow: Creating New Files and Folders
+
+The notebook supports Obsidian-style inline creation for both files and folders, with different behaviors optimized for each type.
+
+### New File Flow
+
+When creating a new file (right-click folder → New File):
+
+```
+┌─────────────────────┐   right-click folder   ┌──────────────────────────┐
+│ NotebookContextMenu │ ────────────────────► │ handleNewFile(folderPath) │
+│ "New File"          │                        │ (NotebookTree)            │
+└─────────────────────┘                        └───────────┬──────────────┘
+                                                           │
+                                                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. Create file: invokeWriteFile("folder/Untitled.md", "# Untitled\n\n") │
+│ 2. Expand parent folder                                                 │
+│ 3. Refresh tree: invokeGetBlueKitFileTree()                             │
+│ 4. Find new node                                                        │
+└───────────────────┬───────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ onNewFileCreated(newNode) callback                                      │
+│ └── ProjectDetailPage.handleNewFileCreated()                          │
+└───────────────────┬───────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. Set isCreatingNewFileRef.current = true (prevent race conditions)   │
+│ 2. Finalize any previous title edit                                    │
+│ 3. setIsNewFile(true)                                                   │
+│ 4. setTitleEditPath(node.path)  // Visual highlight in tree            │
+│ 5. setEditingTitle('Untitled')   // Sync title from editor              │
+│ 6. handleFileSelect(node)        // Open in editor immediately         │
+└─────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ NoteViewPage opens in 'edit' mode                                       │
+│ - Editor has focus (user types immediately)                             │
+│ - Tree shows visual highlight via titleEditPath                         │
+│ - Title syncs bidirectionally: editor ↔ tree                            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Behaviors**:
+- File opens immediately in edit mode with focus
+- Tree shows visual highlight (not inline edit input)
+- Title editing happens in the editor, synced to tree via `titleEditPath`/`editingTitle`
+- User types content and title simultaneously
+
+### New Folder Flow
+
+When creating a new folder (right-click folder → New Folder):
+
+```
+┌─────────────────────┐   right-click folder   ┌──────────────────────────┐
+│ NotebookContextMenu │ ────────────────────► │ handleNewFolder(folderPath)│
+│ "New Folder"        │                        │ (NotebookTree)            │
+└─────────────────────┘                        └───────────┬──────────────┘
+                                                           │
+                                                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. Create folder: invokeCreateFolder("folder/Untitled")                 │
+│ 2. Expand parent folder                                                 │
+│ 3. Refresh tree: invokeGetBlueKitFileTree()                             │
+│ 4. Find new node                                                        │
+└───────────────────┬───────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ setInlineEdit({                                                          │
+│   nodeId: newNode.id,                                                    │
+│   path: newNode.path,                                                     │
+│   isNew: true,                                                           │
+│   isFolder: true,                                                        │
+│   value: 'Untitled'                                                      │
+│ })                                                                       │
+└───────────────────┬───────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TreeNode renders Input component (isEditing === true)                   │
+│ - Input auto-selects text once (hasSelectedTextRef prevents re-selection)│
+│ - User types new name                                                    │
+└───────────────────┬───────────────────────────────────────────────────┘
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+        ▼                       ▼
+┌──────────────────┐   ┌──────────────────────┐
+│ Enter or blur    │   │ Escape key            │
+│ (complete)        │   │ (cancel)              │
+└────────┬─────────┘   └──────────┬───────────┘
+         │                         │
+         ▼                         ▼
+┌──────────────────┐   ┌──────────────────────┐
+│ handleInlineEdit │   │ handleInlineEditCancel│
+│ Complete()       │   │ ()                    │
+│ - Sanitize name  │   │ - Delete folder if    │
+│ - Rename folder  │   │   isNew === true      │
+│ - Refresh tree   │   │ - Clear inline edit   │
+│ - Clear state    │   │   state               │
+└──────────────────┘   └──────────────────────┘
+```
+
+**Key Behaviors**:
+- Folder enters inline edit mode in the tree (not in editor)
+- Input auto-selects text once on mount (prevents re-selection on re-renders)
+- User types new name directly in tree
+- **Enter or blur**: Renames folder, clears edit state
+- **Escape**: Cancels and deletes the newly created folder
+
+### Key Code: Inline Edit State
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:32-39
+interface InlineEditState {
+    nodeId: string | null;    // ID of node being edited
+    path: string | null;      // Path of node being edited
+    isNew: boolean;           // true if newly created (for cancel deletion)
+    isFolder: boolean;        // true for folders, false for files
+    value: string;            // Current edit value
+}
+```
+
+### Key Code: New File Creation
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:209-247
+const handleNewFile = async (folderPath: string) => {
+    const tempName = 'Untitled.md';
+    const filePath = `${folderPath}/${tempName}`;
+    
+    // Create file with placeholder content
+    await invokeWriteFile(filePath, '# Untitled\n\n');
+    
+    // Expand parent and refresh tree
+    const parentNode = findNodeByPath(nodes, folderPath);
+    if (parentNode) {
+        setExpandedFolders(prev => new Set([...prev, parentNode.id]));
+    }
+    
+    const tree = await invokeGetBlueKitFileTree(projectPath);
+    setNodes(tree);
+    
+    // Notify parent to open in editor
+    const newNode = findNodeByPath(tree, filePath);
+    if (newNode && onNewFileCreated) {
+        onNewFileCreated(newNode);
+    }
+};
+```
+
+### Key Code: New Folder Creation
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:249-286
+const handleNewFolder = async (folderPath: string) => {
+    const tempName = 'Untitled';
+    const newFolderPath = `${folderPath}/${tempName}`;
+    
+    await invokeCreateFolder(newFolderPath);
+    
+    // Expand parent and refresh tree
+    const parentNode = findNodeByPath(nodes, folderPath);
+    if (parentNode) {
+        setExpandedFolders(prev => new Set([...prev, parentNode.id]));
+    }
+    
+    const tree = await invokeGetBlueKitFileTree(projectPath);
+    setNodes(tree);
+    
+    // Enter inline edit mode
+    const newNode = findNodeByPath(tree, newFolderPath);
+    if (newNode) {
+        setInlineEdit({
+            nodeId: newNode.id,
+            path: newNode.path,
+            isNew: true,
+            isFolder: true,
+            value: tempName
+        });
+    }
+};
+```
+
+### Key Code: Inline Edit Input (Prevents Re-Selection)
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:726-734
+// Track if text has been selected to prevent re-selecting on every render
+const hasSelectedTextRef = useRef<boolean>(false);
+
+// Reset selection state when exiting edit mode
+useEffect(() => {
+    if (!isEditing) {
+        hasSelectedTextRef.current = false;
+    }
+}, [isEditing]);
+
+// Input ref callback - only selects once
+ref={(input) => {
+    if (input && !hasSelectedTextRef.current) {
+        setTimeout(() => {
+            input.select();
+            hasSelectedTextRef.current = true;
+        }, 0);
+    }
+}}
+```
+
+### Key Code: Inline Edit Completion
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:294-359
+const handleInlineEditComplete = async () => {
+    if (!inlineEdit.nodeId || !inlineEdit.path) return;
+    
+    const node = findNodeByPath(nodes, inlineEdit.path);
+    if (!node) return;
+    
+    // Sanitize name
+    let newName = sanitizeFileName(inlineEdit.value) || 'Untitled';
+    
+    // Only rename if name changed
+    if (node.name !== newName) {
+        if (inlineEdit.isFolder) {
+            await invokeRenameArtifactFolder(node.path, newName);
+        }
+        // ... file rename logic
+    }
+    
+    // Clear state and refresh
+    setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
+    refreshTree();
+};
+```
+
+### Key Code: Inline Edit Cancellation
+
+```typescript
+// src/components/sidebar/NotebookTree.tsx:362-383
+const handleInlineEditCancel = async () => {
+    if (!inlineEdit.path) return;
+    
+    // If newly created, delete it
+    if (inlineEdit.isNew) {
+        if (inlineEdit.isFolder) {
+            await invokeDeleteArtifactFolder(inlineEdit.path);
+        } else {
+            await deleteResources([inlineEdit.path]);
+        }
+        refreshTree();
+    }
+    
+    // Clear state
+    setInlineEdit({ nodeId: null, path: null, isNew: false, isFolder: false, value: '' });
+};
+```
+
+### Differences: Files vs Folders
+
+| Aspect | New File | New Folder |
+|--------|----------|------------|
+| **Edit Location** | Editor (CodeMirror) | Tree (inline Input) |
+| **Focus** | Editor has focus | Input in tree has focus |
+| **Title Sync** | Bidirectional via `titleEditPath`/`editingTitle` | Direct rename in tree |
+| **Auto-Select** | N/A (editor handles) | Input selects text once |
+| **Cancel Behavior** | File remains (no deletion) | Folder deleted if cancelled |
+| **Completion** | User saves in editor | Enter/blur renames folder |
+
+---
+
 ## Data Flow: Editing with Auto-Save
 
 The edit mode uses CodeMirror with debounced auto-save:
@@ -492,19 +770,24 @@ useEffect(() => {
 
 ### NotebookTree
 
-**Purpose**: Displays hierarchical file tree, handles expand/collapse, context menus
+**Purpose**: Displays hierarchical file tree, handles expand/collapse, context menus, and inline creation/editing
 
 **State**:
 - `nodes: FileTreeNode[]` - Tree data
 - `expandedFolders: Set<string>` - IDs of expanded folders
 - `contextMenu: { isOpen, x, y, node }` - Right-click menu state
 - `renameState: { isOpen, node, newName }` - Rename popover state
+- `inlineEdit: InlineEditState` - Inline edit state for folders (new folder creation)
 
 **Key Behaviors**:
 - Loads tree on mount and when `version` prop changes
 - Auto-expands parent folders when `selectedFileId` changes
 - Context menu for folders: New File, New Folder, Rename, Delete, Copy Path
+- **New File**: Creates file, opens in editor immediately with title sync (`onNewFileCreated` callback)
+- **New Folder**: Creates folder, enters inline edit mode in tree (Input component with auto-select)
+- **Inline Edit**: Folders can be renamed directly in tree (Enter/blur to confirm, Escape to cancel and delete if new)
 - File icons vary by type (folder, markdown, mermaid diagram)
+- Supports `titleEditPath`/`editingTitle` props for visual sync when editing file titles in editor
 
 ### NoteViewPage
 
