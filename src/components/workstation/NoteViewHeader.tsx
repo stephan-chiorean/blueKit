@@ -9,6 +9,14 @@ interface NoteViewHeaderProps {
   viewMode: 'preview' | 'source' | 'edit';
   onViewModeChange: (mode: 'preview' | 'source' | 'edit') => void;
   editable?: boolean;
+  /** Navigate to the previous file in the directory */
+  onNavigatePrev?: () => void;
+  /** Navigate to the next file in the directory */
+  onNavigateNext?: () => void;
+  /** Whether navigation to previous is available */
+  canNavigatePrev?: boolean;
+  /** Whether navigation to next is available */
+  canNavigateNext?: boolean;
 }
 
 export function NoteViewHeader({
@@ -16,11 +24,15 @@ export function NoteViewHeader({
   viewMode,
   onViewModeChange,
   editable = true,
+  onNavigatePrev,
+  onNavigateNext,
+  canNavigatePrev = false,
+  canNavigateNext = false,
 }: NoteViewHeaderProps) {
   // Parse breadcrumbs relative to .bluekit
   const breadcrumbs = (() => {
     const pathStr = resource.path;
-    
+
     // Find .bluekit in the path
     const bluekitIndex = pathStr.indexOf('.bluekit/');
     if (bluekitIndex === -1) {
@@ -28,16 +40,16 @@ export function NoteViewHeader({
       const basename = path.basename(pathStr);
       return [basename.replace(/\.(md|mmd)$/, '') || 'Untitled'];
     }
-    
+
     // Extract path after .bluekit/
     const relativePath = pathStr.substring(bluekitIndex + '.bluekit/'.length);
-    
+
     // Remove file extension
     const pathWithoutExt = relativePath.replace(/\.(md|mmd)$/, '');
-    
+
     // Split by path separator and filter out empty parts
     const parts = pathWithoutExt.split(/[/\\]/).filter(part => part.length > 0);
-    
+
     return parts.length > 0 ? parts : ['Untitled'];
   })();
 
@@ -47,14 +59,8 @@ export function NoteViewHeader({
       top={0}
       zIndex={100}
       bg="transparent"
-      borderBottomWidth="1px"
-      borderColor="border.subtle"
       px={4}
       py={2}
-      css={{
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       <HStack justify="space-between" align="center" gap={4}>
         {/* Left: Navigation arrows */}
@@ -63,9 +69,12 @@ export function NoteViewHeader({
             variant="ghost"
             size="sm"
             px={2}
-            disabled
-            opacity={0.5}
-            cursor="not-allowed"
+            bg="transparent"
+            disabled={!canNavigatePrev}
+            opacity={canNavigatePrev ? 1 : 0.5}
+            cursor={canNavigatePrev ? 'pointer' : 'not-allowed'}
+            onClick={onNavigatePrev}
+            _hover={{}}
           >
             <Icon boxSize={4}>
               <LuArrowLeft />
@@ -75,9 +84,12 @@ export function NoteViewHeader({
             variant="ghost"
             size="sm"
             px={2}
-            disabled
-            opacity={0.5}
-            cursor="not-allowed"
+            bg="transparent"
+            disabled={!canNavigateNext}
+            opacity={canNavigateNext ? 1 : 0.5}
+            cursor={canNavigateNext ? 'pointer' : 'not-allowed'}
+            onClick={onNavigateNext}
+            _hover={{}}
           >
             <Icon boxSize={4}>
               <LuArrowRight />
@@ -109,7 +121,7 @@ export function NoteViewHeader({
                 fontSize="sm"
                 color={index === breadcrumbs.length - 1 ? 'text.primary' : 'text.secondary'}
                 fontWeight={index === breadcrumbs.length - 1 ? 'medium' : 'normal'}
-                noOfLines={1}
+                lineClamp={1}
               >
                 {part}
               </Text>
@@ -127,6 +139,7 @@ export function NoteViewHeader({
             onClick={() => onViewModeChange('preview')}
             colorScheme={viewMode === 'preview' ? 'primary' : undefined}
             bg={viewMode === 'preview' ? 'primary.50' : 'transparent'}
+            _hover={{}}
             _dark={{
               bg: viewMode === 'preview' ? 'primary.900/30' : 'transparent',
             }}
@@ -144,6 +157,7 @@ export function NoteViewHeader({
             onClick={() => onViewModeChange('source')}
             colorScheme={viewMode === 'source' ? 'primary' : undefined}
             bg={viewMode === 'source' ? 'primary.50' : 'transparent'}
+            _hover={{}}
             _dark={{
               bg: viewMode === 'source' ? 'primary.900/30' : 'transparent',
             }}
@@ -162,6 +176,7 @@ export function NoteViewHeader({
               onClick={() => onViewModeChange('edit')}
               colorScheme={viewMode === 'edit' ? 'primary' : undefined}
               bg={viewMode === 'edit' ? 'primary.50' : 'transparent'}
+              _hover={{}}
               _dark={{
                 bg: viewMode === 'edit' ? 'primary.900/30' : 'transparent',
               }}
@@ -180,6 +195,7 @@ export function NoteViewHeader({
             disabled
             opacity={0.5}
             cursor="not-allowed"
+            _hover={{}}
           >
             <Icon boxSize={4}>
               <LuEllipsisVertical />

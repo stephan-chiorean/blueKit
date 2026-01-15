@@ -1,7 +1,8 @@
 import { Box, HStack, Icon, Text, Popover, Input, Button, VStack } from '@chakra-ui/react';
 
 import { useEffect, useState, useMemo } from 'react';
-import { LuFile, LuFolder, LuFolderOpen, LuStar } from 'react-icons/lu';
+import { LuFile, LuFolder, LuFolderOpen } from 'react-icons/lu';
+import { FaStar } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { BsDiagram2 } from 'react-icons/bs';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
@@ -185,7 +186,7 @@ export default function NotebookTree({
             const separator = folderPath.includes('\\') ? '\\' : '/';
             const filePath = `${folderPath}${separator}${finalFileName}`;
             await invokeWriteFile(filePath, '');
-            
+
             toaster.create({
                 type: 'success',
                 title: 'File created',
@@ -212,7 +213,7 @@ export default function NotebookTree({
             const separator = folderPath.includes('\\') ? '\\' : '/';
             const newFolderPath = `${folderPath}${separator}${folderName.trim()}`;
             await invokeCreateFolder(newFolderPath);
-            
+
             toaster.create({
                 type: 'success',
                 title: 'Folder created',
@@ -293,8 +294,8 @@ export default function NotebookTree({
                 // For files: read, write to new path, delete old
                 const content = await invokeReadFile(node.path);
                 // Extract parent directory from path
-                const lastSeparator = node.path.lastIndexOf('/') > node.path.lastIndexOf('\\') 
-                    ? node.path.lastIndexOf('/') 
+                const lastSeparator = node.path.lastIndexOf('/') > node.path.lastIndexOf('\\')
+                    ? node.path.lastIndexOf('/')
                     : node.path.lastIndexOf('\\');
                 const parentDir = lastSeparator > 0 ? node.path.slice(0, lastSeparator) : node.path;
                 const separator = node.path.includes('\\') ? '\\' : '/';
@@ -464,14 +465,14 @@ interface CustomTreeProps {
     onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void;
 }
 
-function CustomTree({ 
-    nodes, 
-    onNodeClick, 
-    selectedId, 
+function CustomTree({
+    nodes,
+    onNodeClick,
+    selectedId,
     parentFolderPaths,
     expandedFolders,
     onToggleExpand,
-    level = 0, 
+    level = 0,
     colorMode,
     onContextMenu
 }: CustomTreeProps) {
@@ -496,15 +497,15 @@ function CustomTree({
     );
 }
 
-function TreeNode({ 
-    node, 
-    onNodeClick, 
-    selectedId, 
+function TreeNode({
+    node,
+    onNodeClick,
+    selectedId,
     parentFolderPaths,
     expandedFolders,
     isExpanded,
     onToggleExpand,
-    level, 
+    level,
     colorMode,
     onContextMenu
 }: {
@@ -528,12 +529,12 @@ function TreeNode({
     };
 
     const isSelected = selectedId === node.path;
-    
+
     // Check if file is a markdown file
     const isMarkdownFile = !node.isFolder && (node.name.endsWith('.md') || node.name.endsWith('.markdown'));
     // Check if file is a mermaid diagram file
     const isMermaidFile = !node.isFolder && node.name.endsWith('.mmd');
-    
+
     // Helper function to strip file extension (.mmd or .md) from display name
     const getDisplayName = (fileName: string): string => {
         if (fileName.endsWith('.mmd')) {
@@ -544,7 +545,7 @@ function TreeNode({
         }
         return fileName;
     };
-    
+
     // Match the sidebar menu item styling (subtle blue button style) for light mode
     // Light mode: subtle blue background (blue.100), darker navy text (blue.700)
     // Dark mode: keep original styling (whiteAlpha.200 background, blue.200 text)
@@ -588,22 +589,24 @@ function TreeNode({
                     {node.isFolder ? node.name : getDisplayName(node.name)}
                 </Text>
                 {node.isEssential && (
-                    <Icon as={LuStar} color="yellow.400" boxSize={3} />
+                    <Icon as={FaStar} color="blue.500" boxSize={3} />
                 )}
             </HStack>
 
             {node.isFolder && isExpanded && node.children && (
-                <CustomTree
-                    nodes={node.children}
-                    onNodeClick={onNodeClick}
-                    selectedId={selectedId}
-                    parentFolderPaths={parentFolderPaths}
-                    expandedFolders={expandedFolders}
-                    onToggleExpand={onToggleExpand}
-                    level={level + 1}
-                    colorMode={colorMode}
-                    onContextMenu={onContextMenu}
-                />
+                <Box mt={0.5}>
+                    <CustomTree
+                        nodes={node.children}
+                        onNodeClick={onNodeClick}
+                        selectedId={selectedId}
+                        parentFolderPaths={parentFolderPaths}
+                        expandedFolders={expandedFolders}
+                        onToggleExpand={onToggleExpand}
+                        level={level + 1}
+                        colorMode={colorMode}
+                        onContextMenu={onContextMenu}
+                    />
+                </Box>
             )}
         </Box>
     );

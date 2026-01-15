@@ -618,6 +618,15 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         <NoteViewPage
           resource={notebookFile.resource}
           content={notebookFile.content}
+          onContentChange={(newContent) => {
+            setNotebookFile(prev => prev ? { ...prev, content: newContent } : null);
+          }}
+          onNavigate={(newResource, newContent) => {
+            setNotebookFile({
+              resource: newResource,
+              content: newContent,
+            });
+          }}
         />
       );
     }
