@@ -1,7 +1,9 @@
 import { Box, HStack, Icon, Text, Popover, Input, Button, VStack } from '@chakra-ui/react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { LuFile, LuFolder, LuFolderOpen } from 'react-icons/lu';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { LuFile, LuFolder, LuFolderOpen, LuArrowRight, LuX } from 'react-icons/lu';
 import { FaStar } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { BsDiagram2 } from 'react-icons/bs';
@@ -10,9 +12,11 @@ import { useColorMode } from '../../contexts/ColorModeContext';
 import { NotebookContextMenu } from './NotebookContextMenu';
 import { invokeWriteFile, invokeReadFile } from '../../ipc';
 import { invokeCreateFolder } from '../../ipc/fileTree';
-import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder } from '../../ipc/folders';
+import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder, invokeMoveArtifactToFolder } from '../../ipc/folders';
 import { deleteResources } from '../../ipc/artifacts';
 import { toaster } from '../ui/toaster';
+
+const MotionBox = motion.create(Box);
 
 interface NotebookTreeProps {
     projectPath: string;
@@ -36,6 +40,78 @@ interface InlineEditState {
     isNew: boolean;       // true if this is a newly created item
     isFolder: boolean;
     value: string;
+}
+
+// Drag state for file/folder movement
+interface DragState {
+    draggedNode: FileTreeNode;
+    originalParentPath: string | null;
+    dropTargetPath: string | null | undefined; // null = root, undefined = invalid area
+    isValidDrop: boolean;
+    startPosition: { x: number; y: number };
+}
+
+// Constants for drag behavior
+const DRAG_THRESHOLD = 5; // Pixels before drag activates
+const AUTO_EXPAND_DELAY = 500; // ms before auto-expanding folder on hover
+
+// Check if targetPath is inside sourcePath (for folder-into-itself prevention)
+function isDescendantOf(targetPath: string, sourcePath: string): boolean {
+    const normalizedTarget = targetPath.replace(/\\/g, '/');
+    const normalizedSource = sourcePath.replace(/\\/g, '/');
+    return normalizedTarget.startsWith(normalizedSource + '/');
+}
+
+// Get parent folder path from a file path
+function getParentPath(nodePath: string): string | null {
+    const lastSep = Math.max(nodePath.lastIndexOf('/'), nodePath.lastIndexOf('\\'));
+    return lastSep > 0 ? nodePath.slice(0, lastSep) : null;
+}
+
+// Validate if drop is allowed
+function isValidDropTarget(
+    draggedNode: FileTreeNode,
+    targetPath: string | null | undefined,
+    originalParentPath: string | null
+): boolean {
+    // Not over a valid area
+    if (targetPath === undefined) return false;
+
+    // Same parent = no-op
+    if (targetPath === originalParentPath) return false;
+
+    // Cannot drop folder into itself or its descendants
+    if (draggedNode.isFolder && targetPath !== null) {
+        if (targetPath === draggedNode.path) return false;
+        if (isDescendantOf(targetPath, draggedNode.path)) return false;
+    }
+
+    return true;
+}
+
+// Find drop target at cursor position using data attributes
+function findDropTargetAtPosition(x: number, y: number): string | null | undefined {
+    const elements = document.elementsFromPoint(x, y);
+
+    for (const el of elements) {
+        const droppableEl = (el as HTMLElement).closest('[data-droppable-folder]');
+        if (droppableEl) {
+            const path = droppableEl.getAttribute('data-droppable-folder');
+            // Empty string means root drop zone
+            return path === '' ? null : path;
+        }
+    }
+
+    // Check if over tree area for root drop
+    const treeArea = document.querySelector('[data-notebook-tree-root]');
+    if (treeArea) {
+        const rect = treeArea.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+            return null; // Root
+        }
+    }
+
+    return undefined; // Not a valid drop area
 }
 
 
@@ -117,6 +193,13 @@ export default function NotebookTree({
         value: ''
     });
 
+    // Drag state for file/folder movement
+    const [dragState, setDragState] = useState<DragState | null>(null);
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+    const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
+    const [pendingExpandFolderId, setPendingExpandFolderId] = useState<string | null>(null);
+    const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
         loadTree();
     }, [projectPath, version]);
@@ -188,6 +271,171 @@ export default function NotebookTree({
             onTreeRefresh();
         }
     };
+
+    // Clear drag state helper
+    const clearDragState = useCallback(() => {
+        setDragState(null);
+        setHasDragThresholdMet(false);
+        setPendingExpandFolderId(null);
+        if (hoverExpandTimerRef.current) {
+            clearTimeout(hoverExpandTimerRef.current);
+            hoverExpandTimerRef.current = null;
+        }
+    }, []);
+
+    // Perform move operation
+    const performMove = useCallback(async (node: FileTreeNode, targetFolderPath: string | null) => {
+        try {
+            const blukitRoot = `${projectPath}/.bluekit`;
+            const targetPath = targetFolderPath ?? blukitRoot;
+            await invokeMoveArtifactToFolder(node.path, targetPath);
+
+            const targetName = targetFolderPath === null
+                ? 'root'
+                : findNodeByPath(nodes, targetFolderPath)?.name || 'folder';
+
+            toaster.create({
+                type: 'success',
+                title: 'File moved',
+                description: `Moved "${node.name}" to ${targetName}`,
+            });
+
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to move file:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Move failed',
+                description: error instanceof Error ? error.message : 'An error occurred',
+            });
+        }
+    }, [projectPath, nodes, refreshTree]);
+
+    // Handle drag start from a tree node
+    const handleDragStart = useCallback((node: FileTreeNode, position: { x: number; y: number }) => {
+        // Don't allow dragging essential files
+        if (node.isEssential) return;
+
+        setDragState({
+            draggedNode: node,
+            originalParentPath: getParentPath(node.path),
+            dropTargetPath: undefined,
+            isValidDrop: false,
+            startPosition: position,
+        });
+        setMousePosition(position);
+    }, []);
+
+    // Document-level mouse event handlers for drag
+    useEffect(() => {
+        if (!dragState) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            setMousePosition({ x: e.clientX, y: e.clientY });
+
+            // Check drag threshold
+            if (!hasDragThresholdMet) {
+                const dx = Math.abs(e.clientX - dragState.startPosition.x);
+                const dy = Math.abs(e.clientY - dragState.startPosition.y);
+                if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                    setHasDragThresholdMet(true);
+                }
+                return;
+            }
+
+            // Find drop target at cursor position
+            const dropTarget = findDropTargetAtPosition(e.clientX, e.clientY);
+            const isValid = isValidDropTarget(dragState.draggedNode, dropTarget, dragState.originalParentPath);
+
+            setDragState(prev => prev ? {
+                ...prev,
+                dropTargetPath: dropTarget,
+                isValidDrop: isValid
+            } : null);
+        };
+
+        const handleMouseUp = async () => {
+            if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetPath !== undefined) {
+                await performMove(dragState.draggedNode, dragState.dropTargetPath);
+            }
+            clearDragState();
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                clearDragState();
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [dragState, hasDragThresholdMet, clearDragState, performMove]);
+
+    // Auto-expand folders on hover while dragging
+    useEffect(() => {
+        // Only relevant during active drag
+        if (!dragState || !hasDragThresholdMet) {
+            if (hoverExpandTimerRef.current) {
+                clearTimeout(hoverExpandTimerRef.current);
+                hoverExpandTimerRef.current = null;
+            }
+            setPendingExpandFolderId(null);
+            return;
+        }
+
+        const targetPath = dragState.dropTargetPath;
+
+        // Clear timer if not hovering a folder
+        if (!targetPath) {
+            if (hoverExpandTimerRef.current) {
+                clearTimeout(hoverExpandTimerRef.current);
+                hoverExpandTimerRef.current = null;
+            }
+            setPendingExpandFolderId(null);
+            return;
+        }
+
+        // Find the folder being hovered
+        const hoveredFolder = findNodeByPath(nodes, targetPath);
+        if (!hoveredFolder?.isFolder) return;
+
+        // Already expanded? No timer needed
+        if (expandedFolders.has(hoveredFolder.id)) {
+            setPendingExpandFolderId(null);
+            return;
+        }
+
+        // New folder hover - start timer
+        if (pendingExpandFolderId !== hoveredFolder.id) {
+            if (hoverExpandTimerRef.current) {
+                clearTimeout(hoverExpandTimerRef.current);
+            }
+
+            setPendingExpandFolderId(hoveredFolder.id);
+
+            hoverExpandTimerRef.current = setTimeout(() => {
+                setExpandedFolders(prev => new Set([...prev, hoveredFolder.id]));
+                setPendingExpandFolderId(null);
+                hoverExpandTimerRef.current = null;
+            }, AUTO_EXPAND_DELAY);
+        }
+    }, [dragState?.dropTargetPath, hasDragThresholdMet, nodes, expandedFolders, pendingExpandFolderId]);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (hoverExpandTimerRef.current) {
+                clearTimeout(hoverExpandTimerRef.current);
+            }
+        };
+    }, []);
 
     // Context menu handlers
     const handleContextMenu = (e: React.MouseEvent, node: FileTreeNode) => {
@@ -513,9 +761,17 @@ export default function NotebookTree({
         return nodePath;
     };
 
+    // Get target folder name for drag tooltip
+    const getDropTargetName = (): string | null | undefined => {
+        if (!dragState) return undefined;
+        if (dragState.dropTargetPath === undefined) return undefined;
+        if (dragState.dropTargetPath === null) return null;
+        return findNodeByPath(nodes, dragState.dropTargetPath)?.name ?? null;
+    };
+
     return (
         <>
-            <Box className={className} w="100%">
+            <Box className={className} w="100%" data-notebook-tree-root>
                 <CustomTree
                     nodes={nodes}
                     onNodeClick={onFileSelect}
@@ -532,8 +788,52 @@ export default function NotebookTree({
                     onInlineEditCancel={handleInlineEditCancel}
                     titleEditPath={titleEditPath}
                     editingTitle={editingTitle}
+                    onDragStart={handleDragStart}
+                    draggedNodePath={dragState?.draggedNode.path}
+                    dropTargetPath={hasDragThresholdMet ? dragState?.dropTargetPath : undefined}
+                    isValidDrop={dragState?.isValidDrop ?? false}
                 />
+
+                {/* Root drop zone - visible during drag */}
+                {dragState && hasDragThresholdMet && (
+                    <Box
+                        data-droppable-folder=""
+                        mt={3}
+                        py={3}
+                        borderRadius="md"
+                        border="2px dashed"
+                        borderColor={
+                            dragState.dropTargetPath === null && dragState.isValidDrop
+                                ? 'blue.400'
+                                : colorMode === 'light' ? 'gray.300' : 'gray.600'
+                        }
+                        bg={
+                            dragState.dropTargetPath === null && dragState.isValidDrop
+                                ? colorMode === 'light' ? 'blue.50' : 'blue.900'
+                                : 'transparent'
+                        }
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        transition="all 0.15s"
+                    >
+                        <Text fontSize="xs" color={colorMode === 'light' ? 'gray.500' : 'gray.400'}>
+                            Drop here to move to root
+                        </Text>
+                    </Box>
+                )}
             </Box>
+
+            {/* Drag Tooltip */}
+            {dragState && hasDragThresholdMet && (
+                <DragTooltip
+                    node={dragState.draggedNode}
+                    targetFolderName={getDropTargetName()}
+                    position={mousePosition}
+                    isValidDrop={dragState.isValidDrop}
+                    colorMode={colorMode}
+                />
+            )}
 
             <NotebookContextMenu
                 isOpen={contextMenu.isOpen}
@@ -610,6 +910,78 @@ export default function NotebookTree({
     );
 }
 
+// Drag tooltip component
+interface DragTooltipProps {
+    node: FileTreeNode;
+    targetFolderName: string | null | undefined; // null = "root", undefined = invalid area
+    position: { x: number; y: number };
+    isValidDrop: boolean;
+    colorMode: string;
+}
+
+function DragTooltip({ node, targetFolderName, position, isValidDrop, colorMode }: DragTooltipProps) {
+    // Determine action text
+    let actionText: string;
+    let actionColor: string;
+
+    if (targetFolderName === undefined) {
+        actionText = 'Release to cancel';
+        actionColor = colorMode === 'light' ? 'gray.500' : 'gray.400';
+    } else if (!isValidDrop) {
+        actionText = 'Cannot move here';
+        actionColor = 'red.400';
+    } else if (targetFolderName === null) {
+        actionText = 'Move to root';
+        actionColor = 'blue.500';
+    } else {
+        actionText = `Move to ${targetFolderName}`;
+        actionColor = 'blue.500';
+    }
+
+    const IconComponent = node.isFolder ? LuFolder :
+        (node.name.endsWith('.md') || node.name.endsWith('.markdown') ? AiOutlineFileText : LuFile);
+
+    // Strip extension from display name
+    const displayName = node.name.replace(/\.(md|markdown|mmd)$/, '');
+
+    return createPortal(
+        <Box
+            position="fixed"
+            left={`${position.x + 16}px`}
+            top={`${position.y + 8}px`}
+            pointerEvents="none"
+            zIndex={9999}
+            bg={colorMode === 'light' ? 'white' : 'gray.800'}
+            borderRadius="md"
+            boxShadow="lg"
+            px={3}
+            py={2}
+            border="2px solid"
+            borderColor={isValidDrop ? 'blue.400' : 'red.400'}
+            minW="180px"
+            maxW="280px"
+        >
+            <HStack gap={2}>
+                <Icon as={IconComponent} color="blue.400" boxSize={4} />
+                <Text fontSize="sm" fontWeight="medium" truncate>
+                    {displayName}
+                </Text>
+            </HStack>
+            <HStack gap={1} mt={1.5}>
+                <Icon
+                    as={isValidDrop ? LuArrowRight : LuX}
+                    boxSize={3}
+                    color={actionColor}
+                />
+                <Text fontSize="xs" color={actionColor}>
+                    {actionText}
+                </Text>
+            </HStack>
+        </Box>,
+        document.body
+    );
+}
+
 // Simple recursive tree component
 interface CustomTreeProps {
     nodes: FileTreeNode[];
@@ -630,6 +1002,11 @@ interface CustomTreeProps {
     // Title edit props (for files - visual only, no input capture)
     titleEditPath: string | null | undefined;
     editingTitle: string | undefined;
+    // Drag props
+    onDragStart: (node: FileTreeNode, position: { x: number; y: number }) => void;
+    draggedNodePath?: string;
+    dropTargetPath?: string | null;
+    isValidDrop: boolean;
 }
 
 function CustomTree({
@@ -648,7 +1025,11 @@ function CustomTree({
     onInlineEditComplete,
     onInlineEditCancel,
     titleEditPath,
-    editingTitle
+    editingTitle,
+    onDragStart,
+    draggedNodePath,
+    dropTargetPath,
+    isValidDrop
 }: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
@@ -673,6 +1054,13 @@ function CustomTree({
                     inlineEditNodeId={inlineEditNodeId}
                     titleEditPath={titleEditPath}
                     editingTitle={editingTitle}
+                    onDragStart={onDragStart}
+                    isBeingDragged={draggedNodePath === node.path}
+                    isDraggedOver={dropTargetPath === node.path}
+                    isDraggedOverInvalid={dropTargetPath === node.path && !isValidDrop}
+                    draggedNodePath={draggedNodePath}
+                    dropTargetPath={dropTargetPath}
+                    isValidDrop={isValidDrop}
                 />
             ))}
         </Box>
@@ -697,7 +1085,14 @@ function TreeNode({
     onEditCancel,
     inlineEditNodeId,
     titleEditPath,
-    editingTitle
+    editingTitle,
+    onDragStart,
+    isBeingDragged,
+    isDraggedOver,
+    isDraggedOverInvalid,
+    draggedNodePath,
+    dropTargetPath,
+    isValidDrop
 }: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
@@ -718,7 +1113,15 @@ function TreeNode({
     inlineEditNodeId: string | null,
     // Title edit props (for files - visual only sync)
     titleEditPath: string | null | undefined,
-    editingTitle: string | undefined
+    editingTitle: string | undefined,
+    // Drag props
+    onDragStart: (node: FileTreeNode, position: { x: number; y: number }) => void,
+    isBeingDragged: boolean,
+    isDraggedOver: boolean,
+    isDraggedOverInvalid: boolean,
+    draggedNodePath?: string,
+    dropTargetPath?: string | null,
+    isValidDrop: boolean
 }) {
     // Check if this node is in title-edit mode (visual only, for files)
     const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
@@ -734,14 +1137,26 @@ function TreeNode({
     }, [isEditing]);
 
     const handleClick = () => {
-        // Don't handle clicks when editing
-        if (isEditing) return;
+        // Don't handle clicks when editing or dragging
+        if (isEditing || isBeingDragged) return;
 
         if (node.isFolder) {
             onToggleExpand(node.id);
         } else {
             onNodeClick(node);
         }
+    };
+
+    // Handle mouse down for drag initiation
+    const handleMouseDown = (e: React.MouseEvent) => {
+        // Only start drag on left mouse button
+        if (e.button !== 0) return;
+        // Don't start drag when editing
+        if (isEditing) return;
+        // Don't drag essential files
+        if (node.isEssential) return;
+
+        onDragStart(node, { x: e.clientX, y: e.clientY });
     };
 
     const isSelected = selectedId === node.path;
@@ -769,6 +1184,12 @@ function TreeNode({
     const selectedBg = colorMode === 'light' ? 'blue.100' : 'whiteAlpha.200';
     const selectedColor = colorMode === 'light' ? 'blue.700' : 'blue.200';
 
+    // Drag over styling
+    const dragOverBg = isDraggedOverInvalid
+        ? (colorMode === 'light' ? 'red.50' : 'red.900')
+        : (colorMode === 'light' ? 'blue.50' : 'blue.900');
+    const dragOverBorderColor = isDraggedOverInvalid ? 'red.400' : 'blue.400';
+
     // Determine the icon to use
     const getFileIcon = () => {
         if (node.isFolder) {
@@ -791,20 +1212,41 @@ function TreeNode({
         }
     };
 
+    // Determine cursor style
+    const getCursor = () => {
+        if (isEditing) return 'default';
+        if (isBeingDragged) return 'grabbing';
+        if (node.isEssential) return 'pointer';
+        return 'grab';
+    };
+
     return (
         <Box mb={0.5}>
             <HStack
                 py={1}
                 px={2}
-                cursor={isEditing ? 'default' : 'pointer'}
+                cursor={getCursor()}
                 onClick={handleClick}
+                onMouseDown={handleMouseDown}
                 onContextMenu={(e) => onContextMenu(e, node)}
-                bg={isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent'}
+                bg={
+                    isDraggedOver ? dragOverBg :
+                    (isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent')
+                }
                 color={isSelected || isEditing || isInTitleEditMode ? selectedColor : 'inherit'}
-                _hover={{ bg: isSelected || isEditing || isInTitleEditMode ? selectedBg : hoverBg }}
+                _hover={{
+                    bg: isDraggedOver ? dragOverBg :
+                        (isSelected || isEditing || isInTitleEditMode ? selectedBg : hoverBg)
+                }}
                 borderRadius="sm"
                 gap={2}
-                transition="all 0.1s"
+                transition="all 0.15s"
+                opacity={isBeingDragged ? 0.5 : 1}
+                borderWidth={isDraggedOver && node.isFolder ? '2px' : '0'}
+                borderStyle="dashed"
+                borderColor={isDraggedOver && node.isFolder ? dragOverBorderColor : 'transparent'}
+                data-droppable-folder={node.isFolder ? node.path : undefined}
+                userSelect="none"
             >
                 <Icon
                     as={getFileIcon()}
@@ -853,9 +1295,20 @@ function TreeNode({
                 )}
             </HStack>
 
-            {
-                node.isFolder && isExpanded && node.children && (
-                    <Box mt={0.5}>
+            <AnimatePresence initial={false}>
+                {node.isFolder && isExpanded && node.children && (
+                    <MotionBox
+                        key={`folder-content-${node.id}`}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{
+                            height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                            opacity: { duration: 0.15, delay: 0.05 }
+                        }}
+                        style={{ overflow: 'hidden' }}
+                        mt={0.5}
+                    >
                         <CustomTree
                             nodes={node.children}
                             onNodeClick={onNodeClick}
@@ -873,10 +1326,14 @@ function TreeNode({
                             onInlineEditCancel={onEditCancel}
                             titleEditPath={titleEditPath}
                             editingTitle={editingTitle}
+                            onDragStart={onDragStart}
+                            draggedNodePath={draggedNodePath}
+                            dropTargetPath={dropTargetPath}
+                            isValidDrop={isValidDrop}
                         />
-                    </Box>
-                )
-            }
-        </Box >
+                    </MotionBox>
+                )}
+            </AnimatePresence>
+        </Box>
     );
 }
