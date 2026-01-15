@@ -62,7 +62,19 @@ export default function TaskManagerPopover({
   return (
     <Popover.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)}>
       <Popover.Trigger asChild>
-        <Button variant="ghost" size="sm" position="relative">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          position="relative" 
+          _hover={{ bg: 'transparent' }}
+          _active={{ bg: 'transparent' }}
+          data-state={isOpen ? 'open' : 'closed'}
+          css={{
+            '&[data-state="open"]': {
+              backgroundColor: 'transparent',
+            },
+          }}
+        >
           <LuListTodo />
           {inProgressCount > 0 && (
             <Badge

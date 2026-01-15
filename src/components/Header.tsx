@@ -176,7 +176,6 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             size="sm"
             aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
             onClick={toggleNotepad}
-            colorPalette={isNotepadOpen ? 'primary' : undefined}
             _hover={{ bg: 'transparent' }}
           >
             <LuNotebookPen />

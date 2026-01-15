@@ -29,7 +29,18 @@ export default function TimerPopover() {
   return (
     <Popover.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)}>
       <Popover.Trigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          _hover={{ bg: 'transparent' }}
+          _active={{ bg: 'transparent' }}
+          data-state={isOpen ? 'open' : 'closed'}
+          css={{
+            '&[data-state="open"]': {
+              backgroundColor: 'transparent',
+            },
+          }}
+        >
           <Icon>
             <LuClock />
           </Icon>
