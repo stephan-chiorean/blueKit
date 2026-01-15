@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkSlug from 'remark-slug';
 import { useRef, useState, useEffect } from 'react';
 import mermaid from 'mermaid';
 import {
@@ -138,6 +139,23 @@ export function ResourceMarkdownContent({
   const contentWithoutFrontMatter = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
   const { setSelectedResource } = useResource();
 
+  // Handle initial hash in URL (e.g., when page loads with #1-current-state-analysis)
+  useEffect(() => {
+    if (window.location.hash) {
+      const targetId = window.location.hash.slice(1);
+      // Wait for content to render
+      setTimeout(() => {
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 100);
+    }
+  }, [content]);
+
   if (viewMode === 'source') {
     return (
       <Box id="markdown-content-source">
@@ -238,15 +256,17 @@ export function ResourceMarkdownContent({
       }}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkSlug]}
         components={{
-          h1: ({ children }) => (
+          h1: ({ children, id }) => (
             <Heading
               as="h1"
+              id={id}
               size="2xl"
               mt={6}
               mb={4}
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -256,14 +276,16 @@ export function ResourceMarkdownContent({
               {children}
             </Heading>
           ),
-          h2: ({ children }) => (
+          h2: ({ children, id }) => (
             <Heading
               as="h2"
+              id={id}
               size="2xl"
               mt={5}
               mb={3}
               color="primary.500"
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -273,13 +295,15 @@ export function ResourceMarkdownContent({
               {children}
             </Heading>
           ),
-          h3: ({ children }) => (
+          h3: ({ children, id }) => (
             <Heading
               as="h3"
+              id={id}
               size="lg"
               mt={4}
               mb={2}
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -289,13 +313,15 @@ export function ResourceMarkdownContent({
               {children}
             </Heading>
           ),
-          h4: ({ children }) => (
+          h4: ({ children, id }) => (
             <Heading
               as="h4"
+              id={id}
               size="md"
               mt={3}
               mb={2}
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -305,13 +331,15 @@ export function ResourceMarkdownContent({
               {children}
             </Heading>
           ),
-          h5: ({ children }) => (
+          h5: ({ children, id }) => (
             <Heading
               as="h5"
+              id={id}
               size="sm"
               mt={3}
               mb={2}
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -321,13 +349,15 @@ export function ResourceMarkdownContent({
               {children}
             </Heading>
           ),
-          h6: ({ children }) => (
+          h6: ({ children, id }) => (
             <Heading
               as="h6"
+              id={id}
               size="xs"
               mt={3}
               mb={2}
               css={{
+                scrollMarginTop: '80px',
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                 _dark: {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -426,6 +456,29 @@ export function ResourceMarkdownContent({
             const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
               e.preventDefault();
               if (!href) return;
+
+              // Handle anchor links (table of contents)
+              if (href.startsWith('#')) {
+                const targetId = href.slice(1); // Remove the '#'
+                const targetElement = document.getElementById(targetId);
+                
+                if (targetElement) {
+                  // Scroll to the element with smooth behavior
+                  targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  });
+                  
+                  // Update URL hash without triggering scroll
+                  window.history.pushState(null, '', `#${targetId}`);
+                  return;
+                } else {
+                  // If element not found, try to find it in the current document
+                  // This handles cases where the ID format might be slightly different
+                  console.warn(`Could not find element with id: ${targetId}`);
+                }
+                return;
+              }
 
               // External links - open in browser
               if (href.startsWith('http://') || href.startsWith('https://')) {
