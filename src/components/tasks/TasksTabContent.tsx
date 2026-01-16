@@ -547,6 +547,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         action={{
           label: "Add Task",
           onClick: handleAddTask,
+          variant: 'solid',
         }}
       />
 

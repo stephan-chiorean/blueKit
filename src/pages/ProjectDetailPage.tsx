@@ -46,9 +46,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   const contentBorderStyle = colorMode === 'light'
     ? {
       borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+      borderLeft: '1px solid rgba(0, 0, 0, 0.08)',
     }
     : {
       borderTop: '1px solid rgba(99, 102, 241, 0.2)',
+      borderLeft: '1px solid rgba(99, 102, 241, 0.2)',
     };
 
   // Sidebar state
@@ -974,7 +976,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             maxW="1px"
             p={0}
             m={0}
-            bg={colorMode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(99, 102, 241, 0.2)'}
+            bg="transparent"
             cursor="col-resize"
             border="none"
             outline="none"
@@ -993,10 +995,16 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               minH={0}
               overflowY="auto"
               overflowX="hidden"
+
               position="relative"
-              bg="transparent"
               p={notebookFile ? 0 : 6}
+              borderTopLeftRadius="2xl"
               style={contentBorderStyle}
+              css={{
+                background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+              }}
             >
               {renderContent()}
             </Box>

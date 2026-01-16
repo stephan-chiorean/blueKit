@@ -238,6 +238,7 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
         action={{
           label: "Create Plan",
           onClick: handleOpenCreateDialog,
+          variant: 'solid',
         }}
       />
 

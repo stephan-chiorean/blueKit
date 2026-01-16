@@ -40,7 +40,7 @@ interface OAuthCallbackPayload {
 
 export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
   const { setToken } = useGitHubAuth();
-  
+
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExchanging, setIsExchanging] = useState(false);
@@ -76,7 +76,7 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
       try {
         unlisten = await listen<OAuthCallbackPayload>('oauth-callback', async (event) => {
           const payload = event.payload;
-          
+
           if (payload.error) {
             toaster.create({
               type: 'error',
@@ -95,7 +95,7 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
                 redirect_uri: payload.redirect_uri,
                 has_verifier: !!payload.code_verifier
               });
-              
+
               const status = await invokeAuthExchangeCode(
                 payload.code,
                 payload.state,
@@ -178,7 +178,14 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
 
   if (isLoading || !authUrl) {
     return (
-      <Center h="100vh" bg="transparent">
+      <Center
+        h="100vh"
+        css={{
+          background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        }}
+      >
         <Box
           borderRadius="2xl"
           pt={4}
@@ -218,7 +225,14 @@ export function GitHubAuthScreen({ onSuccess, onSkip }: GitHubAuthScreenProps) {
   }
 
   return (
-    <Center h="100vh" bg="transparent">
+    <Center
+      h="100vh"
+      css={{
+        background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+      }}
+    >
       <Box
         borderRadius="2xl"
         pt={4}

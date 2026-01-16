@@ -18,6 +18,8 @@ export interface ToolkitHeaderProps {
         icon?: IconType;
         /** Color palette for the button (defaults to "primary") */
         colorPalette?: string;
+        /** Variant style: 'glass' (default) or 'solid' */
+        variant?: 'glass' | 'solid';
     };
 }
 
@@ -38,6 +40,8 @@ export interface ToolkitHeaderProps {
  * ```
  */
 export function ToolkitHeader({ title, action }: ToolkitHeaderProps) {
+    const isSolid = action?.variant === 'solid';
+
     return (
         <Flex
             align="center"
@@ -62,16 +66,18 @@ export function ToolkitHeader({ title, action }: ToolkitHeaderProps) {
             {action && (
                 <Button
                     colorPalette={action.colorPalette || 'primary'}
+                    variant={isSolid ? 'solid' : 'solid'} // Use solid variant for both but override CSS for glass
                     size="sm"
                     onClick={action.onClick}
                     borderRadius="lg"
-                    borderWidth="1px"
-                    css={{
+                    borderWidth={isSolid ? undefined : "1px"}
+                    css={isSolid ? undefined : {
                         background: 'rgba(255, 255, 255, 0.25)',
                         backdropFilter: 'blur(20px) saturate(180%)',
                         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                         borderColor: 'rgba(0, 0, 0, 0.08)',
                         boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                        color: 'var(--chakra-colors-text-primary)', // Ensure text contrast for glass
                         _dark: {
                             background: 'rgba(0, 0, 0, 0.2)',
                             borderColor: 'rgba(255, 255, 255, 0.15)',

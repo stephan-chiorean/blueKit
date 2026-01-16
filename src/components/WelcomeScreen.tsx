@@ -11,12 +11,17 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
       alignItems="center"
       justifyContent="center"
       minH="100vh"
-      bg="transparent"
+
+      css={{
+        background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+        backdropFilter: 'blur(30px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+      }}
     >
       <VStack gap={6}>
         <Heading size="2xl">
-          <Text 
-            as="span" 
+          <Text
+            as="span"
             color="primary.500"
             css={{
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
@@ -27,7 +32,7 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
           >
             blue
           </Text>
-          <Text 
+          <Text
             as="span"
             css={{
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',

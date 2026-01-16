@@ -94,7 +94,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuFilePlus />
                 </Icon>
-                <Text fontSize="md">New note</Text>
+                <Text fontSize="sm">New note</Text>
               </HStack>
             </Menu.Item>
 
@@ -103,7 +103,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuFolderPlus />
                 </Icon>
-                <Text fontSize="md">New folder</Text>
+                <Text fontSize="sm">New folder</Text>
               </HStack>
             </Menu.Item>
 
@@ -114,7 +114,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuCopy />
                 </Icon>
-                <Text fontSize="md">Copy path</Text>
+                <Text fontSize="sm">Copy path</Text>
               </HStack>
             </Menu.Item>
 
@@ -123,7 +123,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuCopy />
                 </Icon>
-                <Text fontSize="md">Copy relative path</Text>
+                <Text fontSize="sm">Copy relative path</Text>
               </HStack>
             </Menu.Item>
 
@@ -134,7 +134,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuPencil />
                 </Icon>
-                <Text fontSize="md">Rename</Text>
+                <Text fontSize="sm">Rename</Text>
               </HStack>
             </Menu.Item>
 
@@ -143,7 +143,7 @@ export function NotebookContextMenu({
                 <Icon>
                   <LuTrash2 />
                 </Icon>
-                <Text fontSize="md">Delete</Text>
+                <Text fontSize="sm">Delete</Text>
               </HStack>
             </Menu.Item>
           </Menu.Content>
