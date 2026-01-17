@@ -10,6 +10,7 @@ import {
     LuBookOpen
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
+import { useState, useEffect } from 'react';
 import SidebarSection from './SidebarSection';
 import SidebarMenuItem from './SidebarMenuItem';
 import NotebookTree from './NotebookTree';
@@ -60,6 +61,10 @@ export default function SidebarContent({
     editingTitle
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
+    const [treeHandlers, setTreeHandlers] = useState<{
+        onNewFile: (folderPath: string) => void;
+        onNewFolder: (folderPath: string) => void;
+    } | null>(null);
 
     return (
         <Flex direction="column" width="100%" h="100%" gap={4} pb={4}>
@@ -145,7 +150,8 @@ export default function SidebarContent({
                     rightElement={
                         <NotebookToolbar
                             projectPath={projectPath}
-                            onRefresh={onTreeRefresh || (() => { })}
+                            onNewFile={treeHandlers?.onNewFile}
+                            onNewFolder={treeHandlers?.onNewFolder}
                         />
                     }
                 >
@@ -202,6 +208,7 @@ export default function SidebarContent({
                             onNewFileCreated={onNewFileCreated}
                             titleEditPath={titleEditPath}
                             editingTitle={editingTitle}
+                            onHandlersReady={setTreeHandlers}
                         />
                     </Box>
                 </SidebarSection>

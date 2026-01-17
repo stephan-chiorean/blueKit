@@ -31,6 +31,8 @@ interface NotebookTreeProps {
     titleEditPath?: string | null;
     /** External title to display for the titleEditPath node (synced from editor) */
     editingTitle?: string;
+    /** Called with handlers for creating files/folders (for toolbar) */
+    onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
 }
 
 // Inline edit state for Obsidian-style creation
@@ -167,7 +169,8 @@ export default function NotebookTree({
     onTreeRefresh,
     onNewFileCreated,
     titleEditPath,
-    editingTitle
+    editingTitle,
+    onHandlersReady
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -454,7 +457,7 @@ export default function NotebookTree({
         setContextMenu({ isOpen: false, x: 0, y: 0, node: null });
     };
 
-    const handleNewFile = async (folderPath: string) => {
+    const handleNewFile = useCallback(async (folderPath: string) => {
         try {
             const tempName = 'Untitled.md';
             // Use path separator that works cross-platform (backend handles normalization)
@@ -492,9 +495,9 @@ export default function NotebookTree({
                 description: error instanceof Error ? error.message : 'Unknown error',
             });
         }
-    };
+    }, [nodes, projectPath, onNewFileCreated]);
 
-    const handleNewFolder = async (folderPath: string) => {
+    const handleNewFolder = useCallback(async (folderPath: string) => {
         try {
             const tempName = 'Untitled';
             // Use path separator that works cross-platform (backend handles normalization)
@@ -531,7 +534,17 @@ export default function NotebookTree({
                 description: error instanceof Error ? error.message : 'Unknown error',
             });
         }
-    };
+    }, [nodes, projectPath]);
+
+    // Expose handlers to parent component (for toolbar)
+    useEffect(() => {
+        if (onHandlersReady) {
+            onHandlersReady({
+                onNewFile: handleNewFile,
+                onNewFolder: handleNewFolder
+            });
+        }
+    }, [onHandlersReady, handleNewFile, handleNewFolder]);
 
     // Handler for inline edit value changes
     const handleInlineEditChange = (value: string) => {
