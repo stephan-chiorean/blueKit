@@ -179,3 +179,117 @@ pub async fn migrate_json_to_database(
 
     Ok(summary)
 }
+
+/// Creates a new project in the database.
+pub async fn create_project(
+    db: &DatabaseConnection,
+    name: &str,
+    path: &str,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+) -> Result<project::Model, DbErr> {
+    let now = Utc::now().timestamp_millis();
+    let id = uuid::Uuid::new_v4().to_string();
+
+    let project = project::ActiveModel {
+        id: Set(id),
+        name: Set(name.to_owned()),
+        path: Set(path.to_owned()),
+        description: Set(description),
+        tags: Set(tags.map(|t| serde_json::to_string(&t).unwrap_or_default())),
+        git_connected: Set(false),
+        git_url: Set(None),
+        git_branch: Set(None),
+        git_remote: Set(None),
+        last_commit_sha: Set(None),
+        last_synced_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_opened_at: Set(Some(now)),
+    };
+
+    project.insert(db).await
+}
+
+/// Gets all projects from the database.
+pub async fn get_all_projects(
+    db: &DatabaseConnection,
+) -> Result<Vec<project::Model>, DbErr> {
+    project::Entity::find()
+        .order_by_desc(project::Column::LastOpenedAt)
+        .all(db)
+        .await
+}
+
+/// Updates project git info by detecting git metadata from the project path.
+pub async fn update_project_git_info(
+    db: &DatabaseConnection,
+    project_id: &str,
+) -> Result<project::Model, DbErr> {
+    let project = project::Entity::find_by_id(project_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| DbErr::Custom("Project not found".to_string()))?;
+
+    let path_buf = std::path::PathBuf::from(&project.path);
+    let path = path_buf.as_path();
+    let mut active_model: project::ActiveModel = project.into();
+
+    // Use the git integration module to get info
+    // We'll use the Command API directly here to avoid circular dependencies if integrations module uses db
+    // Or better, just use the same logic as connect_project_git command would
+    
+    // Check if .git directory exists
+    let git_dir = path.join(".git");
+    if git_dir.exists() {
+        active_model.git_connected = Set(true);
+        
+        // Try to get remote URL
+        let output = std::process::Command::new("git")
+            .args(&["remote", "get-url", "origin"])
+            .current_dir(path)
+            .output();
+            
+        if let Ok(output) = output {
+            if output.status.success() {
+                let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                active_model.git_url = Set(Some(url));
+                active_model.git_remote = Set(Some("origin".to_string()));
+            }
+        }
+        
+        // Try to get current branch
+        let output = std::process::Command::new("git")
+            .args(&["branch", "--show-current"])
+            .current_dir(path)
+            .output();
+            
+        if let Ok(output) = output {
+            if output.status.success() {
+                let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !branch.is_empty() {
+                    active_model.git_branch = Set(Some(branch));
+                }
+            }
+        }
+        
+        // Try to get last commit SHA
+        let output = std::process::Command::new("git")
+            .args(&["rev-parse", "HEAD"])
+            .current_dir(path)
+            .output();
+            
+        if let Ok(output) = output {
+            if output.status.success() {
+                let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                active_model.last_commit_sha = Set(Some(sha));
+            }
+        }
+        
+        active_model.last_synced_at = Set(Some(Utc::now().timestamp_millis()));
+    } else {
+        active_model.git_connected = Set(false);
+    }
+
+    active_model.update(db).await
+}

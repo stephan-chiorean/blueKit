@@ -564,6 +564,7 @@ dependencies = [
  "notify",
  "once_cell",
  "rand 0.8.5",
+ "regex",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

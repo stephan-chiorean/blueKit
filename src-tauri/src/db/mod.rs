@@ -1,4 +1,5 @@
-use sea_orm::{Database, DatabaseConnection, DbErr};
+use sea_orm::{Database, DbErr};
+pub use sea_orm::DatabaseConnection;
 use std::env;
 use std::path::PathBuf;
 use tracing::info;

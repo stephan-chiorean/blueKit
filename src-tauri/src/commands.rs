@@ -4908,3 +4908,99 @@ pub async fn create_folder(path: String) -> Result<(), String> {
     std::fs::create_dir_all(path).map_err(|e| format!("Failed to create folder: {}", e))
 }
 
+#[tauri::command]
+pub async fn clone_from_github(
+    db: State<'_, crate::db::DatabaseConnection>,
+    owner_repo: String,      // e.g., "facebook/react"
+    target_path: String,     // absolute path
+    project_title: Option<String>,
+    register_project: bool,  // default: true
+    init_bluekit: bool,      // default: true
+) -> Result<String, String> {
+    use std::process::Command;
+    use std::fs;
+    
+    // 1. Validate owner/repo format
+    let repo_regex = regex::Regex::new(r"^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$").map_err(|e| e.to_string())?;
+    if !repo_regex.is_match(&owner_repo) {
+        return Err("Invalid repository format. Use 'owner/repo'".to_string());
+    }
+    
+    // 2. Construct GitHub URL
+    let git_url = format!("https://github.com/{}.git", owner_repo);
+    let path = PathBuf::from(&target_path);
+    
+    // 3. Validate target path doesn't exist
+    if path.exists() {
+        // If it exists, it must be empty
+        let is_empty = path.read_dir().map_err(|e| e.to_string())?.next().is_none();
+        if !is_empty {
+            return Err(format!("Target directory already exists and is not empty: {}", target_path));
+        }
+    } else {
+        // Create parent directories if needed
+        fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+    
+    // 4. Run git clone
+    tracing::info!("Cloning {} to {}", git_url, target_path);
+    
+    let output = Command::new("git")
+        .arg("clone")
+        .arg("--quiet")
+        .arg(&git_url)
+        .arg(".")  // Clone into the target directory (which we created)
+        .current_dir(&path)
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+        
+    if !output.status.success() {
+        let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(format!("Git clone failed: {}", error_msg));
+    }
+    
+    // 5. Optionally create .bluekit directory
+    if init_bluekit {
+        let bluekit_path = path.join(".bluekit");
+        if !bluekit_path.exists() {
+            fs::create_dir_all(&bluekit_path).map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
+            
+            // Create default directories
+            fs::create_dir_all(bluekit_path.join("kits")).ok();
+            fs::create_dir_all(bluekit_path.join("walkthroughs")).ok();
+            fs::create_dir_all(bluekit_path.join("diagrams")).ok();
+        }
+    }
+    
+    // 6. Optionally register in database
+    if register_project {
+        // Extract project name from path if title not provided
+        let name = project_title.unwrap_or_else(|| {
+             path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("New Project")
+                .to_string()
+        });
+        
+        // Create project entry
+        let _ = crate::db::project_operations::create_project(
+            &db,
+            &name,
+            &target_path,
+            None, // description
+            None, // tags
+        ).await.map_err(|e| format!("Failed to register project: {}", e))?;
+            
+        // We find the project we just created
+        let projects = crate::db::project_operations::get_all_projects(&db).await
+            .map_err(|e| format!("Failed to fetch projects: {}", e))?;
+            
+        if let Some(project) = projects.into_iter().find(|p| p.path == target_path) {
+             // Connect git
+             let _ = crate::db::project_operations::update_project_git_info(&db, &project.id).await;
+        }
+    }
+    
+    Ok(format!("Successfully cloned {} to {}", owner_repo, target_path))
+}
+

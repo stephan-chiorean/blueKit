@@ -80,6 +80,7 @@ async fn main() {
             commands::get_project_diagrams, // Get diagrams from .bluekit/diagrams directory
             commands::get_project_clones, // Get clones from .bluekit/clones.json
             commands::create_project_from_clone, // Create project from clone
+            commands::clone_from_github, // Clone from GitHub
             commands::create_new_project, // Create new project with files
             commands::get_watcher_health, // Get health status of all active file watchers
             commands::stop_watcher, // Stop a file watcher by event name

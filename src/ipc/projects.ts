@@ -210,6 +210,32 @@ export async function invokeCreateProjectFromClone(
 }
 
 /**
+ * Clones a GitHub repository to a local directory.
+ * 
+ * @param ownerRepo - The GitHub repository in "owner/repo" format
+ * @param targetPath - Absolute path where the repo should be cloned
+ * @param projectTitle - Optional title for the new project
+ * @param registerProject - Whether to register the project in the database (default: true)
+ * @param initBluekit - Whether to initialize .bluekit directory (default: true)
+ * @returns A promise that resolves to a success message
+ */
+export async function invokeCloneFromGithub(
+  ownerRepo: string,
+  targetPath: string,
+  projectTitle?: string,
+  registerProject: boolean = true,
+  initBluekit: boolean = true
+): Promise<string> {
+  return await invokeWithTimeout<string>('clone_from_github', {
+    ownerRepo,
+    targetPath,
+    projectTitle,
+    registerProject,
+    initBluekit,
+  }, 120000); // 2 min timeout for git
+}
+
+/**
  * Creates a new project directory and copies files to it.
  *
  * This command:
