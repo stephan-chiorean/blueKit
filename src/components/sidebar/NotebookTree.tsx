@@ -9,7 +9,8 @@ import { AiOutlineFileText } from 'react-icons/ai';
 import { BsDiagram2 } from 'react-icons/bs';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
-import { NotebookContextMenu } from './NotebookContextMenu';
+import { DirectoryContextMenu } from './DirectoryContextMenu';
+import { FileContextMenu } from './FileContextMenu';
 import { invokeWriteFile, invokeReadFile } from '../../ipc';
 import { invokeCreateFolder } from '../../ipc/fileTree';
 import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder, invokeMoveArtifactToFolder } from '../../ipc/folders';
@@ -175,7 +176,13 @@ export default function NotebookTree({
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const { colorMode } = useColorMode();
-    const [contextMenu, setContextMenu] = useState<{
+    const [directoryContextMenu, setDirectoryContextMenu] = useState<{
+        isOpen: boolean;
+        x: number;
+        y: number;
+        node: FileTreeNode | null;
+    }>({ isOpen: false, x: 0, y: 0, node: null });
+    const [fileContextMenu, setFileContextMenu] = useState<{
         isOpen: boolean;
         x: number;
         y: number;
@@ -442,19 +449,32 @@ export default function NotebookTree({
 
     // Context menu handlers
     const handleContextMenu = (e: React.MouseEvent, node: FileTreeNode) => {
-        if (!node.isFolder) return;
         e.preventDefault();
         e.stopPropagation();
-        setContextMenu({
-            isOpen: true,
-            x: e.clientX,
-            y: e.clientY,
-            node,
-        });
+
+        if (node.isFolder) {
+            setDirectoryContextMenu({
+                isOpen: true,
+                x: e.clientX,
+                y: e.clientY,
+                node,
+            });
+        } else {
+            setFileContextMenu({
+                isOpen: true,
+                x: e.clientX,
+                y: e.clientY,
+                node,
+            });
+        }
     };
 
-    const closeContextMenu = () => {
-        setContextMenu({ isOpen: false, x: 0, y: 0, node: null });
+    const closeDirectoryContextMenu = () => {
+        setDirectoryContextMenu({ isOpen: false, x: 0, y: 0, node: null });
+    };
+
+    const closeFileContextMenu = () => {
+        setFileContextMenu({ isOpen: false, x: 0, y: 0, node: null });
     };
 
     const handleNewFile = useCallback(async (folderPath: string) => {
@@ -774,6 +794,66 @@ export default function NotebookTree({
         return nodePath;
     };
 
+    // Handle file duplication
+    const handleDuplicate = async (node: FileTreeNode) => {
+        if (node.isFolder) return; // Only duplicate files
+
+        try {
+            // Read the original file content
+            const content = await invokeReadFile(node.path);
+
+            // Generate new filename with " copy" suffix
+            const lastSeparator = node.path.lastIndexOf('/') > node.path.lastIndexOf('\\')
+                ? node.path.lastIndexOf('/')
+                : node.path.lastIndexOf('\\');
+            const parentDir = lastSeparator > 0 ? node.path.slice(0, lastSeparator) : node.path;
+            const separator = node.path.includes('\\') ? '\\' : '/';
+
+            // Extract name and extension
+            const baseName = node.name.replace(/\.(md|markdown|mmd)$/, '');
+            const extension = node.name.match(/\.(md|markdown|mmd)$/)?.[0] || '.md';
+
+            // Create new filename with " copy" suffix
+            let copyName = `${baseName} copy${extension}`;
+            let newPath = `${parentDir}${separator}${copyName}`;
+
+            // Check if the copy already exists, increment copy number if needed
+            let copyNumber = 1;
+            let existingNode = findNodeByPath(nodes, newPath);
+            while (existingNode) {
+                copyNumber++;
+                copyName = `${baseName} copy ${copyNumber}${extension}`;
+                newPath = `${parentDir}${separator}${copyName}`;
+                existingNode = findNodeByPath(nodes, newPath);
+            }
+
+            // Update the first line (H1) if it's a markdown file
+            let duplicatedContent = content;
+            const nameWithoutExt = copyName.replace(/\.(md|markdown|mmd)$/, '');
+            if (content.startsWith('# ')) {
+                duplicatedContent = content.replace(/^# .+/, `# ${nameWithoutExt}`);
+            }
+
+            // Write the duplicated file
+            await invokeWriteFile(newPath, duplicatedContent);
+
+            toaster.create({
+                type: 'success',
+                title: 'File duplicated',
+                description: `Created "${copyName}"`,
+            });
+
+            refreshTree();
+        } catch (error) {
+            console.error('Failed to duplicate file:', error);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to duplicate',
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
     // Get target folder name for drag tooltip
     const getDropTargetName = (): string | null | undefined => {
         if (!dragState) return undefined;
@@ -848,17 +928,33 @@ export default function NotebookTree({
                 />
             )}
 
-            <NotebookContextMenu
-                isOpen={contextMenu.isOpen}
-                x={contextMenu.x}
-                y={contextMenu.y}
-                node={contextMenu.node}
+            <DirectoryContextMenu
+                isOpen={directoryContextMenu.isOpen}
+                x={directoryContextMenu.x}
+                y={directoryContextMenu.y}
+                node={directoryContextMenu.node}
                 projectPath={projectPath}
-                onClose={closeContextMenu}
+                onClose={closeDirectoryContextMenu}
                 onNewFile={handleNewFile}
                 onNewFolder={handleNewFolder}
                 onCopyPath={handleCopyPath}
-                onCopyRelativePath={(nodePath) => {
+                onCopyRelativePath={(nodePath: string) => {
+                    handleCopyRelativePath(getRelativePath(nodePath));
+                }}
+                onRename={handleRename}
+                onDelete={handleDelete}
+            />
+
+            <FileContextMenu
+                isOpen={fileContextMenu.isOpen}
+                x={fileContextMenu.x}
+                y={fileContextMenu.y}
+                node={fileContextMenu.node}
+                projectPath={projectPath}
+                onClose={closeFileContextMenu}
+                onDuplicate={handleDuplicate}
+                onCopyPath={handleCopyPath}
+                onCopyRelativePath={(nodePath: string) => {
                     handleCopyRelativePath(getRelativePath(nodePath));
                 }}
                 onRename={handleRename}
@@ -1244,7 +1340,7 @@ function TreeNode({
                 onContextMenu={(e) => onContextMenu(e, node)}
                 bg={
                     isDraggedOver ? dragOverBg :
-                    (isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent')
+                        (isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent')
                 }
                 color={isSelected || isEditing || isInTitleEditMode ? selectedColor : 'inherit'}
                 _hover={{
