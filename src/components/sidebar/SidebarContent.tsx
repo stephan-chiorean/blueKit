@@ -97,13 +97,15 @@ export default function SidebarContent({
                     onClick={() => onViewChange('walkthroughs')}
                     collapsed={collapsed}
                 />
-                <SidebarMenuItem
-                    icon={LuNetwork}
-                    label="Diagrams"
-                    isActive={activeView !== 'file' && activeView === 'diagrams'}
-                    onClick={() => onViewChange('diagrams')}
-                    collapsed={collapsed}
-                />
+                {flags.diagrams && (
+                    <SidebarMenuItem
+                        icon={LuNetwork}
+                        label="Diagrams"
+                        isActive={activeView !== 'file' && activeView === 'diagrams'}
+                        onClick={() => onViewChange('diagrams')}
+                        collapsed={collapsed}
+                    />
+                )}
                 <SidebarMenuItem
                     icon={LuGitBranch}
                     label="Timeline"

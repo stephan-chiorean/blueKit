@@ -175,8 +175,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
       setActiveView('tasks');
     } else if (activeView === 'agents' && !flags.agents) {
       setActiveView('tasks');
+    } else if (activeView === 'diagrams' && !flags.diagrams) {
+      setActiveView('tasks');
     }
-  }, [activeView, flags.blueprints, flags.scrapbook, flags.agents]);
+  }, [activeView, flags.blueprints, flags.scrapbook, flags.agents, flags.diagrams]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
