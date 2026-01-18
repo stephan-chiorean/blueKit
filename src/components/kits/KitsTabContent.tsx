@@ -494,6 +494,11 @@ function KitsTabContent({
               width="100%"
               maxW="100%"
               overflow="visible"
+              css={{
+                '> *': {
+                  minHeight: '220px',
+                },
+              }}
             >
               {rootKits.map((kit) => (
                 <ResourceCard
@@ -568,4 +573,3 @@ export default memo(KitsTabContent, (prevProps, nextProps) => {
     prevProps.onReload === nextProps.onReload
   );
 });
-

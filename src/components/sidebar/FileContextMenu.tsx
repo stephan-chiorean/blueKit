@@ -1,6 +1,12 @@
 import { Menu, Portal, HStack, Icon, Text } from '@chakra-ui/react';
+import { useMemo } from 'react';
 import { LuCopy, LuPencil, LuTrash2, LuFiles } from 'react-icons/lu';
 import { FileTreeNode } from '../../ipc/fileTree';
+
+// Estimated height of the file context menu (5 items + 2 separators)
+const ESTIMATED_MENU_HEIGHT = 220;
+// Margin from viewport edge
+const VIEWPORT_MARGIN = 16;
 
 interface FileContextMenuProps {
     isOpen: boolean;
@@ -19,6 +25,7 @@ interface FileContextMenuProps {
 /**
  * Context menu for files in the notebook tree.
  * Provides options for: duplicate, copy path, rename, delete.
+ * Includes smart positioning to stay within viewport bounds.
  */
 export function FileContextMenu({
     isOpen,
@@ -32,6 +39,31 @@ export function FileContextMenu({
     onRename,
     onDelete,
 }: FileContextMenuProps) {
+    // Calculate adjusted position to keep menu within viewport
+    const adjustedPosition = useMemo(() => {
+        const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+
+        let adjustedY = y;
+        let adjustedX = x;
+
+        // Check if menu would overflow below viewport
+        if (y + ESTIMATED_MENU_HEIGHT > windowHeight - VIEWPORT_MARGIN) {
+            // Position menu so its bottom edge is above the viewport bottom
+            adjustedY = windowHeight - ESTIMATED_MENU_HEIGHT - VIEWPORT_MARGIN;
+            // Ensure we don't go above the top of the viewport
+            adjustedY = Math.max(VIEWPORT_MARGIN, adjustedY);
+        }
+
+        // Check if menu would overflow right of viewport
+        const estimatedMenuWidth = 200;
+        if (x + estimatedMenuWidth > windowWidth - VIEWPORT_MARGIN) {
+            adjustedX = windowWidth - estimatedMenuWidth - VIEWPORT_MARGIN;
+        }
+
+        return { x: adjustedX, y: adjustedY };
+    }, [x, y]);
+
     if (!isOpen || !node || node.isFolder) return null;
 
     const handleDuplicate = () => {
@@ -81,8 +113,8 @@ export function FileContextMenu({
                         }}
                         style={{
                             position: 'fixed',
-                            left: `${x}px`,
-                            top: `${y}px`,
+                            left: `${adjustedPosition.x}px`,
+                            top: `${adjustedPosition.y}px`,
                         }}
                     >
                         <Menu.Item value="duplicate" onSelect={handleDuplicate}>

@@ -34,6 +34,8 @@ export interface MarkdownEditorProps {
   placeholder?: string;
   /** Whether to show line numbers */
   showLineNumbers?: boolean;
+  /** Whether to select the H1 title on mount (for new file creation) */
+  selectH1OnMount?: boolean;
 }
 
 export interface MarkdownEditorRef {
@@ -71,6 +73,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       colorMode,
       placeholder = 'Start writing...',
       showLineNumbers = false,
+      selectH1OnMount = false,
     },
     ref
   ) {
@@ -165,6 +168,23 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       });
 
       viewRef.current = view;
+
+      // Select H1 title on mount if requested (for new file creation flow)
+      if (selectH1OnMount) {
+        // Small delay to ensure editor is fully rendered
+        setTimeout(() => {
+          const content = view.state.doc.toString();
+          const h1Match = content.match(/^#\s+(.+)$/m);
+          if (h1Match) {
+            const titleStart = content.indexOf(h1Match[1]);
+            const titleEnd = titleStart + h1Match[1].length;
+            view.dispatch({
+              selection: { anchor: titleStart, head: titleEnd },
+            });
+            view.focus();
+          }
+        }, 50);
+      }
 
       return () => {
         view.destroy();

@@ -41,9 +41,9 @@ export default function SidebarSection({
     const ChildrenContainer = flex ? Flex : VStack;
 
     return (
-        <Container 
-            w="100%" 
-            mb={flex ? 0 : 4}
+        <Container
+            w="100%"
+            mb={flex ? 0 : 0}
             direction="column"
             flex={flex ? "1" : undefined}
             minH={flex ? 0 : undefined}
@@ -93,8 +93,8 @@ export default function SidebarSection({
             </Box>
 
             {(!collapsible || isExpanded) && (
-                <ChildrenContainer 
-                    gap={flex ? 0 : 0} 
+                <ChildrenContainer
+                    gap={flex ? 0 : 0}
                     align="stretch"
                     direction={flex ? "column" : undefined}
                     flex={flex ? "1" : undefined}

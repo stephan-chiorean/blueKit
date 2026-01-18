@@ -1,4 +1,4 @@
-import { VStack, Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import {
     LuListTodo,
     LuMap,
@@ -7,10 +7,14 @@ import {
     LuGitBranch,
     LuNotebook,
     LuBot,
-    LuBookOpen
+    LuBookOpen,
+    LuExternalLink
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Menu, Portal, IconButton, HStack, Text } from '@chakra-ui/react';
+import { invokeOpenProjectInEditor } from '../../ipc';
+import { toaster } from '../ui/toaster';
 import SidebarSection from './SidebarSection';
 import SidebarMenuItem from './SidebarMenuItem';
 import NotebookTree from './NotebookTree';
@@ -45,6 +49,7 @@ interface SidebarContentProps {
     titleEditPath?: string | null;
     /** External title to display for titleEditPath node (synced from editor) */
     editingTitle?: string;
+    projectName?: string;
 }
 
 export default function SidebarContent({
@@ -58,7 +63,8 @@ export default function SidebarContent({
     onTreeRefresh,
     onNewFileCreated,
     titleEditPath,
-    editingTitle
+    editingTitle,
+    projectName
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
     const [treeHandlers, setTreeHandlers] = useState<{
@@ -66,9 +72,83 @@ export default function SidebarContent({
         onNewFolder: (folderPath: string) => void;
     } | null>(null);
 
+    // Handle opening project in external editor
+    const handleOpenInEditor = async (editor: 'cursor' | 'vscode' | 'antigravity') => {
+        if (!projectPath) return; // Should not happen if button is visible
+        try {
+            await invokeOpenProjectInEditor(projectPath, editor);
+            toaster.create({
+                title: `Opened in ${editor.charAt(0).toUpperCase() + editor.slice(1)}`,
+                description: projectName ? `${projectName} opened successfully` : 'Project opened successfully',
+                type: 'success',
+                duration: 2000,
+            });
+        } catch (error) {
+            console.error(`Failed to open project in ${editor}:`, error);
+            toaster.create({
+                title: `Failed to open in ${editor}`,
+                description: error instanceof Error ? error.message : 'Unknown error',
+                type: 'error',
+                duration: 4000,
+            });
+        }
+    };
+
     return (
-        <Flex direction="column" width="100%" h="100%" gap={4} pb={4}>
-            <SidebarSection title="Toolkit" collapsed={collapsed}>
+        <Flex direction="column" width="100%" h="100%" gap={1} pb={0}>
+            <SidebarSection
+                title="Toolkit"
+                collapsed={collapsed}
+                rightElement={
+                    !collapsed && (
+                        <Menu.Root>
+                            <Menu.Trigger asChild>
+                                <IconButton
+                                    variant="ghost"
+                                    size="xs"
+                                    aria-label="Open Project"
+                                    color="gray.500"
+                                    _hover={{ color: "primary.500", bg: "transparent" }}
+                                    minW={5}
+                                    h={5}
+                                >
+                                    <LuExternalLink />
+                                </IconButton>
+                            </Menu.Trigger>
+                            <Portal>
+                                <Menu.Positioner>
+                                    <Menu.Content minW="180px" zIndex={1500}>
+                                        <Menu.Item
+                                            value="cursor"
+                                            onSelect={() => handleOpenInEditor('cursor')}
+                                        >
+                                            <HStack gap={2}>
+                                                <Text>Open in Cursor</Text>
+                                            </HStack>
+                                        </Menu.Item>
+                                        <Menu.Item
+                                            value="vscode"
+                                            onSelect={() => handleOpenInEditor('vscode')}
+                                        >
+                                            <HStack gap={2}>
+                                                <Text>Open in VSCode</Text>
+                                            </HStack>
+                                        </Menu.Item>
+                                        <Menu.Item
+                                            value="antigravity"
+                                            onSelect={() => handleOpenInEditor('antigravity')}
+                                        >
+                                            <HStack gap={2}>
+                                                <Text>Open in Antigravity</Text>
+                                            </HStack>
+                                        </Menu.Item>
+                                    </Menu.Content>
+                                </Menu.Positioner>
+                            </Portal>
+                        </Menu.Root>
+                    )
+                }
+            >
                 <SidebarMenuItem
                     icon={LuListTodo}
                     label="Tasks"

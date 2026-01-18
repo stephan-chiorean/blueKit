@@ -4,8 +4,6 @@ import {
   Flex,
   HStack,
   IconButton,
-  Input,
-  InputGroup,
   Avatar,
   Heading,
   Text,
@@ -13,8 +11,9 @@ import {
   Menu,
   VStack,
   Switch,
+  Input,
 } from '@chakra-ui/react';
-import { LuSearch, LuBell, LuUser, LuLogOut, LuNotebookPen } from 'react-icons/lu';
+import { LuBell, LuUser, LuLogOut, LuNotebookPen, LuMenu, LuSearch } from 'react-icons/lu';
 import { Task } from '../types/task';
 import { Project, invokeGetProjectRegistry } from '../ipc';
 import TaskManagerPopover from './tasks/TaskManagerPopover';
@@ -26,14 +25,17 @@ import { useNotepad } from '../contexts/NotepadContext';
 import { useTimer } from '../contexts/TimerContext';
 import TimerPopover from './shared/TimerPopover';
 import SignInPopover from './shared/SignInPopover';
-import { FaMoon, FaSun } from "react-icons/fa"
+import { FaMoon, FaSun } from "react-icons/fa";
+
+import NavigationMenu from './NavigationDrawer';
 
 interface HeaderProps {
   currentProject?: Project;
   onNavigateToTasks?: () => void;
+  onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
-export default function Header({ currentProject, onNavigateToTasks }: HeaderProps = {}) {
+export default function Header({ currentProject, onNavigateToTasks, onNavigateToPlans }: HeaderProps = {}) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -71,12 +73,16 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
     // Dialogs will reload their own data
   };
 
+  // Handle opening project in external editor
+
+
   // Glass styling for light/dark mode
   const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
 
   return (
     <Box
-      px={6}
+      pl={3}
+      pr={6}
       py={2}
       position="sticky"
       top={0}
@@ -88,9 +94,23 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
       }}
     >
       <Flex align="center" justify="space-between" gap={4}>
-        {/* blueKit branding on the left */}
-        <Box flex="1">
-          <Heading size="lg">
+        {/* blueKit branding on the left with navigation menu */}
+        <HStack gap={3} flex="1">
+          <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
+            {({ onOpen }) => (
+              <IconButton
+                variant="ghost"
+                size="md"
+                aria-label="Open navigation menu"
+                onClick={onOpen}
+                _hover={{ bg: 'transparent' }}
+                ml={-2}
+              >
+                <LuMenu />
+              </IconButton>
+            )}
+          </NavigationMenu>
+          <Heading size="xl">
             <Text
               as="span"
               color="primary.500"
@@ -115,17 +135,53 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
               Kit
             </Text>
           </Heading>
-        </Box>
+        </HStack>
 
-        {/* Center search bar */}
-        <Box flex="2" maxW="600px">
-          <InputGroup startElement={<LuSearch />}>
+        {/* Center Search Bar */}
+        <Box flex="2" display="flex" justifyContent="center" maxW="600px" px={4}>
+          <Box position="relative" width="100%" maxW="400px">
+            <Box
+              position="absolute"
+              left={4}
+              top="50%"
+              transform="translateY(-50%)"
+              pointerEvents="none"
+              zIndex={2}
+              color="gray.400"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Icon as={LuSearch} fontSize="lg" />
+            </Box>
             <Input
+              pl={12}
               placeholder="Search..."
               variant="subtle"
-              bg="bg.emphasized"
+              size="lg"
+              borderRadius="xl"
+              bg={colorMode === 'light' ? 'whiteAlpha.600' : 'blackAlpha.300'}
+              border="1px solid"
+              borderColor={colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100'}
+              fontSize="md"
+              _placeholder={{ color: 'gray.500' }}
+              _hover={{
+                bg: colorMode === 'light' ? 'whiteAlpha.800' : 'blackAlpha.400',
+                borderColor: colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100',
+              }}
+              _focus={{
+                bg: colorMode === 'light' ? 'white' : 'blackAlpha.500',
+                borderColor: colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100',
+                boxShadow: 'none',
+                outline: 'none',
+              }}
+              css={{
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                transition: 'all 0.2s',
+              }}
             />
-          </InputGroup>
+          </Box>
         </Box>
 
         {/* Right side icons */}

@@ -689,7 +689,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     if (notebookFile) {
       return (
         <NoteViewPage
-          key={`${notebookFile.resource.path}-${newFileKey}`}
+          key={newFileKey}
           resource={notebookFile.resource}
           content={notebookFile.content}
           initialViewMode={isNewFile ? 'edit' : undefined}

@@ -14,14 +14,12 @@ import {
 } from "@chakra-ui/react";
 import { listen } from "@tauri-apps/api/event";
 import {
-  LuMenu,
   LuLibrary,
   LuFolder,
   LuWorkflow,
   LuListTodo,
   LuPlus,
 } from "react-icons/lu";
-import NavigationMenu from "../components/NavigationDrawer";
 import Header from "../components/Header";
 import ProjectsTabContent from "../components/projects/ProjectsTabContent";
 import AddProjectDialog from "../components/projects/AddProjectDialog";
@@ -405,7 +403,10 @@ export default function HomePage({
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden" style={{ height: '100vh', maxHeight: '100vh' }} bg="transparent">
       {/* Header above everything */}
       <Box flexShrink={0} bg="transparent">
-        <Header onNavigateToTasks={() => setActiveTab('tasks')} />
+        <Header
+          onNavigateToTasks={() => setActiveTab('tasks')}
+          onNavigateToPlans={onNavigateToPlans}
+        />
       </Box>
 
       {/* Full screen content area - no workstation until kit is selected */}
@@ -433,27 +434,12 @@ export default function HomePage({
               <Flex
                 align="center"
                 gap={4}
-                mb={6}
-                mt={3}
+                mb={8}
+                mt={6}
                 position="relative"
                 w="100%"
                 flexShrink={0}
               >
-                <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
-                  {({ onOpen }) => (
-                    <IconButton
-                      variant="ghost"
-                      size="lg"
-                      aria-label="Open menu"
-                      onClick={onOpen}
-                      color="gray.600"
-                      _hover={{ bg: "transparent" }}
-                    >
-                      <LuMenu />
-                    </IconButton>
-                  )}
-                </NavigationMenu>
-
                 {/* Portal target for left-side header actions (e.g. workspace selector) */}
                 <Box id="header-left-actions" display={activeTab === 'library' ? 'block' : 'none'} />
                 <Box

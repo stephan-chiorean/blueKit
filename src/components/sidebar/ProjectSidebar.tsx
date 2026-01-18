@@ -1,9 +1,9 @@
 import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection } from '@chakra-ui/react';
-import { LuFolder, LuArrowLeft } from 'react-icons/lu';
+import { LuFolder, LuArrowLeft, LuChevronsUpDown } from 'react-icons/lu';
 import SidebarContent, { ViewType } from './SidebarContent';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { Project, ProjectEntry, FileTreeNode } from '../../ipc';
-import { ResourceFile } from '../../types/resource';
+
 
 interface ProjectSidebarProps {
   project: ProjectEntry;
@@ -168,7 +168,7 @@ export default function ProjectSidebar({
       <Box
         flex="1"
         overflowX="hidden"
-        pb={4}
+        pb={1}
         px={2}
       >
         <SidebarContent
@@ -182,7 +182,42 @@ export default function ProjectSidebar({
           onNewFileCreated={onNewFileCreated}
           titleEditPath={titleEditPath}
           editingTitle={editingTitle}
+          projectName={project.title}
         />
+      </Box>
+
+      {/* Vault Switcher */}
+      <Box
+        px={3}
+        py={2}
+        borderTopWidth="1px"
+        borderColor={colorMode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)'}
+      >
+        <HStack
+          as="button"
+          w="100%"
+          py={2}
+          px={2}
+          borderRadius="md"
+          cursor="pointer"
+          _hover={{
+            bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
+          }}
+          gap={2}
+        >
+          <Icon
+            as={LuChevronsUpDown}
+            boxSize={4}
+            color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+          />
+          <Text
+            fontSize="sm"
+            fontWeight="medium"
+            color={colorMode === 'light' ? 'gray.700' : 'gray.300'}
+          >
+            .bluekit
+          </Text>
+        </HStack>
       </Box>
     </Flex>
   );

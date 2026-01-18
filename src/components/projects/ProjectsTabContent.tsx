@@ -447,7 +447,7 @@ export default function ProjectsTabContent({
                 </Flex>
               </Box>
               <Box bg="transparent" pt={2}>
-                <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'text.secondary'} mb={3}>
+                <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'secondary.solid'} mb={3}>
                   {project.description || 'No description'}
                 </Text>
                 <Text fontSize="xs" color="text.tertiary" fontFamily="mono" lineClamp={1}>

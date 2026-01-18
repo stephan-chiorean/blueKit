@@ -1,6 +1,12 @@
 import { Menu, Portal, HStack, Icon, Text } from '@chakra-ui/react';
+import { useMemo } from 'react';
 import { LuFilePlus, LuFolderPlus, LuCopy, LuPencil, LuTrash2 } from 'react-icons/lu';
 import { FileTreeNode } from '../../ipc/fileTree';
+
+// Estimated height of the directory context menu (6 items + 2 separators)
+const ESTIMATED_MENU_HEIGHT = 260;
+// Margin from viewport edge
+const VIEWPORT_MARGIN = 16;
 
 interface DirectoryContextMenuProps {
     isOpen: boolean;
@@ -20,6 +26,7 @@ interface DirectoryContextMenuProps {
 /**
  * Context menu for directories in the notebook tree.
  * Provides options for: new note, new folder, copy path, rename, delete.
+ * Includes smart positioning to stay within viewport bounds.
  */
 export function DirectoryContextMenu({
     isOpen,
@@ -34,6 +41,31 @@ export function DirectoryContextMenu({
     onRename,
     onDelete,
 }: DirectoryContextMenuProps) {
+    // Calculate adjusted position to keep menu within viewport
+    const adjustedPosition = useMemo(() => {
+        const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+
+        let adjustedY = y;
+        let adjustedX = x;
+
+        // Check if menu would overflow below viewport
+        if (y + ESTIMATED_MENU_HEIGHT > windowHeight - VIEWPORT_MARGIN) {
+            // Position menu so its bottom edge is above the viewport bottom
+            adjustedY = windowHeight - ESTIMATED_MENU_HEIGHT - VIEWPORT_MARGIN;
+            // Ensure we don't go above the top of the viewport
+            adjustedY = Math.max(VIEWPORT_MARGIN, adjustedY);
+        }
+
+        // Check if menu would overflow right of viewport
+        const estimatedMenuWidth = 200;
+        if (x + estimatedMenuWidth > windowWidth - VIEWPORT_MARGIN) {
+            adjustedX = windowWidth - estimatedMenuWidth - VIEWPORT_MARGIN;
+        }
+
+        return { x: adjustedX, y: adjustedY };
+    }, [x, y]);
+
     if (!isOpen || !node || !node.isFolder) return null;
 
     const handleNewFile = () => {
@@ -88,8 +120,8 @@ export function DirectoryContextMenu({
                         }}
                         style={{
                             position: 'fixed',
-                            left: `${x}px`,
-                            top: `${y}px`,
+                            left: `${adjustedPosition.x}px`,
+                            top: `${adjustedPosition.y}px`,
                         }}
                     >
                         <Menu.Item value="new-file" onSelect={handleNewFile}>

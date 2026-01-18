@@ -87,17 +87,6 @@ export default function NoteViewPage({
     }
   }, [initialContent, resource.path, viewMode, initialViewMode]);
 
-  // Select H1 title when opening a new file in edit mode
-  useEffect(() => {
-    if (initialViewMode === 'edit' && editorRef.current) {
-      // Small delay to ensure editor is fully mounted
-      const timer = setTimeout(() => {
-        editorRef.current?.selectH1Title();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [initialViewMode, resource.path]);
-
   // Fetch sibling files in the same directory
   useEffect(() => {
     const fetchSiblings = async () => {
@@ -245,6 +234,7 @@ export default function NoteViewPage({
             readOnly={false}
             showLineNumbers={true}
             placeholder="Start writing..."
+            selectH1OnMount={initialViewMode === 'edit'}
           />
         ) : (
           <ResourceMarkdownContent

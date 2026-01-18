@@ -3,112 +3,87 @@ import {
   IconButton,
   Drawer,
   Portal,
-  VStack,
   Text,
   CloseButton,
-  Collapsible,
-  HStack,
-  Button,
-  Separator,
   Box,
   Icon,
   Flex,
-  NativeSelect,
+  SimpleGrid,
+  VStack,
 } from '@chakra-ui/react';
-import { 
-  LuMenu, 
-  LuChevronRight, 
-  LuUsers, 
-  LuFolderOpen, 
-  LuFileText, 
-  LuBookOpen,
+import { useColorMode } from '../contexts/ColorModeContext';
+import {
+  LuMenu,
+  LuUsers,
   LuWrench,
-  LuNotebook,
-  LuPlug,
-  LuBriefcase,
   LuSettings,
   LuArchive,
-  LuCode,
 } from 'react-icons/lu';
-import {FaBucket} from "react-icons/fa6";
-import { RiClaudeFill } from "react-icons/ri";
 
 interface NavigationMenuProps {
   children?: (props: { isOpen: boolean; onOpen: () => void }) => ReactNode;
   onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
-interface MenuItem {
+interface NavCard {
   id: string;
   label: string;
+  description: string;
   icon: React.ComponentType;
-  children?: MenuItem[];
-  onClick?: () => void;
 }
 
-const menuItems: MenuItem[] = [
+const navCards: NavCard[] = [
   {
     id: 'community',
     label: 'Community',
+    description: 'Explore gallery, join forums, and share feedback with other users',
     icon: LuUsers,
-    children: [
-      { id: 'projects', label: 'Projects', icon: LuFolderOpen },
-      { id: 'walkthroughs', label: 'Walkthroughs', icon: LuBookOpen },
-    ],
   },
   {
     id: 'tools',
     label: 'Tools',
+    description: 'View skills, agents, plans and artifacts from Claude, Codex, Cursor, and more',
     icon: LuWrench,
-    children: [
-      { id: 'bucket', label: 'Bucket', icon: FaBucket },
-      { id: 'notebook', label: 'Notebook', icon: LuNotebook },
-      { id: 'mcp', label: 'MCP', icon: LuPlug },
-      { id: 'plans', label: 'Plans', icon: LuFileText, children: [
-        { id: 'claude', label: 'Claude', icon: RiClaudeFill },
-        { id: 'cursor', label: 'Cursor', icon: LuCode },
-      ]},
-    ],
   },
   {
-    id: 'workspace',
-    label: 'Workspace',
-    icon: LuBriefcase,
-    children: [
-      { id: 'settings', label: 'Settings', icon: LuSettings },
-    ],
+    id: 'settings',
+    label: 'Settings',
+    description: 'Configure preferences, integrations, and workspace options',
+    icon: LuSettings,
   },
   {
     id: 'archive',
     label: 'Archive',
+    description: 'Access archived projects, tasks, and other obsolete resources',
     icon: LuArchive,
   },
 ];
 
 export default function NavigationMenu({ children, onNavigateToPlans }: NavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [selectedWorkspace, setSelectedWorkspace] = useState('workspace-1');
+  const { colorMode } = useColorMode();
 
-  const handleMenuItemClick = (item: MenuItem) => {
-    if (item.children) {
-      // Toggle expansion handled by Collapsible
-      return;
-    } else {
-      // Handle navigation
-      console.log('Navigate to:', item.id);
-      setIsOpen(false);
-    }
-  };
+  // Glass styling to match Header - more transparent
+  const drawerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
 
-  const handleChildClick = (child: MenuItem) => {
-    if (child.id === 'claude' || child.id === 'cursor') {
-      onNavigateToPlans?.(child.id as 'claude' | 'cursor');
-      setIsOpen(false);
-    } else {
-      console.log('Navigate to:', child.id);
-      setIsOpen(false);
+  // Card styling
+  const cardBg = colorMode === 'light'
+    ? 'rgba(255, 255, 255, 0.6)'
+    : 'rgba(40, 40, 50, 0.5)';
+  const cardBorder = colorMode === 'light'
+    ? '1px solid rgba(0, 0, 0, 0.08)'
+    : '1px solid rgba(255, 255, 255, 0.1)';
+  const cardHoverBg = colorMode === 'light'
+    ? 'rgba(59, 130, 246, 0.1)'
+    : 'rgba(59, 130, 246, 0.15)';
+
+  const handleCardClick = (cardId: string) => {
+    console.log('Navigate to:', cardId);
+    // Handle specific navigation
+    if (cardId === 'tools' && onNavigateToPlans) {
+      // Could open a sub-menu or navigate to tools page
     }
+    setIsOpen(false);
   };
 
   return (
@@ -116,178 +91,97 @@ export default function NavigationMenu({ children, onNavigateToPlans }: Navigati
       {/* Render children with menu control props */}
       {children?.({ isOpen, onOpen: () => setIsOpen(true) })}
 
-      {/* Drawer with navigation menu */}
-      <Drawer.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} placement="start">
+      {/* Drawer with navigation cards */}
+      <Drawer.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} placement="top">
         <Portal>
-          <Drawer.Backdrop />
+          <Drawer.Backdrop
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(4px)',
+            }}
+          />
           <Drawer.Positioner>
-            <Drawer.Content>
+            <Drawer.Content
+              style={{
+                background: drawerBg,
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                borderBottom: colorMode === 'light'
+                  ? '1px solid rgba(0, 0, 0, 0.08)'
+                  : '1px solid rgba(99, 102, 241, 0.2)',
+              }}
+            >
               <Drawer.Header>
                 <Flex align="center" justify="space-between" w="100%">
-                  <Text fontWeight="semibold" fontSize="md">
-                    Navigation
+                  <Text fontWeight="semibold" fontSize="lg">
+                    Menu
                   </Text>
                   <Drawer.CloseTrigger asChild>
                     <CloseButton size="sm" />
                   </Drawer.CloseTrigger>
                 </Flex>
               </Drawer.Header>
-              <Drawer.Body>
-                <VStack align="stretch" gap={1}>
-                  {/* Workspace Selector */}
-                  <Box mb={2}>
-                    <NativeSelect.Root size="sm">
-                      <NativeSelect.Field
-                        value={selectedWorkspace}
-                        onChange={(e) => setSelectedWorkspace(e.currentTarget.value)}
-                      >
-                        <option value="workspace-1">Workspace 1</option>
-                        <option value="workspace-2">Workspace 2</option>
-                        <option value="workspace-3">Workspace 3</option>
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                  </Box>
-
-
-                  {/* Menu Items */}
-                  {menuItems.map((item) => (
-                    <Box key={item.id}>
-                      <Collapsible.Root
-                        open={expandedItems.has(item.id)}
-                        onOpenChange={(e) => {
-                          if (e.open) {
-                            setExpandedItems((prev) => new Set(prev).add(item.id));
-                          } else {
-                            setExpandedItems((prev) => {
-                              const next = new Set(prev);
-                              next.delete(item.id);
-                              return next;
-                            });
-                          }
-                        }}
-                      >
-                        <Collapsible.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            w="100%"
-                            justifyContent="flex-start"
-                            onClick={() => handleMenuItemClick(item)}
+              <Drawer.Body pb={6}>
+                <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap={4}>
+                  {navCards.map((card) => (
+                    <Box
+                      key={card.id}
+                      as="button"
+                      p={5}
+                      borderRadius="xl"
+                      cursor="pointer"
+                      textAlign="left"
+                      transition="all 0.2s ease"
+                      onClick={() => handleCardClick(card.id)}
+                      style={{
+                        background: cardBg,
+                        border: cardBorder,
+                      }}
+                      _hover={{
+                        background: cardHoverBg,
+                        transform: 'translateY(-2px)',
+                        boxShadow: colorMode === 'light'
+                          ? '0 8px 24px rgba(0, 0, 0, 0.12)'
+                          : '0 8px 24px rgba(0, 0, 0, 0.4)',
+                        borderColor: 'primary.400',
+                      }}
+                      _active={{
+                        transform: 'translateY(0)',
+                      }}
+                    >
+                      <VStack align="start" gap={3}>
+                        <Box
+                          p={3}
+                          borderRadius="lg"
+                          bg={colorMode === 'light' ? 'primary.50' : 'rgba(59, 130, 246, 0.15)'}
+                        >
+                          <Icon
+                            boxSize={6}
+                            color="primary.500"
                           >
-                            <HStack gap={3} flex="1">
-                              <Icon>
-                                <item.icon />
-                              </Icon>
-                              <Text flex="1" textAlign="left">
-                                {item.label}
-                              </Text>
-                              {item.children && (
-                                <Collapsible.Indicator
-                                  transition="transform 0.2s"
-                                  _open={{ transform: 'rotate(90deg)' }}
-                                >
-                                  <LuChevronRight />
-                                </Collapsible.Indicator>
-                              )}
-                            </HStack>
-                          </Button>
-                        </Collapsible.Trigger>
-                        {item.children && (
-                          <Collapsible.Content>
-                            <VStack align="stretch" gap={0} pl={8} mt={1}>
-                              {item.children.map((child) => {
-                                // Check if this child has children (nested menu)
-                                if (child.children) {
-                                  return (
-                                    <Collapsible.Root
-                                      key={child.id}
-                                      open={expandedItems.has(child.id)}
-                                      onOpenChange={(e) => {
-                                        if (e.open) {
-                                          setExpandedItems((prev) => new Set(prev).add(child.id));
-                                        } else {
-                                          setExpandedItems((prev) => {
-                                            const next = new Set(prev);
-                                            next.delete(child.id);
-                                            return next;
-                                          });
-                                        }
-                                      }}
-                                    >
-                                      <Collapsible.Trigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          w="100%"
-                                          justifyContent="flex-start"
-                                        >
-                                          <HStack gap={3} flex="1">
-                                            <Icon size="sm">
-                                              <child.icon />
-                                            </Icon>
-                                            <Text flex="1" textAlign="left">{child.label}</Text>
-                                            <Collapsible.Indicator
-                                              transition="transform 0.2s"
-                                              _open={{ transform: 'rotate(90deg)' }}
-                                            >
-                                              <LuChevronRight />
-                                            </Collapsible.Indicator>
-                                          </HStack>
-                                        </Button>
-                                      </Collapsible.Trigger>
-                                      {child.children && (
-                                        <Collapsible.Content>
-                                          <VStack align="stretch" gap={0} pl={8} mt={1}>
-                                            {child.children.map((grandchild) => (
-                                              <Button
-                                                key={grandchild.id}
-                                                variant="ghost"
-                                                size="sm"
-                                                w="100%"
-                                                justifyContent="flex-start"
-                                                onClick={() => handleChildClick(grandchild)}
-                                              >
-                                                <HStack gap={3}>
-                                                  <Icon size="sm">
-                                                    <grandchild.icon />
-                                                  </Icon>
-                                                  <Text>{grandchild.label}</Text>
-                                                </HStack>
-                                              </Button>
-                                            ))}
-                                          </VStack>
-                                        </Collapsible.Content>
-                                      )}
-                                    </Collapsible.Root>
-                                  );
-                                }
-                                // Regular child item
-                                return (
-                                  <Button
-                                    key={child.id}
-                                    variant="ghost"
-                                    size="sm"
-                                    w="100%"
-                                    justifyContent="flex-start"
-                                    onClick={() => handleChildClick(child)}
-                                  >
-                                    <HStack gap={3}>
-                                      <Icon size="sm">
-                                        <child.icon />
-                                      </Icon>
-                                      <Text>{child.label}</Text>
-                                    </HStack>
-                                  </Button>
-                                );
-                              })}
-                            </VStack>
-                          </Collapsible.Content>
-                        )}
-                      </Collapsible.Root>
+                            <card.icon />
+                          </Icon>
+                        </Box>
+                        <Box>
+                          <Text
+                            fontWeight="semibold"
+                            fontSize="md"
+                            mb={1}
+                          >
+                            {card.label}
+                          </Text>
+                          <Text
+                            fontSize="sm"
+                            color={colorMode === 'light' ? 'gray.600' : 'gray.400'}
+                            lineHeight="1.4"
+                          >
+                            {card.description}
+                          </Text>
+                        </Box>
+                      </VStack>
                     </Box>
                   ))}
-                </VStack>
+                </SimpleGrid>
               </Drawer.Body>
             </Drawer.Content>
           </Drawer.Positioner>
