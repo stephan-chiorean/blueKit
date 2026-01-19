@@ -4,14 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { LuFile, LuFolder, LuFolderOpen, LuArrowRight, LuX } from 'react-icons/lu';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaBookmark } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { BsDiagram2 } from 'react-icons/bs';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { DirectoryContextMenu } from './DirectoryContextMenu';
 import { FileContextMenu } from './FileContextMenu';
-import { invokeWriteFile, invokeReadFile, invokeAddBookmark } from '../../ipc';
+import { listen } from '@tauri-apps/api/event';
+import { invokeWriteFile, invokeReadFile, invokeAddBookmark, invokeGetBookmarks } from '../../ipc';
+import { BookmarkItem } from '../../ipc/types';
 import { invokeCreateFolder } from '../../ipc/fileTree';
 import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder, invokeMoveArtifactToFolder } from '../../ipc/folders';
 import { deleteResources } from '../../ipc/artifacts';
@@ -161,6 +163,22 @@ function findParentFolderPaths(nodes: FileTreeNode[], targetPath: string, parent
     return null;
 }
 
+// Extract all bookmarked file paths from the nested bookmark structure
+function extractBookmarkedPaths(items: BookmarkItem[]): Set<string> {
+    const paths = new Set<string>();
+    const traverse = (items: BookmarkItem[]) => {
+        for (const item of items) {
+            if (item.type === 'file') {
+                paths.add(item.path);
+            } else if (item.type === 'group') {
+                traverse(item.items);
+            }
+        }
+    };
+    traverse(items);
+    return paths;
+}
+
 export default function NotebookTree({
     projectPath,
     onFileSelect,
@@ -209,6 +227,65 @@ export default function NotebookTree({
     const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
     const [pendingExpandFolderId, setPendingExpandFolderId] = useState<string | null>(null);
     const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Bookmarked paths state for showing bookmark icons
+    const [bookmarkedPaths, setBookmarkedPaths] = useState<Set<string>>(new Set());
+
+    // Load bookmarks and extract paths
+    const loadBookmarks = useCallback(async () => {
+        try {
+            const data = await invokeGetBookmarks(projectPath);
+            const paths = extractBookmarkedPaths(data.items);
+            setBookmarkedPaths(paths);
+        } catch (error) {
+            console.error('Failed to load bookmarks:', error);
+        }
+    }, [projectPath]);
+
+    // Initial load of bookmarks
+    useEffect(() => {
+        loadBookmarks();
+    }, [loadBookmarks]);
+
+    // Listen for file changes to refresh bookmarks
+    useEffect(() => {
+        let unlisten: (() => void) | null = null;
+        let isCancelled = false;
+
+        const setupListener = async () => {
+            // Generate the event name (must match the Rust code)
+            const sanitizedPath = projectPath
+                .replace(/\//g, '_')
+                .replace(/\\/g, '_')
+                .replace(/:/g, '_')
+                .replace(/\./g, '_')
+                .replace(/ /g, '_');
+            const eventName = `project-artifacts-changed-${sanitizedPath}`;
+
+            const unlistenFn = await listen<string[]>(eventName, (event) => {
+                // Check if bookmarks.json was changed
+                const changedPaths = event.payload;
+                const bookmarksChanged = changedPaths.some(p => p.endsWith('bookmarks.json'));
+                if (bookmarksChanged) {
+                    loadBookmarks();
+                }
+            });
+
+            // If effect was cleaned up while waiting for listen(), clean up immediately
+            if (isCancelled) {
+                unlistenFn();
+            } else {
+                unlisten = unlistenFn;
+            }
+        };
+
+        setupListener();
+
+        return () => {
+            isCancelled = true;
+            if (unlisten) unlisten();
+        };
+    }, [projectPath, loadBookmarks]);
 
     useEffect(() => {
         loadTree();
@@ -925,6 +1002,7 @@ export default function NotebookTree({
                     draggedNodePath={dragState?.draggedNode.path}
                     dropTargetPath={hasDragThresholdMet ? dragState?.dropTargetPath : undefined}
                     isValidDrop={dragState?.isValidDrop ?? false}
+                    bookmarkedPaths={bookmarkedPaths}
                 />
 
                 {/* Root drop zone - visible during drag */}
@@ -1157,6 +1235,8 @@ interface CustomTreeProps {
     draggedNodePath?: string;
     dropTargetPath?: string | null;
     isValidDrop: boolean;
+    // Bookmark props
+    bookmarkedPaths: Set<string>;
 }
 
 function CustomTree({
@@ -1179,7 +1259,8 @@ function CustomTree({
     onDragStart,
     draggedNodePath,
     dropTargetPath,
-    isValidDrop
+    isValidDrop,
+    bookmarkedPaths
 }: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
@@ -1211,6 +1292,7 @@ function CustomTree({
                     draggedNodePath={draggedNodePath}
                     dropTargetPath={dropTargetPath}
                     isValidDrop={isValidDrop}
+                    bookmarkedPaths={bookmarkedPaths}
                 />
             ))}
         </Box>
@@ -1242,7 +1324,8 @@ function TreeNode({
     isDraggedOverInvalid,
     draggedNodePath,
     dropTargetPath,
-    isValidDrop
+    isValidDrop,
+    bookmarkedPaths
 }: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
@@ -1271,10 +1354,15 @@ function TreeNode({
     isDraggedOverInvalid: boolean,
     draggedNodePath?: string,
     dropTargetPath?: string | null,
-    isValidDrop: boolean
+    isValidDrop: boolean,
+    // Bookmark props
+    bookmarkedPaths: Set<string>
 }) {
     // Check if this node is in title-edit mode (visual only, for files)
     const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
+
+    // Check if this file is bookmarked
+    const isBookmarked = !node.isFolder && bookmarkedPaths.has(node.path);
 
     // Track if text has been selected to prevent re-selecting on every render
     const hasSelectedTextRef = useRef<boolean>(false);
@@ -1440,6 +1528,9 @@ function TreeNode({
                         {isInTitleEditMode && editingTitle ? editingTitle : (node.isFolder ? node.name : getDisplayName(node.name))}
                     </Text>
                 )}
+                {isBookmarked && (
+                    <Icon as={FaBookmark} color="orange.400" boxSize={3} />
+                )}
                 {node.isEssential && (
                     <Icon as={FaStar} color="blue.500" boxSize={3} />
                 )}
@@ -1480,6 +1571,7 @@ function TreeNode({
                             draggedNodePath={draggedNodePath}
                             dropTargetPath={dropTargetPath}
                             isValidDrop={isValidDrop}
+                            bookmarkedPaths={bookmarkedPaths}
                         />
                     </MotionBox>
                 )}

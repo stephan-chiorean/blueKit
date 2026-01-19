@@ -13,7 +13,7 @@ import {
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import { useState } from 'react';
-import { Menu, Portal, IconButton, HStack, Text } from '@chakra-ui/react';
+import { Menu, Portal, IconButton, HStack, Text, Tooltip } from '@chakra-ui/react';
 import { invokeOpenProjectInEditor } from '../../ipc';
 import { toaster } from '../ui/toaster';
 import SidebarSection from './SidebarSection';
@@ -21,6 +21,7 @@ import SidebarMenuItem from './SidebarMenuItem';
 import NotebookTree from './NotebookTree';
 import NotebookToolbar from './NotebookToolbar';
 import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
+import { useColorMode } from '../../contexts/ColorModeContext';
 import { FileTreeNode } from '../../ipc/fileTree';
 
 export type ViewType =
@@ -69,6 +70,7 @@ export default function SidebarContent({
     projectName
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
+    const { colorMode } = useColorMode();
     const [treeHandlers, setTreeHandlers] = useState<{
         onNewFile: (folderPath: string) => void;
         onNewFolder: (folderPath: string) => void;
@@ -104,19 +106,55 @@ export default function SidebarContent({
                 rightElement={
                     !collapsed && (
                         <Menu.Root>
-                            <Menu.Trigger asChild>
-                                <IconButton
-                                    variant="ghost"
-                                    size="xs"
-                                    aria-label="Open Project"
-                                    color="gray.500"
-                                    _hover={{ color: "primary.500", bg: "transparent" }}
-                                    minW={5}
-                                    h={5}
-                                >
-                                    <LuExternalLink />
-                                </IconButton>
-                            </Menu.Trigger>
+                            <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
+                                <Tooltip.Trigger asChild>
+                                    <Box display="inline-flex">
+                                        <Menu.Trigger asChild>
+                                            <IconButton
+                                                variant="ghost"
+                                                size="xs"
+                                                aria-label="Open Project"
+                                                color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                                                _hover={{
+                                                    color: colorMode === 'light' ? 'black' : 'white',
+                                                    bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                                                }}
+                                                minW={5}
+                                                h={5}
+                                            >
+                                                <LuExternalLink />
+                                            </IconButton>
+                                        </Menu.Trigger>
+                                    </Box>
+                                </Tooltip.Trigger>
+                                <Portal>
+                                    <Tooltip.Positioner zIndex={1500}>
+                                        <Tooltip.Content
+                                            px={3}
+                                            py={1.5}
+                                            borderRadius="md"
+                                            fontSize="xs"
+                                            fontWeight="medium"
+                                            color={colorMode === 'light' ? 'gray.700' : 'gray.100'}
+                                            css={{
+                                                background: colorMode === 'light'
+                                                    ? 'rgba(255, 255, 255, 0.75)'
+                                                    : 'rgba(20, 20, 25, 0.7)',
+                                                backdropFilter: 'blur(12px) saturate(180%)',
+                                                WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+                                                border: colorMode === 'light'
+                                                    ? '1px solid rgba(0, 0, 0, 0.08)'
+                                                    : '1px solid rgba(255, 255, 255, 0.15)',
+                                                boxShadow: colorMode === 'light'
+                                                    ? '0 6px 18px rgba(0, 0, 0, 0.12)'
+                                                    : '0 8px 20px rgba(0, 0, 0, 0.4)',
+                                            }}
+                                        >
+                                            Open project
+                                        </Tooltip.Content>
+                                    </Tooltip.Positioner>
+                                </Portal>
+                            </Tooltip.Root>
                             <Portal>
                                 <Menu.Positioner>
                                     <Menu.Content minW="180px" zIndex={1500}>
