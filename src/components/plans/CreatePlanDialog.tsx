@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import {
   Dialog,
   Button,
@@ -6,35 +6,25 @@ import {
   Textarea,
   VStack,
   HStack,
-  Field,
   Portal,
   CloseButton,
   Box,
   Text,
   Icon,
   IconButton,
-  Badge,
-  Card,
-  CardBody,
-  ScrollArea,
-  Separator,
 } from '@chakra-ui/react';
-import { LuPlus, LuX, LuTrash2, LuGripVertical, LuMap } from 'react-icons/lu';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LuPlus, LuX, LuMap, LuFlag, LuSparkles } from 'react-icons/lu';
 import { invokeCreatePlan, invokeCreatePlanPhase, invokeCreatePlanMilestone } from '../../ipc';
 import { toaster } from '../ui/toaster';
+
+const MotionBox = motion.create(Box);
+const MotionVStack = motion.create(VStack);
+const MotionHStack = motion.create(HStack);
 
 interface Milestone {
   id: string;
   name: string;
-  description?: string;
-  phaseId?: string; // undefined = ungrouped
-}
-
-interface Phase {
-  id: string;
-  name: string;
-  description?: string;
-  orderIndex: number;
 }
 
 interface CreatePlanDialogProps {
@@ -54,58 +44,10 @@ export default function CreatePlanDialog({
 }: CreatePlanDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [phases, setPhases] = useState<Phase[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [loading, setLoading] = useState(false);
-  
-  // New milestone/phase form state
   const [newMilestoneName, setNewMilestoneName] = useState('');
-  const [newMilestoneDescription, setNewMilestoneDescription] = useState('');
-  const [selectedPhaseForMilestone, setSelectedPhaseForMilestone] = useState<string>('');
-  const [newPhaseName, setNewPhaseName] = useState('');
-  const [newPhaseDescription, setNewPhaseDescription] = useState('');
-
-  // Group milestones by phase
-  const milestonesByPhase = useMemo(() => {
-    const grouped: Record<string, Milestone[]> = {};
-    const ungrouped: Milestone[] = [];
-
-    milestones.forEach((milestone) => {
-      if (milestone.phaseId) {
-        if (!grouped[milestone.phaseId]) {
-          grouped[milestone.phaseId] = [];
-        }
-        grouped[milestone.phaseId].push(milestone);
-      } else {
-        ungrouped.push(milestone);
-      }
-    });
-
-    return { grouped, ungrouped };
-  }, [milestones]);
-
-  const handleAddPhase = () => {
-    if (!newPhaseName.trim()) return;
-
-    const newPhase: Phase = {
-      id: `phase-${Date.now()}`,
-      name: newPhaseName.trim(),
-      description: newPhaseDescription.trim() || undefined,
-      orderIndex: phases.length,
-    };
-
-    setPhases([...phases, newPhase]);
-    setNewPhaseName('');
-    setNewPhaseDescription('');
-  };
-
-  const handleDeletePhase = (phaseId: string) => {
-    setPhases(phases.filter((p) => p.id !== phaseId));
-    // Unlink milestones from deleted phase
-    setMilestones(
-      milestones.map((m) => (m.phaseId === phaseId ? { ...m, phaseId: undefined } : m))
-    );
-  };
+  const [loading, setLoading] = useState(false);
+  const milestoneInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddMilestone = () => {
     if (!newMilestoneName.trim()) return;
@@ -113,24 +55,24 @@ export default function CreatePlanDialog({
     const newMilestone: Milestone = {
       id: `milestone-${Date.now()}`,
       name: newMilestoneName.trim(),
-      description: newMilestoneDescription.trim() || undefined,
-      phaseId: selectedPhaseForMilestone || undefined,
     };
 
     setMilestones([...milestones, newMilestone]);
     setNewMilestoneName('');
-    setNewMilestoneDescription('');
-    setSelectedPhaseForMilestone('');
+
+    // Focus input for quick entry
+    setTimeout(() => milestoneInputRef.current?.focus(), 50);
   };
 
   const handleDeleteMilestone = (milestoneId: string) => {
     setMilestones(milestones.filter((m) => m.id !== milestoneId));
   };
 
-  const handleMoveMilestoneToPhase = (milestoneId: string, phaseId?: string) => {
-    setMilestones(
-      milestones.map((m) => (m.id === milestoneId ? { ...m, phaseId } : m))
-    );
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddMilestone();
+    }
   };
 
   const handleSubmit = async () => {
@@ -164,47 +106,22 @@ export default function CreatePlanDialog({
         description.trim() || undefined
       );
 
-      // Create phases
-      const createdPhases = await Promise.all(
-        phases.map((phase) =>
-          invokeCreatePlanPhase(plan.id, phase.name, phase.description, phase.orderIndex)
-        )
-      );
-
-      // If we have ungrouped milestones, create a default "Ungrouped" phase
-      const hasUngroupedMilestones = milestones.some((m) => !m.phaseId);
-      let ungroupedPhaseId: string | undefined;
-      if (hasUngroupedMilestones) {
-        const ungroupedPhase = await invokeCreatePlanPhase(
+      // Create a default phase for milestones
+      if (milestones.length > 0) {
+        const phase = await invokeCreatePlanPhase(
           plan.id,
-          'Ungrouped',
-          'Milestones not assigned to a specific phase',
-          createdPhases.length
+          'Milestones',
+          'Plan milestones',
+          0
         );
-        ungroupedPhaseId = ungroupedPhase.id;
-      }
 
-      // Create milestones (grouped by phase)
-      const phaseMap = new Map(phases.map((phase, idx) => [phase.id, createdPhases[idx].id]));
-      
-      await Promise.all(
-        milestones.map((milestone, index) => {
-          const phaseId = milestone.phaseId
-            ? phaseMap.get(milestone.phaseId)
-            : ungroupedPhaseId || phaseMap.get(undefined);
-          
-          if (!phaseId) {
-            throw new Error(`No phase found for milestone: ${milestone.name}`);
-          }
-          
-          return invokeCreatePlanMilestone(
-            phaseId,
-            milestone.name,
-            milestone.description,
-            index // orderIndex
-          );
-        })
-      );
+        // Create milestones
+        await Promise.all(
+          milestones.map((milestone, index) =>
+            invokeCreatePlanMilestone(phase.id, milestone.name, undefined, index)
+          )
+        );
+      }
 
       toaster.create({
         type: 'success',
@@ -213,19 +130,7 @@ export default function CreatePlanDialog({
       });
 
       onPlanCreated();
-
-      // Reset form
-      setName('');
-      setDescription('');
-      setPhases([]);
-      setMilestones([]);
-      setNewMilestoneName('');
-      setNewMilestoneDescription('');
-      setSelectedPhaseForMilestone('');
-      setNewPhaseName('');
-      setNewPhaseDescription('');
-
-      onClose();
+      handleClose();
     } catch (error) {
       console.error('Failed to create plan:', error);
       toaster.create({
@@ -243,381 +148,358 @@ export default function CreatePlanDialog({
     if (!loading) {
       setName('');
       setDescription('');
-      setPhases([]);
       setMilestones([]);
       setNewMilestoneName('');
-      setNewMilestoneDescription('');
-      setSelectedPhaseForMilestone('');
-      setNewPhaseName('');
-      setNewPhaseDescription('');
       onClose();
     }
   };
 
   return (
     <Portal>
-      <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content maxW="4xl" maxH="90vh">
-            <Dialog.Header>
-              <Dialog.Title>Create Plan</Dialog.Title>
-              <Dialog.CloseTrigger asChild>
-                <CloseButton aria-label="Close" size="sm" />
-              </Dialog.CloseTrigger>
-            </Dialog.Header>
-
-            <Dialog.Body>
-              <ScrollArea.Root h="calc(90vh - 200px)">
-                <ScrollArea.Viewport>
-                  <VStack gap={6} align="stretch" p={2}>
-                    {/* Basic Plan Info */}
-                    <VStack align="stretch" gap={4}>
-                      <Field.Root required>
-                        <Field.Label>Plan Name</Field.Label>
-                        <Input
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Enter plan name..."
-                          disabled={loading}
-                        />
-                        <Field.HelperText>
-                          A folder with this name will be created in .bluekit/plans/
-                        </Field.HelperText>
-                      </Field.Root>
-
-                      <Field.Root>
-                        <Field.Label>Description</Field.Label>
-                        <Textarea
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Optional description..."
-                          disabled={loading}
-                          rows={2}
-                        />
-                      </Field.Root>
-                    </VStack>
-
-                    <Separator />
-
-                    {/* Phases Section */}
-                    <VStack align="stretch" gap={3}>
-                      <HStack justify="space-between" align="center">
-                        <Text fontSize="md" fontWeight="medium">
-                          Phases
+      <AnimatePresence>
+        {isOpen && (
+          <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
+            <Dialog.Backdrop
+              asChild
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                backdropFilter: 'blur(12px)',
+              }}
+            >
+              <MotionBox
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+              />
+            </Dialog.Backdrop>
+            <Dialog.Positioner>
+              <Dialog.Content
+                asChild
+                maxW="lg"
+                css={{
+                  background: 'rgba(255, 255, 255, 0.85)',
+                  backdropFilter: 'blur(40px) saturate(200%)',
+                  WebkitBackdropFilter: 'blur(40px) saturate(200%)',
+                  borderWidth: '1px',
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: '24px',
+                  boxShadow: '0 32px 100px -20px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+                  _dark: {
+                    background: 'rgba(20, 20, 25, 0.9)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 32px 100px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+                  },
+                }}
+              >
+                <MotionBox
+                  initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 30 }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  <Dialog.Header pb={2}>
+                    <HStack gap={3} align="center">
+                      <MotionBox
+                        initial={{ rotate: -15, scale: 0.8 }}
+                        animate={{ rotate: 0, scale: 1 }}
+                        transition={{ delay: 0.1, duration: 0.4, type: 'spring', stiffness: 200 }}
+                      >
+                        <Box
+                          p={3}
+                          borderRadius="16px"
+                          bg="primary.100"
+                          _dark={{ bg: 'primary.900/30' }}
+                        >
+                          <Icon boxSize={6} color="primary.500">
+                            <LuMap />
+                          </Icon>
+                        </Box>
+                      </MotionBox>
+                      <VStack align="start" gap={0}>
+                        <Dialog.Title fontSize="xl" fontWeight="bold">
+                          Create Plan
+                        </Dialog.Title>
+                        <Text fontSize="sm" color="text.secondary">
+                          Organize your work with milestones
                         </Text>
-                        <HStack gap={2} flex="1" maxW="400px">
+                      </VStack>
+                    </HStack>
+                    <Dialog.CloseTrigger asChild>
+                      <CloseButton aria-label="Close" size="sm" />
+                    </Dialog.CloseTrigger>
+                  </Dialog.Header>
+
+                  <Dialog.Body pt={4}>
+                    <MotionVStack
+                      align="stretch"
+                      gap={5}
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        hidden: {},
+                        visible: { transition: { staggerChildren: 0.08 } },
+                      }}
+                    >
+                      {/* Plan Name */}
+                      <MotionBox
+                        variants={{
+                          hidden: { opacity: 0, y: 10 },
+                          visible: { opacity: 1, y: 0 },
+                        }}
+                      >
+                        <VStack align="stretch" gap={2}>
+                          <Text fontSize="sm" fontWeight="medium" color="text.primary">
+                            Plan Name
+                          </Text>
                           <Input
-                            placeholder="Phase name..."
-                            value={newPhaseName}
-                            onChange={(e) => setNewPhaseName(e.target.value)}
-                            size="sm"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddPhase();
-                              }
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g., Authentication Revamp"
+                            size="lg"
+                            disabled={loading}
+                            css={{
+                              borderRadius: '12px',
+                              fontSize: '16px',
+                              fontWeight: '500',
+                              _focus: {
+                                borderColor: 'primary.400',
+                                boxShadow: '0 0 0 3px rgba(var(--chakra-colors-primary-400-rgb), 0.2)',
+                              },
                             }}
                           />
-                          <Button
-                            size="sm"
-                            onClick={handleAddPhase}
-                            disabled={!newPhaseName.trim()}
-                          >
-                            <HStack gap={1}>
+                        </VStack>
+                      </MotionBox>
+
+                      {/* Description */}
+                      <MotionBox
+                        variants={{
+                          hidden: { opacity: 0, y: 10 },
+                          visible: { opacity: 1, y: 0 },
+                        }}
+                      >
+                        <VStack align="stretch" gap={2}>
+                          <Text fontSize="sm" fontWeight="medium" color="text.primary">
+                            Description <Text as="span" color="text.tertiary">(optional)</Text>
+                          </Text>
+                          <Textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="What's this plan about?"
+                            disabled={loading}
+                            rows={2}
+                            css={{
+                              borderRadius: '12px',
+                              resize: 'none',
+                            }}
+                          />
+                        </VStack>
+                      </MotionBox>
+
+                      {/* Milestones Section */}
+                      <MotionBox
+                        variants={{
+                          hidden: { opacity: 0, y: 10 },
+                          visible: { opacity: 1, y: 0 },
+                        }}
+                      >
+                        <VStack align="stretch" gap={3}>
+                          <HStack justify="space-between" align="center">
+                            <HStack gap={2}>
+                              <Icon color="primary.500" boxSize={4}>
+                                <LuFlag />
+                              </Icon>
+                              <Text fontSize="sm" fontWeight="medium" color="text.primary">
+                                Milestones
+                              </Text>
+                              {milestones.length > 0 && (
+                                <Box
+                                  px={2}
+                                  py={0.5}
+                                  borderRadius="full"
+                                  bg="primary.100"
+                                  _dark={{ bg: 'primary.900/40' }}
+                                >
+                                  <Text fontSize="xs" fontWeight="semibold" color="primary.600" _dark={{ color: 'primary.300' }}>
+                                    {milestones.length}
+                                  </Text>
+                                </Box>
+                              )}
+                            </HStack>
+                          </HStack>
+
+                          {/* Add Milestone Input */}
+                          <HStack gap={2}>
+                            <Input
+                              ref={milestoneInputRef}
+                              value={newMilestoneName}
+                              onChange={(e) => setNewMilestoneName(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              placeholder="Add a milestone..."
+                              size="md"
+                              disabled={loading}
+                              css={{
+                                borderRadius: '10px',
+                                _focus: {
+                                  borderColor: 'primary.400',
+                                },
+                              }}
+                            />
+                            <IconButton
+                              aria-label="Add milestone"
+                              onClick={handleAddMilestone}
+                              disabled={!newMilestoneName.trim() || loading}
+                              colorPalette="primary"
+                              variant="solid"
+                              size="md"
+                              css={{
+                                borderRadius: '10px',
+                                transition: 'all 0.2s ease',
+                                _hover: {
+                                  transform: 'scale(1.05)',
+                                },
+                              }}
+                            >
                               <Icon>
                                 <LuPlus />
                               </Icon>
-                              <Text>Add Phase</Text>
-                            </HStack>
-                          </Button>
-                        </HStack>
-                      </HStack>
+                            </IconButton>
+                          </HStack>
 
-                      {phases.length > 0 && (
-                        <VStack align="stretch" gap={2}>
-                          {phases.map((phase) => (
-                            <Card.Root key={phase.id} variant="subtle" size="sm">
-                              <CardBody>
-                                <HStack justify="space-between" align="start">
-                                  <VStack align="start" gap={1} flex="1">
-                                    <HStack gap={2}>
-                                      <Icon color="primary.500">
-                                        <LuMap />
-                                      </Icon>
-                                      <Text fontWeight="medium">{phase.name}</Text>
-                                    </HStack>
-                                    {phase.description && (
-                                      <Text fontSize="sm" color="text.secondary">
-                                        {phase.description}
-                                      </Text>
-                                    )}
-                                  </VStack>
-                                  <IconButton
-                                    size="xs"
-                                    variant="ghost"
-                                    colorPalette="red"
-                                    aria-label="Delete phase"
-                                    onClick={() => handleDeletePhase(phase.id)}
-                                  >
-                                    <Icon>
-                                      <LuTrash2 />
-                                    </Icon>
-                                  </IconButton>
-                                </HStack>
-                              </CardBody>
-                            </Card.Root>
-                          ))}
-                        </VStack>
-                      )}
-                    </VStack>
-
-                    <Separator />
-
-                    {/* Milestones Section */}
-                    <VStack align="stretch" gap={3}>
-                      <HStack justify="space-between" align="center">
-                        <Text fontSize="md" fontWeight="medium">
-                          Milestones
-                        </Text>
-                      </HStack>
-
-                      {/* Add Milestone Form */}
-                      <Card.Root variant="outline" size="sm">
-                        <CardBody>
-                          <VStack align="stretch" gap={2}>
-                            <HStack gap={2}>
-                              <Input
-                                placeholder="Milestone name..."
-                                value={newMilestoneName}
-                                onChange={(e) => setNewMilestoneName(e.target.value)}
-                                size="sm"
-                                flex="1"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleAddMilestone();
-                                  }
-                                }}
-                              />
-                              {phases.length > 0 && (
-                                <Box minW="150px">
-                                  <select
-                                    value={selectedPhaseForMilestone}
-                                    onChange={(e) => setSelectedPhaseForMilestone(e.target.value)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      fontSize: '14px',
-                                      borderRadius: '6px',
-                                      border: '1px solid var(--chakra-colors-border-subtle)',
-                                      background: 'var(--chakra-colors-bg-surface)',
+                          {/* Milestone List */}
+                          <AnimatePresence mode="popLayout">
+                            {milestones.length > 0 && (
+                              <VStack align="stretch" gap={2}>
+                                {milestones.map((milestone, index) => (
+                                  <MotionHStack
+                                    key={milestone.id}
+                                    initial={{ opacity: 0, x: -20, height: 0 }}
+                                    animate={{ opacity: 1, x: 0, height: 'auto' }}
+                                    exit={{ opacity: 0, x: 20, height: 0 }}
+                                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                                    gap={3}
+                                    p={3}
+                                    borderRadius="12px"
+                                    bg="bg.subtle"
+                                    borderWidth="1px"
+                                    borderColor="border.subtle"
+                                    role="group"
+                                    css={{
+                                      _hover: {
+                                        borderColor: 'primary.200',
+                                        _dark: {
+                                          borderColor: 'primary.800/50',
+                                        },
+                                      },
                                     }}
                                   >
-                                    <option value="">Ungrouped</option>
-                                    {phases.map((phase) => (
-                                      <option key={phase.id} value={phase.id}>
-                                        {phase.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </Box>
-                              )}
-                              <Button
-                                size="sm"
-                                onClick={handleAddMilestone}
-                                disabled={!newMilestoneName.trim()}
-                                colorPalette="primary"
-                              >
-                                <HStack gap={1}>
-                                  <Icon>
-                                    <LuPlus />
-                                  </Icon>
-                                  <Text>Add</Text>
-                                </HStack>
-                              </Button>
-                            </HStack>
-                            <Input
-                              placeholder="Optional description..."
-                              value={newMilestoneDescription}
-                              onChange={(e) => setNewMilestoneDescription(e.target.value)}
-                              size="sm"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleAddMilestone();
-                                }
-                              }}
-                            />
-                          </VStack>
-                        </CardBody>
-                      </Card.Root>
-
-                      {/* Grouped Milestones by Phase */}
-                      {phases.length > 0 && Object.keys(milestonesByPhase.grouped).length > 0 && (
-                        <VStack align="stretch" gap={3}>
-                          {phases.map((phase) => {
-                            const phaseMilestones = milestonesByPhase.grouped[phase.id] || [];
-                            if (phaseMilestones.length === 0) return null;
-
-                            return (
-                              <Box key={phase.id} pl={4} borderLeft="2px solid" borderColor="primary.200">
-                                <VStack align="stretch" gap={2}>
-                                  <HStack gap={2}>
-                                    <Icon color="primary.500">
-                                      <LuMap />
-                                    </Icon>
-                                    <Text fontSize="sm" fontWeight="medium" color="primary.700">
-                                      {phase.name}
-                                    </Text>
-                                    <Badge size="sm" variant="subtle" colorPalette="primary">
-                                      {phaseMilestones.length}
-                                    </Badge>
-                                  </HStack>
-                                  <VStack align="stretch" gap={1} pl={4}>
-                                    {phaseMilestones.map((milestone) => (
-                                      <HStack
-                                        key={milestone.id}
-                                        justify="space-between"
-                                        p={2}
-                                        bg="bg.subtle"
-                                        borderRadius="md"
-                                      >
-                                        <VStack align="start" gap={0} flex="1">
-                                          <Text fontSize="sm" fontWeight="medium">
-                                            {milestone.name}
-                                          </Text>
-                                          {milestone.description && (
-                                            <Text fontSize="xs" color="text.secondary">
-                                              {milestone.description}
-                                            </Text>
-                                          )}
-                                        </VStack>
-                                        <IconButton
-                                          size="xs"
-                                          variant="ghost"
-                                          colorPalette="red"
-                                          aria-label="Delete milestone"
-                                          onClick={() => handleDeleteMilestone(milestone.id)}
-                                        >
-                                          <Icon>
-                                            <LuX />
-                                          </Icon>
-                                        </IconButton>
-                                      </HStack>
-                                    ))}
-                                  </VStack>
-                                </VStack>
-                              </Box>
-                            );
-                          })}
-                        </VStack>
-                      )}
-
-                      {/* Ungrouped Milestones */}
-                      {milestonesByPhase.ungrouped.length > 0 && (
-                        <VStack align="stretch" gap={2}>
-                          <Text fontSize="sm" fontWeight="medium" color="text.secondary">
-                            Ungrouped
-                          </Text>
-                          <VStack align="stretch" gap={1}>
-                            {milestonesByPhase.ungrouped.map((milestone) => (
-                              <HStack
-                                key={milestone.id}
-                                justify="space-between"
-                                p={2}
-                                bg="bg.subtle"
-                                borderRadius="md"
-                              >
-                                <VStack align="start" gap={0} flex="1">
-                                  <Text fontSize="sm" fontWeight="medium">
-                                    {milestone.name}
-                                  </Text>
-                                  {milestone.description && (
-                                    <Text fontSize="xs" color="text.secondary">
-                                      {milestone.description}
-                                    </Text>
-                                  )}
-                                </VStack>
-                                <HStack gap={1}>
-                                  {phases.length > 0 && (
-                                    <Box minW="120px">
-                                      <select
-                                        value={milestone.phaseId || ''}
-                                        onChange={(e) =>
-                                          handleMoveMilestoneToPhase(
-                                            milestone.id,
-                                            e.target.value || undefined
-                                          )
-                                        }
-                                        style={{
-                                          width: '100%',
-                                          padding: '4px 6px',
-                                          fontSize: '12px',
-                                          borderRadius: '4px',
-                                          border: '1px solid var(--chakra-colors-border-subtle)',
-                                          background: 'var(--chakra-colors-bg-surface)',
-                                        }}
-                                      >
-                                        <option value="">Ungrouped</option>
-                                        {phases.map((phase) => (
-                                          <option key={phase.id} value={phase.id}>
-                                            {phase.name}
-                                          </option>
-                                        ))}
-                                      </select>
+                                    <Box
+                                      w={6}
+                                      h={6}
+                                      borderRadius="full"
+                                      bg="primary.100"
+                                      display="flex"
+                                      alignItems="center"
+                                      justifyContent="center"
+                                      flexShrink={0}
+                                      _dark={{ bg: 'primary.900/40' }}
+                                    >
+                                      <Text fontSize="xs" fontWeight="semibold" color="primary.600" _dark={{ color: 'primary.300' }}>
+                                        {index + 1}
+                                      </Text>
                                     </Box>
-                                  )}
-                                  <IconButton
-                                    size="xs"
-                                    variant="ghost"
-                                    colorPalette="red"
-                                    aria-label="Delete milestone"
-                                    onClick={() => handleDeleteMilestone(milestone.id)}
-                                  >
-                                    <Icon>
-                                      <LuX />
-                                    </Icon>
-                                  </IconButton>
-                                </HStack>
-                              </HStack>
-                            ))}
-                          </VStack>
+                                    <Text flex="1" fontSize="sm" fontWeight="medium">
+                                      {milestone.name}
+                                    </Text>
+                                    <IconButton
+                                      aria-label="Remove milestone"
+                                      variant="ghost"
+                                      size="xs"
+                                      colorPalette="red"
+                                      onClick={() => handleDeleteMilestone(milestone.id)}
+                                      css={{
+                                        opacity: 0,
+                                        transition: 'opacity 0.15s ease',
+                                        '[role="group"]:hover &': {
+                                          opacity: 1,
+                                        },
+                                      }}
+                                    >
+                                      <Icon>
+                                        <LuX />
+                                      </Icon>
+                                    </IconButton>
+                                  </MotionHStack>
+                                ))}
+                              </VStack>
+                            )}
+                          </AnimatePresence>
+
+                          {milestones.length === 0 && (
+                            <Box
+                              p={4}
+                              borderRadius="12px"
+                              borderWidth="1px"
+                              borderStyle="dashed"
+                              borderColor="border.subtle"
+                              textAlign="center"
+                            >
+                              <VStack gap={1}>
+                                <Icon color="text.tertiary" boxSize={5}>
+                                  <LuSparkles />
+                                </Icon>
+                                <Text fontSize="sm" color="text.tertiary">
+                                  Add milestones to track progress
+                                </Text>
+                              </VStack>
+                            </Box>
+                          )}
                         </VStack>
-                      )}
+                      </MotionBox>
+                    </MotionVStack>
+                  </Dialog.Body>
 
-                      {milestones.length === 0 && (
-                        <Text fontSize="sm" color="text.tertiary" textAlign="center" py={4}>
-                          No milestones yet. Add milestones above.
-                        </Text>
-                      )}
-                    </VStack>
-                  </VStack>
-                </ScrollArea.Viewport>
-                <ScrollArea.Scrollbar orientation="vertical">
-                  <ScrollArea.Thumb />
-                </ScrollArea.Scrollbar>
-              </ScrollArea.Root>
-            </Dialog.Body>
-
-            <Dialog.Footer>
-              <HStack gap={2} justify="flex-end">
-                <Button variant="ghost" onClick={handleClose} disabled={loading}>
-                  Cancel
-                </Button>
-                <Button
-                  colorPalette="primary"
-                  onClick={handleSubmit}
-                  loading={loading}
-                  loadingText="Creating..."
-                >
-                  Create Plan
-                </Button>
-              </HStack>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Dialog.Root>
+                  <Dialog.Footer pt={6}>
+                    <HStack gap={3} justify="flex-end" w="100%">
+                      <Button
+                        variant="ghost"
+                        onClick={handleClose}
+                        disabled={loading}
+                        size="lg"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        colorPalette="primary"
+                        onClick={handleSubmit}
+                        loading={loading}
+                        loadingText="Creating..."
+                        size="lg"
+                        css={{
+                          px: 6,
+                          borderRadius: '12px',
+                          fontWeight: '600',
+                          transition: 'all 0.2s ease',
+                          _hover: {
+                            transform: 'scale(1.02)',
+                          },
+                        }}
+                      >
+                        <HStack gap={2}>
+                          <Icon>
+                            <LuPlus />
+                          </Icon>
+                          <Text>Create Plan</Text>
+                        </HStack>
+                      </Button>
+                    </HStack>
+                  </Dialog.Footer>
+                </MotionBox>
+              </Dialog.Content>
+            </Dialog.Positioner>
+          </Dialog.Root>
+        )}
+      </AnimatePresence>
     </Portal>
   );
 }

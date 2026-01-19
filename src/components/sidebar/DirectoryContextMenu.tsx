@@ -1,10 +1,10 @@
 import { Menu, Portal, HStack, Icon, Text } from '@chakra-ui/react';
 import { useMemo } from 'react';
-import { LuFilePlus, LuFolderPlus, LuCopy, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { LuFilePlus, LuFolderPlus, LuCopy, LuPencil, LuTrash2, LuMap } from 'react-icons/lu';
 import { FileTreeNode } from '../../ipc/fileTree';
 
-// Estimated height of the directory context menu (6 items + 2 separators)
-const ESTIMATED_MENU_HEIGHT = 260;
+// Estimated height of the directory context menu (7 items + 3 separators)
+const ESTIMATED_MENU_HEIGHT = 300;
 // Margin from viewport edge
 const VIEWPORT_MARGIN = 16;
 
@@ -21,6 +21,7 @@ interface DirectoryContextMenuProps {
     onCopyRelativePath: (relativePath: string) => void;
     onRename: (node: FileTreeNode) => void;
     onDelete: (node: FileTreeNode) => void;
+    onCreatePlan?: (folderPath: string) => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export function DirectoryContextMenu({
     onCopyRelativePath,
     onRename,
     onDelete,
+    onCreatePlan,
 }: DirectoryContextMenuProps) {
     // Calculate adjusted position to keep menu within viewport
     const adjustedPosition = useMemo(() => {
@@ -98,6 +100,13 @@ export function DirectoryContextMenu({
         onClose();
     };
 
+    const handleCreatePlan = () => {
+        if (onCreatePlan) {
+            onCreatePlan(node.path);
+        }
+        onClose();
+    };
+
     return (
         <Portal>
             <Menu.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
@@ -141,6 +150,20 @@ export function DirectoryContextMenu({
                                 <Text fontSize="sm">New folder</Text>
                             </HStack>
                         </Menu.Item>
+
+                        {onCreatePlan && (
+                            <>
+                                <Menu.Separator />
+                                <Menu.Item value="create-plan" onSelect={handleCreatePlan}>
+                                    <HStack gap={2} width="100%">
+                                        <Icon color="primary.500">
+                                            <LuMap />
+                                        </Icon>
+                                        <Text fontSize="sm">Create Plan</Text>
+                                    </HStack>
+                                </Menu.Item>
+                            </>
+                        )}
 
                         <Menu.Separator />
 

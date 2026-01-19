@@ -25,6 +25,7 @@ interface PlanDocumentListProps {
   selectedDocumentId?: string;
   onSelectDocument?: (document: PlanDocument) => void;
   onDocumentDeleted?: () => void;
+  hideHeader?: boolean;
 }
 
 const PlanDocumentList = memo(function PlanDocumentList({
@@ -33,6 +34,7 @@ const PlanDocumentList = memo(function PlanDocumentList({
   selectedDocumentId,
   onSelectDocument,
   onDocumentDeleted,
+  hideHeader = false,
 }: PlanDocumentListProps) {
   const { setSelectedResource } = useResource();
   const [deletingDocument, setDeletingDocument] = useState<string | null>(null);
@@ -145,9 +147,11 @@ const PlanDocumentList = memo(function PlanDocumentList({
 
   return (
     <VStack align="stretch" gap={2}>
-      <Text fontSize="sm" fontWeight="medium" color="text.secondary">
-        Documents ({documents.length})
-      </Text>
+      {!hideHeader && (
+        <Text fontSize="sm" fontWeight="medium" color="text.secondary">
+          Documents ({documents.length})
+        </Text>
+      )}
 
       {documents.map((document) => {
         const phaseName = getPhaseName(document.phaseId);
@@ -181,7 +185,7 @@ const PlanDocumentList = memo(function PlanDocumentList({
                     <Text
                       fontSize="sm"
                       fontWeight="medium"
-                      noOfLines={1}
+                      lineClamp={1}
                       title={document.fileName}
                     >
                       {document.fileName}

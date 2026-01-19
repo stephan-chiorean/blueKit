@@ -15,14 +15,12 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import {
   LuMenu,
   LuUsers,
-  LuWrench,
+  LuLockKeyhole,
   LuSettings,
-  LuArchive,
 } from 'react-icons/lu';
 
 interface NavigationMenuProps {
   children?: (props: { isOpen: boolean; onOpen: () => void }) => ReactNode;
-  onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
 interface NavCard {
@@ -36,30 +34,24 @@ const navCards: NavCard[] = [
   {
     id: 'community',
     label: 'Community',
-    description: 'Explore gallery, join forums, and share feedback with other users',
+    description: 'Discover published artifacts, connect with builders, and share your work',
     icon: LuUsers,
   },
   {
-    id: 'tools',
-    label: 'Tools',
-    description: 'View skills, agents, plans and artifacts from Claude, Codex, Cursor, and more',
-    icon: LuWrench,
+    id: 'vault',
+    label: 'Vault',
+    description: 'Your personal workspace — notebook, toolkit (kits, walkthroughs, agents), and more',
+    icon: LuLockKeyhole,
   },
   {
     id: 'settings',
     label: 'Settings',
-    description: 'Configure preferences, integrations, and workspace options',
+    description: 'Configure preferences, integrations, and account options',
     icon: LuSettings,
-  },
-  {
-    id: 'archive',
-    label: 'Archive',
-    description: 'Access archived projects, tasks, and other obsolete resources',
-    icon: LuArchive,
   },
 ];
 
-export default function NavigationMenu({ children, onNavigateToPlans }: NavigationMenuProps) {
+export default function NavigationMenu({ children }: NavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { colorMode } = useColorMode();
 
@@ -79,10 +71,10 @@ export default function NavigationMenu({ children, onNavigateToPlans }: Navigati
 
   const handleCardClick = (cardId: string) => {
     console.log('Navigate to:', cardId);
-    // Handle specific navigation
-    if (cardId === 'tools' && onNavigateToPlans) {
-      // Could open a sub-menu or navigate to tools page
-    }
+    // TODO: Implement navigation for each section
+    // - community: marketplace/gallery view
+    // - vault: personal workspace (same UI as project detail, with Toolkit submenu)
+    // - settings: app preferences
     setIsOpen(false);
   };
 

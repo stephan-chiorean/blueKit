@@ -11,7 +11,7 @@ import {
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
 import KitOverview from '../components/kits/KitOverview';
-import PlanOverview from '../components/plans/PlanOverview';
+import PlanWorkspace from '../components/plans/PlanWorkspace';
 import Workstation from '../components/workstation/Workstation';
 import MermaidDiagramViewer from '../components/workstation/MermaidDiagramViewer';
 import { useResource } from '../contexts/ResourceContext';
@@ -97,9 +97,9 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
         </Box>
 
         {/* Diagram viewer */}
-        <Box 
-          flex="1" 
-          minH={0} 
+        <Box
+          flex="1"
+          minH={0}
           overflow="hidden"
           bg="transparent"
           css={{
@@ -114,7 +114,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
     );
   }
 
-  // Plan mode uses PlanOverview instead of KitOverview
+  // Plan mode uses PlanWorkspace for unified experience
   if (viewMode === 'plan') {
     return (
       <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
@@ -123,40 +123,14 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
           <Header />
         </Box>
 
-        {/* Splitter layout below header */}
-        <Box 
-          flex="1" 
-          minH={0} 
+        {/* Plan Workspace below header - matches ProjectDetailPage content styling */}
+        <Box
+          flex="1"
+          minH={0}
           overflow="hidden"
           bg="transparent"
-          css={{
-            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-            backdropFilter: 'blur(30px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-          }}
         >
-          <Splitter.Root
-            defaultSize={[30, 70]}
-            panels={[
-              { id: 'overview', minSize: 25, maxSize: 50 },
-              { id: 'workstation', minSize: 30 },
-            ]}
-            h="100%"
-            orientation="horizontal"
-          >
-            {/* Plan Overview Panel */}
-            <Splitter.Panel id="overview" bg="transparent">
-              <PlanOverview plan={resource} onBack={onBack} />
-            </Splitter.Panel>
-
-            {/* Resize Trigger */}
-            <Splitter.ResizeTrigger id="overview:workstation" />
-
-            {/* Workstation Panel */}
-            <Splitter.Panel id="workstation">
-              <Workstation />
-            </Splitter.Panel>
-          </Splitter.Root>
+          <PlanWorkspace plan={resource} onBack={onBack} />
         </Box>
       </VStack>
     );
@@ -171,9 +145,9 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
       </Box>
 
       {/* Splitter layout below header */}
-      <Box 
-        flex="1" 
-        minH={0} 
+      <Box
+        flex="1"
+        minH={0}
         overflow="hidden"
         bg="transparent"
         css={{

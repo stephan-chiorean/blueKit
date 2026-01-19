@@ -29,10 +29,9 @@ import NavigationMenu from './NavigationDrawer';
 interface HeaderProps {
   currentProject?: Project;
   onNavigateToTasks?: () => void;
-  onNavigateToPlans?: (source: 'claude' | 'cursor') => void;
 }
 
-export default function Header({ currentProject, onNavigateToTasks, onNavigateToPlans }: HeaderProps = {}) {
+export default function Header({ currentProject, onNavigateToTasks }: HeaderProps = {}) {
   const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
@@ -60,7 +59,7 @@ export default function Header({ currentProject, onNavigateToTasks, onNavigateTo
       <Flex align="center" justify="space-between" gap={4}>
         {/* blueKit branding on the left with navigation menu */}
         <HStack gap={3} flex="1">
-          <NavigationMenu onNavigateToPlans={onNavigateToPlans}>
+          <NavigationMenu>
             {({ onOpen }) => (
               <IconButton
                 variant="ghost"

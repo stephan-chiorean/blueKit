@@ -1,4 +1,5 @@
 import { useState, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
   Card,
@@ -31,6 +32,8 @@ import { Plan } from '../../types/plan';
 import CreatePlanDialog from './CreatePlanDialog';
 import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { ToolkitHeader } from '../shared/ToolkitHeader';
+
+const MotionCard = motion.create(Card.Root);
 
 interface PlansTabContentProps {
   plans: Plan[];
@@ -110,28 +113,36 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
   };
 
   // Render plan card
-  const renderPlanCard = (plan: Plan) => {
+  const renderPlanCard = (plan: Plan, index: number) => {
     return (
-      <Card.Root
+      <MotionCard
         key={plan.id}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.3,
+          delay: index * 0.05,
+          ease: [0.4, 0, 0.2, 1]
+        }}
         borderWidth="1px"
-        borderRadius="16px"
+        borderRadius="20px"
         cursor="pointer"
         onClick={() => onViewPlan(plan)}
-        transition="all 0.2s ease-in-out"
         css={{
-          background: 'rgba(255, 255, 255, 0.15)',
+          background: 'rgba(255, 255, 255, 0.6)',
           backdropFilter: 'blur(30px) saturate(180%)',
           WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-          borderColor: 'rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          borderColor: 'rgba(255, 255, 255, 0.25)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)',
           _dark: {
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            background: 'rgba(20, 20, 25, 0.7)',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
             boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
           },
           _hover: {
-            transform: 'scale(1.02)',
+            transform: 'translateY(-4px)',
+            boxShadow: '0 16px 48px 0 rgba(31, 38, 135, 0.2)',
             borderColor: 'var(--chakra-colors-primary-400)',
             zIndex: 10,
           },
@@ -184,7 +195,7 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
             Created {formatDate(plan.createdAt)}
           </Text>
         </CardBody>
-      </Card.Root>
+      </MotionCard>
     );
   };
 
@@ -305,9 +316,11 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
           </Text>
         </Box>
       ) : viewMode === 'card' ? (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
-          {filteredPlans.map(renderPlanCard)}
-        </SimpleGrid>
+        <AnimatePresence mode="popLayout">
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
+            {filteredPlans.map((plan, index) => renderPlanCard(plan, index))}
+          </SimpleGrid>
+        </AnimatePresence>
       ) : viewMode === 'roadmap' ? (
         <Box
           p={6}
