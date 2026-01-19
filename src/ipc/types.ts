@@ -473,3 +473,46 @@ export interface GitHubCommit {
   }>;
 }
 
+// ============================================================================
+// BOOKMARKS
+// ============================================================================
+
+/**
+ * A bookmark item - can be either a file bookmark or a group containing other items.
+ * This is a discriminated union type where `type` determines the variant.
+ */
+export type BookmarkItem = BookmarkFile | BookmarkGroup;
+
+/**
+ * A file bookmark - bookmarks a specific file.
+ */
+export interface BookmarkFile {
+  type: 'file';
+  /** Creation timestamp in milliseconds */
+  ctime: number;
+  /** Absolute path to the bookmarked file */
+  path: string;
+  /** Display title for the bookmark */
+  title: string;
+}
+
+/**
+ * A bookmark group - contains nested bookmark items.
+ */
+export interface BookmarkGroup {
+  type: 'group';
+  /** Creation timestamp in milliseconds */
+  ctime: number;
+  /** Display title for the group */
+  title: string;
+  /** Nested bookmark items within this group */
+  items: BookmarkItem[];
+}
+
+/**
+ * Root structure for bookmarks data.
+ */
+export interface BookmarksData {
+  items: BookmarkItem[];
+}
+

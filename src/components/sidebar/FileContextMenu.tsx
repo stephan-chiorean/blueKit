@@ -1,6 +1,6 @@
 import { Menu, Portal, HStack, Icon, Text } from '@chakra-ui/react';
 import { useMemo } from 'react';
-import { LuCopy, LuPencil, LuTrash2, LuFiles } from 'react-icons/lu';
+import { LuCopy, LuPencil, LuTrash2, LuFiles, LuBookmark } from 'react-icons/lu';
 import { FileTreeNode } from '../../ipc/fileTree';
 
 // Estimated height of the file context menu (5 items + 2 separators)
@@ -20,6 +20,7 @@ interface FileContextMenuProps {
     onCopyRelativePath: (relativePath: string) => void;
     onRename: (node: FileTreeNode) => void;
     onDelete: (node: FileTreeNode) => void;
+    onAddToBookmarks: (node: FileTreeNode) => void;
 }
 
 /**
@@ -38,6 +39,7 @@ export function FileContextMenu({
     onCopyRelativePath,
     onRename,
     onDelete,
+    onAddToBookmarks,
 }: FileContextMenuProps) {
     // Calculate adjusted position to keep menu within viewport
     const adjustedPosition = useMemo(() => {
@@ -88,6 +90,11 @@ export function FileContextMenu({
 
     const handleDelete = () => {
         onDelete(node);
+        onClose();
+    };
+
+    const handleAddToBookmarks = () => {
+        onAddToBookmarks(node);
         onClose();
     };
 
@@ -143,6 +150,17 @@ export function FileContextMenu({
                                     <LuCopy />
                                 </Icon>
                                 <Text fontSize="sm">Copy relative path</Text>
+                            </HStack>
+                        </Menu.Item>
+
+                        <Menu.Separator />
+
+                        <Menu.Item value="add-to-bookmarks" onSelect={handleAddToBookmarks}>
+                            <HStack gap={2} width="100%">
+                                <Icon>
+                                    <LuBookmark />
+                                </Icon>
+                                <Text fontSize="sm">Add to Bookmarks</Text>
                             </HStack>
                         </Menu.Item>
 

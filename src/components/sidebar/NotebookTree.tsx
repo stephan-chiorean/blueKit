@@ -11,7 +11,7 @@ import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { DirectoryContextMenu } from './DirectoryContextMenu';
 import { FileContextMenu } from './FileContextMenu';
-import { invokeWriteFile, invokeReadFile } from '../../ipc';
+import { invokeWriteFile, invokeReadFile, invokeAddBookmark } from '../../ipc';
 import { invokeCreateFolder } from '../../ipc/fileTree';
 import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder, invokeMoveArtifactToFolder } from '../../ipc/folders';
 import { deleteResources } from '../../ipc/artifacts';
@@ -794,6 +794,46 @@ export default function NotebookTree({
         return nodePath;
     };
 
+    // Handle adding file to bookmarks
+    const handleAddToBookmarks = async (node: FileTreeNode) => {
+        if (node.isFolder) return; // Only bookmark files
+
+        try {
+            // Extract title from filename (without extension)
+            const title = node.name.replace(/\.(md|markdown|mmd)$/, '');
+
+            await invokeAddBookmark(projectPath, {
+                type: 'file',
+                ctime: Date.now(),
+                path: node.path,
+                title,
+            });
+
+            toaster.create({
+                type: 'success',
+                title: 'Bookmarked',
+                description: `Added "${title}" to bookmarks`,
+            });
+        } catch (error) {
+            console.error('Failed to add bookmark:', error);
+            // Check if it's a duplicate error
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('already bookmarked')) {
+                toaster.create({
+                    type: 'info',
+                    title: 'Already bookmarked',
+                    description: 'This file is already in your bookmarks',
+                });
+            } else {
+                toaster.create({
+                    type: 'error',
+                    title: 'Failed to bookmark',
+                    description: errorMessage,
+                });
+            }
+        }
+    };
+
     // Handle file duplication
     const handleDuplicate = async (node: FileTreeNode) => {
         if (node.isFolder) return; // Only duplicate files
@@ -959,6 +999,7 @@ export default function NotebookTree({
                 }}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onAddToBookmarks={handleAddToBookmarks}
             />
 
             {/* Rename Popover */}

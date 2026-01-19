@@ -13,6 +13,7 @@ import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
 import TimelineTabContent from '../components/commits/TimelineTabContent';
+import BookmarksTabContent from '../components/bookmarks/BookmarksTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
 import ResourceViewPage from './ResourceViewPage';
@@ -836,6 +837,13 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 setDbProject(matchingProject || null);
               });
             }}
+          />
+        );
+      case 'bookmarks':
+        return (
+          <BookmarksTabContent
+            projectPath={project.path}
+            onViewBookmark={handleFileSelect}
           />
         );
       case 'scrapbook':

@@ -5004,3 +5004,292 @@ pub async fn clone_from_github(
     Ok(format!("Successfully cloned {} to {}", owner_repo, target_path))
 }
 
+// ============================================================================
+// BOOKMARKS - File bookmarking system
+// ============================================================================
+
+/// Bookmark item - can be either a file bookmark or a group containing other items.
+/// Uses serde's tagged enum representation to match the JSON format:
+/// { "type": "file", ... } or { "type": "group", ... }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum BookmarkItem {
+    #[serde(rename = "file")]
+    File {
+        /// Creation timestamp in milliseconds
+        ctime: u64,
+        /// Absolute path to the bookmarked file
+        path: String,
+        /// Display title for the bookmark
+        title: String,
+    },
+    #[serde(rename = "group")]
+    Group {
+        /// Creation timestamp in milliseconds
+        ctime: u64,
+        /// Display title for the group
+        title: String,
+        /// Nested bookmark items within this group
+        items: Vec<BookmarkItem>,
+    },
+}
+
+/// Root structure for bookmarks.json file.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BookmarksData {
+    pub items: Vec<BookmarkItem>,
+}
+
+impl Default for BookmarksData {
+    fn default() -> Self {
+        Self { items: Vec::new() }
+    }
+}
+
+/// Gets the path to the bookmarks.json file for a project.
+fn get_bookmarks_path(project_path: &str) -> PathBuf {
+    PathBuf::from(project_path).join(".bluekit").join("bookmarks.json")
+}
+
+/// Loads bookmarks from a project's .bluekit/bookmarks.json file.
+///
+/// # Arguments
+///
+/// * `project_path` - The root path of the project
+///
+/// # Returns
+///
+/// A `Result<BookmarksData, String>` containing either:
+/// - `Ok(BookmarksData)` - Success case with bookmarks (empty if file doesn't exist)
+/// - `Err(String)` - Error case with an error message
+#[tauri::command]
+pub async fn get_bookmarks(project_path: String) -> Result<BookmarksData, String> {
+    use std::fs;
+
+    let bookmarks_path = get_bookmarks_path(&project_path);
+
+    // Return empty bookmarks if file doesn't exist
+    if !bookmarks_path.exists() {
+        return Ok(BookmarksData::default());
+    }
+
+    // Read and parse the file
+    let content = fs::read_to_string(&bookmarks_path)
+        .map_err(|e| format!("Failed to read bookmarks.json: {}", e))?;
+
+    let bookmarks: BookmarksData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse bookmarks.json: {}", e))?;
+
+    Ok(bookmarks)
+}
+
+/// Saves bookmarks to a project's .bluekit/bookmarks.json file.
+/// Uses atomic write (tmp file + rename) to prevent corruption.
+///
+/// # Arguments
+///
+/// * `project_path` - The root path of the project
+/// * `data` - The bookmarks data to save
+///
+/// # Returns
+///
+/// A `Result<(), String>` indicating success or failure
+#[tauri::command]
+pub async fn save_bookmarks(project_path: String, data: BookmarksData) -> Result<(), String> {
+    use std::fs;
+    use std::io::Write;
+
+    let bookmarks_path = get_bookmarks_path(&project_path);
+    let bluekit_dir = bookmarks_path.parent()
+        .ok_or_else(|| "Invalid bookmarks path".to_string())?;
+
+    // Ensure .bluekit directory exists
+    if !bluekit_dir.exists() {
+        fs::create_dir_all(bluekit_dir)
+            .map_err(|e| format!("Failed to create .bluekit directory: {}", e))?;
+    }
+
+    // Serialize to JSON with pretty formatting
+    let content = serde_json::to_string_pretty(&data)
+        .map_err(|e| format!("Failed to serialize bookmarks: {}", e))?;
+
+    // Atomic write: write to temp file then rename
+    let tmp_path = bookmarks_path.with_extension("json.tmp");
+
+    let mut file = fs::File::create(&tmp_path)
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    file.sync_all()
+        .map_err(|e| format!("Failed to sync temp file: {}", e))?;
+
+    drop(file); // Ensure file is closed before rename
+
+    fs::rename(&tmp_path, &bookmarks_path)
+        .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+
+    Ok(())
+}
+
+/// Adds a bookmark item to the root of the bookmarks list.
+///
+/// # Arguments
+///
+/// * `project_path` - The root path of the project
+/// * `item` - The bookmark item to add
+///
+/// # Returns
+///
+/// A `Result<BookmarksData, String>` containing the updated bookmarks
+#[tauri::command]
+pub async fn add_bookmark(project_path: String, item: BookmarkItem) -> Result<BookmarksData, String> {
+    // Load existing bookmarks
+    let mut bookmarks = get_bookmarks(project_path.clone()).await?;
+
+    // Check for duplicate file paths (only for file bookmarks)
+    if let BookmarkItem::File { ref path, .. } = item {
+        let is_duplicate = check_bookmark_exists(&bookmarks.items, path);
+        if is_duplicate {
+            return Err(format!("File is already bookmarked: {}", path));
+        }
+    }
+
+    // Add the new item
+    bookmarks.items.push(item);
+
+    // Save and return updated bookmarks
+    save_bookmarks(project_path, bookmarks.clone()).await?;
+
+    Ok(bookmarks)
+}
+
+/// Helper function to recursively check if a file path exists in bookmarks.
+fn check_bookmark_exists(items: &[BookmarkItem], target_path: &str) -> bool {
+    for item in items {
+        match item {
+            BookmarkItem::File { path, .. } => {
+                if path == target_path {
+                    return true;
+                }
+            }
+            BookmarkItem::Group { items: nested_items, .. } => {
+                if check_bookmark_exists(nested_items, target_path) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Removes a bookmark by file path (recursively searches through groups).
+///
+/// # Arguments
+///
+/// * `project_path` - The root path of the project
+/// * `bookmark_path` - The file path of the bookmark to remove
+///
+/// # Returns
+///
+/// A `Result<BookmarksData, String>` containing the updated bookmarks
+#[tauri::command]
+pub async fn remove_bookmark(project_path: String, bookmark_path: String) -> Result<BookmarksData, String> {
+    // Load existing bookmarks
+    let mut bookmarks = get_bookmarks(project_path.clone()).await?;
+
+    // Remove the bookmark recursively
+    let removed = remove_bookmark_recursive(&mut bookmarks.items, &bookmark_path);
+
+    if !removed {
+        return Err(format!("Bookmark not found: {}", bookmark_path));
+    }
+
+    // Save and return updated bookmarks
+    save_bookmarks(project_path, bookmarks.clone()).await?;
+
+    Ok(bookmarks)
+}
+
+/// Helper function to recursively remove a bookmark by path.
+/// Returns true if a bookmark was removed.
+fn remove_bookmark_recursive(items: &mut Vec<BookmarkItem>, target_path: &str) -> bool {
+    // First, try to remove from this level
+    let initial_len = items.len();
+    items.retain(|item| {
+        match item {
+            BookmarkItem::File { path, .. } => path != target_path,
+            BookmarkItem::Group { .. } => true, // Keep groups, we'll search inside them
+        }
+    });
+
+    if items.len() < initial_len {
+        return true; // Found and removed at this level
+    }
+
+    // If not found at this level, search in nested groups
+    for item in items.iter_mut() {
+        if let BookmarkItem::Group { items: nested_items, .. } = item {
+            if remove_bookmark_recursive(nested_items, target_path) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Reconciles bookmarks by removing any that point to non-existent files.
+/// This is useful when files are deleted or moved outside the app.
+///
+/// # Arguments
+///
+/// * `project_path` - The root path of the project
+///
+/// # Returns
+///
+/// A `Result<BookmarksData, String>` containing the reconciled bookmarks
+#[tauri::command]
+pub async fn reconcile_bookmarks(project_path: String) -> Result<BookmarksData, String> {
+    use std::fs;
+
+    // Load existing bookmarks
+    let mut bookmarks = get_bookmarks(project_path.clone()).await?;
+
+    // Reconcile recursively
+    reconcile_bookmarks_recursive(&mut bookmarks.items);
+
+    // Save and return updated bookmarks
+    save_bookmarks(project_path, bookmarks.clone()).await?;
+
+    Ok(bookmarks)
+}
+
+/// Helper function to recursively reconcile bookmarks.
+/// Removes file bookmarks that point to non-existent files.
+fn reconcile_bookmarks_recursive(items: &mut Vec<BookmarkItem>) {
+    use std::fs;
+
+    // Remove invalid file bookmarks
+    items.retain(|item| {
+        match item {
+            BookmarkItem::File { path, .. } => {
+                let exists = fs::metadata(path).is_ok();
+                if !exists {
+                    tracing::info!("Removing stale bookmark: {}", path);
+                }
+                exists
+            }
+            BookmarkItem::Group { .. } => true, // Keep groups, process their contents
+        }
+    });
+
+    // Recursively reconcile nested groups
+    for item in items.iter_mut() {
+        if let BookmarkItem::Group { items: nested_items, .. } = item {
+            reconcile_bookmarks_recursive(nested_items);
+        }
+    }
+}
+

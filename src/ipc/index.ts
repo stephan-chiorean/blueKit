@@ -94,4 +94,6 @@ export * from './plans';
 // Re-export File Tree commands
 export * from './fileTree';
 
+// Re-export Bookmark commands
+export * from './bookmarks';
 

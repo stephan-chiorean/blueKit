@@ -71,7 +71,7 @@ fn is_watched_file(path: &PathBuf) -> bool {
 /// Checks if a JSON file is one we specifically care about
 fn is_watched_json(path: &PathBuf) -> bool {
     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        matches!(name, "blueprint.json" | "clones.json" | "projectRegistry.json" | "config.json")
+        matches!(name, "blueprint.json" | "clones.json" | "projectRegistry.json" | "config.json" | "bookmarks.json")
     } else {
         false
     }

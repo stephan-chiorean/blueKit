@@ -177,6 +177,11 @@ async fn main() {
             commands::get_plan_documents, // Get plan documents
             commands::link_document_to_phase, // Link document to phase
             commands::watch_plan_folder, // Watch plan folder for changes
+            commands::get_bookmarks, // Get bookmarks from .bluekit/bookmarks.json
+            commands::save_bookmarks, // Save bookmarks to .bluekit/bookmarks.json
+            commands::add_bookmark, // Add a bookmark to the root
+            commands::remove_bookmark, // Remove a bookmark by file path
+            commands::reconcile_bookmarks, // Prune invalid bookmark paths
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands

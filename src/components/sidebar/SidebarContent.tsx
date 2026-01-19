@@ -8,7 +8,8 @@ import {
     LuNotebook,
     LuBot,
     LuBookOpen,
-    LuExternalLink
+    LuExternalLink,
+    LuBookmark
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import { useState } from 'react';
@@ -29,6 +30,7 @@ export type ViewType =
     | 'walkthroughs'
     | 'diagrams'
     | 'timeline'
+    | 'bookmarks'
     | 'scrapbook'
     | 'blueprints'
     | 'agents'
@@ -191,6 +193,13 @@ export default function SidebarContent({
                     label="Timeline"
                     isActive={activeView !== 'file' && activeView === 'timeline'}
                     onClick={() => onViewChange('timeline')}
+                    collapsed={collapsed}
+                />
+                <SidebarMenuItem
+                    icon={LuBookmark}
+                    label="Bookmarks"
+                    isActive={activeView !== 'file' && activeView === 'bookmarks'}
+                    onClick={() => onViewChange('bookmarks')}
                     collapsed={collapsed}
                 />
 
