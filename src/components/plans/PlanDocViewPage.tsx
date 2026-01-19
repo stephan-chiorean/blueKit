@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Box, VStack, HStack, Text, IconButton, Icon, Badge, Flex, Portal } from '@chakra-ui/react';
+import { Box, VStack, HStack, Text, Button, Icon, Badge, Flex, Portal } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LuChevronLeft, LuChevronRight, LuFileText, LuPencil, LuEye, LuCode } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight, LuFileText } from 'react-icons/lu';
+import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
 import { ResourceFile } from '../../types/resource';
 import { PlanDocument } from '../../types/plan';
 import { useColorMode } from '../../contexts/ColorModeContext';
@@ -226,8 +227,7 @@ export default function PlanDocViewPage({
                 <Flex justify="space-between" align="center" gap={4}>
                     {/* Left: Navigation arrows */}
                     <HStack gap={1}>
-                        <IconButton
-                            aria-label="Previous document"
+                        <Button
                             variant="ghost"
                             size="sm"
                             px={2}
@@ -239,11 +239,10 @@ export default function PlanDocViewPage({
                             _hover={{}}
                         >
                             <Icon boxSize={4}>
-                                <LuChevronLeft />
+                                <LuArrowLeft />
                             </Icon>
-                        </IconButton>
-                        <IconButton
-                            aria-label="Next document"
+                        </Button>
+                        <Button
                             variant="ghost"
                             size="sm"
                             px={2}
@@ -255,9 +254,9 @@ export default function PlanDocViewPage({
                             _hover={{}}
                         >
                             <Icon boxSize={4}>
-                                <LuChevronRight />
+                                <LuArrowRight />
                             </Icon>
-                        </IconButton>
+                        </Button>
                     </HStack>
 
                     {/* Center: Filename with (N/M) indicator */}
@@ -309,52 +308,58 @@ export default function PlanDocViewPage({
                         </AnimatePresence>
 
                         {/* Preview icon */}
-                        <IconButton
-                            aria-label="Preview mode"
+                        <Button
                             variant="ghost"
                             size="sm"
                             px={2}
                             onClick={() => setViewMode('preview')}
-                            colorPalette={viewMode === 'preview' ? 'primary' : undefined}
-                            bg={viewMode === 'preview' ? { _light: 'primary.50', _dark: 'primary.900/30' } : 'transparent'}
+                            colorScheme={viewMode === 'preview' ? 'primary' : undefined}
+                            bg={viewMode === 'preview' ? 'primary.50' : 'transparent'}
                             _hover={{}}
+                            _dark={{
+                                bg: viewMode === 'preview' ? 'primary.900/30' : 'transparent',
+                            }}
                         >
                             <Icon boxSize={4}>
-                                <LuEye />
+                                <FaEye />
                             </Icon>
-                        </IconButton>
+                        </Button>
 
                         {/* Source icon */}
-                        <IconButton
-                            aria-label="Source mode"
+                        <Button
                             variant="ghost"
                             size="sm"
                             px={2}
                             onClick={() => setViewMode('source')}
-                            colorPalette={viewMode === 'source' ? 'primary' : undefined}
-                            bg={viewMode === 'source' ? { _light: 'primary.50', _dark: 'primary.900/30' } : 'transparent'}
+                            colorScheme={viewMode === 'source' ? 'primary' : undefined}
+                            bg={viewMode === 'source' ? 'primary.50' : 'transparent'}
                             _hover={{}}
+                            _dark={{
+                                bg: viewMode === 'source' ? 'primary.900/30' : 'transparent',
+                            }}
                         >
                             <Icon boxSize={4}>
-                                <LuCode />
+                                <FaCode />
                             </Icon>
-                        </IconButton>
+                        </Button>
 
                         {/* Edit icon */}
-                        <IconButton
-                            aria-label="Edit mode"
+                        <Button
                             variant="ghost"
                             size="sm"
                             px={2}
                             onClick={() => setViewMode('edit')}
-                            colorPalette={viewMode === 'edit' ? 'primary' : undefined}
-                            bg={viewMode === 'edit' ? { _light: 'primary.50', _dark: 'primary.900/30' } : 'transparent'}
+                            colorScheme={viewMode === 'edit' ? 'primary' : undefined}
+                            bg={viewMode === 'edit' ? 'primary.50' : 'transparent'}
                             _hover={{}}
+                            _dark={{
+                                bg: viewMode === 'edit' ? 'primary.900/30' : 'transparent',
+                            }}
                         >
                             <Icon boxSize={4}>
-                                <LuPencil />
+                                <FaEdit />
                             </Icon>
-                        </IconButton>
+                        </Button>
                     </HStack>
                 </Flex>
             </Box>

@@ -93,19 +93,21 @@ export default function PlanWorkspace({ plan, onBack, onPlanDeleted }: PlanWorks
         };
 
     // Load plan details
-    const loadPlanDetails = useCallback(async () => {
+    const loadPlanDetails = useCallback(async (isBackground = false) => {
         if (!planId) {
             setLoading(false);
             return;
         }
 
         try {
-            setLoading(true);
+            if (!isBackground) {
+                setLoading(true);
+            }
             const details = await invokeGetPlanDetails(planId);
             setPlanDetails(details);
 
-            // Reset to first document when plan loads
-            if (details.documents.length > 0) {
+            // Reset to first document when plan loads (only on initial load)
+            if (!isBackground && details.documents.length > 0) {
                 setSelectedDocIndex(0);
             }
         } catch (error) {
@@ -117,13 +119,20 @@ export default function PlanWorkspace({ plan, onBack, onPlanDeleted }: PlanWorks
                 closable: true,
             });
         } finally {
-            setLoading(false);
+            if (!isBackground) {
+                setLoading(false);
+            }
         }
     }, [planId]);
 
+    // Wrapper for silent updates
+    const handlePlanUpdate = useCallback(() => {
+        loadPlanDetails(true);
+    }, [loadPlanDetails]);
+
     // Load on mount
     useEffect(() => {
-        loadPlanDetails();
+        loadPlanDetails(false);
     }, [loadPlanDetails]);
 
     // Get documents sorted by filename
@@ -210,7 +219,7 @@ export default function PlanWorkspace({ plan, onBack, onPlanDeleted }: PlanWorks
                         onSelectDocument={handleDocumentSelect}
                         onBack={onBack}
                         onPlanDeleted={onPlanDeleted}
-                        onUpdate={loadPlanDetails}
+                        onUpdate={handlePlanUpdate}
                     />
                 </Splitter.Panel>
 
