@@ -25,7 +25,7 @@ export default function SidebarMenuItem({
     // Light mode: subtle blue background (blue.100 for more visibility), darker navy text (blue.700)
     // Dark mode: blue background (blue.900), light blue text (blue.200)
     const activeBg = colorMode === 'light' ? 'blue.100' : 'blue.900';
-    const hoverBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.05)';
+    const hoverBg = colorMode === 'light' ? 'rgba(0, 0, 0, 0.03)' : 'rgba(66, 135, 245, 0.08)';
     const activeColor = colorMode === 'light' ? 'blue.700' : 'blue.200';
     const inactiveColor = colorMode === 'light' ? 'gray.600' : 'gray.400';
 

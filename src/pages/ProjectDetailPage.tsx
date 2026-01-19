@@ -1016,28 +1016,15 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               },
             }}
           >
-            {/* Visible resize indicator */}
+            {/* Invisible resize indicator - functional but no visual */}
             <Box
               position="absolute"
               left="50%"
               top={0}
               bottom={0}
-              w="2px"
+              w="1px"
               transform="translateX(-50%)"
-              bg={{ _light: 'rgba(0,0,0,0.06)', _dark: 'rgba(99,102,241,0.15)' }}
-              transition="all 0.15s ease"
-              borderRadius="full"
-              css={{
-                // Hover/active states for visual feedback
-                '[data-part="resize-trigger"]:hover &, [data-part="resize-trigger"][data-state="dragging"] &': {
-                  width: '4px',
-                  background: { _light: 'rgba(99,102,241,0.4)', _dark: 'rgba(99,102,241,0.6)' },
-                },
-                '[data-part="resize-trigger"][data-state="dragging"] &': {
-                  width: '4px',
-                  background: { _light: 'rgba(99,102,241,0.6)', _dark: 'rgba(99,102,241,0.8)' },
-                },
-              }}
+              bg="transparent"
             />
             {/* Drag dots indicator (shows on hover) */}
             <Box

@@ -1415,11 +1415,11 @@ function TreeNode({
         return fileName;
     };
 
-    // Match the sidebar menu item styling (subtle blue button style) for light mode
+    // Match the sidebar menu item styling (subtle blue button style) for both modes
     // Light mode: subtle blue background (blue.100), darker navy text (blue.700)
-    // Dark mode: keep original styling (whiteAlpha.200 background, blue.200 text)
-    const hoverBg = colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.100';
-    const selectedBg = colorMode === 'light' ? 'blue.100' : 'whiteAlpha.200';
+    // Dark mode: use blue.900 for consistency instead of whiteAlpha which creates visible borders
+    const hoverBg = colorMode === 'light' ? 'blackAlpha.50' : 'rgba(66, 135, 245, 0.08)';
+    const selectedBg = colorMode === 'light' ? 'blue.100' : 'blue.900';
     const selectedColor = colorMode === 'light' ? 'blue.700' : 'blue.200';
 
     // Drag over styling
@@ -1511,7 +1511,7 @@ function TreeNode({
                         _focus={{
                             boxShadow: 'none',
                             outline: 'none',
-                            bg: colorMode === 'light' ? 'white' : 'whiteAlpha.100'
+                            bg: colorMode === 'light' ? 'white' : 'transparent'
                         }}
                         ref={(input) => {
                             // Auto-select text when input is first focused (only once)
