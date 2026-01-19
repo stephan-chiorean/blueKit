@@ -405,7 +405,6 @@ export default function HomePage({
       <Box flexShrink={0} bg="transparent">
         <Header
           onNavigateToTasks={() => setActiveTab('tasks')}
-          onNavigateToPlans={onNavigateToPlans}
         />
       </Box>
 
