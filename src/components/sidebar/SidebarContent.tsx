@@ -9,7 +9,9 @@ import {
     LuBot,
     LuBookOpen,
     LuExternalLink,
-    LuBookmark
+    LuBookmark,
+    LuGithub,
+    LuPalette
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import { useState } from 'react';
@@ -105,27 +107,107 @@ export default function SidebarContent({
                 collapsed={collapsed}
                 rightElement={
                     !collapsed && (
-                        <Menu.Root>
+                        <HStack gap={2}>
+                            {/* Existing Open Project Menu */}
+                            <Menu.Root>
+                                <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
+                                    <Tooltip.Trigger asChild>
+                                        <Box display="inline-flex">
+                                            <Menu.Trigger asChild>
+                                                <IconButton
+                                                    variant="ghost"
+                                                    size="xs"
+                                                    aria-label="Open Project"
+                                                    color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                                                    _hover={{
+                                                        color: colorMode === 'light' ? 'black' : 'white',
+                                                        bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                                                    }}
+                                                    minW={5}
+                                                    h={5}
+                                                >
+                                                    <LuExternalLink />
+                                                </IconButton>
+                                            </Menu.Trigger>
+                                        </Box>
+                                    </Tooltip.Trigger>
+                                    <Portal>
+                                        <Tooltip.Positioner zIndex={1500}>
+                                            <Tooltip.Content
+                                                px={3}
+                                                py={1.5}
+                                                borderRadius="md"
+                                                fontSize="xs"
+                                                fontWeight="medium"
+                                                color={colorMode === 'light' ? 'gray.700' : 'gray.100'}
+                                                css={{
+                                                    background: colorMode === 'light'
+                                                        ? 'rgba(255, 255, 255, 0.75)'
+                                                        : 'rgba(20, 20, 25, 0.7)',
+                                                    backdropFilter: 'blur(12px) saturate(180%)',
+                                                    WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+                                                    border: colorMode === 'light'
+                                                        ? '1px solid rgba(0, 0, 0, 0.08)'
+                                                        : '1px solid rgba(255, 255, 255, 0.15)',
+                                                    boxShadow: colorMode === 'light'
+                                                        ? '0 6px 18px rgba(0, 0, 0, 0.12)'
+                                                        : '0 8px 20px rgba(0, 0, 0, 0.4)',
+                                                }}
+                                            >
+                                                Open project
+                                            </Tooltip.Content>
+                                        </Tooltip.Positioner>
+                                    </Portal>
+                                </Tooltip.Root>
+                                <Portal>
+                                    <Menu.Positioner>
+                                        <Menu.Content minW="180px" zIndex={1500}>
+                                            <Menu.Item
+                                                value="cursor"
+                                                onSelect={() => handleOpenInEditor('cursor')}
+                                            >
+                                                <HStack gap={2}>
+                                                    <Text>Open in Cursor</Text>
+                                                </HStack>
+                                            </Menu.Item>
+                                            <Menu.Item
+                                                value="vscode"
+                                                onSelect={() => handleOpenInEditor('vscode')}
+                                            >
+                                                <HStack gap={2}>
+                                                    <Text>Open in VSCode</Text>
+                                                </HStack>
+                                            </Menu.Item>
+                                            <Menu.Item
+                                                value="antigravity"
+                                                onSelect={() => handleOpenInEditor('antigravity')}
+                                            >
+                                                <HStack gap={2}>
+                                                    <Text>Open in Antigravity</Text>
+                                                </HStack>
+                                            </Menu.Item>
+                                        </Menu.Content>
+                                    </Menu.Positioner>
+                                </Portal>
+                            </Menu.Root>
+
+                            {/* GitHub Repository Icon */}
                             <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
                                 <Tooltip.Trigger asChild>
-                                    <Box display="inline-flex">
-                                        <Menu.Trigger asChild>
-                                            <IconButton
-                                                variant="ghost"
-                                                size="xs"
-                                                aria-label="Open Project"
-                                                color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
-                                                _hover={{
-                                                    color: colorMode === 'light' ? 'black' : 'white',
-                                                    bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
-                                                }}
-                                                minW={5}
-                                                h={5}
-                                            >
-                                                <LuExternalLink />
-                                            </IconButton>
-                                        </Menu.Trigger>
-                                    </Box>
+                                    <IconButton
+                                        variant="ghost"
+                                        size="xs"
+                                        aria-label="Open Repository"
+                                        color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                                        _hover={{
+                                            color: colorMode === 'light' ? 'black' : 'white',
+                                            bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                                        }}
+                                        minW={5}
+                                        h={5}
+                                    >
+                                        <LuGithub />
+                                    </IconButton>
                                 </Tooltip.Trigger>
                                 <Portal>
                                     <Tooltip.Positioner zIndex={1500}>
@@ -150,42 +232,59 @@ export default function SidebarContent({
                                                     : '0 8px 20px rgba(0, 0, 0, 0.4)',
                                             }}
                                         >
-                                            Open project
+                                            Open Repository
                                         </Tooltip.Content>
                                     </Tooltip.Positioner>
                                 </Portal>
                             </Tooltip.Root>
-                            <Portal>
-                                <Menu.Positioner>
-                                    <Menu.Content minW="180px" zIndex={1500}>
-                                        <Menu.Item
-                                            value="cursor"
-                                            onSelect={() => handleOpenInEditor('cursor')}
+
+                            {/* Palette Customize Icon */}
+                            <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
+                                <Tooltip.Trigger asChild>
+                                    <IconButton
+                                        variant="ghost"
+                                        size="xs"
+                                        aria-label="Customize"
+                                        color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                                        _hover={{
+                                            color: colorMode === 'light' ? 'black' : 'white',
+                                            bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                                        }}
+                                        minW={5}
+                                        h={5}
+                                    >
+                                        <LuPalette />
+                                    </IconButton>
+                                </Tooltip.Trigger>
+                                <Portal>
+                                    <Tooltip.Positioner zIndex={1500}>
+                                        <Tooltip.Content
+                                            px={3}
+                                            py={1.5}
+                                            borderRadius="md"
+                                            fontSize="xs"
+                                            fontWeight="medium"
+                                            color={colorMode === 'light' ? 'gray.700' : 'gray.100'}
+                                            css={{
+                                                background: colorMode === 'light'
+                                                    ? 'rgba(255, 255, 255, 0.75)'
+                                                    : 'rgba(20, 20, 25, 0.7)',
+                                                backdropFilter: 'blur(12px) saturate(180%)',
+                                                WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+                                                border: colorMode === 'light'
+                                                    ? '1px solid rgba(0, 0, 0, 0.08)'
+                                                    : '1px solid rgba(255, 255, 255, 0.15)',
+                                                boxShadow: colorMode === 'light'
+                                                    ? '0 6px 18px rgba(0, 0, 0, 0.12)'
+                                                    : '0 8px 20px rgba(0, 0, 0, 0.4)',
+                                            }}
                                         >
-                                            <HStack gap={2}>
-                                                <Text>Open in Cursor</Text>
-                                            </HStack>
-                                        </Menu.Item>
-                                        <Menu.Item
-                                            value="vscode"
-                                            onSelect={() => handleOpenInEditor('vscode')}
-                                        >
-                                            <HStack gap={2}>
-                                                <Text>Open in VSCode</Text>
-                                            </HStack>
-                                        </Menu.Item>
-                                        <Menu.Item
-                                            value="antigravity"
-                                            onSelect={() => handleOpenInEditor('antigravity')}
-                                        >
-                                            <HStack gap={2}>
-                                                <Text>Open in Antigravity</Text>
-                                            </HStack>
-                                        </Menu.Item>
-                                    </Menu.Content>
-                                </Menu.Positioner>
-                            </Portal>
-                        </Menu.Root>
+                                            Customize
+                                        </Tooltip.Content>
+                                    </Tooltip.Positioner>
+                                </Portal>
+                            </Tooltip.Root>
+                        </HStack>
                     )
                 }
             >

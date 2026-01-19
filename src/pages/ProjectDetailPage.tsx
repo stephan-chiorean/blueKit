@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue } from 'react';
+import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue, useCallback } from 'react';
 import {
   Box,
   VStack,
@@ -57,14 +57,82 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   // Sidebar state
   const [activeView, setActiveView] = useState<ViewType>('tasks');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
-  const [splitSizes, setSplitSizes] = useState<[number, number]>([15, 85]);
 
-  // Pixel-based minimum sidebar width (280px is a good default for sidebar content)
-  const SIDEBAR_MIN_PX = 280;
-  const SIDEBAR_MAX_PX = 500;
+  // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
+  const SIDEBAR_STORAGE_KEY = 'bluekit-sidebar-width';
+  const SIDEBAR_MIN_PX = 240;           // Compact-friendly minimum (allows readable content)
+  const SIDEBAR_MAX_PX = 500;           // Absolute max in pixels
+  const SIDEBAR_MAX_PERCENT = 40;       // Never more than 40% of viewport
+  const SIDEBAR_DEFAULT_PERCENT = 18;   // ~280px on typical 1440px screens
+  const SNAP_COLLAPSE_THRESHOLD = 0.55; // Collapse if below 55% of min (more forgiving)
+
+  // Sidebar width with localStorage persistence
+  const [splitSizes, setSplitSizes] = useState<[number, number]>(() => {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length === 2) {
+          return parsed as [number, number];
+        }
+      }
+    } catch {
+      // Invalid stored value, use default
+    }
+    return [SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT];
+  });
+
+  // Track whether sidebar is being actively dragged (for animation control)
+  const [isSidebarDragging, setIsSidebarDragging] = useState(false);
 
   // Ref to track splitter container width
   const splitterContainerRef = useRef<HTMLDivElement>(null);
+
+  // Persist sidebar width to localStorage (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(splitSizes));
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [splitSizes]);
+
+  // Keyboard shortcut: Cmd/Ctrl + \ to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+        setSplitSizes(prev => {
+          if (prev[0] < 5) {
+            // Currently collapsed - expand to default
+            return [minSidebarPercent, 100 - minSidebarPercent];
+          } else {
+            // Currently expanded - collapse
+            return [0, 100];
+          }
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Toggle sidebar collapse/expand with animation
+  const toggleSidebar = useCallback(() => {
+    const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+    const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+    setSplitSizes(prev => {
+      if (prev[0] < 5) {
+        return [minSidebarPercent, 100 - minSidebarPercent];
+      } else {
+        return [0, 100];
+      }
+    });
+  }, []);
 
   const handleTreeRefresh = () => setFileTreeVersion(v => v + 1);
 
@@ -904,34 +972,46 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
         bg="transparent"
       >
         <Splitter.Root
-          defaultSize={[15, 85]}
+          defaultSize={[SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT]}
           size={splitSizes}
           onResize={(details) => {
             if (details.size && details.size.length >= 2) {
               const [sidebar, content] = details.size;
 
-              // Get container width to calculate pixel-based minimums
+              // Get container width to calculate pixel-based constraints
               const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
 
-              // Calculate minimum and maximum sidebar sizes as percentages
+              // Calculate minimum sidebar size as percentage
               const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-              const maxSidebarPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
+
+              // Calculate maximum: use the smaller of pixel-based or viewport-relative max
+              const pixelMaxPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
+              const maxSidebarPercent = Math.min(pixelMaxPercent, SIDEBAR_MAX_PERCENT);
+
+              // Calculate snap threshold (percentage below which we collapse)
+              // Using 55% of min creates a comfortable "decision zone"
+              const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
 
               let newSidebar = sidebar;
               let newContent = content;
 
-              // Enforce pixel-based minimum (convert to percentage)
-              if (sidebar > 0 && sidebar < minSidebarPercent) {
-                // Snap to either 0 (collapsed) or minimum pixel width
-                newSidebar = sidebar < minSidebarPercent / 2 ? 0 : minSidebarPercent;
-                newContent = 100 - newSidebar;
+              // COLLAPSE ZONE: if below threshold, snap to fully collapsed
+              if (sidebar > 0 && sidebar < snapThresholdPercent) {
+                newSidebar = 0;
+                newContent = 100;
               }
-              // Enforce pixel-based maximum
+              // SNAP-TO-MIN ZONE: if between threshold and minimum, snap to minimum
+              // This prevents awkward "almost collapsed" states
+              else if (sidebar >= snapThresholdPercent && sidebar < minSidebarPercent) {
+                newSidebar = minSidebarPercent;
+                newContent = 100 - minSidebarPercent;
+              }
+              // MAX CONSTRAINT: enforce maximum width (responsive to viewport)
               else if (sidebar > maxSidebarPercent) {
                 newSidebar = maxSidebarPercent;
                 newContent = 100 - newSidebar;
               }
-              // Normal resize within bounds
+              // NORMAL ZONE: free resize within valid bounds
               else {
                 newSidebar = sidebar;
                 newContent = content;
@@ -947,7 +1027,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           h="100%"
           orientation="horizontal"
         >
-          {/* Sidebar Panel */}
+          {/* Sidebar Panel - with smooth transition when not dragging */}
           <Splitter.Panel
             id="sidebar"
             bg="transparent"
@@ -955,6 +1035,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               background: sidebarBg,
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
+              transition: isSidebarDragging ? 'none' : 'flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+              willChange: isSidebarDragging ? 'flex-basis' : 'auto',
             }}
           >
             <ProjectSidebar
@@ -979,11 +1061,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           {/* Professional Resize Handle - wide hit area with visual feedback */}
           <Splitter.ResizeTrigger
             id="sidebar:content"
-            w="16px"
-            minW="16px"
-            maxW="16px"
+            w="20px"
+            minW="20px"
+            maxW="20px"
             p={0}
-            mx="-8px"
+            mx="-10px"
             bg="transparent"
             cursor="col-resize"
             border="none"
@@ -991,19 +1073,10 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             boxShadow="none"
             position="relative"
             zIndex={10}
-            onDoubleClick={() => {
-              // Double-click to toggle sidebar collapse/expand
-              const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-              const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-
-              if (splitSizes[0] < 5) {
-                // Currently collapsed - expand to default
-                setSplitSizes([minSidebarPercent, 100 - minSidebarPercent]);
-              } else {
-                // Currently expanded - collapse
-                setSplitSizes([0, 100]);
-              }
-            }}
+            onDoubleClick={toggleSidebar}
+            onPointerDown={() => setIsSidebarDragging(true)}
+            onPointerUp={() => setIsSidebarDragging(false)}
+            onPointerLeave={() => setIsSidebarDragging(false)}
             css={{
               // Hide default splitter decorations
               '&::before': { display: 'none' },
@@ -1014,15 +1087,18 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
                 alignItems: 'center',
                 justifyContent: 'center',
               },
+              // Prevent text selection during drag
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
           >
-            {/* Invisible resize indicator - functional but no visual */}
+            {/* Invisible resize hit area - stays transparent */}
             <Box
               position="absolute"
               left="50%"
               top={0}
               bottom={0}
-              w="1px"
+              w="2px"
               transform="translateX(-50%)"
               bg="transparent"
             />
@@ -1033,24 +1109,32 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
               top="50%"
               transform="translate(-50%, -50%)"
               opacity={0}
-              transition="opacity 0.15s ease"
+              transition="opacity 0.2s ease, transform 0.2s ease"
               css={{
                 '[data-part="resize-trigger"]:hover &': {
-                  opacity: 0.8,
+                  opacity: 0.7,
+                  transform: 'translate(-50%, -50%) scale(1)',
                 },
                 '[data-part="resize-trigger"][data-state="dragging"] &': {
                   opacity: 1,
+                  transform: 'translate(-50%, -50%) scale(1.1)',
                 },
               }}
             >
-              <VStack gap="2px">
+              <VStack gap="3px">
                 {[0, 1, 2].map((i) => (
                   <Box
                     key={i}
                     w="4px"
                     h="4px"
                     borderRadius="full"
-                    bg={{ _light: 'rgba(99,102,241,0.6)', _dark: 'rgba(99,102,241,0.8)' }}
+                    bg={{ _light: 'rgba(99,102,241,0.7)', _dark: 'rgba(129,140,248,0.9)' }}
+                    transition="transform 0.15s ease"
+                    css={{
+                      '[data-part="resize-trigger"][data-state="dragging"] &': {
+                        transform: 'scale(1.2)',
+                      },
+                    }}
                   />
                 ))}
               </VStack>
