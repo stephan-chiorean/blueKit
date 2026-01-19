@@ -1,8 +1,16 @@
 # Project Invite Flow: The Local-First Collaboration Challenge
 
-**Status:** Design Exploration
+**Status:** Still Valid
 **Created:** 2026-01-15
+**Updated:** 2026-01-19
 **Context:** How do you invite someone to collaborate on a project that exists as local files?
+
+> **Note:** This document covers **project invites** - inviting teammates to collaborate on
+> a git repository. This is separate from the **Personal Library** (see `personal-library-spec.md`).
+>
+> Key distinction:
+> - **Project invites** = Share access to a git repo + synced metadata (tasks, checkpoints)
+> - **Library** = Personal, not shared (no invites needed)
 
 ---
 

@@ -976,25 +976,99 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             />
           </Splitter.Panel>
 
-          {/* Resize Trigger - single 1px border with handle */}
+          {/* Professional Resize Handle - wide hit area with visual feedback */}
           <Splitter.ResizeTrigger
             id="sidebar:content"
-            w="1px"
-            minW="1px"
-            maxW="1px"
+            w="16px"
+            minW="16px"
+            maxW="16px"
             p={0}
-            m={0}
+            mx="-8px"
             bg="transparent"
             cursor="col-resize"
             border="none"
             outline="none"
             boxShadow="none"
+            position="relative"
+            zIndex={10}
+            onDoubleClick={() => {
+              // Double-click to toggle sidebar collapse/expand
+              const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+              const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+              if (splitSizes[0] < 5) {
+                // Currently collapsed - expand to default
+                setSplitSizes([minSidebarPercent, 100 - minSidebarPercent]);
+              } else {
+                // Currently expanded - collapse
+                setSplitSizes([0, 100]);
+              }
+            }}
             css={{
+              // Hide default splitter decorations
               '&::before': { display: 'none' },
               '&::after': { display: 'none' },
-              '& > *': { display: 'none' },
+              // Visible resize line (thin, centered in the hit area)
+              '&': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
             }}
-          />
+          >
+            {/* Visible resize indicator */}
+            <Box
+              position="absolute"
+              left="50%"
+              top={0}
+              bottom={0}
+              w="2px"
+              transform="translateX(-50%)"
+              bg={{ _light: 'rgba(0,0,0,0.06)', _dark: 'rgba(99,102,241,0.15)' }}
+              transition="all 0.15s ease"
+              borderRadius="full"
+              css={{
+                // Hover/active states for visual feedback
+                '[data-part="resize-trigger"]:hover &, [data-part="resize-trigger"][data-state="dragging"] &': {
+                  width: '4px',
+                  background: { _light: 'rgba(99,102,241,0.4)', _dark: 'rgba(99,102,241,0.6)' },
+                },
+                '[data-part="resize-trigger"][data-state="dragging"] &': {
+                  width: '4px',
+                  background: { _light: 'rgba(99,102,241,0.6)', _dark: 'rgba(99,102,241,0.8)' },
+                },
+              }}
+            />
+            {/* Drag dots indicator (shows on hover) */}
+            <Box
+              position="absolute"
+              left="50%"
+              top="50%"
+              transform="translate(-50%, -50%)"
+              opacity={0}
+              transition="opacity 0.15s ease"
+              css={{
+                '[data-part="resize-trigger"]:hover &': {
+                  opacity: 0.8,
+                },
+                '[data-part="resize-trigger"][data-state="dragging"] &': {
+                  opacity: 1,
+                },
+              }}
+            >
+              <VStack gap="2px">
+                {[0, 1, 2].map((i) => (
+                  <Box
+                    key={i}
+                    w="4px"
+                    h="4px"
+                    borderRadius="full"
+                    bg={{ _light: 'rgba(99,102,241,0.6)', _dark: 'rgba(99,102,241,0.8)' }}
+                  />
+                ))}
+              </VStack>
+            </Box>
+          </Splitter.ResizeTrigger>
 
           {/* Main Content Panel */}
           <Splitter.Panel id="content">

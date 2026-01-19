@@ -1,5 +1,19 @@
 # Project Collaboration with Supabase
 
+**Status:** Still Valid
+**Updated:** 2026-01-19
+**Context:** Git-based project collaboration (separate from Personal Library)
+
+> **Note:** This document covers **project collaboration** - sharing tasks, checkpoints, and
+> activity between teammates who share a git repository. This is separate from the
+> **Personal Library** (see `personal-library-spec.md`), which is individual to each user.
+>
+> Key distinction:
+> - **Projects** = Git repos with `.bluekit` folders, shared via git
+> - **Library** = Personal cloud storage, not shared
+
+---
+
 ## Problem Statement
 
 BlueKit projects have associated data (plans, tasks, checkpoints) stored in SQLite locally. When multiple teammates collaborate on the same project, this data needs to sync between them. The challenge is that some data (like plans) has both:

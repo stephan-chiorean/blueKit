@@ -1,8 +1,47 @@
 # Supabase Implementation Roadmap
 
-**Status:** Master Implementation Plan
+**Status:** REVISION NEEDED - Architecture Changed
 **Created:** 2026-01-14
+**Updated:** 2026-01-19
 **Context:** Greenfield implementation of Supabase-first architecture
+
+---
+
+## ⚠️ IMPORTANT: Architecture Update
+
+**This document was written with "workspaces" as collaborative cloud-backed containers.**
+
+**That model is now superseded by:**
+
+1. **Personal Library** - Cloud storage for each user's curated artifacts
+   - See `personal-library-spec.md` for full details
+   - One library per user, not shared
+   - Structured artifacts only (with YAML front matter)
+
+2. **Git-Native Projects** - Team collaboration via repositories
+   - See `project-collab.md` and `invite-flow.md`
+   - .bluekit folders stay in git repos
+   - No cloud sync of project files
+
+3. **No Shared Workspaces** - Removed from architecture
+   - No workspace invites
+   - No workspace members
+   - No cloud-synced workspace storage
+
+**What's still valid in this document:**
+- Phase 0: Foundation & Design (auth, Supabase setup)
+- Phase 1: Auth Foundation (multi-provider auth)
+- Phase 4: GitHub Integration (for Timeline features)
+- RLS concepts (but for personal library, not workspaces)
+- Token storage in Supabase (no local keychain)
+
+**What needs revision:**
+- Phase 2: Data Model (workspaces → personal library)
+- Phase 3: Storage Layer (workspace storage → library storage)
+- Phase 5: Collaboration (workspace sharing → project invites)
+- All "workspace" references → "library" or "project" as appropriate
+
+---
 
 ---
 

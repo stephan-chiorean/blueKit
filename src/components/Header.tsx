@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Flex,
@@ -14,11 +14,8 @@ import {
   Input,
 } from '@chakra-ui/react';
 import { LuBell, LuUser, LuLogOut, LuNotebookPen, LuMenu, LuSearch } from 'react-icons/lu';
-import { Task } from '../types/task';
-import { Project, invokeGetProjectRegistry } from '../ipc';
-import TaskManagerPopover from './tasks/TaskManagerPopover';
-import EditTaskDialog from './tasks/EditTaskDialog';
-import TaskCreateDialog from './tasks/TaskCreateDialog';
+import { Project } from '../ipc';
+import QuickTaskPopover from './tasks/QuickTaskPopover';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
 import { useNotepad } from '../contexts/NotepadContext';
@@ -36,44 +33,11 @@ interface HeaderProps {
 }
 
 export default function Header({ currentProject, onNavigateToTasks, onNavigateToPlans }: HeaderProps = {}) {
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const { isPinned, elapsedTime, formatTime } = useTimer();
-
-  // Load projects on mount
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        const registryProjects = await invokeGetProjectRegistry();
-        setProjects(registryProjects);
-      } catch (error) {
-        console.error('Failed to load projects in Header:', error);
-      }
-    };
-    loadProjects();
-  }, []);
-
-  const handleOpenTaskDialog = (task: Task) => {
-    setSelectedTask(task);
-    setIsTaskDialogOpen(true);
-  };
-
-  const handleOpenCreateDialog = (projectsToPass: Project[]) => {
-    setProjects(projectsToPass);
-    setIsCreateDialogOpen(true);
-  };
-
-  const handleTaskUpdated = () => {
-    // Dialogs will reload their own data
-  };
-
-  // Handle opening project in external editor
 
 
   // Glass styling for light/dark mode
@@ -218,9 +182,7 @@ export default function Header({ currentProject, onNavigateToTasks, onNavigateTo
             </Switch.Control>
           </Switch.Root>
 
-          <TaskManagerPopover
-            onOpenTaskDialog={handleOpenTaskDialog}
-            onOpenCreateDialog={handleOpenCreateDialog}
+          <QuickTaskPopover
             currentProject={currentProject}
             onNavigateToTasks={onNavigateToTasks}
           />
@@ -316,24 +278,6 @@ export default function Header({ currentProject, onNavigateToTasks, onNavigateTo
         </HStack>
       </Flex>
 
-      {/* Task Dialogs */}
-      <EditTaskDialog
-        task={selectedTask}
-        isOpen={isTaskDialogOpen}
-        onClose={() => {
-          setIsTaskDialogOpen(false);
-          setSelectedTask(null);
-        }}
-        onTaskUpdated={handleTaskUpdated}
-      />
-
-      <TaskCreateDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        onTaskCreated={handleTaskUpdated}
-        projects={projects}
-        defaultProjectId={undefined}
-      />
     </Box>
   );
 }

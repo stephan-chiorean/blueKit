@@ -1,12 +1,26 @@
 import { Menu, Portal, HStack, Icon, Text } from '@chakra-ui/react';
 import { useMemo } from 'react';
-import { LuCopy, LuPencil, LuTrash2, LuFiles, LuBookmark } from 'react-icons/lu';
+import { LuCopy, LuPencil, LuTrash2, LuFiles, LuBookmark, LuExternalLink } from 'react-icons/lu';
 import { FileTreeNode } from '../../ipc/fileTree';
+import { invokeOpenResourceInWindow } from '../../ipc/files';
+import { toaster } from '../ui/toaster';
 
-// Estimated height of the file context menu (5 items + 2 separators)
-const ESTIMATED_MENU_HEIGHT = 220;
+// Estimated height of the file context menu (6 items + 3 separators)
+const ESTIMATED_MENU_HEIGHT = 260;
 // Margin from viewport edge
 const VIEWPORT_MARGIN = 16;
+
+const toWindowId = (path: string) => {
+    let hash = 0xcbf29ce484222325n;
+    const prime = 0x100000001b3n;
+
+    for (let i = 0; i < path.length; i += 1) {
+        hash ^= BigInt(path.charCodeAt(i));
+        hash = BigInt.asUintN(64, hash * prime);
+    }
+
+    return `file-${hash.toString(16).padStart(16, '0')}`;
+};
 
 interface FileContextMenuProps {
     isOpen: boolean;
@@ -98,6 +112,39 @@ export function FileContextMenu({
         onClose();
     };
 
+    const handleOpenInNewWindow = async () => {
+        try {
+            const displayName = node.name;
+
+            const windowId = toWindowId(node.path);
+
+            // Open in Tauri window
+            await invokeOpenResourceInWindow({
+                windowId,
+                resourceId: node.path,
+                resourceType: 'file',
+                title: displayName,
+                width: 1200,
+                height: 900,
+            });
+
+            toaster.create({
+                type: 'success',
+                title: 'Window opened',
+                description: `${displayName} opened in new window`,
+            });
+
+            onClose();
+        } catch (err) {
+            console.error('Failed to open file in new window:', err);
+            toaster.create({
+                type: 'error',
+                title: 'Failed to open window',
+                description: err instanceof Error ? err.message : 'Unknown error',
+            });
+        }
+    };
+
     return (
         <Portal>
             <Menu.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
@@ -124,6 +171,17 @@ export function FileContextMenu({
                             top: `${adjustedPosition.y}px`,
                         }}
                     >
+                        <Menu.Item value="open-window" onSelect={handleOpenInNewWindow}>
+                            <HStack gap={2} width="100%">
+                                <Icon>
+                                    <LuExternalLink />
+                                </Icon>
+                                <Text fontSize="sm">Open in new window</Text>
+                            </HStack>
+                        </Menu.Item>
+
+                        <Menu.Separator />
+
                         <Menu.Item value="duplicate" onSelect={handleDuplicate}>
                             <HStack gap={2} width="100%">
                                 <Icon>
