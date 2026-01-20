@@ -247,19 +247,6 @@ export async function invokeGetPlanDocuments(planId: string): Promise<PlanDocume
 }
 
 /**
- * Link document to phase
- */
-export async function invokeLinkDocumentToPhase(
-  documentId: string,
-  phaseId?: string
-): Promise<void> {
-  return await invokeWithTimeout<void>('link_document_to_phase', {
-    documentId,
-    phaseId,
-  });
-}
-
-/**
  * Watch plan folder for file changes
  */
 export async function invokeWatchPlanFolder(

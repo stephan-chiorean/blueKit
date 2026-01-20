@@ -24,12 +24,11 @@ import {
 } from '@chakra-ui/react';
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
-import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { Task, TaskPriority, TaskType } from '../../types/task';
 import { ProjectEntry, Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
 import EditTaskDialog from './EditTaskDialog';
-import TaskCreateDialog from './TaskCreateDialog';
+import { useQuickTaskPopover } from '../../contexts/QuickTaskPopoverContext';
 import { toaster } from '../ui/toaster';
 import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from '../../utils/taskUtils';
 
@@ -59,7 +58,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   // Dialog state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { openPopover } = useQuickTaskPopover();
 
   // Sort state
   const [sortBy] = useState<SortOption>('time');
@@ -159,12 +158,20 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   };
 
   const handleAddTask = () => {
-    setIsCreateDialogOpen(true);
+    openPopover({
+      defaultView: 'create',
+      defaultProjectId: context !== 'workspace' ? (context as ProjectEntry).id : undefined,
+      onTaskCreated: handleTaskCreated,
+    });
   };
 
   useImperativeHandle(ref, () => ({
     openCreateDialog: () => {
-      setIsCreateDialogOpen(true);
+      openPopover({
+        defaultView: 'create',
+        defaultProjectId: context !== 'workspace' ? (context as ProjectEntry).id : undefined,
+        onTaskCreated: handleTaskCreated,
+      });
     },
   }));
 
@@ -359,25 +366,26 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   if (tasks.length === 0) {
     return (
       <VStack py={12} gap={3}>
-        <TaskCreateDialog
-          isOpen={isCreateDialogOpen}
-          onClose={() => setIsCreateDialogOpen(false)}
-          onTaskCreated={handleTaskCreated}
-          projects={projects}
-          defaultProjectId={context !== 'workspace' ? (context as ProjectEntry).id : undefined}
-        />
+        <Button
+          colorPalette="primary"
+          variant="solid"
+          size="sm"
+          borderRadius="lg"
+          onClick={handleAddTask}
+        >
+          <HStack gap={2}>
+            <Icon>
+              <LuPlus />
+            </Icon>
+            <Text>Add Task</Text>
+          </HStack>
+        </Button>
         <Text color="text.secondary" fontSize="lg">
           No tasks yet
         </Text>
         <Text color="text.tertiary" fontSize="sm">
           Click "Add Task" to create your first task
         </Text>
-        <Button colorPalette="primary" onClick={handleAddTask}>
-          <HStack gap={2}>
-            <LuPlus />
-            <Text>Add Task</Text>
-          </HStack>
-        </Button>
       </VStack>
     );
   }
@@ -526,14 +534,6 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
         onTaskUpdated={loadTasks}
       />
 
-      <TaskCreateDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        onTaskCreated={handleTaskCreated}
-        projects={projects}
-        defaultProjectId={context !== 'workspace' ? (context as ProjectEntry).id : undefined}
-      />
-
       <TasksActionBar
         selectedTasks={selectedTasks}
         hasSelection={selectedTaskIds.size > 0}
@@ -542,14 +542,33 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       />
 
       {/* Toolkit Header */}
-      <ToolkitHeader
-        title="Tasks"
-        action={{
-          label: "Add Task",
-          onClick: handleAddTask,
-          variant: 'solid',
-        }}
-      />
+      <Flex align="center" justify="space-between" mb={6} py={2}>
+        <Heading
+          size="2xl"
+          css={{
+            textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+            _dark: {
+              textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+            },
+          }}
+        >
+          Tasks
+        </Heading>
+        <Button
+          colorPalette="primary"
+          variant="solid"
+          size="sm"
+          borderRadius="lg"
+          onClick={handleAddTask}
+        >
+          <HStack gap={2}>
+            <Icon>
+              <LuPlus />
+            </Icon>
+            <Text>Add Task</Text>
+          </HStack>
+        </Button>
+      </Flex>
 
       {/* In Progress Section */}
       <Box mb={8} position="relative">

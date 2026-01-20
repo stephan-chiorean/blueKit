@@ -1,290 +1,379 @@
-# Walkthroughs Revamp: Structured Single-File Experience
+# Walkthroughs Revamp: Plans UX for Understanding
 
-This plan outlines a **single-file walkthrough architecture** that uses rich YAML front matter to enable progressive disclosure, section navigation, and a unique reading experience—without requiring folder-based organization.
+This plan transforms walkthroughs to mirror the Plans UX—same structure, same patterns, but focused on **understanding** rather than execution.
 
 ## Vision
 
-Walkthroughs remain as single `.md` files, but their YAML front matter gains a new `sections` array that describes the document structure. The UI renders sections as collapsible, navigable cards with summaries, icons, and reading progress tracking. This creates an immersive, book-like reading experience that surpasses traditional linear markdown.
+Walkthroughs are single `.md` files with **Takeaways** (understanding checkpoints) instead of Milestones. Like plans, you can create a walkthrough upfront with name, description, and takeaways. The content is the document; the takeaways track what you've learned.
 
-**Key Insight**: The structure lives in the metadata, not the file system. A walkthrough is still one file, but it *feels* like a curated journey.
-
----
-
-## YAML Front Matter Schema
-
-### Current Schema (unchanged)
-
-```yaml
-id: string              # Unique identifier
-alias: string           # Display name
-type: walkthrough       # Artifact type
-is_base: boolean        # Template flag
-version: number         # Version number
-tags: string[]          # Categorization
-description: string     # One-line summary
-complexity: simple | moderate | comprehensive
-format: reference | guide | review | architecture | documentation
-```
-
-### New Additions
-
-```yaml
-# Section structure for progressive disclosure
-sections:
-  - id: string                    # Matches heading anchor (e.g., "overview" for "## Overview")
-    title: string                 # Display title (can differ from heading)
-    summary: string               # 1-2 sentence TLDR shown when collapsed
-    icon: string                  # Optional emoji/icon (e.g., "🎯", "🔐", "⚡")
-    collapsed: boolean            # Default collapsed state (default: false)
-    estimatedMinutes: number      # Optional reading time estimate
-    type: string                  # Section type: overview | deep-dive | reference | example | summary | callout
-
-# Reading experience settings
-reading:
-  showProgress: boolean           # Show reading progress bar (default: true)
-  showOutline: boolean            # Show floating section outline (default: true)
-  expandAllByDefault: boolean     # Start with all sections expanded (default: false)
-  highlightCurrentSection: boolean # Highlight section in outline on scroll (default: true)
-
-# Author/meta info
-author: string                    # Optional author name
-lastReviewed: string              # ISO date of last review
-```
-
-### Section Types
-
-| Type | Description | Visual Treatment |
-|------|-------------|------------------|
-| `overview` | High-level introduction | Large card, prominent |
-| `deep-dive` | Detailed technical content | Standard card, expandable code blocks |
-| `reference` | Quick lookup (tables, specs) | Compact card, table-optimized |
-| `example` | Code examples, demos | Code-focused card with copy buttons |
-| `summary` | Key takeaways, conclusions | Highlighted card, callout style |
-| `callout` | Important notes, warnings | Alert-style card |
+**Key Simplification**: No section splitting. No YAML changes. Just borrow the Plans UX with:
+- Takeaways instead of Milestones
+- 1 file instead of folder
+- No "Documents" tab
 
 ---
 
-## UI Architecture
+## Plans vs Walkthroughs
 
-### 1. Walkthrough Reader Component
+| Aspect | Plans | Walkthroughs |
+|--------|-------|--------------|
+| **Structure** | Folder with docs | Single .md file |
+| **Progress unit** | Milestones (tasks) | Takeaways (understanding) |
+| **Content** | Multiple documents | One document |
+| **Notes** | DB-backed | DB-backed |
+| **Status** | DB-backed | DB-backed |
+| **Creation** | Name + description + milestones | Name + description + takeaways |
 
-**Location**: `src/components/walkthroughs/WalkthroughReader.tsx`
+---
 
-A new component that replaces the standard markdown viewer when displaying walkthroughs with sections defined.
+## Data Architecture
 
-#### Layout Structure
+### SQLite Schema
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Walkthrough Header                                                   │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ 🎯 GitHub Auth Flow & Integration                                │ │
-│ │ comprehensive · architecture · 15 min read                       │ │
-│ │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 40% complete              │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-├────────────────────────────────────────────┬────────────────────────┤
-│ Section Cards (scrollable)                 │ Outline (sticky)       │
-│ ┌────────────────────────────────────────┐ │ ┌────────────────────┐ │
-│ │ 🔑 Part 1: Current Auth Flow           │ │ │ • Overview         │ │
-│ │ ────────────────────────────────────── │ │ │ ● Part 1 ← current │ │
-│ │ Complete OAuth implementation with     │ │ │ ○ Part 2           │ │
-│ │ PKCE, token storage, and security.     │ │ │ ○ Part 3           │ │
-│ │                                  [▼]   │ │ │ ○ Conclusion       │ │
-│ └────────────────────────────────────────┘ │ └────────────────────┘ │
-│ ┌────────────────────────────────────────┐ │                        │
-│ │ 📡 Part 2: GitHub API Integration      │ │                        │
-│ │ ▶ Expand to read                       │ │                        │
-│ └────────────────────────────────────────┘ │                        │
-└────────────────────────────────────────────┴────────────────────────┘
-```
+```sql
+-- Walkthrough registration
+CREATE TABLE walkthroughs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  file_path TEXT NOT NULL,           -- Path to .md file
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT DEFAULT 'not_started', -- not_started | in_progress | completed
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id)
+);
 
-#### Key Features
+-- Takeaways (like milestones, but for understanding)
+CREATE TABLE walkthrough_takeaways (
+  id TEXT PRIMARY KEY,
+  walkthrough_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  sort_order INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (walkthrough_id) REFERENCES walkthroughs(id)
+);
 
-1. **Section Cards**
-   - Each section renders as a glassmorphic card
-   - Collapsed: Shows title, icon, summary, expand button
-   - Expanded: Shows full markdown content with syntax highlighting
-   - Smooth expand/collapse animations
+-- Takeaway progress (per-user)
+CREATE TABLE walkthrough_takeaway_progress (
+  id TEXT PRIMARY KEY,
+  takeaway_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  completed INTEGER DEFAULT 0,       -- 0 or 1
+  completed_at INTEGER,
+  FOREIGN KEY (takeaway_id) REFERENCES walkthrough_takeaways(id)
+);
 
-2. **Floating Outline**
-   - Fixed sidebar showing all sections
-   - Highlights current section on scroll
-   - Click to jump to section
-   - Shows read/unread indicators
-
-3. **Progress Tracking**
-   - Progress bar in header (% of sections read)
-   - Sections marked as "read" when scrolled past
-   - State persisted to localStorage by walkthrough ID
-
-4. **Reading Controls**
-   - "Expand All" / "Collapse All" toggle
-   - "Mark All Read" / "Mark Unread" buttons
-   - View mode: Cards vs. Linear (traditional markdown)
-
-### 2. Section Parser
-
-**Location**: `src/utils/walkthroughParser.ts`
-
-Parses walkthrough content and splits it into sections based on YAML metadata.
-
-```typescript
-interface ParsedSection {
-  id: string;
-  title: string;
-  summary?: string;
-  icon?: string;
-  collapsed: boolean;
-  estimatedMinutes?: number;
-  type: SectionType;
-  content: string;      // Raw markdown content for this section
-  headingLevel: number; // 1 for #, 2 for ##, etc.
-  isRead: boolean;      // Tracked in localStorage
-}
-
-function parseWalkthroughSections(
-  markdown: string,
-  sectionsMeta: SectionMeta[]
-): ParsedSection[];
+-- Notes (like plan notes)
+CREATE TABLE walkthrough_notes (
+  id TEXT PRIMARY KEY,
+  walkthrough_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (walkthrough_id) REFERENCES walkthroughs(id)
+);
 ```
 
-**Parsing Logic**:
-1. Split markdown at `##` boundaries (H2 headings)
-2. Generate anchor IDs from headings (kebab-case)
-3. Match sections to metadata via `id` field
-4. Sections without metadata rendered with defaults
-5. Content before first H2 becomes "intro" section
+### Data Model Philosophy
 
-### 3. Section Editor Modal
+**Breathing Document Principle**: Walkthroughs are living documents that separate immutable properties from personal state.
 
-**Location**: `src/components/walkthroughs/SectionEditorModal.tsx`
+| Location | Data Type | Examples | Characteristics |
+|----------|-----------|----------|-----------------|
+| **YAML Front Matter** | Objective properties | `format`, `complexity`, `tags`, `description` | Version-controlled, set in stone, shared across copies |
+| **SQLite Database** | Personal/fluid state | Notes, takeaway progress, status | Per-user, project-specific, not version-controlled |
 
-A UI for editing section metadata without touching raw YAML.
+**Why this matters**:
+- When you copy a walkthrough to another project, the YAML travels with it—same format, same tags, same complexity
+- But your notes and takeaway progress stay in the source project's database—each reader has their own journey
+- The file is the "textbook"; the database is your "notebook margins"
+
+### YAML Front Matter (Unchanged)
+
+The walkthrough `.md` file keeps its existing front matter. These are **read-only display properties**—the UI shows them but doesn't modify them.
+
+```yaml
+---
+id: github-auth-flow
+alias: GitHub Auth Flow
+type: walkthrough
+description: Complete OAuth implementation walkthrough
+complexity: comprehensive    # → Shown as badge/icon in UI
+format: architecture         # → Shown as badge/icon in UI
+tags: [github, authentication]
+---
+
+# GitHub Auth Flow
+
+[Full markdown content - no section metadata needed]
+```
+
+### UI Display of YAML Metadata
+
+When present in the front matter, display as read-only indicators:
+
+| Field | UI Treatment |
+|-------|--------------|
+| `complexity` | Badge: "Simple" / "Moderate" / "Comprehensive" |
+| `format` | Icon or label: 📚 Reference, 🔧 Guide, 👁️ Review, 🏗️ Architecture, 📖 Documentation |
+| `tags` | Chips/pills for filtering and display |
+
+---
+
+## Creation Flow
+
+### "Create Walkthrough" Dialog
+
+Mirrors "Create Plan" dialog.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ Edit Section                                              [×] │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Title:    [Part 1: Authentication Flow              ]      │
-│                                                              │
-│  Summary:  [Complete OAuth implementation with PKCE,  ]      │
-│            [token storage, and security architecture. ]      │
-│                                                              │
-│  Icon:     [🔑] ← emoji picker                              │
-│                                                              │
-│  Type:     [deep-dive ▼]                                     │
-│                                                              │
-│  Reading Time: [8] minutes                                   │
-│                                                              │
-│  □ Collapsed by default                                      │
-│                                                              │
-│                                        [Cancel] [Save]       │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Create Walkthrough                                            [×] │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Name:        [GitHub Authentication Guide            ]         │
+│                                                                  │
+│  Description: [Understand the OAuth flow, token storage,]        │
+│               [and security architecture.              ]         │
+│                                                                  │
+│  ─────────────────────────────────────────────────────────────   │
+│  Takeaways                                             [+ Add]   │
+│  ─────────────────────────────────────────────────────────────   │
+│  │ ○ │ Understand PKCE flow and why it's needed      │ [×] │   │
+│  │ ○ │ Know where tokens are stored on each platform │ [×] │   │
+│  │ ○ │ Understand token injection points             │ [×] │   │
+│  ─────────────────────────────────────────────────────────────   │
+│                                                                  │
+│                                        [Cancel] [Create]         │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-Clicking "Save" updates the YAML front matter and triggers file save.
+**Creation Result**:
+1. Creates `.bluekit/walkthroughs/<name>.md` with basic front matter + placeholder content
+2. Registers walkthrough in SQLite with status, takeaways
+3. Opens WalkthroughViewPage
 
-### 4. Walkthrough Settings Panel
+---
 
-**Location**: `src/components/walkthroughs/WalkthroughSettingsPanel.tsx`
+## Dedicated Walkthrough Page
 
-Controls for the `reading` configuration.
+### WalkthroughViewPage
 
-- Toggle progress bar visibility
-- Toggle outline visibility
-- Default expand/collapse behavior
-- Reorder sections via drag-and-drop (updates YAML order)
+Mirrors PlanDocViewPage layout.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ← Back                                        [Edit] [Status ▼] [···]  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  GitHub Authentication Guide                                            │
+│  Understand the OAuth flow, token storage, and security architecture.  │
+│                                                                         │
+├───────────────────────────────┬─────────────────────────────────────────┤
+│                               │                                         │
+│  Takeaways                    │  # GitHub Auth Flow                     │
+│  ━━━━━━━━━━━━━━ 1/3          │                                         │
+│                               │  BlueKit implements GitHub's            │
+│  ┌───────────────────────┐    │  Authorization Code Flow with PKCE      │
+│  │ ✓ Understand PKCE     │    │  (Proof Key for Code Exchange)...       │
+│  │   flow and why it's   │    │                                         │
+│  │   needed              │    │  ## Part 1: Authentication              │
+│  └───────────────────────┘    │                                         │
+│  ┌───────────────────────┐    │  The flow works as follows:             │
+│  │ ○ Know where tokens   │    │  1. Generate PKCE parameters            │
+│  │   are stored          │    │  2. Start OAuth server                  │
+│  └───────────────────────┘    │  3. User authorizes...                  │
+│  ┌───────────────────────┐    │                                         │
+│  │ ○ Understand token    │    │  ```rust                                │
+│  │   injection points    │    │  pub fn generate_verifier() {           │
+│  └───────────────────────┘    │      // ...                             │
+│                               │  }                                      │
+│  ─────────────────────────    │  ```                                    │
+│                               │                                         │
+│  Notes                        │  ## Part 2: API Integration             │
+│  ─────────────────────────    │  ...                                    │
+│  ┌───────────────────────┐    │                                         │
+│  │ Remember to check the │    │                                         │
+│  │ keychain docs for     │    │                                         │
+│  │ Linux support...      │    │                                         │
+│  └───────────────────────┘    │                                         │
+│  [+ Add Note]                 │                                         │
+│                               │                                         │
+└───────────────────────────────┴─────────────────────────────────────────┘
+```
+
+### Layout
+
+| Left Sidebar | Right Content |
+|--------------|---------------|
+| Takeaways (checkable) | Full markdown document |
+| Progress indicator | Scrollable content |
+| Notes section | Standard markdown viewer |
+
+### Status
+
+Like plans: `Not Started` → `In Progress` → `Completed`
+
+- Status dropdown in header
+- Auto-updates based on takeaway completion (optional)
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: YAML Schema & Parser
+### Phase 1: Database Schema
 
-**Goal**: Enable section definitions in front matter
+**Goal**: Tables for walkthroughs, takeaways, progress, notes
 
-1. **Update TypeScript types** (`src/types/walkthrough.ts`)
-   - Add `sections` array type
-   - Add `reading` configuration type
-   - Add `SectionMeta` and `ParsedSection` types
+1. Add migration for new tables
+2. Match plan tables structure where possible
 
-2. **Create section parser** (`src/utils/walkthroughParser.ts`)
-   - Split markdown by headings
-   - Match sections to metadata
-   - Handle missing metadata gracefully
+### Phase 2: IPC Commands
 
-3. **Update Rust parser** (`src-tauri/src/parser.rs`)
-   - Parse new YAML fields
-   - Return sections metadata to frontend
+**Goal**: CRUD operations for walkthroughs
 
-### Phase 2: Walkthrough Reader UI
+```rust
+// Walkthrough CRUD
+create_walkthrough(project_id, name, description, takeaways) -> Walkthrough
+get_project_walkthroughs(project_id) -> Vec<Walkthrough>
+get_walkthrough(id) -> Walkthrough
+update_walkthrough(id, updates) -> Walkthrough
+delete_walkthrough(id)
 
-**Goal**: Beautiful section-based reading experience
+// Takeaway operations
+add_takeaway(walkthrough_id, title, description)
+update_takeaway(id, updates)
+delete_takeaway(id)
+reorder_takeaways(walkthrough_id, takeaway_ids)
 
-1. **Create WalkthroughReader component**
-   - Section card rendering
-   - Expand/collapse animations
-   - Scroll-to-section functionality
+// Progress
+get_takeaway_progress(walkthrough_id) -> Vec<TakeawayProgress>
+toggle_takeaway_complete(takeaway_id) -> TakeawayProgress
 
-2. **Create SectionCard component**
-   - Collapsed state (title + summary)
-   - Expanded state (full markdown)
-   - Visual treatments per section type
+// Notes
+get_walkthrough_notes(walkthrough_id) -> Vec<Note>
+add_walkthrough_note(walkthrough_id, content) -> Note
+update_walkthrough_note(id, content) -> Note
+delete_walkthrough_note(id)
 
-3. **Create OutlineSidebar component**
-   - Section list with icons
-   - Current section highlighting
-   - Click-to-navigate
+// Status
+update_walkthrough_status(id, status)
+```
 
-4. **Create ProgressHeader component**
-   - Reading progress bar
-   - Expand all / Collapse all controls
+### Phase 3: Frontend IPC Wrappers
 
-### Phase 3: Reading Progress Persistence
+**Goal**: TypeScript wrappers in `src/ipc/walkthroughs.ts`
 
-**Goal**: Remember what you've read
+Mirror the structure of `src/ipc/plans.ts`.
 
-1. **Create reading state store** (`src/stores/readingProgress.ts`)
-   - localStorage-backed state
-   - Per-walkthrough progress tracking
-   - Section read/unread states
+### Phase 4: Creation Flow
 
-2. **Integrate with WalkthroughReader**
-   - Mark sections read on scroll
-   - Display read indicators in outline
-   - Calculate overall progress percentage
+**Goal**: CreateWalkthroughDialog
 
-### Phase 4: Section Editor UI
+1. Borrow from CreatePlanDialog
+2. Name, description, takeaways inputs
+3. Generate file + register in DB
 
-**Goal**: Edit sections without touching YAML
+### Phase 5: WalkthroughViewPage
 
-1. **Create SectionEditorModal**
-   - Form for section metadata
-   - Emoji picker for icons
-   - Type selector dropdown
+**Goal**: Dedicated page mirroring PlanDocViewPage
 
-2. **Create WalkthroughSettingsPanel**
-   - Reading config toggles
-   - Section reordering (drag-drop)
+1. Route: `/project/:id/walkthrough/:walkthroughId`
+2. Layout: Sidebar (takeaways + notes) + Content (markdown)
+3. Takeaway checkboxes
+4. Notes section
+5. Status dropdown
 
-3. **Integrate with file save system**
-   - Update YAML front matter
-   - Trigger auto-save
+### Phase 6: List View Updates
 
-### Phase 5: Fallback & Migration
+**Goal**: WalkthroughsTabContent shows DB-backed walkthroughs
 
-**Goal**: Graceful handling of legacy walkthroughs
+1. Fetch from DB instead of scanning files
+2. Show status, takeaway progress
+3. Link to WalkthroughViewPage
 
-1. **Auto-generate sections from headings**
-   - If no `sections` array defined
-   - Parse H2 headings as sections
-   - Use heading text as title, no summary/icon
+---
 
-2. **"Convert to Sections" action**
-   - Button in walkthrough header
-   - Opens modal to configure sections
-   - Saves populated YAML structure
+## Copy/Move Across Projects
+
+> [!IMPORTANT]
+> The existing `copy_walkthrough_to_project` command only copies the file—it doesn't register the walkthrough in the target project's database. This must be updated.
+
+### Current Behavior (Problem)
+
+```
+ResourceSelectionBar → "Add to Project" → invokeCopyWalkthroughToProject()
+                                                     ↓
+                                          File copied to target/.bluekit/walkthroughs/
+                                                     ↓
+                                          NO database registration ❌
+                                          Silent overwrite if name exists ❌
+```
+
+### Required Behavior
+
+```
+Copy Walkthrough
+       ↓
+   ┌───────────────────────────────────────┐
+   │ 1. Check if name exists in target DB  │
+   │    → Error if collision               │
+   └───────────────────────────────────────┘
+       ↓
+   ┌───────────────────────────────────────┐
+   │ 2. Copy .md file to target project    │
+   │    (YAML travels with file)           │
+   └───────────────────────────────────────┘
+       ↓
+   ┌───────────────────────────────────────┐
+   │ 3. Register in target project's DB    │
+   │    - Create walkthrough record        │
+   │    - Copy takeaway definitions        │
+   │    - Reset progress to 0              │
+   │    - Empty notes (fresh start)        │
+   └───────────────────────────────────────┘
+```
+
+### What Transfers vs What Stays
+
+| Transfers (with file) | Stays in Source Project |
+|-----------------------|-------------------------|
+| YAML front matter (format, complexity, tags) | Your notes |
+| Markdown content | Your takeaway progress |
+| Takeaway *definitions* (titles, descriptions) | Your status |
+
+### Implementation
+
+Update `copy_walkthrough_to_project` in `src-tauri/src/commands.rs`:
+
+```rust
+pub async fn copy_walkthrough_to_project(
+    source_file_path: String,
+    target_project_path: String,
+    db: State<'_, DbPool>,  // NEW: need DB access
+) -> Result<String, String> {
+    // 1. Get source walkthrough from DB (for takeaway definitions)
+    // 2. Check if name exists in target project
+    // 3. Copy file
+    // 4. Register walkthrough in target project's DB
+    // 5. Copy takeaway definitions (with 0 progress)
+}
+```
+
+Add corresponding IPC command:
+```rust
+copy_walkthrough_to_project_with_registration(...)
+```
+
+### Collision Handling
+
+If a walkthrough with the same `file_path` basename exists in the target:
+- **Option A (Recommended)**: Return error with message: "A walkthrough named 'X' already exists in this project"
+- **Option B**: Auto-rename to `X-copy-1.md`, `X-copy-2.md`, etc.
+
+Phase 2 should handle this as part of IPC Commands implementation.
 
 ---
 
@@ -294,140 +383,50 @@ Controls for the `reading` configuration.
 
 ```
 src/
+├── pages/
+│   └── WalkthroughViewPage.tsx        # Mirrors PlanDocViewPage
 ├── components/walkthroughs/
-│   ├── WalkthroughReader.tsx       # Main reader component
-│   ├── SectionCard.tsx             # Individual section card
-│   ├── OutlineSidebar.tsx          # Floating section outline
-│   ├── ProgressHeader.tsx          # Header with progress bar
-│   ├── SectionEditorModal.tsx      # Edit section metadata
-│   └── WalkthroughSettingsPanel.tsx # Reading config UI
-├── utils/
-│   └── walkthroughParser.ts        # Section parsing logic
-├── stores/
-│   └── readingProgress.ts          # LocalStorage reading state
+│   ├── CreateWalkthroughDialog.tsx    # Creation flow
+│   ├── TakeawaysSidebar.tsx           # Takeaways list (like milestones)
+│   ├── TakeawayItem.tsx               # Single takeaway with checkbox
+│   └── WalkthroughNotes.tsx           # Notes section
+├── ipc/
+│   └── walkthroughs.ts                # IPC wrappers
 └── types/
-    └── sections.ts                 # Section type definitions
+    └── walkthrough.ts                 # Updated types
+
+src-tauri/src/
+├── db/
+│   └── walkthroughs.rs                # SQLite operations
+└── main.rs                            # Register commands
 ```
 
 ### Modified Files
 
 ```
-src/types/walkthrough.ts            # Add sections/reading types
-src/pages/NoteViewPage.tsx          # Detect walkthrough, use WalkthroughReader
-src/components/workstation/EditableMarkdownViewer.tsx  # Option to use reader
+src/App.tsx                            # Add route
+src/components/walkthroughs/WalkthroughsTabContent.tsx  # Fetch from DB
+src-tauri/src/commands.rs              # Update copy_walkthrough_to_project
 ```
 
 ---
 
-## Example: Before and After
+## What We're NOT Doing
 
-### Before (Current Format)
-
-```yaml
----
-id: github-auth-flow
-alias: GitHub Auth Flow
-type: walkthrough
-complexity: comprehensive
-format: architecture
----
-# GitHub Auth Flow
-
-## Part 1: Current Auth Flow
-...content...
-
-## Part 2: GitHub API Integration
-...content...
-```
-
-**Result**: Standard linear markdown, scroll to read everything.
-
-### After (New Format)
-
-```yaml
----
-id: github-auth-flow
-alias: GitHub Auth Flow
-type: walkthrough
-complexity: comprehensive
-format: architecture
-
-sections:
-  - id: overview
-    title: "Overview"
-    summary: "Why GitHub auth matters and what this walkthrough covers."
-    icon: "🎯"
-    type: overview
-    estimatedMinutes: 2
-
-  - id: part-1-current-auth-flow
-    title: "Part 1: Current Auth Flow"
-    summary: "Complete OAuth implementation with PKCE, token storage, and security architecture."
-    icon: "🔑"
-    type: deep-dive
-    estimatedMinutes: 8
-    collapsed: true
-
-  - id: part-2-github-api-integration
-    title: "Part 2: GitHub API Integration"
-    summary: "API client architecture, token injection, and available operations."
-    icon: "📡"
-    type: deep-dive
-    estimatedMinutes: 5
-    collapsed: true
-
-reading:
-  showProgress: true
-  showOutline: true
-  expandAllByDefault: false
----
-```
-
-**Result**: Beautiful section cards, collapsible deep-dives, progress tracking, jump navigation.
-
----
-
-## Design Philosophy
-
-### Progressive Disclosure
-
-Not everyone needs every detail. The section-based approach lets readers:
-- Scan summaries to find what they need
-- Expand only relevant sections
-- Collapse sections they've read
-- Track their progress through complex walkthroughs
-
-### Immersive Reading
-
-This isn't just documentation—it's an experience:
-- Glassmorphic cards with subtle shadows
-- Smooth animations on expand/collapse
-- Contextual icons that guide the eye
-- Progress that rewards completion
-
-### Developer Control
-
-Authors control the experience via YAML:
-- Define which sections start collapsed
-- Write compelling summaries for each section
-- Choose icons that match content mood
-- Estimate reading time to set expectations
-
-### Graceful Degradation
-
-Walkthroughs without sections still work:
-- Auto-parsed from H2 headings
-- Default styling applied
-- One-click conversion to structured format
+- ❌ Section splitting in markdown
+- ❌ YAML front matter changes
+- ❌ Section boundary editing
+- ❌ Reading progress per-section
+- ❌ Collapsible cards
+- ❌ Multiple view modes
 
 ---
 
 ## Success Criteria
 
-1. **Existing walkthroughs render** with auto-generated sections
-2. **Section cards** expand/collapse smoothly
-3. **Outline sidebar** highlights current section on scroll
-4. **Progress bar** accurately reflects sections read
-5. **Section editor** updates YAML without corrupting file
-6. **Reading state persists** across sessions
-7. **Performance**: No perceptible lag with 20+ sections
+1. **"Create Walkthrough"** works like "Create Plan"
+2. **Takeaways** are checkable understanding goals
+3. **Notes** persist alongside walkthrough
+4. **Status** tracks overall progress
+5. **WalkthroughViewPage** mirrors PlanDocViewPage UX
+6. **Existing walkthroughs** still viewable (just without takeaways until converted)

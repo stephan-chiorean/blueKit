@@ -6,12 +6,11 @@ import {
   Icon,
   Card,
   CardBody,
-  Badge,
   IconButton,
   EmptyState,
 } from '@chakra-ui/react';
 import { LuFileText, LuTrash2 } from 'react-icons/lu';
-import { PlanDocument, PlanPhase } from '../../types/plan';
+import { PlanDocument } from '../../types/plan';
 import { invokeReadFile } from '../../ipc';
 import { deleteResources } from '../../ipc/artifacts';
 import { useResource } from '../../contexts/ResourceContext';
@@ -21,7 +20,6 @@ import { PlanDocumentContextMenu } from './PlanDocumentContextMenu';
 
 interface PlanDocumentListProps {
   documents: PlanDocument[];
-  phases: PlanPhase[];
   selectedDocumentId?: string;
   onSelectDocument?: (document: PlanDocument) => void;
   onDocumentDeleted?: () => void;
@@ -30,7 +28,6 @@ interface PlanDocumentListProps {
 
 const PlanDocumentList = memo(function PlanDocumentList({
   documents,
-  phases,
   selectedDocumentId,
   onSelectDocument,
   onDocumentDeleted,
@@ -50,12 +47,6 @@ const PlanDocumentList = memo(function PlanDocumentList({
     document: null,
   });
 
-  // Get phase name for a document
-  const getPhaseName = (phaseId?: string) => {
-    if (!phaseId) return null;
-    const phase = phases.find((p) => p.id === phaseId);
-    return phase?.name || null;
-  };
 
   // Handle document click - load in workstation
   const handleDocumentClick = async (document: PlanDocument) => {
@@ -154,7 +145,6 @@ const PlanDocumentList = memo(function PlanDocumentList({
       )}
 
       {documents.map((document) => {
-        const phaseName = getPhaseName(document.phaseId);
         const isSelected = selectedDocumentId === document.id;
         const isDeleting = deletingDocument === document.id;
 
@@ -190,11 +180,6 @@ const PlanDocumentList = memo(function PlanDocumentList({
                     >
                       {document.fileName}
                     </Text>
-                    {phaseName && (
-                      <Badge size="sm" variant="subtle" colorPalette="primary">
-                        {phaseName}
-                      </Badge>
-                    )}
                   </VStack>
                 </HStack>
 
@@ -236,10 +221,9 @@ const PlanDocumentList = memo(function PlanDocumentList({
     </VStack>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if documents, phases, or selectedDocumentId actually changed
+  // Only re-render if documents or selectedDocumentId actually changed
   return (
     JSON.stringify(prevProps.documents) === JSON.stringify(nextProps.documents) &&
-    JSON.stringify(prevProps.phases) === JSON.stringify(nextProps.phases) &&
     prevProps.selectedDocumentId === nextProps.selectedDocumentId
   );
 });

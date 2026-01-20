@@ -3,6 +3,7 @@ import { Box, VStack, HStack, Text, Button, Icon, Badge, Flex, Portal } from '@c
 import { motion, AnimatePresence } from 'framer-motion';
 import { LuArrowLeft, LuArrowRight, LuFileText } from 'react-icons/lu';
 import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
+import { listen } from '@tauri-apps/api/event';
 import { ResourceFile } from '../../types/resource';
 import { PlanDocument } from '../../types/plan';
 import { useColorMode } from '../../contexts/ColorModeContext';
@@ -25,6 +26,8 @@ interface PlanDocViewPageProps {
     documents: PlanDocument[];
     /** Currently selected document index */
     currentIndex: number;
+    /** Plan ID for file watcher events */
+    planId?: string;
     /** Callback when navigating to a different document */
     onNavigate: (index: number, document: PlanDocument) => void;
     /** Callback when content changes */
@@ -34,6 +37,7 @@ interface PlanDocViewPageProps {
 export default function PlanDocViewPage({
     documents,
     currentIndex,
+    planId,
     onNavigate,
     onContentChange,
 }: PlanDocViewPageProps) {
@@ -105,6 +109,51 @@ export default function PlanDocViewPage({
 
         loadContent();
     }, [currentDoc?.filePath]);
+
+    // Listen for file changes from the plan folder watcher
+    // Reload content if the current document is modified externally (e.g., by AI tools)
+    useEffect(() => {
+        if (!planId || !currentDoc) return;
+        // Skip if in edit mode - don't disrupt user edits
+        if (viewMode === 'edit') return;
+
+        const eventName = `plan-documents-changed-${planId}`;
+        let isMounted = true;
+        // Capture current filePath for comparison inside the async callback
+        const currentFilePath = currentDoc.filePath;
+
+        const setupListener = async () => {
+            const unlisten = await listen<string[]>(eventName, async (event) => {
+                if (!isMounted) return;
+
+                const changedPaths = event.payload;
+                // Check if the current document's file was changed
+                const currentFileChanged = changedPaths.some(
+                    changedPath => changedPath === currentFilePath
+                );
+
+                if (currentFileChanged) {
+                    try {
+                        const fileContent = await invokeReadFile(currentFilePath);
+                        if (isMounted) {
+                            setContent(fileContent);
+                        }
+                    } catch (error) {
+                        console.error('Failed to reload document after file change:', error);
+                    }
+                }
+            });
+
+            return unlisten;
+        };
+
+        const unlistenPromise = setupListener();
+
+        return () => {
+            isMounted = false;
+            unlistenPromise.then(unlisten => unlisten?.());
+        };
+    }, [planId, currentDoc?.filePath, viewMode]);
 
     // Handle content changes from editor
     const handleContentChange = useCallback((newContent: string) => {

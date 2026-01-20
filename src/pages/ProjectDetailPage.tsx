@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useTransition, useDeferredValue, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Box,
   VStack,
@@ -217,24 +218,33 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     loadDbProject();
   }, [project.path]);
 
-  // Load plans for this project
-  const loadPlans = async () => {
+  // Load plans for this project - wrapped in useCallback for stable reference
+  const loadPlans = useCallback(async () => {
     try {
       setPlansLoading(true);
       const projectPlans = await invokeGetProjectPlans(project.id);
-      setPlans(projectPlans);
+      flushSync(() => {
+        setPlans(projectPlans);
+      });
     } catch (err) {
       console.error('Failed to load plans:', err);
-      setPlans([]);
+      flushSync(() => {
+        setPlans([]);
+      });
     } finally {
       setPlansLoading(false);
     }
-  };
+  }, [project.id]);
+
+  // Callback for plan deletion - refreshes the plans list
+  const handlePlanDeleted = useCallback(async () => {
+    await loadPlans();
+  }, [loadPlans]);
 
   // Load plans on mount and when project changes
   useEffect(() => {
     loadPlans();
-  }, [project.id]);
+  }, [project.id, loadPlans]);
 
   // Handle restricted views
   useEffect(() => {
@@ -612,14 +622,23 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     setResourceType('plan');
   };
 
-  // Handler to go back from resource view
-  const handleBackFromResourceView = () => {
+  // Handler to go back from resource view - wrapped in useCallback for stable reference
+  const handleBackFromResourceView = useCallback(() => {
+    // Store resourceType before clearing it
+    const wasViewingPlan = resourceType === 'plan';
+
+    // If returning from a plan view, set activeView to 'plans' to show PlansTabContent
+    if (wasViewingPlan) {
+      setActiveView('plans');
+      // Fallback refresh: reload plans when returning from plan view
+      // This ensures the list is updated even if onPlanDeleted callback wasn't triggered
+      loadPlans();
+    }
+
     setViewingResource(null);
     setResourceContent(null);
     setResourceType(null);
-    // When returning from resource view, we might need to reset activeView?
-    // No, keep current active view
-  };
+  }, [resourceType, loadPlans]);
 
   // Find matching Project for Header (use dbProject if available, otherwise find from allProjects)
   const currentProjectForHeader = useMemo(() => {
@@ -740,6 +759,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     // For plans, we allow empty content (they load their own data)
     // For other resources, require content
     if (resourceType === 'plan' || resourceContent) {
+      // Provide onPlanDeleted callback for plan views to ensure list is refreshed after deletion
+      const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
       return (
         <ResourceViewPage
           resource={viewingResource}
@@ -747,6 +768,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
           resourceType={resourceType}
           viewMode={viewMode}
           onBack={handleBackFromResourceView}
+          onPlanDeleted={planDeletedCallback}
         />
       );
     }

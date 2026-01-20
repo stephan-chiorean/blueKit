@@ -20,6 +20,7 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
 import { useNotepad } from '../contexts/NotepadContext';
 import { useTimer } from '../contexts/TimerContext';
+import { useQuickTaskPopover } from '../contexts/QuickTaskPopoverContext';
 import TimerPopover from './shared/TimerPopover';
 import SignInPopover from './shared/SignInPopover';
 import { FaMoon, FaSun } from "react-icons/fa";
@@ -37,6 +38,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const { isPinned, elapsedTime, formatTime } = useTimer();
+  const { isOpen: isPopoverOpen, setOpen: setPopoverOpen, popoverOptions, closePopover } = useQuickTaskPopover();
 
 
   // Glass styling for light/dark mode
@@ -184,6 +186,16 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           <QuickTaskPopover
             currentProject={currentProject}
             onNavigateToTasks={onNavigateToTasks}
+            open={isPopoverOpen}
+            onOpenChange={(e) => {
+              setPopoverOpen(e.open);
+              if (!e.open) {
+                closePopover();
+              }
+            }}
+            defaultView={popoverOptions.defaultView}
+            defaultProjectId={popoverOptions.defaultProjectId}
+            onTaskCreated={popoverOptions.onTaskCreated}
           />
 
           <TimerPopover />

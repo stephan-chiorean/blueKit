@@ -23,9 +23,10 @@ interface ResourceViewPageProps {
   resourceType: ResourceType;
   viewMode?: ResourceViewMode;
   onBack: () => void;
+  onPlanDeleted?: () => void | Promise<void>;
 }
 
-export default function ResourceViewPage({ resource, resourceContent, resourceType, viewMode, onBack }: ResourceViewPageProps) {
+export default function ResourceViewPage({ resource, resourceContent, resourceType, viewMode, onBack, onPlanDeleted }: ResourceViewPageProps) {
   const { setSelectedResource, clearSelectedResource } = useResource();
   const hasInitialized = useRef(false);
   const resourcePathRef = useRef<string | null>(null);
@@ -130,7 +131,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
           overflow="hidden"
           bg="transparent"
         >
-          <PlanWorkspace plan={resource} onBack={onBack} />
+          <PlanWorkspace plan={resource} onBack={onBack} onPlanDeleted={onPlanDeleted} />
         </Box>
       </VStack>
     );

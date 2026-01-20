@@ -35,7 +35,7 @@ interface PlanOverviewPanelProps {
     selectedDocumentId?: string;
     onSelectDocument?: (document: PlanDocument) => void;
     onBack?: () => void;
-    onPlanDeleted?: () => void;
+    onPlanDeleted?: () => void | Promise<void>;
     onUpdate: () => void;
 }
 
@@ -298,10 +298,12 @@ export default function PlanOverviewPanel({
     };
 
     // Handle plan deletion
-    const handlePlanDeleted = () => {
+    const handlePlanDeleted = async () => {
+        // Notify parent to refresh the plans list
         if (onPlanDeleted) {
-            onPlanDeleted();
+            await onPlanDeleted();
         }
+        // Navigate back after deletion
         if (onBack) {
             onBack();
         }
@@ -504,7 +506,6 @@ export default function PlanOverviewPanel({
                         <PlanDocumentList
                             key={`documents-${planDetails.id}`}
                             documents={planDetails.documents}
-                            phases={planDetails.phases}
                             selectedDocumentId={selectedDocumentId}
                             onSelectDocument={handleSelectDocument}
                             onDocumentDeleted={onUpdate}

@@ -3,7 +3,7 @@ id: github-auth-flow-and-integration
 alias: GitHub Authentication Flow and Integration Architecture
 type: walkthrough
 is_base: false
-version: 2
+version: 1
 tags:
   - github
   - authentication
@@ -11,92 +11,6 @@ tags:
 description: Complete end-to-end documentation of the current GitHub OAuth authentication flow (Authorization Code Flow with PKCE) and how it expands into Library publishing, git operations, and team collaboration
 complexity: comprehensive
 format: architecture
-author: BlueKit Team
-lastReviewed: "2025-01-19"
-
-sections:
-  - id: overview
-    title: "Overview"
-    summary: "What this walkthrough covers and the current state of GitHub integration in BlueKit."
-    icon: "🎯"
-    type: overview
-    estimatedMinutes: 2
-
-  - id: architecture-overview
-    title: "Architecture Overview"
-    summary: "High-level system diagram showing how React, Tauri, and external services connect."
-    icon: "🏗️"
-    type: reference
-    estimatedMinutes: 1
-
-  - id: part-1-current-authentication-flow
-    title: "Part 1: Current Authentication Flow"
-    summary: "Deep dive into Authorization Code Flow with PKCE, component architecture, security measures, and complete data flow."
-    icon: "🔐"
-    type: deep-dive
-    estimatedMinutes: 10
-    collapsed: true
-
-  - id: part-2-github-api-integration
-    title: "Part 2: GitHub API Integration"
-    summary: "API client architecture, token injection points, and available operations for user and repository management."
-    icon: "📡"
-    type: deep-dive
-    estimatedMinutes: 4
-    collapsed: true
-
-  - id: part-3-library-workspace-system
-    title: "Part 3: Library Workspace System"
-    summary: "Current workspace implementation, data models, and the planned publishing flow for kits and artifacts."
-    icon: "📚"
-    type: deep-dive
-    estimatedMinutes: 5
-    collapsed: true
-
-  - id: part-4-planned-expansions
-    title: "Part 4: Planned Expansions"
-    summary: "Roadmap including commit viewer, repository creator, git operations, and team collaboration features."
-    icon: "🚀"
-    type: reference
-    estimatedMinutes: 3
-    collapsed: true
-
-  - id: part-5-implementation-phases
-    title: "Part 5: Implementation Phases"
-    summary: "Six-phase rollout from foundation through team features, with current progress status."
-    icon: "📋"
-    type: reference
-    estimatedMinutes: 2
-    collapsed: true
-
-  - id: part-6-security-considerations
-    title: "Part 6: Security Considerations"
-    summary: "Token security, API security, and git operation security measures—all the ways we keep your data safe."
-    icon: "🛡️"
-    type: callout
-    estimatedMinutes: 2
-    collapsed: true
-
-  - id: part-7-error-handling
-    title: "Part 7: Error Handling"
-    summary: "How authentication, API, and git errors are gracefully handled with user-friendly recovery paths."
-    icon: "⚠️"
-    type: reference
-    estimatedMinutes: 2
-    collapsed: true
-
-  - id: conclusion
-    title: "Conclusion"
-    summary: "Key takeaways and the architectural principles that make this system work."
-    icon: "✨"
-    type: summary
-    estimatedMinutes: 1
-
-reading:
-  showProgress: true
-  showOutline: true
-  expandAllByDefault: false
-  highlightCurrentSection: true
 ---
 
 # GitHub Authentication Flow and Integration Architecture

@@ -15,7 +15,8 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import {
   LuMenu,
   LuUsers,
-  LuLockKeyhole,
+  LuLayoutGrid,
+  LuCircleHelp,
   LuSettings,
 } from 'react-icons/lu';
 
@@ -33,15 +34,21 @@ interface NavCard {
 const navCards: NavCard[] = [
   {
     id: 'community',
-    label: 'Community',
-    description: 'Discover published artifacts, connect with builders, and share your work',
+    label: 'Invite your team',
+    description: 'Invite your team and unlock collaborative workflows like shared plans, tasks, and notes',
     icon: LuUsers,
   },
   {
-    id: 'vault',
-    label: 'Vault',
-    description: 'Your personal workspace — notebook, toolkit (kits, walkthroughs, agents), and more',
-    icon: LuLockKeyhole,
+    id: 'gallery',
+    label: 'Gallery',
+    description: 'Sponsored and community resources (kits, walkthroughs, skills) you can ingest into vaults and projects',
+    icon: LuLayoutGrid,
+  },
+  {
+    id: 'help',
+    label: 'Help',
+    description: 'Documentation, guides, and support for getting the most out of BlueKit',
+    icon: LuCircleHelp,
   },
   {
     id: 'settings',

@@ -20,7 +20,7 @@ const MotionBox = motion.create(Box);
 interface DeletePlanDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onDeleted: () => void;
+    onDeleted?: () => void | Promise<void>;
     planId: string;
     planName: string;
     folderPath: string;
@@ -45,7 +45,9 @@ export default function DeletePlanDialog({
                 title: 'Plan deleted',
                 description: `"${planName}" and its folder have been removed`,
             });
-            onDeleted();
+            if (onDeleted) {
+                await onDeleted();
+            }
             onClose();
         } catch (error) {
             console.error('Failed to delete plan:', error);

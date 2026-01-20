@@ -6,6 +6,8 @@
 
 **Toolkit** - A section within your Vault containing structured, reusable building blocks. Accessed via submenu: Kits, Walkthroughs, Agents, Skills. All items have YAML front matter. Exposed via MCP for AI integration.
 
+**Gallery** - A curated (sponsored + community) collection of resources like kits, walkthroughs, and skills that can be ingested into vaults and projects.
+
 **Project** - A git repository with a `.bluekit/` directory. Shared with teammates via git push/pull. Has its own notebook, kits, plans, etc.
 
 ---

@@ -50,14 +50,36 @@ type PopoverView = 'list' | 'create' | 'edit';
 interface QuickTaskPopoverProps {
     currentProject?: Project;
     onNavigateToTasks?: () => void;
+    // External control props
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    defaultView?: PopoverView;
+    defaultProjectId?: string;
+    onTaskCreated?: () => void;
+    trigger?: React.ReactNode;
 }
 
 export default function QuickTaskPopover({
     currentProject,
     onNavigateToTasks,
+    open: controlledOpen,
+    onOpenChange,
+    defaultView = 'list',
+    defaultProjectId,
+    onTaskCreated,
+    trigger,
 }: QuickTaskPopoverProps) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<PopoverView>('list');
+    const [internalOpen, setInternalOpen] = useState(false);
+    const isControlled = controlledOpen !== undefined;
+    const isOpen = isControlled ? controlledOpen : internalOpen;
+    const setIsOpen = (open: boolean) => {
+        if (isControlled) {
+            onOpenChange?.(open);
+        } else {
+            setInternalOpen(open);
+        }
+    };
+    const [currentView, setCurrentView] = useState<PopoverView>(defaultView);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -163,8 +185,23 @@ export default function QuickTaskPopover({
     useEffect(() => {
         if (isOpen) {
             loadData();
+            // Reset to default view when opening
+            setCurrentView(defaultView);
+            // Reset form with latest defaultProjectId
+            setTitle('');
+            setDescription('');
+            setPriority('standard');
+            setStatus('backlog');
+            const initialProjectIds = defaultProjectId
+                ? [defaultProjectId]
+                : currentProject
+                ? [currentProject.id]
+                : [];
+            setSelectedProjectIds(initialProjectIds);
+            setShowMoreOptions(false);
+            setEditingTask(null);
         }
-    }, [isOpen]);
+    }, [isOpen, defaultView, defaultProjectId, currentProject]);
 
     // Focus title input when entering create/edit view
     useEffect(() => {
@@ -179,7 +216,13 @@ export default function QuickTaskPopover({
         setDescription('');
         setPriority('standard');
         setStatus('backlog');
-        setSelectedProjectIds(currentProject ? [currentProject.id] : []);
+        // Prefer defaultProjectId, then currentProject, then empty
+        const initialProjectIds = defaultProjectId
+            ? [defaultProjectId]
+            : currentProject
+            ? [currentProject.id]
+            : [];
+        setSelectedProjectIds(initialProjectIds);
         setShowMoreOptions(false);
         setEditingTask(null);
     };
@@ -232,6 +275,11 @@ export default function QuickTaskPopover({
             });
 
             await loadData();
+            
+            // Call the callback if provided
+            if (onTaskCreated) {
+                onTaskCreated();
+            }
 
             if (addAnother) {
                 setTitle('');
@@ -425,42 +473,48 @@ export default function QuickTaskPopover({
                     }
                 }}
             >
-                <Popover.Trigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        position="relative"
-                        _hover={{ bg: 'transparent' }}
-                        _active={{ bg: 'transparent' }}
-                        data-state={isOpen ? 'open' : 'closed'}
-                        css={{
-                            '&[data-state="open"]': {
-                                backgroundColor: 'transparent',
-                            },
-                        }}
-                    >
-                        <LuListTodo />
-                        {inProgressCount > 0 && (
-                            <Badge
-                                position="absolute"
-                                top="-4px"
-                                right="-4px"
-                                colorPalette="blue"
-                                size="xs"
-                                borderRadius="full"
-                                px={1.5}
-                                fontSize="10px"
-                                minW="18px"
-                                h="18px"
-                                display="flex"
-                                alignItems="center"
-                                justifyContent="center"
-                            >
-                                {inProgressCount}
-                            </Badge>
-                        )}
-                    </Button>
-                </Popover.Trigger>
+                {trigger ? (
+                    <Popover.Trigger asChild>
+                        {trigger}
+                    </Popover.Trigger>
+                ) : (
+                    <Popover.Trigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            position="relative"
+                            _hover={{ bg: 'transparent' }}
+                            _active={{ bg: 'transparent' }}
+                            data-state={isOpen ? 'open' : 'closed'}
+                            css={{
+                                '&[data-state="open"]': {
+                                    backgroundColor: 'transparent',
+                                },
+                            }}
+                        >
+                            <LuListTodo />
+                            {inProgressCount > 0 && (
+                                <Badge
+                                    position="absolute"
+                                    top="-4px"
+                                    right="-4px"
+                                    colorPalette="blue"
+                                    size="xs"
+                                    borderRadius="full"
+                                    px={1.5}
+                                    fontSize="10px"
+                                    minW="18px"
+                                    h="18px"
+                                    display="flex"
+                                    alignItems="center"
+                                    justifyContent="center"
+                                >
+                                    {inProgressCount}
+                                </Badge>
+                            )}
+                        </Button>
+                    </Popover.Trigger>
+                )}
 
                 <Portal>
                     <Popover.Positioner>

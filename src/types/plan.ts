@@ -44,7 +44,6 @@ export interface PlanMilestone {
 export interface PlanDocument {
   id: string;
   planId: string;
-  phaseId?: string;
   filePath: string;
   fileName: string;
   createdAt: number;

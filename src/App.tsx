@@ -14,6 +14,7 @@ import { TimerProvider } from './contexts/TimerContext';
 import { LibraryCacheProvider } from './contexts/LibraryCacheContext';
 import { WorkstationProvider } from './contexts/WorkstationContext';
 import { ProjectArtifactsProvider } from './contexts/ProjectArtifactsContext';
+import { QuickTaskPopoverProvider } from './contexts/QuickTaskPopoverContext';
 import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
 import { Project } from './ipc';
 
@@ -163,9 +164,11 @@ function App() {
     <GitHubAuthProvider>
       <NotepadProvider>
         <TimerProvider>
-          <WorkstationProvider>
-            <AppContent />
-          </WorkstationProvider>
+          <QuickTaskPopoverProvider>
+            <WorkstationProvider>
+              <AppContent />
+            </WorkstationProvider>
+          </QuickTaskPopoverProvider>
         </TimerProvider>
       </NotepadProvider>
     </GitHubAuthProvider>

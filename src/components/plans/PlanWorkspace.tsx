@@ -11,7 +11,7 @@ import PlanDocViewPage from './PlanDocViewPage';
 interface PlanWorkspaceProps {
     plan: ResourceFile;
     onBack?: () => void;
-    onPlanDeleted?: () => void;
+    onPlanDeleted?: () => void | Promise<void>;
 }
 
 // Sidebar drag UX constants - matching ProjectDetailPage
@@ -328,6 +328,7 @@ export default function PlanWorkspace({ plan, onBack, onPlanDeleted }: PlanWorks
                             <PlanDocViewPage
                                 documents={sortedDocuments}
                                 currentIndex={selectedDocIndex}
+                                planId={planId}
                                 onNavigate={handleDocNavigate}
                             />
                         )}
