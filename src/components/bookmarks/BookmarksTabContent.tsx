@@ -8,8 +8,11 @@ import {
     VStack,
     Menu,
     Portal,
+    Badge,
 } from '@chakra-ui/react';
-import { LuBookmark, LuFolder, LuChevronDown, LuChevronRight, LuTrash2 } from 'react-icons/lu';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LuFolder, LuChevronDown, LuChevronRight, LuTrash2 } from 'react-icons/lu';
+import { FaBookmark } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { BsDiagram2 } from 'react-icons/bs';
 import { listen } from '@tauri-apps/api/event';
@@ -32,6 +35,7 @@ export default function BookmarksTabContent({
     const [bookmarks, setBookmarks] = useState<BookmarksData>({ items: [] });
     const [bookmarksLoading, setBookmarksLoading] = useState(true);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+    const [selectedBookmark, setSelectedBookmark] = useState<string | null>(null);
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
         x: number;
@@ -124,6 +128,7 @@ export default function BookmarksTabContent({
 
     // Handle bookmark click - convert to FileTreeNode
     const handleBookmarkClick = (bookmark: BookmarkFile) => {
+        setSelectedBookmark(bookmark.path);
         const pathParts = bookmark.path.split(/[/\\]/);
         const filename = pathParts[pathParts.length - 1] || bookmark.title;
 
@@ -193,14 +198,21 @@ export default function BookmarksTabContent({
 
     return (
         <Box w="100%" h="100%" p={6} overflow="auto">
-            <Flex align="center" justify="space-between" mb={6} py={2}>
-                <HStack gap={3}>
-                    <Icon as={LuBookmark} boxSize={6} color="blue.500" />
-                    <VStack align="start" gap={0}>
-                        <Text fontSize="xl" fontWeight="bold">Bookmarks</Text>
-                        <Text fontSize="sm" color="gray.500">
-                            {bookmarksLoading ? 'Loading...' : `${totalBookmarks} bookmarked file${totalBookmarks !== 1 ? 's' : ''}`}
-                        </Text>
+            <Flex align="center" justify="space-between" mb={8} py={3}>
+                <HStack gap={4}>
+                    <Icon as={FaBookmark} boxSize={7} color="orange.400" />
+                    <VStack align="start" gap={1}>
+                        <Text fontSize="2xl" fontWeight="bold">Bookmarks</Text>
+                        <HStack gap={2}>
+                            <Text fontSize="sm" color="gray.500">
+                                {bookmarksLoading ? 'Loading...' : `${totalBookmarks} bookmarked file${totalBookmarks !== 1 ? 's' : ''}`}
+                            </Text>
+                            {!bookmarksLoading && totalBookmarks > 0 && (
+                                <Badge size="sm" colorPalette="orange" variant="subtle" borderRadius="full">
+                                    {totalBookmarks}
+                                </Badge>
+                            )}
+                        </HStack>
                     </VStack>
                 </HStack>
             </Flex>
@@ -210,20 +222,21 @@ export default function BookmarksTabContent({
                     direction="column"
                     align="center"
                     justify="center"
-                    h="300px"
-                    color="gray.500"
-                    gap={4}
+                    h="400px"
+                    gap={5}
                 >
-                    <Icon as={LuBookmark} boxSize={12} opacity={0.5} />
-                    <VStack gap={1}>
-                        <Text fontSize="lg" fontWeight="medium">No bookmarks yet</Text>
-                        <Text fontSize="sm" color="gray.400">
+                    <Icon as={FaBookmark} boxSize={16} color="orange.400" opacity={0.6} />
+                    <VStack gap={2}>
+                        <Text fontSize="lg" fontWeight="semibold" color="gray.700" _dark={{ color: 'gray.300' }}>
+                            No bookmarks yet
+                        </Text>
+                        <Text fontSize="sm" color="gray.500" textAlign="center" maxW="300px">
                             Right-click a file in the Notebook to add it to your bookmarks
                         </Text>
                     </VStack>
                 </Flex>
             ) : (
-                <Box mt={6}>
+                <Box mt={4}>
                     <BookmarkList
                         items={bookmarks.items}
                         expandedGroups={expandedGroups}
@@ -232,6 +245,7 @@ export default function BookmarksTabContent({
                         onContextMenu={handleContextMenu}
                         colorMode={colorMode}
                         level={0}
+                        selectedBookmark={selectedBookmark}
                     />
                 </Box>
             )}
@@ -242,19 +256,19 @@ export default function BookmarksTabContent({
                     <Menu.Root open={contextMenu.isOpen} onOpenChange={({ open }) => !open && closeContextMenu()}>
                         <Menu.Positioner>
                             <Menu.Content
-                                minW="180px"
+                                minW="200px"
                                 borderWidth="1px"
                                 borderRadius="lg"
                                 css={{
-                                    background: 'rgba(255, 255, 255, 0.65)',
+                                    background: 'rgba(255, 255, 255, 0.7)',
                                     backdropFilter: 'blur(20px) saturate(180%)',
                                     WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                                    borderColor: 'rgba(0, 0, 0, 0.08)',
-                                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
+                                    borderColor: 'rgba(251, 146, 60, 0.2)',
+                                    boxShadow: '0 4px 16px 0 rgba(251, 146, 60, 0.15)',
                                     _dark: {
-                                        background: 'rgba(20, 20, 25, 0.8)',
-                                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                                        background: 'rgba(20, 20, 25, 0.85)',
+                                        borderColor: 'rgba(251, 146, 60, 0.3)',
+                                        boxShadow: '0 4px 16px 0 rgba(251, 146, 60, 0.2)',
                                     },
                                 }}
                                 style={{
@@ -263,9 +277,22 @@ export default function BookmarksTabContent({
                                     top: `${contextMenu.y}px`,
                                 }}
                             >
-                                <Menu.Item value="remove" onSelect={handleRemoveBookmark}>
+                                <Menu.Item 
+                                    value="remove" 
+                                    onSelect={handleRemoveBookmark}
+                                    css={{
+                                        _hover: {
+                                            bg: 'rgba(251, 146, 60, 0.1)',
+                                        },
+                                        _dark: {
+                                            _hover: {
+                                                bg: 'rgba(251, 146, 60, 0.15)',
+                                            },
+                                        },
+                                    }}
+                                >
                                     <HStack gap={2} width="100%">
-                                        <Icon>
+                                        <Icon color="orange.500">
                                             <LuTrash2 />
                                         </Icon>
                                         <Text fontSize="sm">Remove from Bookmarks</Text>
@@ -289,6 +316,7 @@ interface BookmarkListProps {
     onContextMenu: (e: React.MouseEvent, bookmark: BookmarkFile) => void;
     colorMode: string;
     level: number;
+    selectedBookmark?: string | null;
 }
 
 function BookmarkList({
@@ -299,9 +327,10 @@ function BookmarkList({
     onContextMenu,
     colorMode,
     level,
+    selectedBookmark,
 }: BookmarkListProps) {
     return (
-        <VStack align="stretch" gap={1} pl={level > 0 ? 6 : 0}>
+        <VStack align="stretch" gap={2} pl={level > 0 ? 8 : 0}>
             {items.map((item, index) => {
                 if (item.type === 'file') {
                     return (
@@ -311,6 +340,7 @@ function BookmarkList({
                             onClick={() => onBookmarkClick(item)}
                             onContextMenu={(e) => onContextMenu(e, item)}
                             colorMode={colorMode}
+                            isSelected={selectedBookmark === item.path}
                         />
                     );
                 } else {
@@ -326,6 +356,7 @@ function BookmarkList({
                             onContextMenu={onContextMenu}
                             colorMode={colorMode}
                             level={level}
+                            selectedBookmark={selectedBookmark}
                         />
                     );
                 }
@@ -334,12 +365,15 @@ function BookmarkList({
     );
 }
 
+const MotionBox = motion.create(Box);
+
 // File bookmark item
 interface BookmarkFileItemProps {
     bookmark: BookmarkFile;
     onClick: () => void;
     onContextMenu: (e: React.MouseEvent) => void;
     colorMode: string;
+    isSelected?: boolean;
 }
 
 function BookmarkFileItem({
@@ -347,6 +381,7 @@ function BookmarkFileItem({
     onClick,
     onContextMenu,
     colorMode,
+    isSelected = false,
 }: BookmarkFileItemProps) {
     // Determine icon based on file extension
     const getIcon = () => {
@@ -356,39 +391,69 @@ function BookmarkFileItem({
         return AiOutlineFileText;
     };
 
-    const hoverBg = colorMode === 'light' ? 'gray.50' : 'whiteAlpha.100';
-    const borderColor = colorMode === 'light' ? 'gray.200' : 'whiteAlpha.200';
+    const hoverBg = colorMode === 'light' ? 'orange.50' : 'rgba(154, 52, 18, 0.2)';
+    const selectedBg = colorMode === 'light' ? 'orange.100' : 'rgba(154, 52, 18, 0.3)';
+    const borderColor = colorMode === 'light' 
+        ? (isSelected ? 'orange.400' : 'orange.200') 
+        : (isSelected ? 'orange.500' : 'rgba(251, 146, 60, 0.3)');
+    const hoverBorderColor = colorMode === 'light' ? 'orange.300' : 'rgba(251, 146, 60, 0.4)';
 
     return (
-        <HStack
-            py={3}
-            px={4}
-            cursor="pointer"
-            onClick={onClick}
-            onContextMenu={onContextMenu}
-            bg="transparent"
-            _hover={{ bg: hoverBg }}
-            borderRadius="lg"
-            borderWidth="1px"
-            borderColor={borderColor}
-            gap={3}
-            transition="all 0.15s"
+        <MotionBox
+            initial={false}
+            animate={{
+                scale: isSelected ? 1.02 : 1,
+            }}
+            transition={{ duration: 0.2 }}
         >
-            <Icon
-                as={getIcon()}
-                color="blue.500"
-                boxSize={5}
-                flexShrink={0}
-            />
-            <VStack align="start" gap={0} flex={1} overflow="hidden">
-                <Text fontSize="sm" fontWeight="medium" truncate w="100%">
-                    {bookmark.title}
-                </Text>
-                <Text fontSize="xs" color="gray.500" truncate w="100%">
-                    {bookmark.path}
-                </Text>
-            </VStack>
-        </HStack>
+            <HStack
+                py={3.5}
+                px={4}
+                cursor="pointer"
+                onClick={onClick}
+                onContextMenu={onContextMenu}
+                bg={isSelected ? selectedBg : 'transparent'}
+                _hover={{ 
+                    bg: isSelected ? selectedBg : hoverBg,
+                    borderColor: hoverBorderColor,
+                    transform: 'translateX(2px)',
+                }}
+                borderRadius="lg"
+                borderWidth={isSelected ? '2px' : '1px'}
+                borderColor={borderColor}
+                gap={3}
+                transition="all 0.2s ease-in-out"
+                position="relative"
+                boxShadow={isSelected 
+                    ? (colorMode === 'light' 
+                        ? '0 2px 8px rgba(251, 146, 60, 0.15)' 
+                        : '0 2px 8px rgba(251, 146, 60, 0.2)')
+                    : 'none'
+                }
+            >
+                <Icon
+                    as={getIcon()}
+                    color="orange.400"
+                    boxSize={5}
+                    flexShrink={0}
+                />
+                <VStack align="start" gap={0.5} flex={1} overflow="hidden">
+                    <Text fontSize="sm" fontWeight="semibold" truncate w="100%" color={isSelected ? 'orange.700' : 'inherit'} _dark={{ color: isSelected ? 'orange.300' : 'inherit' }}>
+                        {bookmark.title}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500" truncate w="100%">
+                        {bookmark.path}
+                    </Text>
+                </VStack>
+                <Icon
+                    as={FaBookmark}
+                    color="orange.400"
+                    boxSize={3.5}
+                    flexShrink={0}
+                    opacity={0.8}
+                />
+            </HStack>
+        </MotionBox>
     );
 }
 
@@ -403,6 +468,7 @@ interface BookmarkGroupItemProps {
     onContextMenu: (e: React.MouseEvent, bookmark: BookmarkFile) => void;
     colorMode: string;
     level: number;
+    selectedBookmark?: string | null;
 }
 
 function BookmarkGroupItem({
@@ -415,53 +481,97 @@ function BookmarkGroupItem({
     onContextMenu,
     colorMode,
     level,
+    selectedBookmark,
 }: BookmarkGroupItemProps) {
-    const hoverBg = colorMode === 'light' ? 'gray.50' : 'whiteAlpha.100';
-    const borderColor = colorMode === 'light' ? 'gray.200' : 'whiteAlpha.200';
+    const hoverBg = colorMode === 'light' ? 'orange.50' : 'rgba(154, 52, 18, 0.15)';
+    const borderColor = colorMode === 'light' ? 'orange.200' : 'rgba(251, 146, 60, 0.25)';
+    const hoverBorderColor = colorMode === 'light' ? 'orange.300' : 'rgba(251, 146, 60, 0.35)';
+    
+    // Count bookmarks in group recursively
+    const countBookmarksInGroup = (items: BookmarkItem[]): number => {
+        return items.reduce((count, item) => {
+            if (item.type === 'file') {
+                return count + 1;
+            } else {
+                return count + countBookmarksInGroup(item.items);
+            }
+        }, 0);
+    };
+    
+    const bookmarkCount = countBookmarksInGroup(group.items);
 
     return (
         <Box>
             <HStack
-                py={3}
+                py={3.5}
                 px={4}
                 cursor="pointer"
                 onClick={onToggle}
-                bg="transparent"
-                _hover={{ bg: hoverBg }}
+                bg={isExpanded ? (colorMode === 'light' ? 'orange.50' : 'rgba(154, 52, 18, 0.1)') : 'transparent'}
+                _hover={{ 
+                    bg: hoverBg,
+                    borderColor: hoverBorderColor,
+                }}
                 borderRadius="lg"
                 borderWidth="1px"
                 borderColor={borderColor}
                 gap={3}
-                transition="all 0.15s"
+                transition="all 0.2s ease-in-out"
+                position="relative"
             >
                 <Icon
                     as={isExpanded ? LuChevronDown : LuChevronRight}
-                    color="gray.500"
+                    color="orange.500"
                     boxSize={4}
                     flexShrink={0}
+                    transition="transform 0.2s"
+                    transform={isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
                 />
-                <Icon as={LuFolder} color="blue.400" boxSize={5} flexShrink={0} />
-                <Text fontSize="sm" fontWeight="medium" flex={1}>
+                <Icon as={LuFolder} color="orange.400" boxSize={5} flexShrink={0} />
+                <Text fontSize="sm" fontWeight="semibold" flex={1} color={isExpanded ? 'orange.700' : 'inherit'} _dark={{ color: isExpanded ? 'orange.300' : 'inherit' }}>
                     {group.title}
                 </Text>
-                <Text fontSize="xs" color="gray.500">
-                    {group.items.length} item{group.items.length !== 1 ? 's' : ''}
-                </Text>
+                <Badge 
+                    size="sm" 
+                    colorPalette="orange" 
+                    variant="subtle" 
+                    borderRadius="full"
+                    fontSize="xs"
+                >
+                    {bookmarkCount} {bookmarkCount === 1 ? 'item' : 'items'}
+                </Badge>
             </HStack>
 
-            {isExpanded && group.items.length > 0 && (
-                <Box mt={2}>
-                    <BookmarkList
-                        items={group.items}
-                        expandedGroups={expandedGroups}
-                        onToggleGroup={onToggleGroup}
-                        onBookmarkClick={onBookmarkClick}
-                        onContextMenu={onContextMenu}
-                        colorMode={colorMode}
-                        level={level + 1}
-                    />
-                </Box>
-            )}
+            <AnimatePresence initial={false}>
+                {isExpanded && group.items.length > 0 && (
+                    <MotionBox
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{
+                            height: { duration: 0.25, ease: [0.4, 0, 0.2, 1] },
+                            opacity: { duration: 0.2, delay: 0.05 }
+                        }}
+                        style={{ overflow: 'hidden' }}
+                        mt={2}
+                        ml={level > 0 ? 2 : 0}
+                        pl={level > 0 ? 4 : 0}
+                        borderLeftWidth={level > 0 ? '2px' : '0'}
+                        borderLeftColor={colorMode === 'light' ? 'orange.200' : 'rgba(251, 146, 60, 0.2)'}
+                    >
+                        <BookmarkList
+                            items={group.items}
+                            expandedGroups={expandedGroups}
+                            onToggleGroup={onToggleGroup}
+                            onBookmarkClick={onBookmarkClick}
+                            onContextMenu={onContextMenu}
+                            colorMode={colorMode}
+                            level={level + 1}
+                            selectedBookmark={selectedBookmark}
+                        />
+                    </MotionBox>
+                )}
+            </AnimatePresence>
         </Box>
     );
 }
