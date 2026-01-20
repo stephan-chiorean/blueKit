@@ -21,6 +21,38 @@ interface MermaidDiagramViewerProps {
   content: string;
 }
 
+/**
+ * Cleans up orphaned mermaid elements that may have escaped into document.body.
+ * Mermaid.js creates temporary elements for rendering, and when errors occur
+ * (especially module loading failures), these elements can get orphaned at the
+ * document root level instead of being contained within the React component.
+ */
+function cleanupOrphanedMermaidElements() {
+  // Find and remove orphaned mermaid SVGs in document body
+  // These are typically created with IDs starting with 'mermaid' or 'd' followed by numbers
+  const orphanedElements = document.querySelectorAll(
+    'body > svg[id^="mermaid"], body > svg[id^="d"], body > div[id^="dmermaid"], body > div[id^="d"]'
+  );
+
+  orphanedElements.forEach((el) => {
+    // Check if this looks like a mermaid element
+    const isMermaidElement =
+      el.id?.includes('mermaid') ||
+      el.classList?.contains('mermaid') ||
+      (el.tagName === 'SVG' && el.querySelector('.error-icon, .error-text')) ||
+      (el.innerHTML?.includes('Syntax error') || el.innerHTML?.includes('Parse error'));
+
+    if (isMermaidElement) {
+      console.warn('Removing orphaned mermaid element:', el.id || el.tagName);
+      el.remove();
+    }
+  });
+
+  // Also clean up any floating error elements that mermaid might create
+  const errorElements = document.querySelectorAll('body > div.mermaid-error, body > .error');
+  errorElements.forEach((el) => el.remove());
+}
+
 export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagramViewerProps) {
   const diagramRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,6 +64,7 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
 
   // Initialize Mermaid with dark theme (similar to ShikiCodeBlock always using github-dark)
   useEffect(() => {
@@ -45,6 +78,38 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
         arrowheadColor: '#4287f5',
       },
     });
+  }, []);
+
+  // Set up MutationObserver to catch and remove any mermaid elements that escape to body
+  useEffect(() => {
+    // Create observer to watch for mermaid elements being added to body
+    observerRef.current = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element && node.parentElement === document.body) {
+              const isMermaidElement =
+                (node.id?.includes('mermaid') || node.id?.match(/^d\d/)) &&
+                (node.tagName === 'SVG' || node.tagName === 'DIV');
+
+              if (isMermaidElement) {
+                console.warn('Caught escaping mermaid element, removing:', node.id);
+                node.remove();
+              }
+            }
+          });
+        }
+      }
+    });
+
+    // Observe body for direct children being added
+    observerRef.current.observe(document.body, { childList: true });
+
+    return () => {
+      observerRef.current?.disconnect();
+      // Cleanup any orphaned elements on unmount
+      cleanupOrphanedMermaidElements();
+    };
   }, []);
 
   // Color palette mapping for different subgraph types
@@ -552,9 +617,14 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
 
       // Clear any previous errors
       setRenderError(null);
-      
+
+      // Clean up any orphaned elements before rendering
+      cleanupOrphanedMermaidElements();
+
       // Render the diagram
       mermaid.render(id, mermaidCode).then((result) => {
+        // Clean up after successful render (in case mermaid left temp elements)
+        cleanupOrphanedMermaidElements();
         if (diagramRef.current) {
           diagramRef.current.innerHTML = result.svg;
           
@@ -739,12 +809,26 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
           mermaidCodeLength: mermaidCode.length,
           mermaidCodePreview: mermaidCode.substring(0, 200),
         });
-        
+
+        // CRITICAL: Clean up orphaned elements after error
+        // This is where mermaid often leaves elements at document.body
+        cleanupOrphanedMermaidElements();
+
+        // Also clean up after a short delay since mermaid may create elements asynchronously
+        setTimeout(cleanupOrphanedMermaidElements, 50);
+        setTimeout(cleanupOrphanedMermaidElements, 200);
+
         // Parse error message to extract useful information
         const errorMessage = error?.message || error?.toString() || 'Unknown error';
-        const parsed = parseMermaidError(errorMessage);
-        setRenderError(parsed);
-        
+
+        // Check for module loading failures (Vite dev server issues)
+        if (errorMessage.includes('module script failed') || errorMessage.includes('Failed to fetch')) {
+          setRenderError('Failed to load Mermaid diagram module. Try refreshing the page.');
+        } else {
+          const parsed = parseMermaidError(errorMessage);
+          setRenderError(parsed);
+        }
+
         if (diagramRef.current) {
           diagramRef.current.innerHTML = '';
         }
@@ -753,6 +837,8 @@ export default function MermaidDiagramViewer({ diagram, content }: MermaidDiagra
 
     return () => {
       clearTimeout(renderTimeout);
+      // Clean up on effect cleanup
+      cleanupOrphanedMermaidElements();
     };
   }, [content, diagram.path]);
 

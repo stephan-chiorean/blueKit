@@ -33,10 +33,43 @@ interface ResourceMarkdownContentProps {
 // Track if mermaid has been initialized to avoid multiple initializations
 let mermaidInitialized = false;
 
+/**
+ * Cleans up orphaned mermaid elements that may have escaped into document.body.
+ * Mermaid.js creates temporary elements for rendering, and when errors occur
+ * (especially module loading failures), these elements can get orphaned at the
+ * document root level instead of being contained within the React component.
+ */
+function cleanupOrphanedMermaidElements() {
+  // Find and remove orphaned mermaid SVGs in document body
+  // These are typically created with IDs starting with 'mermaid' or 'd' followed by numbers
+  const orphanedElements = document.querySelectorAll(
+    'body > svg[id^="mermaid"], body > svg[id^="d"], body > div[id^="dmermaid"], body > div[id^="d"]'
+  );
+
+  orphanedElements.forEach((el) => {
+    // Check if this looks like a mermaid element
+    const isMermaidElement =
+      el.id?.includes('mermaid') ||
+      el.classList?.contains('mermaid') ||
+      (el.tagName === 'SVG' && el.querySelector('.error-icon, .error-text')) ||
+      (el.innerHTML?.includes('Syntax error') || el.innerHTML?.includes('Parse error'));
+
+    if (isMermaidElement) {
+      console.warn('Removing orphaned mermaid element:', el.id || el.tagName);
+      el.remove();
+    }
+  });
+
+  // Also clean up any floating error elements that mermaid might create
+  const errorElements = document.querySelectorAll('body > div.mermaid-error, body > .error');
+  errorElements.forEach((el) => el.remove());
+}
+
 // Component to render mermaid diagrams inline in markdown
 function InlineMermaidDiagram({ code }: { code: string }) {
   const diagramRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
 
   // Initialize mermaid once globally
   useEffect(() => {
@@ -55,52 +88,110 @@ function InlineMermaidDiagram({ code }: { code: string }) {
     }
   }, []);
 
+  // Set up MutationObserver to catch and remove any mermaid elements that escape to body
+  useEffect(() => {
+    // Create observer to watch for mermaid elements being added to body
+    observerRef.current = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element && node.parentElement === document.body) {
+              const isMermaidElement =
+                (node.id?.includes('mermaid') || node.id?.match(/^d\d/)) &&
+                (node.tagName === 'SVG' || node.tagName === 'DIV');
+
+              if (isMermaidElement) {
+                console.warn('Caught escaping mermaid element, removing:', node.id);
+                node.remove();
+              }
+            }
+          });
+        }
+      }
+    });
+
+    // Observe body for direct children being added
+    observerRef.current.observe(document.body, { childList: true });
+
+    return () => {
+      observerRef.current?.disconnect();
+      // Cleanup any orphaned elements on unmount
+      cleanupOrphanedMermaidElements();
+    };
+  }, []);
+
   // Render the diagram
   useEffect(() => {
     if (!diagramRef.current || !code.trim()) {
       return;
     }
 
-    const renderTimeout = setTimeout(() => {
+    const renderTimeout = setTimeout(async () => {
       if (!diagramRef.current) return;
 
       // Clear previous content and errors
       diagramRef.current.innerHTML = '';
       setRenderError(null);
 
+      // Clean up any orphaned elements before rendering
+      cleanupOrphanedMermaidElements();
+
       const id = `mermaid-inline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      mermaid.render(id, code.trim())
-        .then((result) => {
-          if (diagramRef.current) {
-            diagramRef.current.innerHTML = result.svg;
+      try {
+        const result = await mermaid.render(id, code.trim());
 
-            // Check for errors in the rendered SVG immediately
-            const svg = diagramRef.current.querySelector('svg');
-            if (svg) {
-              const svgText = svg.textContent || '';
-              const hasError = /syntax\s+error|parse\s+error|error\s+in\s+text/i.test(svgText);
+        // Clean up after successful render (in case mermaid left temp elements)
+        cleanupOrphanedMermaidElements();
 
-              if (hasError) {
-                diagramRef.current.innerHTML = '';
-                setRenderError('Syntax error in Mermaid diagram');
-              }
+        if (diagramRef.current) {
+          diagramRef.current.innerHTML = result.svg;
+
+          // Check for errors in the rendered SVG immediately
+          const svg = diagramRef.current.querySelector('svg');
+          if (svg) {
+            const svgText = svg.textContent || '';
+            const hasError = /syntax\s+error|parse\s+error|error\s+in\s+text/i.test(svgText);
+
+            if (hasError) {
+              diagramRef.current.innerHTML = '';
+              setRenderError('Syntax error in Mermaid diagram');
             }
           }
-        })
-        .catch((error) => {
-          console.error('Error rendering mermaid diagram:', error);
-          if (diagramRef.current) {
-            diagramRef.current.innerHTML = '';
-          }
-          const errorMessage = error?.message || error?.toString() || 'Unknown error';
-          setRenderError(errorMessage.includes('syntax') || errorMessage.includes('parse')
-            ? 'Syntax error in Mermaid diagram'
-            : 'Error rendering Mermaid diagram');
-        });
+        }
+      } catch (error) {
+        console.error('Error rendering mermaid diagram:', error);
+
+        // CRITICAL: Clean up orphaned elements after error
+        // This is where mermaid often leaves elements at document.body
+        cleanupOrphanedMermaidElements();
+
+        // Also clean up after a short delay since mermaid may create elements asynchronously
+        setTimeout(cleanupOrphanedMermaidElements, 50);
+        setTimeout(cleanupOrphanedMermaidElements, 200);
+
+        if (diagramRef.current) {
+          diagramRef.current.innerHTML = '';
+        }
+
+        const errorMessage = (error as Error)?.message || String(error) || 'Unknown error';
+
+        // Check for module loading failures (Vite dev server issues)
+        if (errorMessage.includes('module script failed') || errorMessage.includes('Failed to fetch')) {
+          setRenderError('Failed to load Mermaid diagram module. Try refreshing the page.');
+        } else if (errorMessage.includes('syntax') || errorMessage.includes('parse')) {
+          setRenderError('Syntax error in Mermaid diagram');
+        } else {
+          setRenderError('Error rendering Mermaid diagram');
+        }
+      }
     }, 100);
 
-    return () => clearTimeout(renderTimeout);
+    return () => {
+      clearTimeout(renderTimeout);
+      // Clean up on effect cleanup
+      cleanupOrphanedMermaidElements();
+    };
   }, [code]);
 
   if (renderError) {
