@@ -43,6 +43,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_plan_documents_table(db).await?;
     create_plan_links_table(db).await?;
 
+    // Add order_index to plan_documents
+    add_plan_documents_order_index(db).await?;
+
     Ok(())
 }
 
@@ -516,6 +519,53 @@ async fn create_plan_documents_table(db: &DatabaseConnection) -> Result<(), DbEr
     .await?;
 
     info!("Plan documents table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn add_plan_documents_order_index(db: &DatabaseConnection) -> Result<(), DbErr> {
+    // Check if order_index column exists
+    let check_column_sql = r#"
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('plan_documents')
+        WHERE name='order_index'
+    "#;
+
+    let result = db.query_one(Statement::from_string(
+        db.get_database_backend(),
+        check_column_sql.to_string(),
+    )).await?;
+
+    let column_exists = if let Some(row) = result {
+        row.try_get::<i32>("", "count").unwrap_or(0) > 0
+    } else {
+        false
+    };
+
+    if !column_exists {
+        let add_column_sql = r#"
+            ALTER TABLE plan_documents ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            add_column_sql.to_string(),
+        )).await?;
+
+        // Create index for ordering
+        let index_sql = r#"
+            CREATE INDEX IF NOT EXISTS idx_plan_documents_order ON plan_documents(plan_id, order_index);
+        "#;
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            index_sql.to_string(),
+        )).await?;
+
+        info!("Added order_index to plan_documents table");
+    } else {
+        info!("order_index column already exists in plan_documents table");
+    }
 
     Ok(())
 }

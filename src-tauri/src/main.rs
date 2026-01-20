@@ -176,6 +176,7 @@ async fn main() {
             commands::toggle_milestone_completion, // Toggle milestone completion
             commands::get_plan_documents, // Get plan documents
             commands::link_document_to_phase, // Link document to phase
+            commands::reorder_plan_documents, // Reorder plan documents
             commands::watch_plan_folder, // Watch plan folder for changes
             commands::get_bookmarks, // Get bookmarks from .bluekit/bookmarks.json
             commands::save_bookmarks, // Save bookmarks to .bluekit/bookmarks.json

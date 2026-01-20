@@ -4757,6 +4757,18 @@ pub async fn link_document_to_phase(
         .map_err(|e| format!("Failed to link document to phase: {}", e))
 }
 
+/// Reorders plan documents
+#[tauri::command]
+pub async fn reorder_plan_documents(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    plan_id: String,
+    document_ids: Vec<String>,
+) -> Result<(), String> {
+    crate::db::plan_operations::reorder_plan_documents(db.inner(), plan_id, document_ids)
+        .await
+        .map_err(|e| format!("Failed to reorder documents: {}", e))
+}
+
 /// Watch plan folder for file changes
 #[tauri::command]
 pub async fn watch_plan_folder(

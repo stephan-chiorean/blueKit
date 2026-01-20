@@ -1,7 +1,8 @@
-# Phase 1: Supabase Auth Migration
+# Phase 2: Supabase Auth Migration
 
-**Status:** Ready to Implement
-**Goal:** Replace GitHub OAuth with Supabase Auth (multi-provider)
+**Status:** Planned (after Phase 1)
+**Goal:** Add Supabase Auth as the identity provider (multi-provider)
+**Prerequisite:** Phase 1 complete (GitHub OAuth refactored to integration)
 
 ---
 

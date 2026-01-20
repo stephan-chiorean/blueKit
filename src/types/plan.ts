@@ -48,6 +48,7 @@ export interface PlanDocument {
   fileName: string;
   createdAt: number;
   updatedAt: number;
+  orderIndex: number;
 }
 
 export interface PlanLink {

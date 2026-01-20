@@ -18,6 +18,8 @@ pub struct Model {
     pub created_at: i64,
     #[serde(rename = "updatedAt")]
     pub updated_at: i64,
+    #[serde(rename = "orderIndex")]
+    pub order_index: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

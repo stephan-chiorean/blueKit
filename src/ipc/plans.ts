@@ -247,6 +247,19 @@ export async function invokeGetPlanDocuments(planId: string): Promise<PlanDocume
 }
 
 /**
+ * Reorder plan documents
+ */
+export async function invokeReorderPlanDocuments(
+  planId: string,
+  documentIds: string[]
+): Promise<void> {
+  return await invokeWithTimeout<void>('reorder_plan_documents', {
+    planId,
+    documentIds,
+  });
+}
+
+/**
  * Watch plan folder for file changes
  */
 export async function invokeWatchPlanFolder(

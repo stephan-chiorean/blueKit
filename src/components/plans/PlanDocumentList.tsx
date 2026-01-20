@@ -9,7 +9,7 @@ import {
   IconButton,
   EmptyState,
 } from '@chakra-ui/react';
-import { LuFileText, LuTrash2 } from 'react-icons/lu';
+import { LuFileText, LuTrash2, LuGripVertical } from 'react-icons/lu';
 import { PlanDocument } from '../../types/plan';
 import { invokeReadFile } from '../../ipc';
 import { deleteResources } from '../../ipc/artifacts';
@@ -18,19 +18,155 @@ import { ResourceFile } from '../../types/resource';
 import { toaster } from '../ui/toaster';
 import { PlanDocumentContextMenu } from './PlanDocumentContextMenu';
 
+// DnD Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 interface PlanDocumentListProps {
   documents: PlanDocument[];
   selectedDocumentId?: string;
   onSelectDocument?: (document: PlanDocument) => void;
   onDocumentDeleted?: () => void;
+  onReorder?: (documents: PlanDocument[]) => void;
   hideHeader?: boolean;
 }
+
+// Sortable Item Component
+const SortableDocumentItem = ({
+  document,
+  isSelected,
+  isDeleting,
+  onClick,
+  onContextMenu,
+  onDelete,
+  onReorder
+}: {
+  document: PlanDocument;
+  isSelected: boolean;
+  isDeleting: boolean;
+  onClick: (doc: PlanDocument) => void;
+  onContextMenu: (e: React.MouseEvent, doc: PlanDocument) => void;
+  onDelete: (doc: PlanDocument) => void;
+  onReorder?: (documents: PlanDocument[]) => void;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: document.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+    opacity: isDragging ? 0.5 : (isDeleting ? 0.5 : 1),
+    position: 'relative' as const,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card.Root
+        variant="subtle"
+        borderWidth="1px"
+        borderColor={isSelected ? 'primary.500' : 'border.subtle'}
+        cursor="pointer"
+        onClick={() => onClick(document)}
+        onContextMenu={(e) => onContextMenu(e, document)}
+        transition="all 0.2s ease-in-out"
+        _hover={{
+          transform: 'translateY(-2px)',
+          shadow: 'sm',
+          '& .drag-handle': { opacity: 1 },
+        }}
+        role="group"
+      >
+        <CardBody>
+          <HStack justify="space-between" align="center" gap={3}>
+            {/* Drag Handle */}
+            {onReorder && (
+              <Icon
+                className="drag-handle"
+                color="text.tertiary"
+                cursor="grab"
+                opacity={0}
+                transition="opacity 0.2s"
+                {...attributes}
+                {...listeners}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LuGripVertical />
+              </Icon>
+            )}
+
+            <HStack gap={2} flex="1" minW={0}>
+              <Icon color="primary.500">
+                <LuFileText />
+              </Icon>
+              <VStack align="start" gap={1} flex="1" minW={0}>
+                <Text
+                  fontSize="sm"
+                  fontWeight="medium"
+                  lineClamp={1}
+                  title={document.fileName}
+                >
+                  {document.fileName}
+                </Text>
+              </VStack>
+            </HStack>
+
+            <IconButton
+              aria-label="Delete document"
+              variant="ghost"
+              size="xs"
+              colorPalette="red"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(document);
+              }}
+              disabled={isDeleting}
+              css={{
+                opacity: 0,
+                transition: 'opacity 0.2s ease-in-out',
+                '[role="group"]:hover &': {
+                  opacity: 1,
+                },
+              }}
+            >
+              <Icon>
+                <LuTrash2 />
+              </Icon>
+            </IconButton>
+          </HStack>
+        </CardBody>
+      </Card.Root>
+    </div>
+  );
+};
 
 const PlanDocumentList = memo(function PlanDocumentList({
   documents,
   selectedDocumentId,
   onSelectDocument,
   onDocumentDeleted,
+  onReorder,
   hideHeader = false,
 }: PlanDocumentListProps) {
   const { setSelectedResource } = useResource();
@@ -46,6 +182,24 @@ const PlanDocumentList = memo(function PlanDocumentList({
     y: 0,
     document: null,
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id && onReorder) {
+      const oldIndex = documents.findIndex((d) => d.id === active.id);
+      const newIndex = documents.findIndex((d) => d.id === over.id);
+      const newDocuments = arrayMove(documents, oldIndex, newIndex);
+      onReorder(newDocuments);
+    }
+  };
 
 
   // Handle document click - load in workstation
@@ -144,72 +298,29 @@ const PlanDocumentList = memo(function PlanDocumentList({
         </Text>
       )}
 
-      {documents.map((document) => {
-        const isSelected = selectedDocumentId === document.id;
-        const isDeleting = deletingDocument === document.id;
-
-        return (
-          <Card.Root
-            key={document.id}
-            variant="subtle"
-            borderWidth="1px"
-            borderColor={isSelected ? 'primary.500' : 'border.subtle'}
-            opacity={isDeleting ? 0.5 : 1}
-            cursor="pointer"
-            onClick={() => handleDocumentClick(document)}
-            onContextMenu={(e) => handleContextMenu(e, document)}
-            transition="all 0.2s ease-in-out"
-            _hover={{
-              transform: 'translateY(-2px)',
-              shadow: 'sm',
-            }}
-            role="group"
-          >
-            <CardBody>
-              <HStack justify="space-between" align="start" gap={3}>
-                <HStack gap={2} flex="1" minW={0}>
-                  <Icon color="primary.500">
-                    <LuFileText />
-                  </Icon>
-                  <VStack align="start" gap={1} flex="1" minW={0}>
-                    <Text
-                      fontSize="sm"
-                      fontWeight="medium"
-                      lineClamp={1}
-                      title={document.fileName}
-                    >
-                      {document.fileName}
-                    </Text>
-                  </VStack>
-                </HStack>
-
-                <IconButton
-                  aria-label="Delete document"
-                  variant="ghost"
-                  size="xs"
-                  colorPalette="red"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteDocument(document);
-                  }}
-                  disabled={isDeleting}
-                  css={{
-                    opacity: 0,
-                    transition: 'opacity 0.2s ease-in-out',
-                    '[role="group"]:hover &': {
-                      opacity: 1,
-                    },
-                  }}
-                >
-                  <Icon>
-                    <LuTrash2 />
-                  </Icon>
-                </IconButton>
-              </HStack>
-            </CardBody>
-          </Card.Root>
-        );
-      })}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={documents.map(d => d.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {documents.map((document) => (
+            <SortableDocumentItem
+              key={document.id}
+              document={document}
+              isSelected={selectedDocumentId === document.id}
+              isDeleting={deletingDocument === document.id}
+              onClick={handleDocumentClick}
+              onContextMenu={handleContextMenu}
+              onDelete={handleDeleteDocument}
+              onReorder={onReorder}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       <PlanDocumentContextMenu
         isOpen={contextMenu.isOpen}

@@ -1,31 +1,46 @@
 # Supabase Integration Plan
 
-**Last Updated:** 2026-01-19
+**Last Updated:** 2026-01-20
 
 ---
 
 ## Overview
 
-Supabase provides the identity backbone for BlueKit. Phase 1 focuses on auth migration. Future phases add Vault sync and collaboration.
+Supabase provides the identity backbone for BlueKit. Before migrating auth, we first refactor GitHub OAuth to its proper role. Future phases add Vault sync and collaboration.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     PHASE 1: IDENTITY                        │
+│               PHASE 1: GITHUB INTEGRATION REFACTOR           │
 │                      (Current Focus)                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Replace GitHub OAuth with Supabase Auth:                   │
-│  • Google sign-in                                           │
-│  • GitHub sign-in (for identity, not integration)           │
-│  • Email magic link                                         │
+│  Move GitHub OAuth from sign-in to optional integration:    │
+│  • Remove GitHub as identity provider                       │
+│  • Add "Connect GitHub" button to unlock features           │
+│  • Similar pattern to project-level git connection          │
 │                                                              │
-│  GitHub stays as optional integration for Timeline features │
+│  GitHub features (Timeline, etc) work after connection      │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     PHASE 2: VAULT SYNC                      │
+│                     PHASE 2: SUPABASE AUTH                   │
+│                        (Future)                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Replace temp auth with Supabase Auth:                      │
+│  • Google sign-in                                           │
+│  • GitHub sign-in (for identity, not integration)           │
+│  • Email magic link                                         │
+│                                                              │
+│  GitHub integration stays separate from identity            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     PHASE 3: VAULT SYNC                      │
 │                        (Future)                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
@@ -38,7 +53,7 @@ Supabase provides the identity backbone for BlueKit. Phase 1 focuses on auth mig
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   PHASE 3: COLLABORATION                     │
+│                   PHASE 4: COLLABORATION                     │
 │                        (Future)                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
@@ -53,7 +68,7 @@ Supabase provides the identity backbone for BlueKit. Phase 1 focuses on auth mig
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    PHASE 4: MARKETPLACE                      │
+│                    PHASE 5: MARKETPLACE                      │
 │                        (Future)                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
@@ -70,30 +85,31 @@ Supabase provides the identity backbone for BlueKit. Phase 1 focuses on auth mig
 
 | File | Purpose |
 |------|---------|
-| `auth-phase1.md` | **Implementation plan for Phase 1** |
+| `github-integration-phase1.md` | **Implementation plan for Phase 1** (current focus) |
+| `auth-phase2.md` | Implementation plan for Phase 2 (Supabase Auth) |
 | `archive/` | Reference docs for future phases |
 
 ---
 
-## Phase 1 Summary
+## Phase 1 Summary: GitHub Integration Refactor
 
-**Goal:** Replace GitHub-only auth with Supabase Auth (multi-provider)
+**Goal:** Move GitHub OAuth from sign-in identity to optional feature integration
 
 **What Changes:**
-- New: `SupabaseAuthContext` as primary identity
-- New: Sign-in screen with Google/GitHub/Email options
-- Demoted: `GitHubAuthProvider` becomes optional integration for Timeline
-- Removed: Keychain storage (Supabase handles tokens)
+- GitHub OAuth no longer required at sign-in
+- New: "Connect GitHub" button in header/settings to unlock features
+- Timeline, activity feed, etc. gated behind GitHub connection
+- Pattern mirrors project-level git connection (`ProjectsTabContent.tsx`)
 
 **What Stays:**
 - Local SQLite for projects, tasks, plans
 - File watchers, kit rendering, everything else
-- GitHub API for Timeline features (via integration, not identity)
+- All GitHub API features (just accessed differently)
 
-**Extensibility:**
-- User profiles table ready for Vault sync
-- `user_integrations` table for future integrations
-- RLS policies in place for when we add Vault tables
+**Why First?**
+- Separates identity from integration before Supabase migration
+- GitHub connection pattern needed for Phase 2 anyway
+- Reduces scope of Phase 2 (Supabase handles identity only)
 
 ---
 

@@ -135,10 +135,8 @@ export default function PlanWorkspace({ plan, onBack, onPlanDeleted }: PlanWorks
         loadPlanDetails(false);
     }, [loadPlanDetails]);
 
-    // Get documents sorted by filename
-    const sortedDocuments = useMemo(() => planDetails?.documents
-        ? [...planDetails.documents].sort((a, b) => a.fileName.localeCompare(b.fileName))
-        : [], [planDetails?.documents]);
+    // Get documents (already sorted by backend)
+    const sortedDocuments = useMemo(() => planDetails?.documents || [], [planDetails?.documents]);
 
     // Handle document selection from overview panel
     const handleDocumentSelect = useCallback((document: PlanDocument) => {

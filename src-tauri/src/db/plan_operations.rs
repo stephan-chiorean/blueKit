@@ -84,6 +84,8 @@ pub struct PlanDocumentDto {
     pub created_at: i64,
     #[serde(rename = "updatedAt")]
     pub updated_at: i64,
+    #[serde(rename = "orderIndex")]
+    pub order_index: i32,
 }
 
 /// Plan Link DTO
@@ -370,6 +372,7 @@ async fn get_plan_documents_internal(
         file_name: d.file_name,
         created_at: d.created_at,
         updated_at: d.updated_at,
+        order_index: d.order_index,
     }).collect())
 }
 
@@ -902,14 +905,21 @@ pub async fn get_plan_documents(
 
     let folder_path = Path::new(&plan_model.folder_path);
 
-    // Get existing documents from DB
+    // Get existing documents from DB sorted by order_index
     let existing_docs: Vec<plan_document::Model> = plan_document::Entity::find()
         .filter(plan_document::Column::PlanId.eq(&plan_id))
+        .order_by_asc(plan_document::Column::OrderIndex)
         .all(db)
         .await?;
 
     let mut existing_paths: std::collections::HashMap<String, plan_document::Model> =
-        existing_docs.into_iter().map(|d| (d.file_path.clone(), d)).collect();
+        existing_docs.iter().map(|d| (d.file_path.clone(), d.clone())).collect();
+
+    // Determine next order index
+    let mut next_order_index = existing_docs.iter()
+        .map(|d| d.order_index)
+        .max()
+        .unwrap_or(-1) + 1;
 
     // Scan folder for .md files
     let mut documents = Vec::new();
@@ -936,6 +946,7 @@ pub async fn get_plan_documents(
                         file_name: doc.file_name,
                         created_at: doc.created_at,
                         updated_at: doc.updated_at,
+                        order_index: doc.order_index,
                     });
                 } else {
                     // New file, create DB record
@@ -950,7 +961,10 @@ pub async fn get_plan_documents(
                         file_name: Set(file_name.clone()),
                         created_at: Set(now),
                         updated_at: Set(now),
+                        order_index: Set(next_order_index),
                     };
+
+                    next_order_index += 1;
 
                     let doc_model = doc_active.insert(db).await?;
 
@@ -962,6 +976,7 @@ pub async fn get_plan_documents(
                         file_name: doc_model.file_name,
                         created_at: doc_model.created_at,
                         updated_at: doc_model.updated_at,
+                        order_index: doc_model.order_index,
                     });
                 }
             }
@@ -972,6 +987,9 @@ pub async fn get_plan_documents(
     for (_, doc) in existing_paths {
         plan_document::Entity::delete_by_id(doc.id).exec(db).await?;
     }
+
+    // Sort documents by order_index just to be safe
+    documents.sort_by_key(|d| d.order_index);
 
     Ok(documents)
 }
@@ -994,6 +1012,34 @@ pub async fn link_document_to_phase(
     doc_active.updated_at = Set(now);
 
     doc_active.update(db).await?;
+
+    Ok(())
+}
+
+/// Reorder plan documents
+pub async fn reorder_plan_documents(
+    db: &DatabaseConnection,
+    plan_id: String,
+    document_ids_in_order: Vec<String>,
+) -> Result<(), DbErr> {
+    let now = Utc::now().timestamp();
+
+    for (index, doc_id) in document_ids_in_order.iter().enumerate() {
+        let doc_model = plan_document::Entity::find_by_id(doc_id)
+            .one(db)
+            .await?
+            .ok_or_else(|| DbErr::RecordNotFound(format!("Document not found: {}", doc_id)))?;
+
+        // Verify document belongs to this plan
+        if doc_model.plan_id != plan_id {
+            return Err(DbErr::Custom("Document does not belong to this plan".to_string()));
+        }
+
+        let mut doc_active: plan_document::ActiveModel = doc_model.into();
+        doc_active.order_index = Set(index as i32);
+        doc_active.updated_at = Set(now);
+        doc_active.update(db).await?;
+    }
 
     Ok(())
 }

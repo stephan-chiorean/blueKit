@@ -13,12 +13,13 @@ import {
     Badge,
     Progress,
     Box,
+    Center,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { listen } from '@tauri-apps/api/event';
 import { LuArrowLeft, LuCopy, LuCheck, LuTrash2, LuCircleCheck, LuPartyPopper, LuChevronDown, LuFileText, LuNotebook } from 'react-icons/lu';
 import { ResourceFile } from '../../types/resource';
-import { invokeWatchPlanFolder, invokeStopWatcher, invokeUpdatePlan, invokeGetPlanDocuments } from '../../ipc';
+import { invokeWatchPlanFolder, invokeStopWatcher, invokeUpdatePlan, invokeGetPlanDocuments, invokeReorderPlanDocuments } from '../../ipc';
 import { PlanDetails, PlanDocument } from '../../types/plan';
 import { toaster } from '../ui/toaster';
 import MilestoneTimeline from './MilestoneTimeline';
@@ -39,92 +40,6 @@ interface PlanOverviewPanelProps {
     onUpdate: () => void;
 }
 
-const CollapsibleCard = ({
-    title,
-    icon,
-    children,
-    headerContent,
-    defaultExpanded = true,
-}: {
-    title: React.ReactNode;
-    icon?: React.ReactNode;
-    children: React.ReactNode;
-    headerContent?: React.ReactNode;
-    defaultExpanded?: boolean;
-}) => {
-    const { colorMode } = useColorMode();
-    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-    const cardStyle = {
-        background: colorMode === 'light'
-            ? 'rgba(255, 255, 255, 0.65)'
-            : 'rgba(40, 40, 50, 0.5)',
-        backdropFilter: 'blur(24px) saturate(200%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(200%)',
-        borderWidth: '1px',
-        borderColor: colorMode === 'light'
-            ? 'rgba(255, 255, 255, 0.5)'
-            : 'rgba(255, 255, 255, 0.12)',
-        borderRadius: '16px',
-        boxShadow: colorMode === 'light'
-            ? '0 4px 16px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.5)'
-            : '0 4px 24px -8px rgba(0, 0, 0, 0.4)',
-        transition: 'all 0.2s ease',
-    };
-
-    return (
-        <Card.Root variant="subtle" css={cardStyle}>
-            <CardBody>
-                <VStack align="stretch" gap={0}>
-                    <Flex
-                        justify="space-between"
-                        align="center"
-                        cursor="pointer"
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        py={1}
-                    >
-                        <HStack gap={2}>
-                            <Icon
-                                boxSize={5}
-                                color="text.secondary"
-                                transform={isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
-                                transition="transform 0.2s ease"
-                            >
-                                <LuChevronDown />
-                            </Icon>
-                            {icon && (
-                                <Icon boxSize={4} color="text.secondary">
-                                    {icon}
-                                </Icon>
-                            )}
-                            <Box fontWeight="medium" fontSize="sm">
-                                {title}
-                            </Box>
-                        </HStack>
-                        <Box onClick={(e) => e.stopPropagation()}>
-                            {headerContent}
-                        </Box>
-                    </Flex>
-                    <AnimatePresence>
-                        {isExpanded && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.3, ease: "easeInOut" }}
-                                style={{ overflow: 'hidden' }}
-                            >
-                                <Box pt={4}>
-                                    {children}
-                                </Box>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </VStack>
-            </CardBody>
-        </Card.Root>
-    );
-};
 
 export default function PlanOverviewPanel({
     plan,
@@ -314,9 +229,13 @@ export default function PlanOverviewPanel({
         onSelectDocument?.(document);
     }, [onSelectDocument]);
 
+    // Unified Expand State - Default to expanded
+    const [isUnifiedExpanded, setIsUnifiedExpanded] = useState(true);
+
     // Background is now handled by parent Splitter.Panel in PlanWorkspace
     return (
         <VStack
+            className="plan-overview-scroll"
             h="100%"
             p={5}
             align="stretch"
@@ -386,173 +305,270 @@ export default function PlanOverviewPanel({
                 <Text color="red.500">Failed to load plan details</Text>
             ) : (
                 <>
-                    {/* Plan Metadata with Progress */}
-                    <CollapsibleCard
-                        title={planDetails.name}
-                        headerContent={
-                            <Badge
-                                size="md"
-                                variant="subtle"
-                                colorPalette={getStatusColorPalette(planDetails.status)}
-                            >
-                                {planDetails.status}
-                            </Badge>
-                        }
+                    <Card.Root
+                        variant="subtle"
+                        css={{
+                            background: colorMode === 'light'
+                                ? 'rgba(255, 255, 255, 0.65)'
+                                : 'rgba(40, 40, 50, 0.5)',
+                            backdropFilter: 'blur(24px) saturate(200%)',
+                            WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+                            borderWidth: '1px',
+                            borderColor: colorMode === 'light'
+                                ? 'rgba(255, 255, 255, 0.5)'
+                                : 'rgba(255, 255, 255, 0.12)',
+                            borderRadius: '16px',
+                            boxShadow: colorMode === 'light'
+                                ? '0 4px 16px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.5)'
+                                : '0 4px 24px -8px rgba(0, 0, 0, 0.4)',
+                            transition: 'all 0.2s ease',
+                        }}
                     >
-                        <VStack align="stretch" gap={4}>
-                            {planDetails.description && (
-                                <Text fontSize="sm" color="text.secondary">
-                                    {planDetails.description}
-                                </Text>
-                            )}
-
-                            {/* Progress Indicator */}
-                            <VStack align="stretch" gap={2}>
-                                <Flex justify="space-between" align="center">
-                                    <Text fontSize="sm" fontWeight="medium">
-                                        Progress
-                                    </Text>
-                                    <Text fontSize="sm" color="text.secondary" transition="all 0.3s ease-out">
-                                        {completedMilestones} / {totalMilestones} milestones
-                                    </Text>
-                                </Flex>
-                                <Progress.Root
-                                    value={progress}
-                                    size="sm"
-                                    colorPalette={progress >= 100 ? 'green' : 'primary'}
-                                    css={{
-                                        '& [data-part="range"]': {
-                                            transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important',
-                                            background: progress >= 100
-                                                ? 'linear-gradient(90deg, var(--chakra-colors-green-400), var(--chakra-colors-green-500))'
-                                                : 'linear-gradient(90deg, var(--chakra-colors-primary-400), var(--chakra-colors-primary-500))',
-                                        },
-                                        '& [data-part="track"]': {
-                                            overflow: 'hidden',
-                                            borderRadius: '999px',
-                                        },
-                                    }}
+                        <CardBody>
+                            <VStack
+                                align="stretch"
+                                gap={0}
+                            >
+                                {/* Collapsed Header Area */}
+                                <VStack
+                                    align="stretch"
+                                    gap={3}
+                                    cursor="pointer"
+                                    onClick={() => setIsUnifiedExpanded(!isUnifiedExpanded)}
+                                    py={1}
                                 >
-                                    <Progress.Track>
-                                        <Progress.Range />
-                                    </Progress.Track>
-                                </Progress.Root>
-                            </VStack>
+                                    <Flex justify="space-between" align="start">
+                                        <VStack align="start" gap={1} flex="1">
+                                            <Text fontWeight="semibold" fontSize="md">
+                                                {planDetails.name}
+                                            </Text>
 
-                            {/* Action Buttons */}
-                            <HStack gap={2} pt={1}>
-                                {planDetails.status !== 'completed' && (
-                                    <Button
-                                        colorPalette="green"
-                                        variant="subtle"
+                                            <Text fontSize="xs" color="text.secondary">
+                                                {completedMilestones} / {totalMilestones} milestones · {Math.round(progress)}%
+                                            </Text>
+                                        </VStack>
+                                        <Badge
+                                            size="md"
+                                            variant="subtle"
+                                            colorPalette={getStatusColorPalette(planDetails.status)}
+                                        >
+                                            {planDetails.status}
+                                        </Badge>
+                                    </Flex>
+
+                                    <Progress.Root
+                                        value={progress}
                                         size="sm"
-                                        onClick={handleCompletePlan}
-                                        loading={isCompleting}
-                                        loadingText="Completing..."
+                                        colorPalette={progress >= 100 ? 'green' : 'primary'}
                                         css={{
-                                            borderRadius: '10px',
-                                            transition: 'all 0.2s ease',
-                                            _hover: {
-                                                transform: 'scale(1.02)',
+                                            '& [data-part="range"]': {
+                                                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important',
+                                                background: progress >= 100
+                                                    ? 'linear-gradient(90deg, var(--chakra-colors-green-400), var(--chakra-colors-green-500))'
+                                                    : 'linear-gradient(90deg, var(--chakra-colors-primary-400), var(--chakra-colors-primary-500))',
+                                            },
+                                            '& [data-part="track"]': {
+                                                overflow: 'hidden',
+                                                borderRadius: '999px',
                                             },
                                         }}
                                     >
-                                        <HStack gap={2}>
-                                            <Icon>
-                                                <LuCircleCheck />
-                                            </Icon>
-                                            <Text>Complete</Text>
-                                        </HStack>
-                                    </Button>
-                                )}
-                                <Button
-                                    colorPalette="red"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setIsDeleteDialogOpen(true)}
-                                    css={{
-                                        borderRadius: '10px',
-                                    }}
-                                >
-                                    <HStack gap={2}>
-                                        <Icon>
-                                            <LuTrash2 />
+                                        <Progress.Track>
+                                            <Progress.Range />
+                                        </Progress.Track>
+                                    </Progress.Root>
+
+                                    <Center pt={1}>
+                                        <Icon
+                                            color="text.tertiary"
+                                            size="lg"
+                                            transform={isUnifiedExpanded ? 'rotate(180deg)' : 'rotate(0deg)'}
+                                            transition="transform 0.2s ease"
+                                        >
+                                            <LuChevronDown />
                                         </Icon>
-                                        <Text>Delete</Text>
+                                    </Center>
+                                </VStack>
+
+                                {/* Expanded Content */}
+                                <AnimatePresence>
+                                    {isUnifiedExpanded && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                                            style={{ overflow: 'hidden' }}
+                                        >
+                                            <VStack align="stretch" gap={6} pt={4}>
+                                                <Box h="1px" bg="border.subtle" />
+
+
+
+                                                {/* Action Buttons */}
+                                                <HStack gap={2}>
+                                                    {planDetails.status !== 'completed' && (
+                                                        <Button
+                                                            colorPalette="green"
+                                                            variant="subtle"
+                                                            size="sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleCompletePlan();
+                                                            }}
+                                                            loading={isCompleting}
+                                                            loadingText="Completing..."
+                                                            flex="1"
+                                                            css={{
+                                                                borderRadius: '10px',
+                                                            }}
+                                                        >
+                                                            <HStack gap={2}>
+                                                                <Icon>
+                                                                    <LuCircleCheck />
+                                                                </Icon>
+                                                                <Text>Complete</Text>
+                                                            </HStack>
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        colorPalette="red"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setIsDeleteDialogOpen(true);
+                                                        }}
+                                                        flex="1"
+                                                        css={{
+                                                            borderRadius: '10px',
+                                                        }}
+                                                    >
+                                                        <HStack gap={2}>
+                                                            <Icon>
+                                                                <LuTrash2 />
+                                                            </Icon>
+                                                            <Text>Delete</Text>
+                                                        </HStack>
+                                                    </Button>
+                                                </HStack>
+
+                                                {/* Milestones */}
+                                                <MilestoneTimeline
+                                                    key={`milestone-${planDetails.id}`}
+                                                    planId={planDetails.id}
+                                                    phases={planDetails.phases}
+                                                    onUpdate={onUpdate}
+                                                    embedded={true}
+                                                />
+
+                                                {/* Documents */}
+                                                <VStack align="stretch" gap={3}>
+                                                    <HStack gap={2} color="text.secondary">
+                                                        <Icon size="sm">
+                                                            <LuFileText />
+                                                        </Icon>
+                                                        <Text fontSize="sm" fontWeight="medium">
+                                                            Documents ({planDetails.documents.length})
+                                                        </Text>
+                                                    </HStack>
+                                                    <PlanDocumentList
+                                                        key={`documents-${planDetails.id}`}
+                                                        documents={planDetails.documents}
+                                                        selectedDocumentId={selectedDocumentId}
+                                                        onSelectDocument={handleSelectDocument}
+                                                        onDocumentDeleted={onUpdate}
+                                                        onReorder={async (reorderedDocs) => {
+                                                            try {
+                                                                const docIds = reorderedDocs.map(d => d.id);
+                                                                await invokeReorderPlanDocuments(planDetails.id, docIds);
+                                                                onUpdate();
+                                                            } catch (error) {
+                                                                console.error("Failed to reorder documents:", error);
+                                                                toaster.create({
+                                                                    type: 'error',
+                                                                    title: 'Failed to reorder documents',
+                                                                    description: String(error),
+                                                                });
+                                                            }
+                                                        }}
+                                                        hideHeader={true}
+                                                    />
+                                                </VStack>
+                                            </VStack>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </VStack>
+                        </CardBody>
+                    </Card.Root >
+
+                    <Card.Root
+                        variant="subtle"
+                        css={{
+                            background: colorMode === 'light'
+                                ? 'rgba(255, 255, 255, 0.65)'
+                                : 'rgba(40, 40, 50, 0.5)',
+                            backdropFilter: 'blur(24px) saturate(200%)',
+                            WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+                            borderWidth: '1px',
+                            borderColor: colorMode === 'light'
+                                ? 'rgba(255, 255, 255, 0.5)'
+                                : 'rgba(255, 255, 255, 0.12)',
+                            borderRadius: '16px',
+                            boxShadow: colorMode === 'light'
+                                ? '0 4px 16px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.5)'
+                                : '0 4px 24px -8px rgba(0, 0, 0, 0.4)',
+                            transition: 'all 0.2s ease',
+                        }}
+                    >
+                        <CardBody>
+                            <VStack align="stretch" gap={3}>
+                                <Flex justify="space-between" align="center">
+                                    <HStack gap={2} color="text.secondary">
+                                        <Icon size="sm">
+                                            <LuNotebook />
+                                        </Icon>
+                                        <Text fontSize="sm" fontWeight="medium">Notes</Text>
                                     </HStack>
-                                </Button>
-                            </HStack>
-                        </VStack>
-                    </CollapsibleCard>
-
-                    {/* Milestone Timeline */}
-                    <MilestoneTimeline
-                        key={`milestone-${planDetails.id}`}
-                        planId={planDetails.id}
-                        phases={planDetails.phases}
-                        onUpdate={onUpdate}
-                    />
-
-                    {/* Document List */}
-                    <CollapsibleCard
-                        title="Documents"
-                        icon={<LuFileText />}
-                        headerContent={
-                            <Badge variant="subtle" size="sm">
-                                {planDetails.documents.length}
-                            </Badge>
-                        }
-                    >
-                        <PlanDocumentList
-                            key={`documents-${planDetails.id}`}
-                            documents={planDetails.documents}
-                            selectedDocumentId={selectedDocumentId}
-                            onSelectDocument={handleSelectDocument}
-                            onDocumentDeleted={onUpdate}
-                            hideHeader={true}
-                        />
-                    </CollapsibleCard>
-
-                    {/* Notepad */}
-                    <CollapsibleCard
-                        title="Notes"
-                        icon={<LuNotebook />}
-                        headerContent={
-                            <IconButton
-                                aria-label="Copy notes"
-                                variant="ghost"
-                                size="xs"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyNotes();
-                                }}
-                                disabled={!notes}
-                            >
-                                <Icon>
-                                    {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
-                                </Icon>
-                            </IconButton>
-                        }
-                    >
-                        <VStack align="stretch" gap={3}>
-                            <Textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Take notes about this plan..."
-                                rows={4}
-                                resize="vertical"
-                                css={{
-                                    borderRadius: '10px',
-                                    fontSize: '13px',
-                                }}
-                            />
-                            <Text fontSize="xs" color="text.tertiary">
-                                Auto-saved to browser
-                            </Text>
-                        </VStack>
-                    </CollapsibleCard>
+                                    <IconButton
+                                        aria-label="Copy notes"
+                                        variant="ghost"
+                                        size="xs"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyNotes();
+                                        }}
+                                        disabled={!notes}
+                                    >
+                                        <Icon>
+                                            {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
+                                        </Icon>
+                                    </IconButton>
+                                </Flex>
+                                <VStack align="stretch" gap={1}>
+                                    <Textarea
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        placeholder="Take notes about this plan..."
+                                        rows={6}
+                                        resize="vertical"
+                                        css={{
+                                            borderRadius: '10px',
+                                            fontSize: '13px',
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <Text fontSize="xs" color="text.tertiary" textAlign="right">
+                                        Auto-saved
+                                    </Text>
+                                </VStack>
+                            </VStack>
+                        </CardBody>
+                    </Card.Root>
                 </>
-            )}
-        </VStack>
+            )
+            }
+        </VStack >
     );
 }

@@ -27,17 +27,19 @@ interface MilestoneTimelineProps {
   planId: string;
   phases: PlanPhaseWithMilestones[];
   onUpdate: () => void;
+  embedded?: boolean;
 }
 
 const MilestoneTimeline = memo(function MilestoneTimeline({
   planId,
   phases,
   onUpdate,
+  embedded = false,
 }: MilestoneTimelineProps) {
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(!embedded);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Flatten all milestones from all phases and sort by orderIndex
@@ -139,6 +141,219 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
       handleAddMilestone();
     }
   };
+
+  if (embedded) {
+    return (
+      <VStack align="stretch" gap={0}>
+        <Flex
+          justify="space-between"
+          align="center"
+          py={1}
+        >
+          <HStack gap={2}>
+            <Text fontSize="sm" fontWeight="medium">
+              Milestones
+            </Text>
+            <Box
+              px={2}
+              py={0.5}
+              borderRadius="full"
+              bg={completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.100' : 'primary.100'}
+              _dark={{ bg: completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.900/40' : 'primary.900/40' }}
+            >
+              <Text
+                fontSize="xs"
+                fontWeight="semibold"
+                color={completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.600' : 'primary.600'}
+                _dark={{ color: completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.300' : 'primary.300' }}
+              >
+                {completedMilestones.length}/{allMilestones.length}
+              </Text>
+            </Box>
+          </HStack>
+          {completedMilestones.length > 0 && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCompleted(!showCompleted);
+              }}
+            >
+              <HStack gap={1}>
+                <Icon boxSize={3}>
+                  {showCompleted ? <LuChevronUp /> : <LuChevronDown />}
+                </Icon>
+                <Text fontSize="xs">
+                  {showCompleted ? 'Hide' : 'Show'} completed ({completedMilestones.length})
+                </Text>
+              </HStack>
+            </Button>
+          )}
+        </Flex>
+
+        <VStack align="stretch" gap={4} pt={4}>
+          {/* Add Milestone */}
+          <HStack gap={2}>
+            <Input
+              ref={inputRef}
+              value={newMilestoneName}
+              onChange={(e) => setNewMilestoneName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Add a milestone..."
+              size="sm"
+              disabled={isCreating}
+              flex="1"
+              css={{
+                borderRadius: '10px',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button
+              size="sm"
+              colorPalette="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddMilestone();
+              }}
+              disabled={!newMilestoneName.trim() || isCreating}
+              loading={isCreating}
+              css={{
+                borderRadius: '10px',
+              }}
+            >
+              <Icon>
+                <LuPlus />
+              </Icon>
+              Add
+            </Button>
+          </HStack>
+
+          {allMilestones.length === 0 ? (
+            <Box
+              p={4}
+              borderRadius="12px"
+              borderWidth="1px"
+              borderStyle="dashed"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <VStack gap={1}>
+                <Icon color="text.tertiary" boxSize={5}>
+                  <LuSparkles />
+                </Icon>
+                <Text fontSize="sm" color="text.tertiary">
+                  No milestones yet
+                </Text>
+              </VStack>
+            </Box>
+          ) : (
+            <VStack align="stretch" gap={2}>
+              <AnimatePresence mode="popLayout">
+                {visibleMilestones.map((milestone, index) => (
+                  <MotionCard
+                    key={milestone.id}
+                    layout
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
+                    variant="outline"
+                    size="sm"
+                    bg={milestone.completed ? 'green.50' : 'transparent'}
+                    borderColor={milestone.completed ? 'green.200' : 'border.subtle'}
+                    cursor="pointer"
+                    role="group"
+                    onClick={() => handleToggleMilestone(milestone.id)}
+                    css={{
+                      borderRadius: '12px',
+                      transition: 'all 0.2s ease',
+                      _dark: {
+                        bg: milestone.completed ? 'green.950/30' : 'transparent',
+                        borderColor: milestone.completed ? 'green.800/50' : 'border.subtle',
+                      },
+                      _hover: {
+                        transform: 'translateX(4px)',
+                        borderColor: milestone.completed ? 'green.300' : 'primary.300',
+                      },
+                    }}
+                  >
+                    <CardBody py={2} px={3}>
+                      <Flex justify="space-between" align="center" gap={2}>
+                        <HStack gap={3} flex="1">
+                          <MotionBox
+                            initial={false}
+                            animate={milestone.completed ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <Checkbox.Root
+                              checked={milestone.completed}
+                              onCheckedChange={() => handleToggleMilestone(milestone.id)}
+                              colorPalette="green"
+                              size="md"
+                              cursor="pointer"
+                              p={1}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Checkbox.HiddenInput />
+                              <Checkbox.Control
+                                css={{
+                                  borderRadius: '6px',
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                <Checkbox.Indicator />
+                              </Checkbox.Control>
+                            </Checkbox.Root>
+                          </MotionBox>
+                          <VStack align="start" gap={1} flex="1">
+                            <Text
+                              fontSize="sm"
+                              textDecoration={milestone.completed ? 'line-through' : 'none'}
+                              color={milestone.completed ? 'text.tertiary' : 'text.primary'}
+                              transition="all 0.2s ease-in-out"
+                            >
+                              {milestone.name}
+                            </Text>
+                            {milestone.phase.name !== 'Ungrouped' && milestone.phase.name !== 'Milestones' && (
+                              <Badge size="xs" variant="subtle" colorPalette="blue">
+                                {milestone.phase.name}
+                              </Badge>
+                            )}
+                          </VStack>
+                        </HStack>
+                        <IconButton
+                          aria-label="Delete milestone"
+                          variant="ghost"
+                          size="xs"
+                          colorPalette="red"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMilestone(milestone.id, milestone.name);
+                          }}
+                          css={{
+                            opacity: 0,
+                            transition: 'opacity 0.15s ease',
+                            '[role="group"]:hover &': {
+                              opacity: 1,
+                            },
+                          }}
+                        >
+                          <Icon>
+                            <LuTrash2 />
+                          </Icon>
+                        </IconButton>
+                      </Flex>
+                    </CardBody>
+                  </MotionCard>
+                ))}
+              </AnimatePresence>
+            </VStack>
+          )}
+        </VStack>
+      </VStack>
+    );
+  }
 
   return (
     <Card.Root
@@ -396,7 +611,8 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
 }, (prevProps, nextProps) => {
   return (
     prevProps.planId === nextProps.planId &&
-    JSON.stringify(prevProps.phases) === JSON.stringify(nextProps.phases)
+    JSON.stringify(prevProps.phases) === JSON.stringify(nextProps.phases) &&
+    prevProps.embedded === nextProps.embedded
   );
 });
 

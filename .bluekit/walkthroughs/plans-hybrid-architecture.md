@@ -286,6 +286,23 @@ plan_documents (table)
 
 ---
 
+## Feature Spotlight: Persistent Document Ordering
+
+One specific challenge of the hybrid architecture is that **filesystems do not have an inherent order**. When scanning a directory, files come back in arbitrary order (usually alphabetical or creation time), but users need to curate the narrative flow of a plan.
+
+### The Solution: "Metadata Overlay"
+
+We solved this by overlaying database-stored order onto filesystem-discovered files:
+
+1.  **Discovery**: When `reconcile` finds a new file (e.g., `new-doc.md`), it assigns it the next available `order_index` (max + 1).
+2.  **Storage**: The `plan_documents` table stores this `order_index` alongside the `file_path`.
+3.  **Retrieval**: `get_plan_documents` always returns files sorted by `order_index`, effectively overriding the filesystem's chaos.
+4.  **Reordering**: When a user drags-and-drops a file in the UI, an IPC call `reorder_plan_documents` updates just the `order_index` fields in the DB.
+
+This creates a seamless experience where **text content lives in files** (easy to edit/version) but **structure lives in the DB** (easy to curate).
+
+---
+
 ## Component Architecture
 
 ```mermaid
