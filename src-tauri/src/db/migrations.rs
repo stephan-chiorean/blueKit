@@ -46,6 +46,11 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Add order_index to plan_documents
     add_plan_documents_order_index(db).await?;
 
+    // Create walkthrough tables
+    create_walkthroughs_table(db).await?;
+    create_walkthrough_takeaways_table(db).await?;
+    create_walkthrough_notes_table(db).await?;
+
     Ok(())
 }
 
@@ -1030,6 +1035,117 @@ async fn add_collection_description_and_tags(db: &DatabaseConnection) -> Result<
     } else {
         info!("Tags column already exists in library_collections table");
     }
+
+    Ok(())
+}
+
+async fn create_walkthroughs_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS walkthroughs (
+            id TEXT PRIMARY KEY NOT NULL,
+            project_id TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            status TEXT NOT NULL DEFAULT 'not_started',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_walkthroughs_project_id ON walkthroughs(project_id);
+        CREATE INDEX IF NOT EXISTS idx_walkthroughs_status ON walkthroughs(status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_walkthroughs_file_path ON walkthroughs(project_id, file_path);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Walkthroughs table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_walkthrough_takeaways_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS walkthrough_takeaways (
+            id TEXT PRIMARY KEY NOT NULL,
+            walkthrough_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            sort_order INTEGER NOT NULL,
+            completed INTEGER NOT NULL DEFAULT 0,
+            completed_at INTEGER,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (walkthrough_id) REFERENCES walkthroughs(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_walkthrough_takeaways_walkthrough_id ON walkthrough_takeaways(walkthrough_id);
+        CREATE INDEX IF NOT EXISTS idx_walkthrough_takeaways_order ON walkthrough_takeaways(walkthrough_id, sort_order);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Walkthrough takeaways table and indexes created or already exist");
+
+    Ok(())
+}
+
+async fn create_walkthrough_notes_table(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let sql = r#"
+        CREATE TABLE IF NOT EXISTS walkthrough_notes (
+            id TEXT PRIMARY KEY NOT NULL,
+            walkthrough_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (walkthrough_id) REFERENCES walkthroughs(id) ON DELETE CASCADE
+        )
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await?;
+
+    // Create indexes
+    let index_sql = r#"
+        CREATE INDEX IF NOT EXISTS idx_walkthrough_notes_walkthrough_id ON walkthrough_notes(walkthrough_id);
+    "#;
+
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        index_sql.to_string(),
+    ))
+    .await?;
+
+    info!("Walkthrough notes table and indexes created or already exist");
 
     Ok(())
 }

@@ -97,3 +97,6 @@ export * from './fileTree';
 // Re-export Bookmark commands
 export * from './bookmarks';
 
+// Re-export Walkthrough commands
+export * from './walkthroughs';
+

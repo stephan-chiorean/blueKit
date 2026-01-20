@@ -23,6 +23,7 @@ import ProjectSidebar from '../components/sidebar/ProjectSidebar';
 import { ViewType } from '../components/sidebar/SidebarContent';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
 import { deleteResources } from '../ipc/artifacts';
+import { invokeGetOrCreateWalkthroughByPath } from '../ipc/walkthroughs';
 import { ResourceFile, ResourceType } from '../types/resource';
 import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -622,6 +623,35 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
     setResourceType('plan');
   };
 
+  const handleViewWalkthrough = async (walkthrough: ArtifactFile) => {
+    try {
+      // Get or create the walkthrough in DB (ensures file-based walkthroughs are synced)
+      const walkthroughData = await invokeGetOrCreateWalkthroughByPath(
+        project.id,
+        walkthrough.path
+      );
+
+      // Create a ResourceFile object with the DB ID
+      const walkthroughResource: ResourceFile & { id?: string } = {
+        id: walkthroughData.id,
+        name: walkthroughData.name,
+        path: walkthrough.path,
+        frontMatter: {
+          ...walkthrough.frontMatter,
+          id: walkthroughData.id, // Include ID in frontMatter for ResourceViewPage
+          type: 'walkthrough',
+        },
+        resourceType: 'walkthrough',
+      };
+
+      setViewingResource(walkthroughResource);
+      setResourceContent(''); // Walkthrough content is loaded by WalkthroughWorkspace
+      setResourceType('walkthrough');
+    } catch (error) {
+      console.error('Failed to load walkthrough:', error);
+    }
+  };
+
   // Handler to go back from resource view - wrapped in useCallback for stable reference
   const handleBackFromResourceView = useCallback(() => {
     // Store resourceType before clearing it
@@ -751,14 +781,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   };
 
   // If viewing any resource, show the generic resource view page
-  // For plans, resourceContent can be empty (plans load their own data)
+  // For plans and walkthroughs, resourceContent can be empty (they load their own data)
   if (viewingResource && resourceType) {
     // Determine view mode based on resource type
-    const viewMode = resourceType === 'plan' ? 'plan' : undefined;
+    const viewMode = resourceType === 'plan' ? 'plan' : resourceType === 'walkthrough' ? 'walkthrough' : undefined;
 
-    // For plans, we allow empty content (they load their own data)
+    // For plans and walkthroughs, we allow empty content (they load their own data)
     // For other resources, require content
-    if (resourceType === 'plan' || resourceContent) {
+    if (resourceType === 'plan' || resourceType === 'walkthrough' || resourceContent) {
       // Provide onPlanDeleted callback for plan views to ensure list is refreshed after deletion
       const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
       return (
@@ -892,7 +922,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             projectsCount={1}
             projectPath={project.path}
             projectId={project.id}
-            onViewKit={handleViewKit}
+            onViewKit={handleViewWalkthrough}
             onReload={loadProjectArtifacts}
             onOptimisticMove={handleOptimisticMove}
             onConfirmMove={handleConfirmMove}

@@ -9,6 +9,7 @@ pub mod migrations;
 pub mod task_operations;
 pub mod project_operations;
 pub mod plan_operations;
+pub mod walkthrough_operations;
 
 /// Get the path to the SQLite database file
 pub fn get_db_path() -> Result<PathBuf, String> {

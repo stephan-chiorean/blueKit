@@ -178,6 +178,21 @@ async fn main() {
             commands::link_document_to_phase, // Link document to phase
             commands::reorder_plan_documents, // Reorder plan documents
             commands::watch_plan_folder, // Watch plan folder for changes
+            commands::create_walkthrough, // Create a new walkthrough
+            commands::get_project_walkthroughs, // Get all walkthroughs for a project
+            commands::get_or_create_walkthrough_by_path, // Get or create walkthrough by file path
+            commands::get_walkthrough_details, // Get walkthrough details
+            commands::update_walkthrough, // Update a walkthrough
+            commands::delete_walkthrough, // Delete a walkthrough
+            commands::add_walkthrough_takeaway, // Add takeaway
+            commands::toggle_takeaway_complete, // Toggle takeaway completion
+            commands::update_walkthrough_takeaway, // Update takeaway
+            commands::delete_walkthrough_takeaway, // Delete takeaway
+            commands::reorder_walkthrough_takeaways, // Reorder takeaways
+            commands::get_walkthrough_notes, // Get walkthrough notes
+            commands::add_walkthrough_note, // Add walkthrough note
+            commands::update_walkthrough_note, // Update walkthrough note
+            commands::delete_walkthrough_note, // Delete walkthrough note
             commands::get_bookmarks, // Get bookmarks from .bluekit/bookmarks.json
             commands::save_bookmarks, // Save bookmarks to .bluekit/bookmarks.json
             commands::add_bookmark, // Add a bookmark to the root

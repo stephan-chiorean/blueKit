@@ -44,6 +44,9 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
   // Glass styling for light/dark mode
   const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
 
+  // Determine search placeholder based on context
+  const searchPlaceholder = currentProject ? 'Search Project... ' : 'Search Vault...';
+
   return (
     <Box
       pl={3}
@@ -121,7 +124,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             </Box>
             <Input
               pl={12}
-              placeholder="Search..."
+              placeholder={searchPlaceholder}
               variant="subtle"
               size="lg"
               borderRadius="xl"
@@ -187,9 +190,9 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             currentProject={currentProject}
             onNavigateToTasks={onNavigateToTasks}
             open={isPopoverOpen}
-            onOpenChange={(e) => {
-              setPopoverOpen(e.open);
-              if (!e.open) {
+            onOpenChange={(open) => {
+              setPopoverOpen(open);
+              if (!open) {
                 closePopover();
               }
             }}

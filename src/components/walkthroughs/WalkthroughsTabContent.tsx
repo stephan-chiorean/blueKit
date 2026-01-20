@@ -11,10 +11,9 @@ import {
   Badge,
   SimpleGrid,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus, LuBookOpen } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuBookOpen, LuPlus } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
 import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
-import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
@@ -26,6 +25,7 @@ import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 import { ResourceCard } from '../shared/ResourceCard';
 import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
+import CreateWalkthroughDialog from './CreateWalkthroughDialog';
 
 interface WalkthroughsTabContentProps {
   kits: ArtifactFile[];
@@ -39,6 +39,7 @@ interface WalkthroughsTabContentProps {
   onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
   onConfirmMove?: (oldPath: string, newPath: string) => void;
   movingArtifacts?: Set<string>;
+  onViewWalkthrough?: (walkthroughId: string) => void;
 }
 
 type ViewMode = 'card' | 'walkthroughs';
@@ -55,6 +56,7 @@ function WalkthroughsTabContent({
   onOptimisticMove,
   onConfirmMove,
   movingArtifacts = new Set(),
+  onViewWalkthrough,
 }: WalkthroughsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
   const [viewMode, setViewMode] = useState<ViewMode>('card');
@@ -67,6 +69,7 @@ function WalkthroughsTabContent({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
+  const [isCreateWalkthroughOpen, setIsCreateWalkthroughOpen] = useState(false);
 
   const isSelected = (walkthroughId: string) => isSelectedInContext(walkthroughId);
 
@@ -289,8 +292,36 @@ function WalkthroughsTabContent({
   return (
     <Box position="relative">
       <VStack align="stretch" gap={6}>
-        {/* Toolkit Header */}
-        <ToolkitHeader title="Walkthroughs" />
+        {/* Toolkit Header - matches Tasks pattern */}
+        <Flex align="center" justify="space-between" mb={6} py={2}>
+          <Heading
+            size="2xl"
+            css={{
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+              _dark: {
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+              },
+            }}
+          >
+            Walkthroughs
+          </Heading>
+          {projectId && (
+            <Button
+              colorPalette="primary"
+              variant="solid"
+              size="sm"
+              borderRadius="lg"
+              onClick={() => setIsCreateWalkthroughOpen(true)}
+            >
+              <HStack gap={2}>
+                <Icon>
+                  <LuPlus />
+                </Icon>
+                <Text>Add Walkthrough</Text>
+              </HStack>
+            </Button>
+          )}
+        </Flex>
 
         {/* Folders Section */}
         <Box position="relative">
@@ -487,6 +518,19 @@ function WalkthroughsTabContent({
         folder={deletingFolder}
         onConfirm={handleConfirmDeleteFolder}
       />
+
+      {/* Create Walkthrough Dialog */}
+      {projectId && (
+        <CreateWalkthroughDialog
+          isOpen={isCreateWalkthroughOpen}
+          onClose={() => setIsCreateWalkthroughOpen(false)}
+          onWalkthroughCreated={() => {
+            onReload?.();
+          }}
+          projectId={projectId}
+          projectPath={projectPath}
+        />
+      )}
     </Box>
   );
 }
@@ -500,8 +544,10 @@ export default memo(WalkthroughsTabContent, (prevProps, nextProps) => {
     prevProps.error === nextProps.error &&
     prevProps.projectsCount === nextProps.projectsCount &&
     prevProps.projectPath === nextProps.projectPath &&
+    prevProps.projectId === nextProps.projectId &&
     prevProps.onViewKit === nextProps.onViewKit &&
-    prevProps.onReload === nextProps.onReload
+    prevProps.onReload === nextProps.onReload &&
+    prevProps.onViewWalkthrough === nextProps.onViewWalkthrough
   );
 });
 

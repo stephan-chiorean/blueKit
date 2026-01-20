@@ -17,3 +17,6 @@ pub mod plan_phase;
 pub mod plan_milestone;
 pub mod plan_document;
 pub mod plan_link;
+pub mod walkthrough;
+pub mod walkthrough_takeaway;
+pub mod walkthrough_note;

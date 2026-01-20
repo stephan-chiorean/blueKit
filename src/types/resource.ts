@@ -14,7 +14,7 @@ export type ResourceType = 'kit' | 'walkthrough' | 'agent' | 'blueprint' | 'task
 /**
  * Resource view mode - determines the layout and features shown in ResourceViewPage
  */
-export type ResourceViewMode = 'kit' | 'plan' | 'default';
+export type ResourceViewMode = 'kit' | 'plan' | 'walkthrough' | 'default';
 
 /**
  * Generic resource file interface

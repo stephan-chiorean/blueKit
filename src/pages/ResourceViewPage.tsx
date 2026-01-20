@@ -12,6 +12,7 @@ import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
 import KitOverview from '../components/kits/KitOverview';
 import PlanWorkspace from '../components/plans/PlanWorkspace';
+import WalkthroughWorkspace from '../components/walkthroughs/WalkthroughWorkspace';
 import Workstation from '../components/workstation/Workstation';
 import MermaidDiagramViewer from '../components/workstation/MermaidDiagramViewer';
 import { useResource } from '../contexts/ResourceContext';
@@ -135,6 +136,33 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
         </Box>
       </VStack>
     );
+  }
+
+  // Walkthrough mode uses WalkthroughWorkspace for unified experience
+  if (viewMode === 'walkthrough') {
+    // Extract walkthrough ID from resource
+    const walkthroughId = (resource as ResourceFile & { id?: string }).id || resource.frontMatter?.id;
+
+    if (walkthroughId) {
+      return (
+        <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
+          {/* Header above everything */}
+          <Box flexShrink={0} bg="transparent">
+            <Header />
+          </Box>
+
+          {/* Walkthrough Workspace */}
+          <Box
+            flex="1"
+            minH={0}
+            overflow="hidden"
+            bg="transparent"
+          >
+            <WalkthroughWorkspace walkthroughId={walkthroughId} onBack={onBack} />
+          </Box>
+        </VStack>
+      );
+    }
   }
 
   // All other resource types use the split view layout (overview + workstation)

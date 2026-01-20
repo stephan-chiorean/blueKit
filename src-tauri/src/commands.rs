@@ -4783,6 +4783,198 @@ pub async fn watch_plan_folder(
     crate::core::watcher::watch_directory(app, path, event_name)
 }
 
+// ============================================================================
+// WALKTHROUGH COMMANDS
+// ============================================================================
+
+/// Create a new walkthrough with file and DB registration
+#[tauri::command]
+pub async fn create_walkthrough(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+    project_path: String,
+    name: String,
+    description: Option<String>,
+    initial_takeaways: Vec<(String, Option<String>)>,
+) -> Result<crate::db::walkthrough_operations::WalkthroughDto, String> {
+    crate::db::walkthrough_operations::create_walkthrough(
+        db.inner(),
+        project_id,
+        project_path,
+        name,
+        description,
+        initial_takeaways,
+    )
+    .await
+    .map_err(|e| format!("Failed to create walkthrough: {}", e))
+}
+
+/// Get all walkthroughs for a project (syncs with file system first)
+#[tauri::command]
+pub async fn get_project_walkthroughs(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+    project_path: Option<String>,
+) -> Result<Vec<crate::db::walkthrough_operations::WalkthroughDto>, String> {
+    crate::db::walkthrough_operations::get_project_walkthroughs(db.inner(), project_id, project_path)
+        .await
+        .map_err(|e| format!("Failed to get project walkthroughs: {}", e))
+}
+
+/// Get or create a walkthrough by file path (for file-based walkthroughs)
+#[tauri::command]
+pub async fn get_or_create_walkthrough_by_path(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    project_id: String,
+    file_path: String,
+) -> Result<crate::db::walkthrough_operations::WalkthroughDto, String> {
+    crate::db::walkthrough_operations::get_or_create_walkthrough_by_path(db.inner(), &project_id, &file_path)
+        .await
+        .map_err(|e| format!("Failed to get or create walkthrough: {}", e))
+}
+
+/// Get walkthrough details with takeaways and notes
+#[tauri::command]
+pub async fn get_walkthrough_details(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+) -> Result<crate::db::walkthrough_operations::WalkthroughDetailsDto, String> {
+    crate::db::walkthrough_operations::get_walkthrough_details(db.inner(), walkthrough_id)
+        .await
+        .map_err(|e| format!("Failed to get walkthrough details: {}", e))
+}
+
+/// Update a walkthrough
+#[tauri::command]
+pub async fn update_walkthrough(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+    status: Option<String>,
+) -> Result<crate::db::walkthrough_operations::WalkthroughDto, String> {
+    crate::db::walkthrough_operations::update_walkthrough(db.inner(), walkthrough_id, name, description, status)
+        .await
+        .map_err(|e| format!("Failed to update walkthrough: {}", e))
+}
+
+/// Delete a walkthrough (removes file and database records)
+#[tauri::command]
+pub async fn delete_walkthrough(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+) -> Result<(), String> {
+    crate::db::walkthrough_operations::delete_walkthrough(db.inner(), walkthrough_id)
+        .await
+        .map_err(|e| format!("Failed to delete walkthrough: {}", e))
+}
+
+/// Add a takeaway to a walkthrough
+#[tauri::command]
+pub async fn add_walkthrough_takeaway(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+    title: String,
+    description: Option<String>,
+) -> Result<crate::db::walkthrough_operations::TakeawayDto, String> {
+    crate::db::walkthrough_operations::add_takeaway(db.inner(), walkthrough_id, title, description)
+        .await
+        .map_err(|e| format!("Failed to add takeaway: {}", e))
+}
+
+/// Toggle takeaway completion
+#[tauri::command]
+pub async fn toggle_takeaway_complete(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    takeaway_id: String,
+) -> Result<crate::db::walkthrough_operations::TakeawayDto, String> {
+    crate::db::walkthrough_operations::toggle_takeaway_complete(db.inner(), takeaway_id)
+        .await
+        .map_err(|e| format!("Failed to toggle takeaway: {}", e))
+}
+
+/// Update a takeaway
+#[tauri::command]
+pub async fn update_walkthrough_takeaway(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    takeaway_id: String,
+    title: Option<String>,
+    description: Option<Option<String>>,
+) -> Result<crate::db::walkthrough_operations::TakeawayDto, String> {
+    crate::db::walkthrough_operations::update_takeaway(db.inner(), takeaway_id, title, description)
+        .await
+        .map_err(|e| format!("Failed to update takeaway: {}", e))
+}
+
+/// Delete a takeaway
+#[tauri::command]
+pub async fn delete_walkthrough_takeaway(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    takeaway_id: String,
+) -> Result<(), String> {
+    crate::db::walkthrough_operations::delete_takeaway(db.inner(), takeaway_id)
+        .await
+        .map_err(|e| format!("Failed to delete takeaway: {}", e))
+}
+
+/// Reorder takeaways
+#[tauri::command]
+pub async fn reorder_walkthrough_takeaways(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+    takeaway_ids_in_order: Vec<String>,
+) -> Result<(), String> {
+    crate::db::walkthrough_operations::reorder_takeaways(db.inner(), walkthrough_id, takeaway_ids_in_order)
+        .await
+        .map_err(|e| format!("Failed to reorder takeaways: {}", e))
+}
+
+/// Get walkthrough notes
+#[tauri::command]
+pub async fn get_walkthrough_notes(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+) -> Result<Vec<crate::db::walkthrough_operations::WalkthroughNoteDto>, String> {
+    crate::db::walkthrough_operations::get_walkthrough_notes(db.inner(), walkthrough_id)
+        .await
+        .map_err(|e| format!("Failed to get walkthrough notes: {}", e))
+}
+
+/// Add a note to a walkthrough
+#[tauri::command]
+pub async fn add_walkthrough_note(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    walkthrough_id: String,
+    content: String,
+) -> Result<crate::db::walkthrough_operations::WalkthroughNoteDto, String> {
+    crate::db::walkthrough_operations::add_walkthrough_note(db.inner(), walkthrough_id, content)
+        .await
+        .map_err(|e| format!("Failed to add walkthrough note: {}", e))
+}
+
+/// Update a walkthrough note
+#[tauri::command]
+pub async fn update_walkthrough_note(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    note_id: String,
+    content: String,
+) -> Result<crate::db::walkthrough_operations::WalkthroughNoteDto, String> {
+    crate::db::walkthrough_operations::update_walkthrough_note(db.inner(), note_id, content)
+        .await
+        .map_err(|e| format!("Failed to update walkthrough note: {}", e))
+}
+
+/// Delete a walkthrough note
+#[tauri::command]
+pub async fn delete_walkthrough_note(
+    db: State<'_, sea_orm::DatabaseConnection>,
+    note_id: String,
+) -> Result<(), String> {
+    crate::db::walkthrough_operations::delete_walkthrough_note(db.inner(), note_id)
+        .await
+        .map_err(|e| format!("Failed to delete walkthrough note: {}", e))
+}
+
 /// File tree node structure.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileTreeNode {
