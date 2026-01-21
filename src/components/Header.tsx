@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Box,
   Flex,
@@ -12,40 +12,60 @@ import {
   VStack,
   Switch,
   Input,
-} from '@chakra-ui/react';
-import { LuBell, LuUser, LuLogOut, LuNotebookPen, LuMenu, LuSearch } from 'react-icons/lu';
-import { Project } from '../ipc';
-import QuickTaskPopover from './tasks/QuickTaskPopover';
-import { useColorMode } from '../contexts/ColorModeContext';
-import { useGitHubAuth } from '../auth/github/GitHubAuthProvider';
-import { useNotepad } from '../contexts/NotepadContext';
-import { useTimer } from '../contexts/TimerContext';
-import { useQuickTaskPopover } from '../contexts/QuickTaskPopoverContext';
-import TimerPopover from './shared/TimerPopover';
-import SignInPopover from './shared/SignInPopover';
+} from "@chakra-ui/react";
+import {
+  LuBell,
+  LuUser,
+  LuLogOut,
+  LuNotebookPen,
+  LuMenu,
+  LuSearch,
+} from "react-icons/lu";
+import { Project } from "../ipc";
+import QuickTaskPopover from "./tasks/QuickTaskPopover";
+import { useColorMode } from "../contexts/ColorModeContext";
+import { useGitHubAuth } from "../auth/github/GitHubAuthProvider";
+import { useNotepad } from "../contexts/NotepadContext";
+import { useTimer } from "../contexts/TimerContext";
+import { useQuickTaskPopover } from "../contexts/QuickTaskPopoverContext";
+import TimerPopover from "./shared/TimerPopover";
+import SignInPopover from "./shared/SignInPopover";
 import { FaMoon, FaSun } from "react-icons/fa";
+import { ActiveLogo as BlueKitLogo } from "./logo";
 
-import NavigationMenu from './NavigationDrawer';
+import NavigationMenu from "./NavigationDrawer";
 
 interface HeaderProps {
   currentProject?: Project;
   onNavigateToTasks?: () => void;
 }
 
-export default function Header({ currentProject, onNavigateToTasks }: HeaderProps = {}) {
+export default function Header({
+  currentProject,
+  onNavigateToTasks,
+}: HeaderProps = {}) {
   const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const { isPinned, elapsedTime, formatTime } = useTimer();
-  const { isOpen: isPopoverOpen, setOpen: setPopoverOpen, popoverOptions, closePopover } = useQuickTaskPopover();
-
+  const {
+    isOpen: isPopoverOpen,
+    setOpen: setPopoverOpen,
+    popoverOptions,
+    closePopover,
+  } = useQuickTaskPopover();
 
   // Glass styling for light/dark mode
-  const headerBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
+  const headerBg =
+    colorMode === "light"
+      ? "rgba(255, 255, 255, 0.3)"
+      : "rgba(20, 20, 25, 0.15)";
 
   // Determine search placeholder based on context
-  const searchPlaceholder = currentProject ? 'Search Project... ' : 'Search Vault...';
+  const searchPlaceholder = currentProject
+    ? "Search Project... "
+    : "Search Vault...";
 
   return (
     <Box
@@ -57,13 +77,13 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
       zIndex={10}
       style={{
         background: headerBg,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       <Flex align="center" justify="space-between" gap={4}>
         {/* blueKit branding on the left with navigation menu */}
-        <HStack gap={3} flex="1">
+        <HStack gap={1} flex="1">
           <NavigationMenu>
             {({ onOpen }) => (
               <IconButton
@@ -71,21 +91,22 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
                 size="md"
                 aria-label="Open navigation menu"
                 onClick={onOpen}
-                _hover={{ bg: 'transparent' }}
+                _hover={{ bg: "transparent" }}
                 ml={-2}
               >
                 <LuMenu />
               </IconButton>
             )}
           </NavigationMenu>
+          <BlueKitLogo size={28} />
           <Heading size="xl">
             <Text
               as="span"
               color="primary.500"
               css={{
-                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                textShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
                 _dark: {
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
                 },
               }}
             >
@@ -94,9 +115,9 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             <Text
               as="span"
               css={{
-                textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                textShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
                 _dark: {
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
                 },
               }}
             >
@@ -106,7 +127,13 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
         </HStack>
 
         {/* Center Search Bar */}
-        <Box flex="2" display="flex" justifyContent="center" maxW="600px" px={4}>
+        <Box
+          flex="2"
+          display="flex"
+          justifyContent="center"
+          maxW="600px"
+          px={4}
+        >
           <Box position="relative" width="100%" maxW="400px">
             <Box
               position="absolute"
@@ -128,25 +155,29 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
               variant="subtle"
               size="lg"
               borderRadius="xl"
-              bg={colorMode === 'light' ? 'whiteAlpha.600' : 'blackAlpha.300'}
+              bg={colorMode === "light" ? "whiteAlpha.600" : "blackAlpha.300"}
               border="1px solid"
-              borderColor={colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100'}
+              borderColor={
+                colorMode === "light" ? "whiteAlpha.400" : "whiteAlpha.100"
+              }
               fontSize="md"
-              _placeholder={{ color: 'gray.500' }}
+              _placeholder={{ color: "gray.500" }}
               _hover={{
-                bg: colorMode === 'light' ? 'whiteAlpha.800' : 'blackAlpha.400',
-                borderColor: colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100',
+                bg: colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400",
+                borderColor:
+                  colorMode === "light" ? "whiteAlpha.400" : "whiteAlpha.100",
               }}
               _focus={{
-                bg: colorMode === 'light' ? 'white' : 'blackAlpha.500',
-                borderColor: colorMode === 'light' ? 'whiteAlpha.400' : 'whiteAlpha.100',
-                boxShadow: 'none',
-                outline: 'none',
+                bg: colorMode === "light" ? "white" : "blackAlpha.500",
+                borderColor:
+                  colorMode === "light" ? "whiteAlpha.400" : "whiteAlpha.100",
+                boxShadow: "none",
+                outline: "none",
               }}
               css={{
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                transition: 'all 0.2s',
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                transition: "all 0.2s",
               }}
             />
           </Box>
@@ -171,7 +202,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
 
           {/* Dark Mode Toggle */}
           <Switch.Root
-            checked={colorMode === 'dark'}
+            checked={colorMode === "dark"}
             onCheckedChange={toggleColorMode}
             colorPalette="blue"
             size="lg"
@@ -180,7 +211,9 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             <Switch.HiddenInput />
             <Switch.Control>
               <Switch.Thumb />
-              <Switch.Indicator fallback={<Icon as={FaSun} color="orange.400" />}>
+              <Switch.Indicator
+                fallback={<Icon as={FaSun} color="orange.400" />}
+              >
                 <Icon as={FaMoon} color="yellow.400" />
               </Switch.Indicator>
             </Switch.Control>
@@ -206,9 +239,9 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           <IconButton
             variant="ghost"
             size="sm"
-            aria-label={isNotepadOpen ? 'Close notepad' : 'Open notepad'}
+            aria-label={isNotepadOpen ? "Close notepad" : "Open notepad"}
             onClick={toggleNotepad}
-            _hover={{ bg: 'transparent' }}
+            _hover={{ bg: "transparent" }}
           >
             <LuNotebookPen />
           </IconButton>
@@ -217,7 +250,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
             variant="ghost"
             size="sm"
             aria-label="Notifications"
-            _hover={{ bg: 'transparent' }}
+            _hover={{ bg: "transparent" }}
           >
             <LuBell />
           </IconButton>
@@ -226,10 +259,17 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           {isAuthenticated && user ? (
             <Menu.Root>
               <Menu.Trigger asChild>
-                <Box as="button" cursor="pointer" _hover={{ bg: 'transparent' }}>
+                <Box
+                  as="button"
+                  cursor="pointer"
+                  _hover={{ bg: "transparent" }}
+                >
                   <Avatar.Root size="sm">
                     {user.avatar_url ? (
-                      <Avatar.Image src={user.avatar_url} alt={user.login || 'User'} />
+                      <Avatar.Image
+                        src={user.avatar_url}
+                        alt={user.login || "User"}
+                      />
                     ) : null}
                     <Avatar.Fallback>
                       <LuUser />
@@ -240,7 +280,12 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
               <Menu.Positioner>
                 <Menu.Content width="240px">
                   {/* User Info */}
-                  <Box px={3} py={2} borderBottomWidth="1px" borderColor="border.subtle">
+                  <Box
+                    px={3}
+                    py={2}
+                    borderBottomWidth="1px"
+                    borderColor="border.subtle"
+                  >
                     <VStack align="start" gap={1}>
                       <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
                         {user.name || user.login}
@@ -260,7 +305,7 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
                         // Close sign-in popover if it's open
                         setIsSignInPopoverOpen(false);
                       } catch (error) {
-                        console.error('Failed to sign out:', error);
+                        console.error("Failed to sign out:", error);
                       }
                     }}
                   >
@@ -291,7 +336,6 @@ export default function Header({ currentProject, onNavigateToTasks }: HeaderProp
           )}
         </HStack>
       </Flex>
-
     </Box>
   );
 }

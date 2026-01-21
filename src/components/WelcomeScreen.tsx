@@ -1,4 +1,5 @@
 import { Box, Button, VStack, Text } from '@chakra-ui/react';
+import { ActiveLogo as BlueKitLogo } from './logo';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
@@ -18,6 +19,7 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
       }}
     >
       <VStack gap={10} pb={16}>
+        <BlueKitLogo size={180} />
         <Box
           as="h1"
           fontSize={{ base: '5xl', md: '7xl', lg: '8xl' }}
@@ -79,4 +81,3 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
     </Box>
   );
 }
-
