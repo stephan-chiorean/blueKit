@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -9,7 +9,7 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 import { ActiveLogo as BlueKitLogo } from "./logo";
-import { FaGoogle, FaGithub, FaEnvelope } from "react-icons/fa";
+import { FaGoogle, FaGithub } from "react-icons/fa";
 import { LuArrowRight, LuSparkles } from "react-icons/lu";
 import { useSupabaseAuth } from "../contexts/SupabaseAuthContext";
 import { useColorMode } from "../contexts/ColorModeContext";
@@ -23,6 +23,16 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
   const { isAuthenticated, isLoading, signInWithGoogle, signInWithGitHub } =
     useSupabaseAuth();
   const [signingIn, setSigningIn] = useState<"google" | "github" | null>(null);
+
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      const timer = setTimeout(() => {
+        onGetStarted();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading, onGetStarted]);
 
   const handleGoogleSignIn = async () => {
     setSigningIn("google");
