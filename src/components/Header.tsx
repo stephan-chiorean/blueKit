@@ -22,7 +22,7 @@ import { useNotepad } from "../contexts/NotepadContext";
 import { useTimer } from "../contexts/TimerContext";
 import { useQuickTaskPopover } from "../contexts/QuickTaskPopoverContext";
 import TimerPopover from "./shared/TimerPopover";
-import GitHubConnectionButton from "./shared/GitHubConnectionButton";
+import UserProfileButton from "./shared/UserProfileButton";
 import { FaMoon, FaSun } from "react-icons/fa";
 import { ActiveLogo as BlueKitLogo } from "./logo";
 
@@ -246,8 +246,8 @@ export default function Header({
             <LuBell />
           </IconButton>
 
-          {/* GitHub Connection */}
-          <GitHubConnectionButton />
+          {/* User Profile / Auth */}
+          <UserProfileButton />
         </HStack>
       </Flex>
     </Box>

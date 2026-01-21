@@ -427,7 +427,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
 
   const checkGitHubAuth = async () => {
     try {
-      const user = await invokeGitHubGetUser();
+      // Library implementation pending revamp - passing empty string
+      const user = await invokeGitHubGetUser('');
       setGithubUser(user);
       loadWorkspaces();
     } catch (error) {
@@ -645,7 +646,8 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     const content = await invokeGitHubGetFile(
       selectedWorkspace.github_owner,
       selectedWorkspace.github_repo,
-      variation.remote_path
+      variation.remote_path,
+      '' // Library implementation pending revamp
     );
 
     // Update cache

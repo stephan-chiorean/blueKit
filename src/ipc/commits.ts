@@ -48,7 +48,8 @@ export async function invokeFetchProjectCommits(
   projectId: string,
   branch?: string,
   page?: number,
-  perPage?: number
+  perPage?: number,
+  accessToken?: string
 ): Promise<GitHubCommit[]> {
   return await invokeWithTimeout<GitHubCommit[]>(
     'fetch_project_commits',
@@ -57,6 +58,7 @@ export async function invokeFetchProjectCommits(
       branch,
       page,
       perPage,
+      accessToken,
     },
     15000 // 15 second timeout for GitHub API calls
   );

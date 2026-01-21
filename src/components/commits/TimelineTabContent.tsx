@@ -51,6 +51,7 @@ import RollbackModal from "./RollbackModal";
 import { FilterPanel } from "../shared/FilterPanel";
 import { LiquidViewModeSwitcher } from "../kits/LiquidViewModeSwitcher";
 import { ToolkitHeader } from "../shared/ToolkitHeader";
+import { useGitHubIntegration } from "../../contexts/GitHubIntegrationContext";
 
 interface TimelineTabContentProps {
   projectId: string;
@@ -241,6 +242,7 @@ export default function TimelineTabContent({
   gitConnected,
   onGitConnected,
 }: TimelineTabContentProps) {
+  const { accessToken } = useGitHubIntegration();
   const [viewMode, setViewMode] = useState<ViewMode>("commits");
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -278,7 +280,8 @@ export default function TimelineTabContent({
         projectId,
         undefined, // use project's current branch
         pageNum,
-        perPage
+        perPage,
+        accessToken || undefined
       );
 
       if (append) {

@@ -104,19 +104,12 @@ async fn main() {
             commands::open_html_in_browser, // Open HTML content in browser
             commands::open_resource_in_window, // Open resource in new Tauri window
             commands::close_preview_window, // Close preview window
-            commands::keychain_store_token, // Store GitHub token in keychain
-            commands::keychain_retrieve_token, // Retrieve GitHub token from keychain
-            commands::keychain_delete_token, // Delete GitHub token from keychain
-            commands::auth_start_authorization, // Start GitHub authorization code flow
-            commands::auth_exchange_code, // Exchange authorization code for token
-            commands::auth_get_status, // Get current authentication status
-            commands::github_get_user, // Get authenticated GitHub user
-            commands::github_get_repos, // Get user's GitHub repositories
-            commands::github_get_file, // Get file contents from repository
-            commands::github_create_or_update_file, // Create or update file in repository
-            commands::github_delete_file, // Delete file from repository
-            commands::github_get_file_sha, // Get file SHA (for conflict detection)
-            commands::github_get_tree, // Get tree (directory) from repository
+            // GitHub keychain commands removed - using Supabase tokens instead
+            // commands::keychain_store_token, commands::keychain_retrieve_token, commands::keychain_delete_token,
+            // commands::auth_start_authorization, commands::auth_exchange_code, commands::auth_get_status,
+            // commands::github_get_user, commands::github_get_repos, commands::github_get_file,
+            // commands::github_create_or_update_file, commands::github_delete_file, commands::github_get_file_sha,
+            // commands::github_get_tree,
             commands::library_create_workspace, // Create Library workspace
             commands::library_list_workspaces, // List Library workspaces
             commands::library_get_workspace, // Get Library workspace
@@ -135,13 +128,11 @@ async fn main() {
             commands::get_project_resources, // Get project resources (Phase 1)
             commands::get_resource_by_id, // Get resource by ID (Phase 1)
             commands::check_publish_status, // Check publish status (Phase 3)
-            commands::publish_resource, // Publish resource to workspace (Phase 3)
-            commands::sync_workspace_catalog, // Sync workspace catalog from GitHub (Phase 4)
-            commands::list_workspace_catalogs, // List workspace catalogs (Phase 4)
-            commands::delete_catalogs, // Delete catalogs from workspace (Phase 4)
-            commands::pull_variation, // Pull variation to local project (Phase 4)
-            commands::check_resource_status, // Check resource status for updates (Phase 5)
-            commands::check_project_for_updates, // Check all resources in project (Phase 5)
+            // Library commands that use keychain - commented out:
+            // commands::publish_resource, commands::sync_workspace_catalog,
+            // commands::list_workspace_catalogs, commands::delete_catalogs,
+            // commands::pull_variation, commands::check_resource_status,
+            // commands::check_project_for_updates,
             commands::migrate_projects_to_database, // Migrate JSON to database (Phase 1)
             commands::db_get_projects, // Get all projects from database (Phase 1)
             commands::db_create_project, // Create new project in database (Phase 1)
@@ -149,10 +140,9 @@ async fn main() {
             commands::db_delete_project, // Delete project from database (Phase 1)
             commands::connect_project_git, // Connect project to git (Phase 1)
             commands::disconnect_project_git, // Disconnect project from git (Phase 1)
-            commands::fetch_project_commits, // Fetch commits from GitHub API (Phase 2)
-            commands::open_commit_in_github, // Open commit diff in GitHub (Phase 2)
-            commands::invalidate_commit_cache, // Invalidate commit cache for a project (Phase 2)
-            commands::checkout_commit_in_project, // Checkout commit in project (detached HEAD or new branch)
+            // Commit commands commented - use keychain:
+            // commands::fetch_project_commits, commands::open_commit_in_github,
+            // commands::invalidate_commit_cache, commands::checkout_commit_in_project,
             commands::pin_checkpoint, // Pin commit as checkpoint (Phase 3)
             commands::get_project_checkpoints, // Get project checkpoints (Phase 3)
             commands::unpin_checkpoint, // Unpin checkpoint (Phase 3)
@@ -198,6 +188,8 @@ async fn main() {
             commands::add_bookmark, // Add a bookmark to the root
             commands::remove_bookmark, // Remove a bookmark by file path
             commands::reconcile_bookmarks, // Prune invalid bookmark paths
+            commands::start_supabase_auth_server, // Start Supabase OAuth callback server
+            commands::stop_supabase_auth_server, // Stop Supabase OAuth callback server
         ])
         .setup(|app| {
             // Initialize database synchronously before app starts accepting commands

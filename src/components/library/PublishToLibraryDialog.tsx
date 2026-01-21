@@ -84,7 +84,9 @@ export default function PublishToLibraryDialog({
   const checkGitHubAuth = async () => {
     setCheckingAuth(true);
     try {
-      const user = await invokeGitHubGetUser();
+      // Library implementation is deprecated/being revamped.
+      // Passing empty string to satisfy TS compiler for now.
+      const user = await invokeGitHubGetUser('');
       setGithubUser(user);
     } catch (error) {
       console.error('Not authenticated with GitHub:', error);
@@ -204,13 +206,13 @@ export default function PublishToLibraryDialog({
         // Match items to resources by path
         for (const item of projectItems) {
           console.log(`Looking for resource matching: ${item.path} or ${item.name}`);
-          
+
           const resource = resources.find((r: LibraryResource) => {
             // Normalize paths for comparison (remove leading ./ or /)
             const normalizePath = (p: string) => p.replace(/^\.?\//, '').replace(/\\/g, '/');
             const itemPath = item.path ? normalizePath(item.path) : '';
             const resourcePath = normalizePath(r.relativePath);
-            
+
             // Match by path - check if paths end the same way (handles nested folders)
             const pathMatch = itemPath && (
               itemPath === resourcePath ||
@@ -219,10 +221,10 @@ export default function PublishToLibraryDialog({
               // Handle case where item.path is absolute and contains the relative path
               itemPath.includes('/.bluekit/' + resourcePath)
             );
-            
+
             // Match by filename (fallback)
             const nameMatch = r.fileName === item.name || r.fileName === `${item.name}.md`;
-            
+
             return pathMatch || nameMatch;
           });
 

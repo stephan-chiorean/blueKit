@@ -3087,31 +3087,10 @@ pub async fn close_preview_window(
 }
 
 // ============================================================================
-// KEYCHAIN COMMANDS
+// KEYCHAIN COMMANDS - REMOVED
 // ============================================================================
+// Keychain storage is no longer used - tokens are stored in frontend/Supabase
 
-use crate::integrations::github::keychain::{KeychainManager, GitHubToken};
-
-/// Stores a GitHub token in the OS keychain.
-#[tauri::command]
-pub async fn keychain_store_token(token: GitHubToken) -> Result<(), String> {
-    let manager = KeychainManager::new()?;
-    manager.store_token(&token)
-}
-
-/// Retrieves a GitHub token from the OS keychain.
-#[tauri::command]
-pub async fn keychain_retrieve_token() -> Result<GitHubToken, String> {
-    let manager = KeychainManager::new()?;
-    manager.retrieve_token()
-}
-
-/// Deletes a GitHub token from the OS keychain.
-#[tauri::command]
-pub async fn keychain_delete_token() -> Result<(), String> {
-    let manager = KeychainManager::new()?;
-    manager.delete_token()
-}
 
 // ============================================================================
 // AUTHENTICATION COMMANDS
@@ -3202,15 +3181,15 @@ use crate::integrations::github::github::{GitHubClient, GitHubUser, GitHubRepo, 
 
 /// Gets the authenticated user's information from GitHub.
 #[tauri::command]
-pub async fn github_get_user() -> Result<GitHubUser, String> {
-    let client = GitHubClient::from_keychain()?;
+pub async fn github_get_user(access_token: String) -> Result<GitHubUser, String> {
+    let client = GitHubClient::new(access_token);
     client.get_user().await
 }
 
 /// Gets the authenticated user's repositories from GitHub.
 #[tauri::command]
-pub async fn github_get_repos() -> Result<Vec<GitHubRepo>, String> {
-    let client = GitHubClient::from_keychain()?;
+pub async fn github_get_repos(access_token: String) -> Result<Vec<GitHubRepo>, String> {
+    let client = GitHubClient::new(access_token);
     client.get_user_repos().await
 }
 
@@ -3220,8 +3199,9 @@ pub async fn github_get_file(
     owner: String,
     repo: String,
     path: String,
+    access_token: String,
 ) -> Result<String, String> {
-    let client = GitHubClient::from_keychain()?;
+    let client = GitHubClient::new(access_token);
     client.get_file_contents(&owner, &repo, &path).await
 }
 
@@ -3234,8 +3214,9 @@ pub async fn github_create_or_update_file(
     content: String,
     message: String,
     sha: Option<String>, // Required for updates
+    access_token: String,
 ) -> Result<GitHubFileResponse, String> {
-    let client = GitHubClient::from_keychain()?;
+    let client = GitHubClient::new(access_token);
     client
         .create_or_update_file(&owner, &repo, &path, &content, &message, sha.as_deref())
         .await
@@ -3249,8 +3230,9 @@ pub async fn github_delete_file(
     path: String,
     message: String,
     sha: String, // Required for deletion
+    access_token: String,
 ) -> Result<GitHubFileResponse, String> {
-    let client = GitHubClient::from_keychain()?;
+    let client = GitHubClient::new(access_token);
     client.delete_file(&owner, &repo, &path, &message, &sha).await
 }
 
@@ -3260,8 +3242,9 @@ pub async fn github_get_file_sha(
     owner: String,
     repo: String,
     path: String,
+    access_token: String,
 ) -> Result<Option<String>, String> {
-    let client = GitHubClient::from_keychain()?;
+    let client = GitHubClient::new(access_token);
     client.get_file_sha(&owner, &repo, &path).await
 }
 
@@ -3271,8 +3254,9 @@ pub async fn github_get_tree(
     owner: String,
     repo: String,
     tree_sha: String,
+    access_token: String,
 ) -> Result<GitHubTreeResponse, String> {
-    let client = GitHubClient::from_keychain()?;
+    let client = GitHubClient::new(access_token);
     client.get_tree(&owner, &repo, &tree_sha).await
 }
 
@@ -4013,6 +3997,7 @@ pub async fn fetch_project_commits(
     branch: Option<String>,
     page: Option<u32>,
     per_page: Option<u32>,
+    access_token: Option<String>,
 ) -> Result<Vec<GitHubCommit>, String> {
     use crate::db::entities::project;
     use sea_orm::EntityTrait;
@@ -4046,7 +4031,9 @@ pub async fn fetch_project_commits(
     let branch_to_use = branch.clone().or(project.git_branch);
 
     // Create GitHub client and fetch commits
-    let client = GitHubClient::from_keychain()?;
+    // Token must be provided by frontend
+    let token = access_token.ok_or("GitHub access token is required but was not provided")?;
+    let client = GitHubClient::new(token);
     let commits = client
         .get_commits(
             &owner,
@@ -5495,5 +5482,63 @@ fn reconcile_bookmarks_recursive(items: &mut Vec<BookmarkItem>) {
             reconcile_bookmarks_recursive(nested_items);
         }
     }
+}
+
+// ============================================================================
+// Supabase Auth Commands
+// ============================================================================
+
+use crate::integrations::supabase::auth_server;
+use once_cell::sync::Lazy;
+use tokio::sync::oneshot;
+
+/// Global storage for auth server shutdown channel.
+static AUTH_SERVER_SHUTDOWN: Lazy<Mutex<Option<oneshot::Sender<()>>>> = 
+    Lazy::new(|| Mutex::new(None));
+
+/// Starts the Supabase OAuth callback server.
+/// 
+/// Returns the port the server is listening on.
+/// The server will listen for OAuth callbacks and emit a `supabase-auth-callback` event.
+/// 
+/// # Arguments
+/// 
+/// * `app_handle` - Tauri application handle
+/// 
+/// # Returns
+/// 
+/// A `Result<u16, String>` containing the port number or an error message.
+#[tauri::command]
+pub async fn start_supabase_auth_server(app_handle: AppHandle) -> Result<u16, String> {
+    // Stop any existing auth server
+    if let Ok(mut guard) = AUTH_SERVER_SHUTDOWN.lock() {
+        if let Some(shutdown_tx) = guard.take() {
+            let _ = shutdown_tx.send(());
+            tracing::info!("Stopped previous Supabase auth server");
+        }
+    }
+    
+    // Start new auth server
+    let (port, shutdown_tx) = auth_server::start_auth_server(app_handle).await?;
+    
+    // Store shutdown channel
+    if let Ok(mut guard) = AUTH_SERVER_SHUTDOWN.lock() {
+        *guard = Some(shutdown_tx);
+    }
+    
+    tracing::info!("Supabase auth server started on port {}", port);
+    Ok(port)
+}
+
+/// Stops the Supabase OAuth callback server if running.
+#[tauri::command]
+pub async fn stop_supabase_auth_server() -> Result<(), String> {
+    if let Ok(mut guard) = AUTH_SERVER_SHUTDOWN.lock() {
+        if let Some(shutdown_tx) = guard.take() {
+            let _ = shutdown_tx.send(());
+            tracing::info!("Stopped Supabase auth server");
+        }
+    }
+    Ok(())
 }
 

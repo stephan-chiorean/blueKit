@@ -4,7 +4,7 @@
 /// All API calls are authenticated using the GitHub token stored in the keychain.
 
 use serde::{Deserialize, Serialize};
-use super::keychain::KeychainManager;
+// KeychainManager import removed
 
 /// GitHub API client for making authenticated requests.
 pub struct GitHubClient {
@@ -21,11 +21,10 @@ impl GitHubClient {
         }
     }
 
-    /// Creates a new GitHub client by retrieving the token from the keychain.
+    // Keychain support removed - tokens must be passed explicitly
+    // This method is kept for backward compatibility with legacy library code
     pub fn from_keychain() -> Result<Self, String> {
-        let manager = KeychainManager::new()?;
-        let token_data = manager.retrieve_token()?;
-        Ok(Self::new(token_data.access_token))
+        Err("Keychain storage has been removed. Please use implicit token passing.".to_string())
     }
 
     /// Makes a raw authenticated request to the GitHub API (public wrapper).
@@ -480,11 +479,19 @@ pub struct GitHubRepo {
     pub language: Option<String>,
 }
 
-/// GitHub repository owner information.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitHubRepoOwner {
     pub login: String,
     pub id: u64,
     pub avatar_url: String,
     pub html_url: String,
+}
+
+/// GitHub OAuth token.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubToken {
+    pub access_token: String,
+    pub token_type: String,
+    pub scope: String,
+    pub expires_at: Option<i64>,
 }

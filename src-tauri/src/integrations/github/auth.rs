@@ -12,7 +12,7 @@
 /// 6. Store the token in the keychain
 
 use serde::{Deserialize, Serialize};
-use super::keychain::{KeychainManager, GitHubToken};
+use super::github::GitHubToken;
 use sha2::{Sha256, Digest};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
@@ -158,13 +158,9 @@ pub async fn exchange_code_for_token(
                 expires_at: None, // GitHub tokens don't expire by default
             };
             
-            // Store token in keychain
-            tracing::info!("Storing token in keychain...");
-            let manager = KeychainManager::new()
-                .map_err(|e| format!("Failed to create keychain manager: {}", e))?;
-            manager.store_token(&token)
-                .map_err(|e| format!("Failed to store token in keychain: {}", e))?;
-            tracing::info!("Token stored successfully");
+            // Store token in keychain - REMOVED: We now rely on Supabase for storage
+            // The token is returned to the frontend which saves it to Supabase
+            tracing::info!("Token exchange successful");
             
             return Ok(AuthStatus::Authorized { token });
         }
@@ -186,13 +182,14 @@ pub async fn exchange_code_for_token(
     }
 }
 
-/// Gets the current authentication status by checking for a stored token.
+/// Gets the current authentication status.
+/// 
+/// Note: Since we moved away from Keychain storage, this essentially just
+/// returns "not authenticated" as the backend doesn't persist the token anymore.
+/// The frontend manages the token state via Supabase.
 pub fn get_auth_status() -> Result<AuthStatus, String> {
-    let manager = KeychainManager::new()?;
-    match manager.retrieve_token() {
-        Ok(token) => Ok(AuthStatus::Authorized { token }),
-        Err(_) => Ok(AuthStatus::Error {
-            message: "Not authenticated".to_string(),
-        }),
-    }
+    // We no longer store tokens in the backend keychain
+    Ok(AuthStatus::Error {
+        message: "Not authenticated (backend storage removed)".to_string(),
+    })
 }

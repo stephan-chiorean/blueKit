@@ -16,6 +16,7 @@ import { WorkstationProvider } from './contexts/WorkstationContext';
 import { ProjectArtifactsProvider } from './contexts/ProjectArtifactsContext';
 import { QuickTaskPopoverProvider } from './contexts/QuickTaskPopoverContext';
 import { GitHubIntegrationProvider } from './contexts/GitHubIntegrationContext';
+import { SupabaseAuthProvider } from './contexts/SupabaseAuthContext';
 import { Project } from './ipc';
 
 import DraggableNotepad from './components/workstation/DraggableNotepad';
@@ -126,17 +127,19 @@ function AppContent() {
 
 function App() {
   return (
-    <GitHubIntegrationProvider>
-      <NotepadProvider>
-        <TimerProvider>
-          <QuickTaskPopoverProvider>
-            <WorkstationProvider>
-              <AppContent />
-            </WorkstationProvider>
-          </QuickTaskPopoverProvider>
-        </TimerProvider>
-      </NotepadProvider>
-    </GitHubIntegrationProvider>
+    <SupabaseAuthProvider>
+      <GitHubIntegrationProvider>
+        <NotepadProvider>
+          <TimerProvider>
+            <QuickTaskPopoverProvider>
+              <WorkstationProvider>
+                <AppContent />
+              </WorkstationProvider>
+            </QuickTaskPopoverProvider>
+          </TimerProvider>
+        </NotepadProvider>
+      </GitHubIntegrationProvider>
+    </SupabaseAuthProvider>
   );
 }
 

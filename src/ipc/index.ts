@@ -70,8 +70,8 @@ export * from './folders';
 // Re-export task commands
 export * from './tasks';
 
-// Re-export keychain commands
-export * from './keychain';
+// Re-export keychain commands - REMOVED
+// export * from './keychain';
 
 // Re-export auth commands
 export * from './auth';
