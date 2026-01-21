@@ -1,22 +1,16 @@
-import { useState } from "react";
 import {
   Box,
   Flex,
   HStack,
   IconButton,
-  Avatar,
   Heading,
   Text,
   Icon,
-  Menu,
-  VStack,
   Switch,
   Input,
 } from "@chakra-ui/react";
 import {
   LuBell,
-  LuUser,
-  LuLogOut,
   LuNotebookPen,
   LuMenu,
   LuSearch,
@@ -24,12 +18,11 @@ import {
 import { Project } from "../ipc";
 import QuickTaskPopover from "./tasks/QuickTaskPopover";
 import { useColorMode } from "../contexts/ColorModeContext";
-import { useGitHubAuth } from "../auth/github/GitHubAuthProvider";
 import { useNotepad } from "../contexts/NotepadContext";
 import { useTimer } from "../contexts/TimerContext";
 import { useQuickTaskPopover } from "../contexts/QuickTaskPopoverContext";
 import TimerPopover from "./shared/TimerPopover";
-import SignInPopover from "./shared/SignInPopover";
+import GitHubConnectionButton from "./shared/GitHubConnectionButton";
 import { FaMoon, FaSun } from "react-icons/fa";
 import { ActiveLogo as BlueKitLogo } from "./logo";
 
@@ -44,9 +37,7 @@ export default function Header({
   currentProject,
   onNavigateToTasks,
 }: HeaderProps = {}) {
-  const [isSignInPopoverOpen, setIsSignInPopoverOpen] = useState(false);
   const { colorMode, toggleColorMode } = useColorMode();
-  const { isAuthenticated, user, signOut } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const { isPinned, elapsedTime, formatTime } = useTimer();
   const {
@@ -255,85 +246,8 @@ export default function Header({
             <LuBell />
           </IconButton>
 
-          {/* User Menu */}
-          {isAuthenticated && user ? (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Box
-                  as="button"
-                  cursor="pointer"
-                  _hover={{ bg: "transparent" }}
-                >
-                  <Avatar.Root size="sm">
-                    {user.avatar_url ? (
-                      <Avatar.Image
-                        src={user.avatar_url}
-                        alt={user.login || "User"}
-                      />
-                    ) : null}
-                    <Avatar.Fallback>
-                      <LuUser />
-                    </Avatar.Fallback>
-                  </Avatar.Root>
-                </Box>
-              </Menu.Trigger>
-              <Menu.Positioner>
-                <Menu.Content width="240px">
-                  {/* User Info */}
-                  <Box
-                    px={3}
-                    py={2}
-                    borderBottomWidth="1px"
-                    borderColor="border.subtle"
-                  >
-                    <VStack align="start" gap={1}>
-                      <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
-                        {user.name || user.login}
-                      </Text>
-                      <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-                        @{user.login}
-                      </Text>
-                    </VStack>
-                  </Box>
-
-                  {/* Logout */}
-                  <Menu.Item
-                    value="logout"
-                    onSelect={async () => {
-                      try {
-                        await signOut();
-                        // Close sign-in popover if it's open
-                        setIsSignInPopoverOpen(false);
-                      } catch (error) {
-                        console.error("Failed to sign out:", error);
-                      }
-                    }}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuLogOut />
-                      </Icon>
-                      <Text>Sign Out</Text>
-                    </HStack>
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Positioner>
-            </Menu.Root>
-          ) : (
-            <SignInPopover
-              isOpen={isSignInPopoverOpen}
-              onOpenChange={setIsSignInPopoverOpen}
-              trigger={
-                <Box as="button" cursor="pointer">
-                  <Avatar.Root size="sm">
-                    <Avatar.Fallback>
-                      <LuUser />
-                    </Avatar.Fallback>
-                  </Avatar.Root>
-                </Box>
-              }
-            />
-          )}
+          {/* GitHub Connection */}
+          <GitHubConnectionButton />
         </HStack>
       </Flex>
     </Box>

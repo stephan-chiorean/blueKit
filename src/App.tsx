@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Spinner } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import WelcomeScreen from './components/WelcomeScreen';
 import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
@@ -15,17 +15,16 @@ import { LibraryCacheProvider } from './contexts/LibraryCacheContext';
 import { WorkstationProvider } from './contexts/WorkstationContext';
 import { ProjectArtifactsProvider } from './contexts/ProjectArtifactsContext';
 import { QuickTaskPopoverProvider } from './contexts/QuickTaskPopoverContext';
-import { GitHubAuthProvider, GitHubAuthScreen, useGitHubAuth } from './auth/github';
+import { GitHubIntegrationProvider } from './contexts/GitHubIntegrationContext';
 import { Project } from './ipc';
 
 import DraggableNotepad from './components/workstation/DraggableNotepad';
 import { useNotepad } from './contexts/NotepadContext';
 import GradientBackground from './components/shared/GradientBackground';
 
-type View = 'welcome' | 'github-auth' | 'home' | 'project-detail' | 'plans';
+type View = 'welcome' | 'home' | 'project-detail' | 'plans';
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useGitHubAuth();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
   const [currentView, setCurrentView] = useState<View>('welcome');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -34,19 +33,8 @@ function AppContent() {
   // Check if this is a preview window
   const isPreviewWindow = window.location.pathname === '/preview';
 
+  // Go directly to home - no auth required
   const handleGetStarted = () => {
-    if (isAuthenticated) {
-      setCurrentView('home');
-    } else {
-      setCurrentView('github-auth');
-    }
-  };
-
-  const handleAuthSuccess = () => {
-    setCurrentView('home');
-  };
-
-  const handleSkipAuth = () => {
     setCurrentView('home');
   };
 
@@ -90,28 +78,7 @@ function AppContent() {
     );
   }
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <ColorModeProvider>
-        <FeatureFlagsProvider>
-          <LibraryCacheProvider>
-            <ResourceProvider>
-              <ProjectArtifactsProvider>
-                <SelectionProvider>
-                  <GradientBackground />
-                  <Box display="flex" justifyContent="center" alignItems="center" h="100vh" position="relative" zIndex={1}>
-                    <Spinner size="xl" />
-                  </Box>
-                </SelectionProvider>
-              </ProjectArtifactsProvider>
-            </ResourceProvider>
-          </LibraryCacheProvider>
-        </FeatureFlagsProvider>
-      </ColorModeProvider>
-    );
-  }
-
+  // App opens directly - no auth gate
   return (
     <ColorModeProvider>
       <FeatureFlagsProvider>
@@ -123,8 +90,6 @@ function AppContent() {
                 <Box position="relative" zIndex={1}>
                   {currentView === 'welcome' ? (
                     <WelcomeScreen onGetStarted={handleGetStarted} />
-                  ) : currentView === 'github-auth' ? (
-                    <GitHubAuthScreen onSuccess={handleAuthSuccess} onSkip={handleSkipAuth} />
                   ) : currentView === 'project-detail' && selectedProject ? (
                     <ProjectDetailPage
                       project={{
@@ -161,7 +126,7 @@ function AppContent() {
 
 function App() {
   return (
-    <GitHubAuthProvider>
+    <GitHubIntegrationProvider>
       <NotepadProvider>
         <TimerProvider>
           <QuickTaskPopoverProvider>
@@ -171,7 +136,7 @@ function App() {
           </QuickTaskPopoverProvider>
         </TimerProvider>
       </NotepadProvider>
-    </GitHubAuthProvider>
+    </GitHubIntegrationProvider>
   );
 }
 
