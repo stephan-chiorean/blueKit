@@ -177,8 +177,8 @@ After running, you should see:
    - You should see `user_profiles` and `user_integrations`
 
 2. **Check RLS is enabled:**
-   - Tables should show a lock icon
-   - Click table → **Policies** tab should show your policies
+   - Click on a table, then click **"RLS policy"** button in the toolbar
+   - You should see your policies listed (e.g., "Users can view own profile")
 
 3. **Test auth provider:**
    - Go to **Authentication** → **Users**
