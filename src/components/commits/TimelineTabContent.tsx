@@ -24,6 +24,7 @@ import {
   LuRefreshCw,
   LuFilter,
   LuRotateCcw,
+  LuGithub,
 } from "react-icons/lu";
 import { TbCopyPlus } from "react-icons/tb";
 import { RiFlag2Fill } from "react-icons/ri";
@@ -52,6 +53,8 @@ import { FilterPanel } from "../shared/FilterPanel";
 import { LiquidViewModeSwitcher } from "../kits/LiquidViewModeSwitcher";
 import { ToolkitHeader } from "../shared/ToolkitHeader";
 import { useGitHubIntegration } from "../../contexts/GitHubIntegrationContext";
+import { useSupabaseAuth } from "../../contexts/SupabaseAuthContext";
+import { GitHubConnectButton } from "../auth/GitHubConnectButton";
 
 interface TimelineTabContentProps {
   projectId: string;
@@ -242,7 +245,8 @@ export default function TimelineTabContent({
   gitConnected,
   onGitConnected,
 }: TimelineTabContentProps) {
-  const { accessToken } = useGitHubIntegration();
+  const { accessToken, isConnected: isGitHubConnected, isLoading: isGitHubLoading } = useGitHubIntegration();
+  const { isAuthenticated } = useSupabaseAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("commits");
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -331,14 +335,14 @@ export default function TimelineTabContent({
     }
   };
 
-  // Load commits on mount
+  // Load commits only when git + GitHub both connected
   useEffect(() => {
-    if (gitConnected) {
+    if (gitConnected && isGitHubConnected && accessToken) {
       loadCommits(1);
     } else {
       setLoading(false);
     }
-  }, [projectId, gitConnected]);
+  }, [projectId, gitConnected, isGitHubConnected, accessToken]);
 
   // Load checkpoints when project changes (needed for commits view to show pinned commits)
   useEffect(() => {
@@ -577,11 +581,35 @@ export default function TimelineTabContent({
     );
   };
 
+  // Empty state: not authenticated with Supabase
+  if (!isAuthenticated) {
+    return (
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size="xl" color="gray.400">
+              <LuGitBranch />
+            </Icon>
+          </EmptyState.Indicator>
+          <EmptyState.Title>Sign in to view commits</EmptyState.Title>
+          <EmptyState.Description>
+            Sign in to your account to view commit history for this project.
+          </EmptyState.Description>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    );
+  }
+
   // Empty state: not connected to git
   if (!gitConnected) {
     return (
       <EmptyState.Root>
         <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size="xl" color="primary.500">
+              <LuGitBranch />
+            </Icon>
+          </EmptyState.Indicator>
           <EmptyState.Title>Not connected to git</EmptyState.Title>
           <EmptyState.Description>
             Connect this project to git to view commit history
@@ -594,6 +622,26 @@ export default function TimelineTabContent({
           >
             Connect Git
           </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    );
+  }
+
+  // Empty state: git connected but no GitHub integration
+  if (!isGitHubConnected && !isGitHubLoading) {
+    return (
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size="xl" color="gray.400">
+              <LuGithub />
+            </Icon>
+          </EmptyState.Indicator>
+          <EmptyState.Title>Connect to GitHub</EmptyState.Title>
+          <EmptyState.Description>
+            Connect your GitHub account to view commit history and open diffs.
+          </EmptyState.Description>
+          <GitHubConnectButton />
         </EmptyState.Content>
       </EmptyState.Root>
     );

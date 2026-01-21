@@ -104,12 +104,17 @@ async fn main() {
             commands::open_html_in_browser, // Open HTML content in browser
             commands::open_resource_in_window, // Open resource in new Tauri window
             commands::close_preview_window, // Close preview window
-            // GitHub keychain commands removed - using Supabase tokens instead
-            // commands::keychain_store_token, commands::keychain_retrieve_token, commands::keychain_delete_token,
-            // commands::auth_start_authorization, commands::auth_exchange_code, commands::auth_get_status,
-            // commands::github_get_user, commands::github_get_repos, commands::github_get_file,
-            // commands::github_create_or_update_file, commands::github_delete_file, commands::github_get_file_sha,
-            // commands::github_get_tree,
+            // GitHub OAuth and API commands (tokens passed from Supabase via frontend)
+            commands::auth_start_authorization, // Start GitHub OAuth flow
+            commands::auth_exchange_code, // Exchange OAuth code for token
+            commands::auth_get_status, // Get current auth status
+            commands::github_get_user, // Get GitHub user info with token
+            commands::github_get_repos, // Get user repositories
+            commands::github_get_file, // Get file from repository
+            commands::github_create_or_update_file, // Create or update file
+            commands::github_delete_file, // Delete file from repository
+            commands::github_get_file_sha, // Get file SHA
+            commands::github_get_tree, // Get repository tree
             commands::library_create_workspace, // Create Library workspace
             commands::library_list_workspaces, // List Library workspaces
             commands::library_get_workspace, // Get Library workspace
@@ -128,11 +133,14 @@ async fn main() {
             commands::get_project_resources, // Get project resources (Phase 1)
             commands::get_resource_by_id, // Get resource by ID (Phase 1)
             commands::check_publish_status, // Check publish status (Phase 3)
-            // Library commands that use keychain - commented out:
-            // commands::publish_resource, commands::sync_workspace_catalog,
-            // commands::list_workspace_catalogs, commands::delete_catalogs,
-            // commands::pull_variation, commands::check_resource_status,
-            // commands::check_project_for_updates,
+            // Library publishing commands (now use tokens from Supabase)
+            commands::publish_resource, // Publish resource to GitHub
+            commands::sync_workspace_catalog, // Sync workspace catalog
+            commands::list_workspace_catalogs, // List workspace catalogs
+            commands::delete_catalogs, // Delete catalogs
+            commands::pull_variation, // Pull variation to project
+            commands::check_resource_status, // Check resource publish status
+            commands::check_project_for_updates, // Check for resource updates
             commands::migrate_projects_to_database, // Migrate JSON to database (Phase 1)
             commands::db_get_projects, // Get all projects from database (Phase 1)
             commands::db_create_project, // Create new project in database (Phase 1)
@@ -140,9 +148,11 @@ async fn main() {
             commands::db_delete_project, // Delete project from database (Phase 1)
             commands::connect_project_git, // Connect project to git (Phase 1)
             commands::disconnect_project_git, // Disconnect project from git (Phase 1)
-            // Commit commands commented - use keychain:
-            // commands::fetch_project_commits, commands::open_commit_in_github,
-            // commands::invalidate_commit_cache, commands::checkout_commit_in_project,
+            // Commit commands (now use tokens from Supabase)
+            commands::fetch_project_commits, // Fetch commits from GitHub
+            commands::open_commit_in_github, // Open commit in GitHub
+            commands::invalidate_commit_cache, // Invalidate commit cache
+            commands::checkout_commit_in_project, // Checkout commit in project
             commands::pin_checkpoint, // Pin commit as checkpoint (Phase 3)
             commands::get_project_checkpoints, // Get project checkpoints (Phase 3)
             commands::unpin_checkpoint, // Unpin checkpoint (Phase 3)

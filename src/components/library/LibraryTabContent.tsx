@@ -73,6 +73,7 @@ import {
 import { Project, invokeGetProjectRegistry } from '../../ipc';
 import { invokeGitHubGetUser, invokeGitHubGetFile } from '../../ipc/github';
 import { useLibraryCache } from '../../contexts/LibraryCacheContext';
+import { useGitHubIntegration } from '../../contexts/GitHubIntegrationContext';
 import { ResourceFile, ResourceType } from '../../types/resource';
 import AddWorkspaceDialog from './AddWorkspaceDialog';
 import { FilterPanel } from '../shared/FilterPanel';
@@ -81,6 +82,7 @@ import EditLibraryCollectionModal from './EditLibraryCollectionModal';
 import { LibrarySelectionBar } from './LibrarySelectionBar';
 import { CatalogCard } from './CatalogCard';
 import { CatalogDetailModal, SelectedVariation } from './CatalogDetailModal';
+import { GitHubConnectButton } from '../auth/GitHubConnectButton';
 
 type ViewMode = 'loading' | 'no-auth' | 'no-workspaces' | 'browse';
 
@@ -114,6 +116,7 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     getCachedVariationContent,
     setCachedVariationContent
   } = useLibraryCache();
+  const { isConnected: isGitHubConnected, accessToken, user: gitHubUserFromContext } = useGitHubIntegration();
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [workspaces, setWorkspaces] = useState<LibraryWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
@@ -419,24 +422,22 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
     }
   }, [selectedWorkspaceId, loadCollectionsFromDatabase]);
 
-  // Load workspaces on mount
+  // Load projects on mount
   useEffect(() => {
-    checkGitHubAuth();
     loadProjects();
   }, []);
 
-  const checkGitHubAuth = async () => {
-    try {
-      // Library implementation pending revamp - passing empty string
-      const user = await invokeGitHubGetUser('');
-      setGithubUser(user);
+  // React to GitHub integration context changes
+  useEffect(() => {
+    if (isGitHubConnected && gitHubUserFromContext) {
+      setGithubUser(gitHubUserFromContext);
+      setViewMode('browse');
       loadWorkspaces();
-    } catch (error) {
-      console.error('Not authenticated with GitHub:', error);
+    } else {
       setGithubUser(null);
       setViewMode('no-auth');
     }
-  };
+  }, [isGitHubConnected, gitHubUserFromContext]);
 
   const loadWorkspaces = async () => {
     // Check cache first
@@ -1358,11 +1359,9 @@ const LibraryTabContent = forwardRef<LibraryTabContentRef, LibraryTabContentProp
           </EmptyState.Indicator>
           <EmptyState.Title>Connect to GitHub</EmptyState.Title>
           <EmptyState.Description>
-            Sign in with GitHub to access the library and publish resources.
+            Connect your GitHub account to access the library and publish resources.
           </EmptyState.Description>
-          <Text fontSize="sm" color="text.secondary" mt={2}>
-            Go to Settings to connect your GitHub account.
-          </Text>
+          <GitHubConnectButton />
         </EmptyState.Content>
       </EmptyState.Root>
     );
