@@ -302,6 +302,25 @@ export async function invokeOpenProjectInEditor(
 }
 
 /**
+ * Opens a directory in the default system terminal.
+ *
+ * @param path - Absolute path to the directory
+ * @returns Promise that resolves when the terminal is opened
+ *
+ * @example
+ * ```typescript
+ * await invokeOpenInTerminal('/path/to/project');
+ * ```
+ */
+export async function invokeOpenInTerminal(path: string): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'open_in_terminal',
+    { path },
+    5000 // 5 second timeout for opening terminal
+  );
+}
+
+/**
  * Opens a file in the specified editor (Cursor, Claude, or VSCode).
  *
  * @param filePath - Absolute path to the file to open

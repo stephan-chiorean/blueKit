@@ -100,6 +100,7 @@ async fn main() {
             commands::move_artifact_to_folder, // Move artifact into folder
             commands::move_folder_to_folder, // Move folder into folder (nesting)
             commands::open_project_in_editor, // Open project in Cursor or VSCode
+            commands::open_in_terminal, // Open directory in Terminal
             commands::open_file_in_editor, // Open file in Cursor or VSCode
             commands::open_html_in_browser, // Open HTML content in browser
             commands::open_resource_in_window, // Open resource in new Tauri window

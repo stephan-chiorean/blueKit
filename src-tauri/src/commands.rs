@@ -2792,6 +2792,59 @@ pub async fn open_project_in_editor(
     Ok(())
 }
 
+/// Opens a directory in the system default terminal.
+///
+/// # Arguments
+/// * `path` - Absolute path to the directory to open
+///
+/// # Returns
+/// * `Ok(())` if the terminal was opened successfully
+/// * `Err(String)` if the path doesn't exist, is not a directory, or the terminal failed to open
+#[tauri::command]
+pub async fn open_in_terminal(
+    path: String,
+) -> Result<(), String> {
+    use std::process::Command;
+
+    let path_buf = PathBuf::from(&path);
+
+    // Verify the path exists and is a directory
+    if !path_buf.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+
+    if !path_buf.is_dir() {
+        return Err(format!("Path is not a directory: {}", path));
+    }
+
+    // Determine the command based on OS
+    let (cmd, args) = {
+        #[cfg(target_os = "macos")]
+        {
+            ("open", vec!["-a", "Terminal", &path])
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Fallback for other OSs - simplistic implementation
+            // Ideally we'd detect OS and use appropriate terminal
+            return Err("Opening terminal is currently only supported on macOS".to_string());
+        }
+    };
+
+    // Execute the command
+    let output = Command::new(cmd)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to open terminal: {}", stderr));
+    }
+
+    Ok(())
+}
+
 /// Opens a file in the specified editor (Cursor or VSCode).
 ///
 /// Similar to `open_project_in_editor`, but opens a specific file instead of a directory.

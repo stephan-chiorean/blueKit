@@ -17,7 +17,7 @@ import {
   Input,
 } from '@chakra-ui/react';
 import { useColorMode } from '../../contexts/ColorModeContext';
-import { Project, invokeOpenProjectInEditor, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
+import { Project, invokeOpenProjectInEditor, invokeOpenInTerminal, invokeConnectProjectGit, invokeDisconnectProjectGit, invokeDbUpdateProject, invokeDbDeleteProject } from '../../ipc';
 import { LuFolder, LuChevronRight, LuPencil, LuTrash2, LuCopy } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
@@ -167,6 +167,19 @@ export default function ProjectsTabContent({
       await invokeOpenProjectInEditor(project.path, editor);
     } catch (error) {
       console.error(`Failed to open project in ${editor}:`, error);
+    }
+  };
+
+  const handleOpenInTerminal = async (project: Project) => {
+    try {
+      await invokeOpenInTerminal(project.path);
+    } catch (error) {
+      console.error('Failed to open terminal:', error);
+      toaster.create({
+        title: 'Failed to open terminal',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        type: 'error',
+      });
     }
   };
 
@@ -394,6 +407,12 @@ export default function ProjectsTabContent({
                               <Portal>
                                 <Menu.Positioner>
                                   <Menu.Content>
+                                    <Menu.Item
+                                      value="terminal"
+                                      onSelect={() => handleOpenInTerminal(project)}
+                                    >
+                                      Terminal
+                                    </Menu.Item>
                                     <Menu.Item
                                       value="cursor"
                                       onSelect={() => handleOpenInEditor(project, 'cursor')}
