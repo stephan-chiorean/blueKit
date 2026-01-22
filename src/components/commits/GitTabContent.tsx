@@ -25,6 +25,7 @@ import {
   LuFilter,
   LuRotateCcw,
   LuGithub,
+  LuNetwork,
 } from "react-icons/lu";
 import { TbCopyPlus } from "react-icons/tb";
 import { RiFlag2Fill } from "react-icons/ri";
@@ -33,6 +34,9 @@ import {
   invokeFetchProjectCommits,
   invokeOpenCommitInGitHub,
   invokeInvalidateCommitCache,
+  type GitWorktree,
+  invokeListProjectWorktrees,
+  invokeOpenWorktreeInWindow,
 } from "../../ipc/commits";
 import { invokeConnectProjectGit } from "../../ipc/projects";
 import {
@@ -56,14 +60,14 @@ import { useGitHubIntegration } from "../../contexts/GitHubIntegrationContext";
 import { useSupabaseAuth } from "../../contexts/SupabaseAuthContext";
 import { GitHubConnectButton } from "../auth/GitHubConnectButton";
 
-interface TimelineTabContentProps {
+interface GitTabContentProps {
   projectId: string;
   gitUrl?: string;
   gitConnected: boolean;
   onGitConnected?: () => void;
 }
 
-type ViewMode = "commits" | "checkpoints";
+type ViewMode = "commits" | "checkpoints" | "worktrees";
 
 // Activity calculation constants
 const CHANGES_PER_CIRCLE = 1000;
@@ -239,12 +243,12 @@ const DateHeader = ({
   </Box>
 );
 
-export default function TimelineTabContent({
+export default function GitTabContent({
   projectId,
   gitUrl,
   gitConnected,
   onGitConnected,
-}: TimelineTabContentProps) {
+}: GitTabContentProps) {
   const { accessToken, isConnected: isGitHubConnected, isLoading: isGitHubLoading } = useGitHubIntegration();
   const { isAuthenticated } = useSupabaseAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("commits");
@@ -269,6 +273,10 @@ export default function TimelineTabContent({
   const [checkpointAllTags, setCheckpointAllTags] = useState<string[]>([]);
   const [isCheckpointFilterOpen, setIsCheckpointFilterOpen] = useState(false);
   const checkpointFilterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Worktrees state
+  const [worktrees, setWorktrees] = useState<GitWorktree[]>([]);
+  const [loadingWorktrees, setLoadingWorktrees] = useState(false);
 
   // Load commits
   const loadCommits = async (pageNum: number = 1, append: boolean = false) => {
@@ -358,6 +366,55 @@ export default function TimelineTabContent({
     }
   }, [viewMode]);
 
+  // Load worktrees
+  const loadWorktrees = async () => {
+    if (!projectId || !gitConnected) return;
+
+    try {
+      setLoadingWorktrees(true);
+      const loadedWorktrees = await invokeListProjectWorktrees(projectId);
+      setWorktrees(loadedWorktrees);
+    } catch (err) {
+      console.error("Error loading worktrees:", err);
+      toaster.create({
+        title: "Failed to load worktrees",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
+        duration: 5000,
+      });
+    } finally {
+      setLoadingWorktrees(false);
+    }
+  };
+
+  // Load worktrees when switching to worktrees view
+  useEffect(() => {
+    if (viewMode === "worktrees" && projectId && gitConnected) {
+      loadWorktrees();
+    }
+  }, [viewMode, projectId, gitConnected]);
+
+  // Handle opening worktree in new window
+  const handleOpenWorktree = async (worktree: GitWorktree) => {
+    try {
+      await invokeOpenWorktreeInWindow(projectId, worktree.path, worktree.branch);
+      toaster.create({
+        title: "Opening worktree",
+        description: `Opening ${worktree.branch} in a new window`,
+        type: "info",
+        duration: 2000,
+      });
+    } catch (err) {
+      console.error("Error opening worktree:", err);
+      toaster.create({
+        title: "Failed to open worktree",
+        description: err instanceof Error ? err.message : "Unknown error",
+        type: "error",
+        duration: 5000,
+      });
+    }
+  };
+
   // Handle pin checkpoint
   const handlePinCheckpoint = (commit: GitHubCommit) => {
     setSelectedCommit(commit);
@@ -373,10 +430,7 @@ export default function TimelineTabContent({
     }
   };
 
-  // Check if a commit is already pinned
-  const isCommitPinned = (commitSha: string): boolean => {
-    return checkpoints.some((cp) => cp.gitCommitSha === commitSha);
-  };
+
 
   // Get checkpoint for a commit SHA
   const getCheckpointForCommit = (
@@ -798,6 +852,7 @@ export default function TimelineTabContent({
         modes={[
           { id: "commits", label: "Commits", icon: LuGitBranch },
           { id: "checkpoints", label: "Checkpoints", icon: RiFlag2Fill },
+          { id: "worktrees", label: "Worktrees", icon: LuNetwork },
         ]}
       />
     </Flex>
@@ -807,7 +862,7 @@ export default function TimelineTabContent({
   return (
     <VStack align="stretch" gap={2} pt={2} pb={4}>
       {/* Toolkit Header */}
-      <ToolkitHeader title="Timeline" />
+      <ToolkitHeader title="Git" />
 
       {renderViewModeSwitcher()}
 
@@ -1009,7 +1064,7 @@ export default function TimelineTabContent({
             </Text>
           )}
         </>
-      ) : (
+      ) : viewMode === "checkpoints" ? (
         // Checkpoints view
         <CheckpointsView
           projectId={projectId}
@@ -1020,6 +1075,14 @@ export default function TimelineTabContent({
           nameFilter={checkpointNameFilter}
           selectedTags={checkpointSelectedTags}
           onAllTagsUpdate={setCheckpointAllTags}
+        />
+      ) : (
+        // Worktrees view
+        <WorktreesView
+          worktrees={worktrees}
+          loading={loadingWorktrees}
+          onOpenWorktree={handleOpenWorktree}
+          onReload={loadWorktrees}
         />
       )}
 
@@ -1490,5 +1553,164 @@ function CheckpointsView({
         />
       )}
     </Box>
+  );
+}
+
+// Worktrees View Component
+interface WorktreesViewProps {
+  worktrees: GitWorktree[];
+  loading: boolean;
+  onOpenWorktree: (worktree: GitWorktree) => void;
+  onReload: () => void;
+}
+
+function WorktreesView({
+  worktrees,
+  loading,
+  onOpenWorktree,
+  onReload,
+}: WorktreesViewProps) {
+  // Loading state
+  if (loading) {
+    return (
+      <VStack align="center" justify="center" py={12} gap={4}>
+        <Spinner size="lg" />
+        <Text fontSize="sm" color="fg.muted">
+          Loading worktrees...
+        </Text>
+      </VStack>
+    );
+  }
+
+  // Empty state
+  if (worktrees.length === 0) {
+    return (
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size="xl" color="gray.400">
+              <LuNetwork />
+            </Icon>
+          </EmptyState.Indicator>
+          <EmptyState.Title>No worktrees found</EmptyState.Title>
+          <EmptyState.Description>
+            Create worktrees with: git worktree add
+          </EmptyState.Description>
+          <Button variant="outline" onClick={onReload}>
+            Refresh
+          </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={3}>
+      {/* Header with reload button */}
+      <Flex justify="flex-end" mb={1}>
+        <Button
+          onClick={onReload}
+          variant="ghost"
+          size="sm"
+          borderRadius="lg"
+          borderWidth="1px"
+          css={{
+            background: 'rgba(255, 255, 255, 0.25)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            borderColor: 'rgba(0, 0, 0, 0.08)',
+            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+            _dark: {
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderColor: 'rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+            },
+            _hover: {
+              background: 'rgba(255, 255, 255, 0.35)',
+              _dark: {
+                background: 'rgba(0, 0, 0, 0.3)',
+              },
+            },
+          }}
+        >
+          <HStack gap={2}>
+            <Icon>
+              <LuRefreshCw />
+            </Icon>
+            <Text>Refresh</Text>
+          </HStack>
+        </Button>
+      </Flex>
+
+      {/* Worktree cards */}
+      {worktrees.map((worktree) => (
+        <Card.Root
+          key={worktree.path}
+          variant="outline"
+          cursor="pointer"
+          onClick={() => onOpenWorktree(worktree)}
+          borderWidth="1px"
+          borderRadius="xl"
+          transition="all 0.2s ease"
+          css={{
+            background: 'rgba(255, 255, 255, 0.4)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            borderColor: worktree.isMain ? 'rgba(59, 130, 246, 0.5)' : 'rgba(0, 0, 0, 0.08)',
+            boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.06)',
+            _dark: {
+              background: 'rgba(20, 20, 25, 0.4)',
+              borderColor: worktree.isMain ? 'rgba(99, 102, 241, 0.5)' : 'rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+            },
+            _hover: {
+              transform: 'scale(1.005)',
+              boxShadow: '0 4px 12px 0 rgba(0, 0, 0, 0.1)',
+              borderColor: worktree.isMain ? 'rgba(59, 130, 246, 0.7)' : 'rgba(0, 0, 0, 0.15)',
+              _dark: {
+                boxShadow: '0 8px 24px 0 rgba(0, 0, 0, 0.4)',
+                borderColor: worktree.isMain ? 'rgba(99, 102, 241, 0.7)' : 'rgba(255, 255, 255, 0.25)',
+              },
+            },
+          }}
+        >
+          <Card.Header py={3} px={4}>
+            <HStack justify="space-between" align="center">
+              <HStack gap={2}>
+                <Icon color={worktree.isMain ? "blue.500" : "fg.muted"}>
+                  <LuGitBranch />
+                </Icon>
+                <Text fontWeight="semibold" fontSize="md">
+                  {worktree.branch}
+                </Text>
+                {worktree.isMain && (
+                  <Badge colorPalette="blue" size="sm" variant="subtle">
+                    Main
+                  </Badge>
+                )}
+              </HStack>
+              <Icon color="fg.muted" size="sm">
+                <LuExternalLink />
+              </Icon>
+            </HStack>
+          </Card.Header>
+          <Card.Body pt={0} pb={3} px={4}>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+                {worktree.path}
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Commit: {worktree.commitSha.substring(0, 7)}
+              </Text>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      ))}
+
+      {/* Hint text */}
+      <Text fontSize="xs" textAlign="center" color="fg.muted" pt={2}>
+        Click to open in a new window
+      </Text>
+    </VStack>
   );
 }

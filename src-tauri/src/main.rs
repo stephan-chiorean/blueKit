@@ -149,6 +149,8 @@ async fn main() {
             commands::db_delete_project, // Delete project from database (Phase 1)
             commands::connect_project_git, // Connect project to git (Phase 1)
             commands::disconnect_project_git, // Disconnect project from git (Phase 1)
+            commands::list_project_worktrees, // List git worktrees for project
+            commands::open_worktree_in_window, // Open worktree in new window
             // Commit commands (now use tokens from Supabase)
             commands::fetch_project_commits, // Fetch commits from GitHub
             commands::open_commit_in_github, // Open commit in GitHub

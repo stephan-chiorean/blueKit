@@ -13,7 +13,7 @@ import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent'
 import AgentsTabContent from '../components/agents/AgentsTabContent';
 import ScrapbookTabContent from '../components/scrapbook/ScrapbookTabContent';
 import DiagramsTabContent from '../components/diagrams/DiagramsTabContent';
-import TimelineTabContent from '../components/commits/TimelineTabContent';
+import GitTabContent from '../components/commits/GitTabContent';
 import BookmarksTabContent from '../components/bookmarks/BookmarksTabContent';
 import TasksTabContent, { TasksTabContentRef } from '../components/tasks/TasksTabContent';
 import PlansTabContent, { PlansTabContentRef } from '../components/plans/PlansTabContent';
@@ -29,14 +29,16 @@ import { Plan } from '../types/plan';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useProjectArtifacts } from '../contexts/ProjectArtifactsContext';
 import { useColorMode } from '../contexts/ColorModeContext';
+import { SelectionProvider } from '../contexts/SelectionContext';
 
 interface ProjectDetailPageProps {
   project: ProjectEntry;
   onBack: () => void;
   onProjectSelect?: (project: Project) => void;
+  isWorktreeView?: boolean;
 }
 
-export default function ProjectDetailPage({ project, onBack, onProjectSelect }: ProjectDetailPageProps) {
+export default function ProjectDetailPage({ project, onBack, onProjectSelect, isWorktreeView = false }: ProjectDetailPageProps) {
   // Feature flags
   const { flags } = useFeatureFlags();
   const { setArtifacts: setGlobalArtifacts } = useProjectArtifacts();
@@ -944,9 +946,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
             movingArtifacts={movingArtifacts}
           />
         );
-      case 'timeline':
+      case 'git':
         return (
-          <TimelineTabContent
+          <GitTabContent
             projectId={dbProject?.id || ''}
             gitUrl={dbProject?.gitUrl}
             gitConnected={dbProject?.gitConnected || false}
@@ -1006,216 +1008,220 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect }: 
   };
 
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-      {/* Header above everything */}
-      <Box flexShrink={0} bg="transparent">
-        <Header
-          currentProject={currentProjectForHeader}
-          onNavigateToTasks={() => setActiveView('tasks')}
-        />
-      </Box>
+    <SelectionProvider>
+      <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
+        {/* Header above everything */}
+        <Box flexShrink={0} bg="transparent">
+          <Header
+            currentProject={currentProjectForHeader}
+            onNavigateToTasks={() => setActiveView('tasks')}
+            hideNavigation={isWorktreeView}
+          />
+        </Box>
 
-      {/* Full screen content area with Splitter */}
-      <Box
-        ref={splitterContainerRef}
-        flex="1"
-        minH={0}
-        overflow="hidden"
-        bg="transparent"
-      >
-        <Splitter.Root
-          defaultSize={[SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT]}
-          size={splitSizes}
-          onResize={(details) => {
-            if (details.size && details.size.length >= 2) {
-              const [sidebar, content] = details.size;
-
-              // Get container width to calculate pixel-based constraints
-              const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-
-              // Calculate minimum sidebar size as percentage
-              const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-
-              // Calculate maximum: use the smaller of pixel-based or viewport-relative max
-              const pixelMaxPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
-              const maxSidebarPercent = Math.min(pixelMaxPercent, SIDEBAR_MAX_PERCENT);
-
-              // Calculate snap threshold (percentage below which we collapse)
-              // Using 55% of min creates a comfortable "decision zone"
-              const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
-
-              let newSidebar = sidebar;
-              let newContent = content;
-
-              // COLLAPSE ZONE: if below threshold, snap to fully collapsed
-              if (sidebar > 0 && sidebar < snapThresholdPercent) {
-                newSidebar = 0;
-                newContent = 100;
-              }
-              // SNAP-TO-MIN ZONE: if between threshold and minimum, snap to minimum
-              // This prevents awkward "almost collapsed" states
-              else if (sidebar >= snapThresholdPercent && sidebar < minSidebarPercent) {
-                newSidebar = minSidebarPercent;
-                newContent = 100 - minSidebarPercent;
-              }
-              // MAX CONSTRAINT: enforce maximum width (responsive to viewport)
-              else if (sidebar > maxSidebarPercent) {
-                newSidebar = maxSidebarPercent;
-                newContent = 100 - newSidebar;
-              }
-              // NORMAL ZONE: free resize within valid bounds
-              else {
-                newSidebar = sidebar;
-                newContent = content;
-              }
-
-              setSplitSizes([newSidebar, newContent]);
-            }
-          }}
-          panels={[
-            { id: 'sidebar', minSize: 0, maxSize: 100 },
-            { id: 'content', minSize: 30 },
-          ]}
-          h="100%"
-          orientation="horizontal"
+        {/* Full screen content area with Splitter */}
+        <Box
+          ref={splitterContainerRef}
+          flex="1"
+          minH={0}
+          overflow="hidden"
+          bg="transparent"
         >
-          {/* Sidebar Panel - with smooth transition when not dragging */}
-          <Splitter.Panel
-            id="sidebar"
-            bg="transparent"
-            style={{
-              background: sidebarBg,
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              transition: isSidebarDragging ? 'none' : 'flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-              willChange: isSidebarDragging ? 'flex-basis' : 'auto',
-            }}
-          >
-            <ProjectSidebar
-              project={project}
-              allProjects={allProjects}
-              activeView={activeView}
-              onBack={onBack}
-              onProjectSelect={onProjectSelect}
-              onViewChange={setActiveView}
-              projectPath={project.path}
-              onFileSelect={handleFileSelect}
-              selectedFileId={notebookFile?.resource.path || viewingResource?.path}
-              fileTreeVersion={fileTreeVersion}
-              onTreeRefresh={handleTreeRefresh}
-              onClearResourceView={handleClearResourceView}
-              onNewFileCreated={handleNewFileCreated}
-              titleEditPath={titleEditPath}
-              editingTitle={editingTitle}
-            />
-          </Splitter.Panel>
+          <Splitter.Root
+            defaultSize={[SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT]}
+            size={splitSizes}
+            onResize={(details) => {
+              if (details.size && details.size.length >= 2) {
+                const [sidebar, content] = details.size;
 
-          {/* Professional Resize Handle - wide hit area with visual feedback */}
-          <Splitter.ResizeTrigger
-            id="sidebar:content"
-            w="20px"
-            minW="20px"
-            maxW="20px"
-            p={0}
-            mx="-10px"
-            bg="transparent"
-            cursor="col-resize"
-            border="none"
-            outline="none"
-            boxShadow="none"
-            position="relative"
-            zIndex={10}
-            onDoubleClick={toggleSidebar}
-            onPointerDown={() => setIsSidebarDragging(true)}
-            onPointerUp={() => setIsSidebarDragging(false)}
-            onPointerLeave={() => setIsSidebarDragging(false)}
-            css={{
-              // Hide default splitter decorations
-              '&::before': { display: 'none' },
-              '&::after': { display: 'none' },
-              // Visible resize line (thin, centered in the hit area)
-              '&': {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              // Prevent text selection during drag
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
+                // Get container width to calculate pixel-based constraints
+                const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+
+                // Calculate minimum sidebar size as percentage
+                const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+                // Calculate maximum: use the smaller of pixel-based or viewport-relative max
+                const pixelMaxPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
+                const maxSidebarPercent = Math.min(pixelMaxPercent, SIDEBAR_MAX_PERCENT);
+
+                // Calculate snap threshold (percentage below which we collapse)
+                // Using 55% of min creates a comfortable "decision zone"
+                const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
+
+                let newSidebar = sidebar;
+                let newContent = content;
+
+                // COLLAPSE ZONE: if below threshold, snap to fully collapsed
+                if (sidebar > 0 && sidebar < snapThresholdPercent) {
+                  newSidebar = 0;
+                  newContent = 100;
+                }
+                // SNAP-TO-MIN ZONE: if between threshold and minimum, snap to minimum
+                // This prevents awkward "almost collapsed" states
+                else if (sidebar >= snapThresholdPercent && sidebar < minSidebarPercent) {
+                  newSidebar = minSidebarPercent;
+                  newContent = 100 - minSidebarPercent;
+                }
+                // MAX CONSTRAINT: enforce maximum width (responsive to viewport)
+                else if (sidebar > maxSidebarPercent) {
+                  newSidebar = maxSidebarPercent;
+                  newContent = 100 - newSidebar;
+                }
+                // NORMAL ZONE: free resize within valid bounds
+                else {
+                  newSidebar = sidebar;
+                  newContent = content;
+                }
+
+                setSplitSizes([newSidebar, newContent]);
+              }
             }}
+            panels={[
+              { id: 'sidebar', minSize: 0, maxSize: 100 },
+              { id: 'content', minSize: 30 },
+            ]}
+            h="100%"
+            orientation="horizontal"
           >
-            {/* Invisible resize hit area - stays transparent */}
-            <Box
-              position="absolute"
-              left="50%"
-              top={0}
-              bottom={0}
-              w="2px"
-              transform="translateX(-50%)"
+            {/* Sidebar Panel - with smooth transition when not dragging */}
+            <Splitter.Panel
+              id="sidebar"
               bg="transparent"
-            />
-            {/* Drag dots indicator (shows on hover) */}
-            <Box
-              position="absolute"
-              left="50%"
-              top="50%"
-              transform="translate(-50%, -50%)"
-              opacity={0}
-              transition="opacity 0.2s ease, transform 0.2s ease"
-              css={{
-                '[data-part="resize-trigger"]:hover &': {
-                  opacity: 0.7,
-                  transform: 'translate(-50%, -50%) scale(1)',
-                },
-                '[data-part="resize-trigger"][data-state="dragging"] &': {
-                  opacity: 1,
-                  transform: 'translate(-50%, -50%) scale(1.1)',
-                },
+              style={{
+                background: sidebarBg,
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                transition: isSidebarDragging ? 'none' : 'flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                willChange: isSidebarDragging ? 'flex-basis' : 'auto',
               }}
             >
-              <VStack gap="3px">
-                {[0, 1, 2].map((i) => (
-                  <Box
-                    key={i}
-                    w="4px"
-                    h="4px"
-                    borderRadius="full"
-                    bg={{ _light: 'rgba(99,102,241,0.7)', _dark: 'rgba(129,140,248,0.9)' }}
-                    transition="transform 0.15s ease"
-                    css={{
-                      '[data-part="resize-trigger"][data-state="dragging"] &': {
-                        transform: 'scale(1.2)',
-                      },
-                    }}
-                  />
-                ))}
-              </VStack>
-            </Box>
-          </Splitter.ResizeTrigger>
+              <ProjectSidebar
+                project={project}
+                allProjects={allProjects}
+                activeView={activeView}
+                onBack={onBack}
+                onProjectSelect={onProjectSelect}
+                onViewChange={setActiveView}
+                isWorktreeView={isWorktreeView}
+                projectPath={project.path}
+                onFileSelect={handleFileSelect}
+                selectedFileId={notebookFile?.resource.path || viewingResource?.path}
+                fileTreeVersion={fileTreeVersion}
+                onTreeRefresh={handleTreeRefresh}
+                onClearResourceView={handleClearResourceView}
+                onNewFileCreated={handleNewFileCreated}
+                titleEditPath={titleEditPath}
+                editingTitle={editingTitle}
+              />
+            </Splitter.Panel>
 
-          {/* Main Content Panel */}
-          <Splitter.Panel id="content">
-            <Box
-              h="100%"
-              minH={0}
-              overflowY="auto"
-              overflowX="hidden"
-
+            {/* Professional Resize Handle - wide hit area with visual feedback */}
+            <Splitter.ResizeTrigger
+              id="sidebar:content"
+              w="20px"
+              minW="20px"
+              maxW="20px"
+              p={0}
+              mx="-10px"
+              bg="transparent"
+              cursor="col-resize"
+              border="none"
+              outline="none"
+              boxShadow="none"
               position="relative"
-              p={notebookFile ? 0 : 6}
-              borderTopLeftRadius="2xl"
-              style={contentBorderStyle}
+              zIndex={10}
+              onDoubleClick={toggleSidebar}
+              onPointerDown={() => setIsSidebarDragging(true)}
+              onPointerUp={() => setIsSidebarDragging(false)}
+              onPointerLeave={() => setIsSidebarDragging(false)}
               css={{
-                background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-                backdropFilter: 'blur(30px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                // Hide default splitter decorations
+                '&::before': { display: 'none' },
+                '&::after': { display: 'none' },
+                // Visible resize line (thin, centered in the hit area)
+                '&': {
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                // Prevent text selection during drag
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
               }}
             >
-              {renderContent()}
-            </Box>
-          </Splitter.Panel>
-        </Splitter.Root>
-      </Box>
-    </VStack>
+              {/* Invisible resize hit area - stays transparent */}
+              <Box
+                position="absolute"
+                left="50%"
+                top={0}
+                bottom={0}
+                w="2px"
+                transform="translateX(-50%)"
+                bg="transparent"
+              />
+              {/* Drag dots indicator (shows on hover) */}
+              <Box
+                position="absolute"
+                left="50%"
+                top="50%"
+                transform="translate(-50%, -50%)"
+                opacity={0}
+                transition="opacity 0.2s ease, transform 0.2s ease"
+                css={{
+                  '[data-part="resize-trigger"]:hover &': {
+                    opacity: 0.7,
+                    transform: 'translate(-50%, -50%) scale(1)',
+                  },
+                  '[data-part="resize-trigger"][data-state="dragging"] &': {
+                    opacity: 1,
+                    transform: 'translate(-50%, -50%) scale(1.1)',
+                  },
+                }}
+              >
+                <VStack gap="3px">
+                  {[0, 1, 2].map((i) => (
+                    <Box
+                      key={i}
+                      w="4px"
+                      h="4px"
+                      borderRadius="full"
+                      bg={{ _light: 'rgba(99,102,241,0.7)', _dark: 'rgba(129,140,248,0.9)' }}
+                      transition="transform 0.15s ease"
+                      css={{
+                        '[data-part="resize-trigger"][data-state="dragging"] &': {
+                          transform: 'scale(1.2)',
+                        },
+                      }}
+                    />
+                  ))}
+                </VStack>
+              </Box>
+            </Splitter.ResizeTrigger>
+
+            {/* Main Content Panel */}
+            <Splitter.Panel id="content">
+              <Box
+                h="100%"
+                minH={0}
+                overflowY="auto"
+                overflowX="hidden"
+
+                position="relative"
+                p={notebookFile ? 0 : 6}
+                borderTopLeftRadius="2xl"
+                style={contentBorderStyle}
+                css={{
+                  background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
+                  backdropFilter: 'blur(30px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                }}
+              >
+                {renderContent()}
+              </Box>
+            </Splitter.Panel>
+          </Splitter.Root>
+        </Box>
+      </VStack>
+    </SelectionProvider>
   );
 }

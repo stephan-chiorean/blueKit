@@ -32,7 +32,7 @@ export type ViewType =
     | 'kits'
     | 'walkthroughs'
     | 'diagrams'
-    | 'timeline'
+    | 'git'
     | 'bookmarks'
     | 'scrapbook'
     | 'blueprints'
@@ -327,9 +327,9 @@ export default function SidebarContent({
                 )}
                 <SidebarMenuItem
                     icon={LuGitBranch}
-                    label="Timeline"
-                    isActive={activeView !== 'file' && activeView === 'timeline'}
-                    onClick={() => onViewChange('timeline')}
+                    label="Git"
+                    isActive={activeView !== 'file' && activeView === 'git'}
+                    onClick={() => onViewChange('git')}
                     collapsed={collapsed}
                 />
                 <SidebarMenuItem

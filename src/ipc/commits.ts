@@ -171,3 +171,92 @@ export async function invokeCheckoutCommitInProject(
     30000 // 30 second timeout for git operations
   );
 }
+
+// ============================================================================
+// GIT WORKTREE COMMANDS
+// ============================================================================
+
+/**
+ * Represents a git worktree.
+ */
+export interface GitWorktree {
+  /** Absolute path to the worktree directory */
+  path: string;
+  /** Branch name (or "(detached HEAD)" if in detached state) */
+  branch: string;
+  /** Current commit SHA at HEAD */
+  commitSha: string;
+  /** Whether this is the main working tree */
+  isMain: boolean;
+}
+
+/**
+ * Lists all git worktrees for a project.
+ *
+ * Returns information about all worktrees including the main working tree.
+ * Used by the Git tab's "Worktrees" view.
+ *
+ * @param projectId - The project ID (from database)
+ * @returns A promise that resolves to an array of git worktrees
+ *
+ * @example
+ * ```typescript
+ * const worktrees = await invokeListProjectWorktrees('project-id-123');
+ * // Returns: [{ path: '/path/to/main', branch: 'main', commitSha: 'abc123', isMain: true }, ...]
+ * ```
+ */
+export async function invokeListProjectWorktrees(
+  projectId: string
+): Promise<GitWorktree[]> {
+  // Backend uses snake_case for field names, convert to camelCase
+  const result = await invokeWithTimeout<Array<{
+    path: string;
+    branch: string;
+    commit_sha: string;
+    is_main: boolean;
+  }>>(
+    'list_project_worktrees',
+    { projectId },
+    5000 // 5 second timeout for git command
+  );
+
+  // Transform snake_case to camelCase
+  return result.map(worktree => ({
+    path: worktree.path,
+    branch: worktree.branch,
+    commitSha: worktree.commit_sha,
+    isMain: worktree.is_main,
+  }));
+}
+
+/**
+ * Opens a worktree in a new window.
+ *
+ * Creates a new Tauri window displaying the worktree as an ephemeral project.
+ * The window shows a full ProjectDetailPage for the worktree path.
+ * If the window is already open, it will be focused instead.
+ *
+ * @param worktreePath - Absolute path to the worktree directory
+ * @param worktreeBranch - Branch name of the worktree (used in window title)
+ * @returns A promise that resolves when the window is opened
+ *
+ * @example
+ * ```typescript
+ * await invokeOpenWorktreeInWindow('/path/to/worktree', 'feature-branch');
+ * ```
+ */
+export async function invokeOpenWorktreeInWindow(
+  projectId: string,
+  worktreePath: string,
+  worktreeBranch: string
+): Promise<void> {
+  return await invokeWithTimeout<void>(
+    'open_worktree_in_window',
+    {
+      projectId,
+      worktreePath,
+      worktreeBranch,
+    },
+    5000 // 5 second timeout for window creation
+  );
+}

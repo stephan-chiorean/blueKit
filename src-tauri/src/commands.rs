@@ -4016,6 +4016,98 @@ pub async fn disconnect_project_git(
 }
 
 // ============================================================================
+// GIT WORKTREE COMMANDS
+// ============================================================================
+
+use crate::integrations::git::GitWorktree;
+
+/// Lists all git worktrees for a project.
+/// 
+/// Returns information about all worktrees including the main working tree.
+/// Used by the Git tab's "Worktrees" view.
+#[tauri::command]
+pub async fn list_project_worktrees(
+    db: State<'_, DatabaseConnection>,
+    project_id: String,
+) -> Result<Vec<GitWorktree>, String> {
+    use sea_orm::EntityTrait;
+    
+    // Get project from database
+    let project = crate::db::entities::project::Entity::find_by_id(&project_id)
+        .one(&*db)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or_else(|| "Project not found".to_string())?;
+    
+    // List worktrees using the project path
+    crate::integrations::git::list_git_worktrees(&project.path)
+}
+
+/// Opens a worktree in a new window.
+/// 
+/// Creates a new Tauri window displaying the worktree as an ephemeral project.
+/// The window shows a full ProjectDetailPage for the worktree path.
+/// 
+/// # Arguments
+/// 
+/// * `worktree_path` - Absolute path to the worktree directory
+/// * `worktree_branch` - Branch name of the worktree (used in window title)
+#[tauri::command]
+pub async fn open_worktree_in_window(
+    app_handle: AppHandle,
+    project_id: String,
+    worktree_path: String,
+    worktree_branch: String,
+) -> Result<(), String> {
+    use tauri::{WindowBuilder, WindowUrl, Manager};
+    
+    // Generate unique window label based on path hash
+    // This allows us to detect if window is already open for this worktree
+    let path_hash = worktree_path
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect::<String>();
+    let window_label = format!("worktree-{}", &path_hash[path_hash.len().saturating_sub(50)..]);
+    
+    // Check if window already exists - focus it instead of creating duplicate
+    if let Some(existing_window) = app_handle.get_window(&window_label) {
+        existing_window.set_focus()
+            .map_err(|e| format!("Failed to focus existing window: {}", e))?;
+        return Ok(());
+    }
+    
+    // Build URL with query parameters for the worktree route
+    // Frontend route will be: /worktree?path=...&branch=...
+    let url = format!(
+        "/worktree?path={}&branch={}&projectId={}",
+        urlencoding::encode(&worktree_path),
+        urlencoding::encode(&worktree_branch),
+        urlencoding::encode(&project_id)
+    );
+    
+    // Create window title from branch name
+    let title = format!("Worktree: {}", worktree_branch);
+    
+    // Create new window
+    let _window = WindowBuilder::new(
+        &app_handle,
+        window_label.clone(),
+        WindowUrl::App(url.into())
+    )
+    .title(&title)
+    .inner_size(1400.0, 900.0)
+    .resizable(true)
+    .decorations(true)
+    .center()
+    .build()
+    .map_err(|e| format!("Failed to create worktree window: {}", e))?;
+    
+    tracing::info!("Created worktree window for: {} ({})", worktree_branch, worktree_path);
+    
+    Ok(())
+}
+
+// ============================================================================
 // COMMIT TIMELINE COMMANDS (Phase 2)
 // ============================================================================
 

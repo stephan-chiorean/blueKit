@@ -31,11 +31,13 @@ import NavigationMenu from "./NavigationDrawer";
 interface HeaderProps {
   currentProject?: Project;
   onNavigateToTasks?: () => void;
+  hideNavigation?: boolean;
 }
 
 export default function Header({
   currentProject,
   onNavigateToTasks,
+  hideNavigation = false,
 }: HeaderProps = {}) {
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
@@ -75,20 +77,22 @@ export default function Header({
       <Flex align="center" justify="space-between" gap={4}>
         {/* blueKit branding on the left with navigation menu */}
         <HStack gap={1} flex="1">
-          <NavigationMenu>
-            {({ onOpen }) => (
-              <IconButton
-                variant="ghost"
-                size="md"
-                aria-label="Open navigation menu"
-                onClick={onOpen}
-                _hover={{ bg: "transparent" }}
-                ml={-2}
-              >
-                <LuMenu />
-              </IconButton>
-            )}
-          </NavigationMenu>
+          {!hideNavigation && (
+            <NavigationMenu>
+              {({ onOpen }) => (
+                <IconButton
+                  variant="ghost"
+                  size="md"
+                  aria-label="Open navigation menu"
+                  onClick={onOpen}
+                  _hover={{ bg: "transparent" }}
+                  ml={-2}
+                >
+                  <LuMenu />
+                </IconButton>
+              )}
+            </NavigationMenu>
+          )}
           <BlueKitLogo size={28} />
           <Heading size="xl">
             <Text

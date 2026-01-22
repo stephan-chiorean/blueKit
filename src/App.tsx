@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import EditorPlansPage from './pages/EditorPlansPage';
 import PreviewWindowPage from './pages/PreviewWindowPage';
+import WorktreeWindowPage from './pages/WorktreeWindowPage';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { ColorModeProvider } from './contexts/ColorModeContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
@@ -33,6 +34,7 @@ function AppContent() {
 
   // Check if this is a preview window
   const isPreviewWindow = window.location.pathname === '/preview';
+  const isWorktreeWindow = window.location.pathname === '/worktree';
 
   // Go directly to home - no auth required
   const handleGetStarted = () => {
@@ -71,6 +73,23 @@ function AppContent() {
                 <Box position="relative" zIndex={1}>
                   <PreviewWindowPage />
                 </Box>
+              </ProjectArtifactsProvider>
+            </ResourceProvider>
+          </LibraryCacheProvider>
+        </FeatureFlagsProvider>
+      </ColorModeProvider>
+    );
+  }
+
+  // If this is a worktree window, render the worktree page
+  if (isWorktreeWindow) {
+    return (
+      <ColorModeProvider>
+        <FeatureFlagsProvider>
+          <LibraryCacheProvider>
+            <ResourceProvider>
+              <ProjectArtifactsProvider>
+                <WorktreeWindowPage />
               </ProjectArtifactsProvider>
             </ResourceProvider>
           </LibraryCacheProvider>

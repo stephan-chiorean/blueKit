@@ -1,5 +1,5 @@
 import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection } from '@chakra-ui/react';
-import { LuFolder, LuArrowLeft, LuChevronsUpDown } from 'react-icons/lu';
+import { LuFolder, LuArrowLeft, LuChevronsUpDown, LuNetwork } from 'react-icons/lu';
 import SidebarContent, { ViewType } from './SidebarContent';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { Project, ProjectEntry, FileTreeNode } from '../../ipc';
@@ -24,6 +24,7 @@ interface ProjectSidebarProps {
   titleEditPath?: string | null;
   /** External title to display for titleEditPath node (synced from editor) */
   editingTitle?: string;
+  isWorktreeView?: boolean;
 }
 
 export default function ProjectSidebar({
@@ -42,6 +43,7 @@ export default function ProjectSidebar({
   onNewFileCreated,
   titleEditPath,
   editingTitle,
+  isWorktreeView = false,
 }: ProjectSidebarProps) {
   const { colorMode } = useColorMode();
 
@@ -72,95 +74,106 @@ export default function ProjectSidebar({
       {/* Back button and project selector */}
       <Box px={3} pb={4} pt={0}>
         <VStack gap={3} align="stretch">
-          <HStack>
-            <Box as="button" onClick={onBack} title="Back to Projects" cursor="pointer">
-              <Icon
-                as={LuArrowLeft}
-                boxSize={5}
-                color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
-                _hover={{ color: colorMode === 'light' ? 'black' : 'white' }}
-              />
-            </Box>
-            <Select.Root
-              collection={projectsCollection}
-              value={[project.id]}
-              onValueChange={handleProjectChange}
-              size="sm"
-              width="100%"
-            >
-              <Select.HiddenSelect />
-              <Select.Control
-                cursor="pointer"
-                borderWidth="1px"
-                borderRadius="lg"
-                px={2}
-                css={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  borderColor: 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                  transition: 'none',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                  },
-                }}
+          {!isWorktreeView ? (
+            <HStack>
+              <Box as="button" onClick={onBack} title="Back to Projects" cursor="pointer">
+                <Icon
+                  as={LuArrowLeft}
+                  boxSize={5}
+                  color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                  _hover={{ color: colorMode === 'light' ? 'black' : 'white' }}
+                />
+              </Box>
+              <Select.Root
+                collection={projectsCollection}
+                value={[project.id]}
+                onValueChange={handleProjectChange}
+                size="sm"
+                width="100%"
               >
-                <Select.Trigger
-                  width="100%"
-                  bg="transparent"
-                  border="none"
-                  _focus={{ boxShadow: "none", outline: "none" }}
-                  _hover={{ bg: "transparent" }}
-                  _active={{ bg: "transparent" }}
+                <Select.HiddenSelect />
+                <Select.Control
+                  cursor="pointer"
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  px={2}
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                    borderColor: 'rgba(0, 0, 0, 0.08)',
+                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                    transition: 'none',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                    },
+                  }}
                 >
-                  <HStack gap={2} align="center" flex="1">
-                    <Icon boxSize={4} color="primary.500">
-                      <LuFolder />
-                    </Icon>
-                    <Select.ValueText placeholder="Select project" flex="1" />
-                  </HStack>
-                </Select.Trigger>
-                <Select.IndicatorGroup>
-                  <Select.Indicator />
-                </Select.IndicatorGroup>
-              </Select.Control>
-              <Portal>
-                <Select.Positioner>
-                  <Select.Content
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    css={{
-                      background: 'rgba(255, 255, 255, 0.65)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                      borderColor: 'rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
-                      _dark: {
-                        background: 'rgba(20, 20, 25, 0.8)',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                      },
-                    }}
+                  <Select.Trigger
+                    width="100%"
+                    bg="transparent"
+                    border="none"
+                    _focus={{ boxShadow: "none", outline: "none" }}
+                    _hover={{ bg: "transparent" }}
+                    _active={{ bg: "transparent" }}
                   >
-                    {projectsCollection.items.map((proj) => (
-                      <Select.Item key={proj.id} item={proj}>
-                        <HStack gap={2}>
-                          <Icon color="primary.500">
-                            <LuFolder />
-                          </Icon>
-                          <Select.ItemText>{proj.name}</Select.ItemText>
-                        </HStack>
-                        <Select.ItemIndicator />
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Positioner>
-              </Portal>
-            </Select.Root>
-          </HStack>
+                    <HStack gap={2} align="center" flex="1">
+                      <Icon boxSize={4} color="primary.500">
+                        <LuFolder />
+                      </Icon>
+                      <Select.ValueText placeholder="Select project" flex="1" />
+                    </HStack>
+                  </Select.Trigger>
+                  <Select.IndicatorGroup>
+                    <Select.Indicator />
+                  </Select.IndicatorGroup>
+                </Select.Control>
+                <Portal>
+                  <Select.Positioner>
+                    <Select.Content
+                      borderWidth="1px"
+                      borderRadius="lg"
+                      css={{
+                        background: 'rgba(255, 255, 255, 0.65)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderColor: 'rgba(0, 0, 0, 0.08)',
+                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
+                        _dark: {
+                          background: 'rgba(20, 20, 25, 0.8)',
+                          borderColor: 'rgba(255, 255, 255, 0.15)',
+                          boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                        },
+                      }}
+                    >
+                      {projectsCollection.items.map((proj) => (
+                        <Select.Item key={proj.id} item={proj}>
+                          <HStack gap={2}>
+                            <Icon color="primary.500">
+                              <LuFolder />
+                            </Icon>
+                            <Select.ItemText>{proj.name}</Select.ItemText>
+                          </HStack>
+                          <Select.ItemIndicator />
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Positioner>
+                </Portal>
+              </Select.Root>
+            </HStack>
+          ) : (
+            <HStack gap={2} px={1} py={1}>
+              <Icon boxSize={5} color="primary.500">
+                <LuNetwork />
+              </Icon>
+              <Text fontWeight="semibold" fontSize="md" truncate>
+                {project.title}
+              </Text>
+            </HStack>
+          )}
         </VStack>
       </Box>
 
@@ -187,38 +200,40 @@ export default function ProjectSidebar({
       </Box>
 
       {/* Vault Switcher */}
-      <Box
-        px={3}
-        py={2}
-        borderTopWidth="1px"
-        borderColor={colorMode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)'}
-      >
-        <HStack
-          as="button"
-          w="100%"
+      {!isWorktreeView && (
+        <Box
+          px={3}
           py={2}
-          px={2}
-          borderRadius="md"
-          cursor="pointer"
-          _hover={{
-            bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
-          }}
-          gap={2}
+          borderTopWidth="1px"
+          borderColor={colorMode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)'}
         >
-          <Icon
-            as={LuChevronsUpDown}
-            boxSize={4}
-            color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
-          />
-          <Text
-            fontSize="sm"
-            fontWeight="medium"
-            color={colorMode === 'light' ? 'gray.700' : 'gray.300'}
+          <HStack
+            as="button"
+            w="100%"
+            py={2}
+            px={2}
+            borderRadius="md"
+            cursor="pointer"
+            _hover={{
+              bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
+            }}
+            gap={2}
           >
-            .bluekit
-          </Text>
-        </HStack>
-      </Box>
+            <Icon
+              as={LuChevronsUpDown}
+              boxSize={4}
+              color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+            />
+            <Text
+              fontSize="sm"
+              fontWeight="medium"
+              color={colorMode === 'light' ? 'gray.700' : 'gray.300'}
+            >
+              .bluekit
+            </Text>
+          </HStack>
+        </Box>
+      )}
     </Flex>
   );
 }
