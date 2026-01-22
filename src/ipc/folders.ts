@@ -10,16 +10,16 @@ import type { ArtifactFolder, FolderConfig } from './types';
  *
  * Scans the specified artifact directory (kits, walkthroughs, diagrams)
  * and returns all folders found. Folders are flat (no nesting) and
- * contain only basic metadata: name, path, and artifact count.
+ * contain metadata from config.json if available.
  *
  * @param projectPath - Path to the project root
  * @param artifactType - Type directory to scan ('kits', 'walkthroughs', 'diagrams')
- * @returns Promise resolving to array of folders (config is always undefined)
+ * @returns Promise resolving to array of folders
  *
  * @example
  * ```typescript
  * const folders = await invokeGetArtifactFolders('/path/to/project', 'kits');
- * console.log(folders); // [{ name: 'ui-components', path: '...', artifactCount: 5 }]
+ * console.log(folders); // [{ name: 'ui-components', path: '...', config: {...}, artifactCount: 5 }]
  * ```
  */
 export async function invokeGetArtifactFolders(
@@ -37,29 +37,35 @@ export async function invokeGetArtifactFolders(
 }
 
 /**
- * Creates a new empty folder in an artifact directory.
+ * Creates a new folder in an artifact directory with metadata.
  *
- * Folders are flat (always created at root level) and no config.json is created.
- * The folder name is the only metadata.
+ * Creates a folder at the root level of the artifact type directory
+ * and writes a config.json file with the provided metadata.
  *
  * @param projectPath - Path to the project root
  * @param artifactType - Type directory ('kits', 'walkthroughs', 'diagrams')
- * @param parentPath - Ignored (kept for backward compatibility)
- * @param folderName - Name of the new folder
- * @param config - Ignored (kept for backward compatibility, no config.json created)
+ * @param parentPath - Reserved for future use (pass null)
+ * @param folderName - Name of the new folder (used as directory name)
+ * @param config - Folder configuration (name, description, tags, etc.)
  * @returns Promise resolving to the path of the created folder
  *
  * @example
  * ```typescript
- * // Config is required for backward compatibility but ignored
- * const dummyConfig: FolderConfig = {
- *   id: '',
- *   name: folderName,
- *   tags: [],
- *   createdAt: '',
- *   updatedAt: '',
+ * const config: FolderConfig = {
+ *   id: 'ui-components-1234567890',
+ *   name: 'UI Components',
+ *   description: 'Reusable React components',
+ *   tags: ['react', 'ui', 'components'],
+ *   createdAt: new Date().toISOString(),
+ *   updatedAt: new Date().toISOString(),
  * };
- * const path = await invokeCreateArtifactFolder('/path/to/project', 'kits', null, 'my-folder', dummyConfig);
+ * const path = await invokeCreateArtifactFolder(
+ *   '/path/to/project',
+ *   'kits',
+ *   null,
+ *   'ui-components',
+ *   config
+ * );
  * ```
  */
 export async function invokeCreateArtifactFolder(
@@ -83,20 +89,27 @@ export async function invokeCreateArtifactFolder(
 }
 
 /**
- * @deprecated Folders no longer use config.json. This function does nothing.
- *
  * Updates a folder's config.json file.
  *
+ * Overwrites the existing config.json with new metadata.
+ * Used for editing folder details after creation.
+ *
  * @param folderPath - Full path to the folder
- * @param config - Updated folder configuration (ignored)
- * @returns Promise resolving immediately (no-op)
+ * @param config - Updated folder configuration
+ * @returns Promise resolving when update is complete
+ *
+ * @example
+ * ```typescript
+ * await invokeUpdateFolderConfig(
+ *   '/path/to/project/.bluekit/kits/ui-components',
+ *   { ...existingConfig, description: 'Updated description' }
+ * );
+ * ```
  */
 export async function invokeUpdateFolderConfig(
   folderPath: string,
   config: FolderConfig
 ): Promise<void> {
-  // DEPRECATED: Folders no longer use config.json
-  // This function is kept for backward compatibility but does nothing
   return await invokeWithTimeout<void>(
     'update_folder_config',
     {

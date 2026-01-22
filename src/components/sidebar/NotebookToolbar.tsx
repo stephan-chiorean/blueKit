@@ -73,7 +73,7 @@ export default function NotebookToolbar({ projectPath, onNewFile, onNewFolder }:
             <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
                 <Tooltip.Trigger asChild>
                     <IconButton
-                        aria-label="New Folder"
+                        aria-label="New Group"
                         size="xs"
                         variant="ghost"
                         color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
@@ -107,7 +107,7 @@ export default function NotebookToolbar({ projectPath, onNewFile, onNewFolder }:
                                     : '0 8px 20px rgba(0, 0, 0, 0.4)',
                             }}
                         >
-                            New folder
+                            New group
                         </Tooltip.Content>
                     </Tooltip.Positioner>
                 </Portal>

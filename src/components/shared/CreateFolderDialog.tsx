@@ -70,7 +70,7 @@ export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDi
         <Dialog.Positioner>
           <Dialog.Content maxW="md">
             <Dialog.Header>
-              <Dialog.Title>Create Folder</Dialog.Title>
+              <Dialog.Title>Create Group</Dialog.Title>
               <Dialog.CloseTrigger asChild>
                 <CloseButton size="sm" />
               </Dialog.CloseTrigger>
@@ -79,18 +79,18 @@ export function CreateFolderDialog({ isOpen, onClose, onCreate }: CreateFolderDi
             <Dialog.Body>
               <VStack gap={4} align="stretch">
                 <Field.Root required>
-                  <Field.Label>Folder Name</Field.Label>
+                  <Field.Label>Group Name</Field.Label>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="my-folder"
+                    placeholder="my-group"
                     disabled={isCreating}
                     autoFocus
                     _placeholder={{ color: 'fg.muted', opacity: 0.6 }}
                   />
                   <Field.HelperText>
-                    Name for the new folder
+                    Name for the new group
                   </Field.HelperText>
                 </Field.Root>
               </VStack>

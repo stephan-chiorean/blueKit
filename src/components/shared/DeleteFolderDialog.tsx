@@ -39,7 +39,7 @@ export default function DeleteFolderDialog({
         <Dialog.Positioner>
           <Dialog.Content maxW="md">
             <Dialog.Header>
-              <Dialog.Title>Delete Folder</Dialog.Title>
+              <Dialog.Title>Delete Group</Dialog.Title>
               <Dialog.CloseTrigger asChild>
                 <CloseButton size="sm" />
               </Dialog.CloseTrigger>
@@ -50,7 +50,7 @@ export default function DeleteFolderDialog({
                 <Text>
                   Are you sure you want to delete <strong>{displayName}</strong>?
                 </Text>
-                
+
                 <VStack gap={2} align="stretch" p={3} bg="red.50" borderRadius="md" borderWidth="1px" borderColor="red.200">
                   <HStack gap={2}>
                     <Icon color="red.600">
@@ -61,11 +61,11 @@ export default function DeleteFolderDialog({
                     </Text>
                   </HStack>
                   <Text fontSize="sm" color="red.700" pl={6}>
-                    • The folder and all its contents
+                    • The group and all its contents
                   </Text>
                   {itemCount > 0 && (
                     <Text fontSize="sm" color="red.700" pl={6}>
-                      • {itemCount} {itemCount === 1 ? 'item' : 'items'} inside the folder
+                      • {itemCount} {itemCount === 1 ? 'item' : 'items'} inside the group
                     </Text>
                   )}
                   <Text fontSize="sm" color="red.700" pl={6}>
@@ -88,7 +88,7 @@ export default function DeleteFolderDialog({
                     <Icon>
                       <LuTrash2 />
                     </Icon>
-                    <Text>Delete Folder</Text>
+                    <Text>Delete Group</Text>
                   </HStack>
                 </Button>
               </HStack>

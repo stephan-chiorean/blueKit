@@ -61,7 +61,7 @@ export function ArtifactActionBar({
             <Icon>
               <LuFolderPlus />
             </Icon>
-            <Text>New Folder</Text>
+            <Text>New Group</Text>
           </HStack>
         </Button>
       </HStack>

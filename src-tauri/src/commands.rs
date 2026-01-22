@@ -2434,6 +2434,28 @@ pub async fn get_artifact_folders(
                 continue;
             }
 
+            // Try to read config.json
+            let config_path = path.join("config.json");
+            let config = if config_path.exists() {
+                match fs::read_to_string(&config_path) {
+                    Ok(content) => {
+                        match serde_json::from_str::<FolderConfig>(&content) {
+                            Ok(cfg) => Some(cfg),
+                            Err(e) => {
+                                eprintln!("Failed to parse config.json for {}: {}", folder_name, e);
+                                None
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to read config.json for {}: {}", folder_name, e);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
             // Count direct artifacts only (no config.json reading, no nesting)
             let artifact_count = count_artifacts(&path)?;
 
@@ -2441,7 +2463,7 @@ pub async fn get_artifact_folders(
                 name: folder_name,
                 path: path.to_str().unwrap_or("").to_string(),
                 parent_path: None, // Flat structure - no parents
-                config: None,      // No config.json dependency
+                config,            // Populated from config.json if exists
                 artifact_count,
                 folder_count: 0,   // Flat structure - no subfolders
             });
@@ -2473,7 +2495,7 @@ pub async fn create_artifact_folder(
     artifact_type: String,
     _parent_path: Option<String>,  // Ignored - flat structure
     folder_name: String,
-    _config: FolderConfig,          // Ignored - no config.json
+    config: FolderConfig,          // Used to create config.json
 ) -> Result<String, String> {
     use std::fs;
 
@@ -2488,9 +2510,17 @@ pub async fn create_artifact_folder(
         return Err(format!("Folder already exists: {}", folder_name));
     }
 
-    // Just create the folder, no config.json
+    // Create the folder
     fs::create_dir_all(&folder_path)
         .map_err(|e| format!("Failed to create folder: {}", e))?;
+
+    // Write config.json
+    let config_path = folder_path.join("config.json");
+    let config_json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    fs::write(&config_path, config_json)
+        .map_err(|e| format!("Failed to write config.json: {}", e))?;
 
     Ok(folder_path.to_str().unwrap_or("").to_string())
 }
@@ -2507,14 +2537,22 @@ pub async fn create_artifact_folder(
 ///
 /// # Returns
 ///
-/// Always returns Ok(())
+
 #[tauri::command]
 pub async fn update_folder_config(
-    _folder_path: String,
-    _config: FolderConfig,
+    folder_path: String,
+    config: FolderConfig,
 ) -> Result<(), String> {
-    // DEPRECATED: Folders no longer use config.json
-    // This function is kept for backward compatibility but does nothing
+    use std::fs;
+
+    let config_path = PathBuf::from(&folder_path).join("config.json");
+
+    let config_json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    fs::write(&config_path, config_json)
+        .map_err(|e| format!("Failed to write config.json: {}", e))?;
+
     Ok(())
 }
 
@@ -2604,6 +2642,22 @@ pub async fn rename_artifact_folder(
     // Rename folder
     fs::rename(&path, &new_path)
         .map_err(|e| format!("Failed to rename folder: {}", e))?;
+
+    // Update config.json name if it exists
+    let config_path = new_path.join("config.json");
+    if config_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            if let Ok(mut cfg) = serde_json::from_str::<FolderConfig>(&content) {
+                // Update name and timestamp
+                cfg.name = new_name.clone();
+                cfg.updated_at = chrono::Utc::now().to_rfc3339();
+                
+                if let Ok(updated_json) = serde_json::to_string_pretty(&cfg) {
+                    let _ = fs::write(&config_path, updated_json);
+                }
+            }
+        }
+    }
 
     Ok(new_path.to_str().unwrap_or("").to_string())
 }

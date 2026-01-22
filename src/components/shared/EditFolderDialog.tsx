@@ -164,7 +164,7 @@ export default function EditFolderDialog({
 
       toaster.create({
         type: 'success',
-        title: 'Folder updated',
+        title: 'Group updated',
         description: `Updated ${alias}`,
       });
 
@@ -177,7 +177,7 @@ export default function EditFolderDialog({
       console.error('Failed to update folder:', error);
       toaster.create({
         type: 'error',
-        title: 'Failed to update folder',
+        title: 'Failed to update group',
         description: error instanceof Error ? error.message : 'Unknown error',
         closable: true,
       });
@@ -201,7 +201,7 @@ export default function EditFolderDialog({
   // Group management functions
   const handleAddGroup = () => {
     if (!newGroupName.trim()) return;
-    
+
     const maxOrder = groups.length > 0 ? Math.max(...groups.map(g => g.order)) : 0;
     const newGroup: FolderGroup = {
       id: `group-${Date.now()}`,
@@ -209,7 +209,7 @@ export default function EditFolderDialog({
       name: newGroupName.trim(),
       resourcePaths: [],
     };
-    
+
     setGroups([...groups, newGroup]);
     setNewGroupName('');
   };
@@ -222,7 +222,7 @@ export default function EditFolderDialog({
   };
 
   const handleUpdateGroupName = (groupId: string, newName: string) => {
-    setGroups(groups.map(g => 
+    setGroups(groups.map(g =>
       g.id === groupId ? { ...g, name: newName.trim() } : g
     ));
   };
@@ -230,7 +230,7 @@ export default function EditFolderDialog({
   const handleToggleResourceInGroup = (groupId: string, resourcePath: string) => {
     setGroups(groups.map(group => {
       if (group.id !== groupId) return group;
-      
+
       const hasResource = group.resourcePaths.includes(resourcePath);
       return {
         ...group,
@@ -286,7 +286,7 @@ export default function EditFolderDialog({
         <Dialog.Positioner>
           <Dialog.Content maxW="600px">
             <Dialog.Header>
-              <Dialog.Title>Edit Folder</Dialog.Title>
+              <Dialog.Title>Edit Group</Dialog.Title>
               <Dialog.CloseTrigger asChild>
                 <CloseButton size="sm" />
               </Dialog.CloseTrigger>
@@ -303,7 +303,7 @@ export default function EditFolderDialog({
                     disabled={loading}
                   />
                   <Field.HelperText>
-                    Display name for the folder (what's rendered)
+                    Display name for the group (what's rendered)
                   </Field.HelperText>
                 </Field.Root>
 
@@ -374,10 +374,10 @@ export default function EditFolderDialog({
                         .sort((a, b) => a.order - b.order)
                         .map((group, index) => {
                           const isEditing = editingGroupId === group.id;
-                          const groupResources = folderArtifacts.filter(a => 
+                          const groupResources = folderArtifacts.filter(a =>
                             group.resourcePaths.includes(a.path)
                           );
-                          
+
                           return (
                             <Box
                               key={group.id}
@@ -530,7 +530,7 @@ export default function EditFolderDialog({
                     <Separator />
                     <Box>
                       <Text fontSize="sm" fontWeight="medium" mb={3}>
-                        Artifacts in Folder ({folderArtifacts.length})
+                        Artifacts in Group ({folderArtifacts.length})
                       </Text>
                       <VStack align="stretch" gap={2} maxH="300px" overflowY="auto">
                         {folderArtifacts.map((artifact) => {

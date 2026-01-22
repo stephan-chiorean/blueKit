@@ -9,13 +9,17 @@ import {
     Portal,
     Text,
     VStack,
+    Textarea,
+    Badge,
+    Wrap,
+    Button,
 } from '@chakra-ui/react';
-import { LuPlus } from 'react-icons/lu';
+import { LuPlus, LuX } from 'react-icons/lu';
 
 interface CreateFolderPopoverProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onConfirm: (name: string) => Promise<void>;
+    onConfirm: (name: string, description: string, tags: string[]) => Promise<void>;
     trigger: ReactElement;
 }
 
@@ -26,6 +30,9 @@ export function CreateFolderPopover({
     trigger,
 }: CreateFolderPopoverProps) {
     const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [tags, setTags] = useState<string[]>([]);
+    const [tagInput, setTagInput] = useState('');
     const [loading, setLoading] = useState(false);
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
@@ -34,9 +41,13 @@ export function CreateFolderPopover({
     const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
 
     // Reset name when opening
+    // Reset when opening
     useEffect(() => {
         if (isOpen) {
             setName('');
+            setDescription('');
+            setTags([]);
+            setTagInput('');
         }
     }, [isOpen]);
 
@@ -70,11 +81,33 @@ export function CreateFolderPopover({
         if (!name.trim()) return;
         setLoading(true);
         try {
-            await onConfirm(name);
+            await onConfirm(name, description, tags);
             onOpenChange(false);
             setName('');
+            setDescription('');
+            setTags([]);
+            setTagInput('');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAddTag = () => {
+        const trimmed = tagInput.trim();
+        if (trimmed && !tags.includes(trimmed)) {
+            setTags([...tags, trimmed]);
+            setTagInput('');
+        }
+    };
+
+    const handleRemoveTag = (tagToRemove: string) => {
+        setTags(tags.filter(t => t !== tagToRemove));
+    };
+
+    const handleTagKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddTag();
         }
     };
 
@@ -140,7 +173,7 @@ export function CreateFolderPopover({
                 <Portal>
                     <Popover.Positioner zIndex={1400}>
                         <Popover.Content
-                            width="280px"
+                            width="320px"
                             borderRadius="xl"
                             css={{
                                 background: 'rgba(255, 255, 255, 0.85)',
@@ -156,13 +189,14 @@ export function CreateFolderPopover({
                                 },
                             }}
                         >
-                            <Popover.Body p={3}>
+                            <Popover.Body p={4}>
                                 <VStack align="stretch" gap={3}>
-                                    <Text fontSize="sm" fontWeight="semibold">New Folder</Text>
-                                    <HStack gap={2}>
+                                    <Text fontSize="sm" fontWeight="semibold">New Group</Text>
+
+                                    <VStack align="stretch" gap={2}>
                                         <Input
                                             ref={initialFocusRef}
-                                            placeholder="Folder Name"
+                                            placeholder="Group Name"
                                             size="sm"
                                             variant="subtle"
                                             value={name}
@@ -173,32 +207,68 @@ export function CreateFolderPopover({
                                             }}
                                             disabled={loading}
                                             borderRadius="md"
-                                            css={{
-                                                border: 'none',
-                                                '&:focus': {
-                                                    outline: 'none',
-                                                    boxShadow: 'none',
-                                                    border: 'none',
-                                                },
-                                                '&:focus-visible': {
-                                                    outline: 'none',
-                                                    boxShadow: 'none',
-                                                    border: 'none',
-                                                },
-                                            }}
                                         />
-                                        <IconButton
-                                            aria-label="Create folder"
+
+                                        <Textarea
+                                            placeholder="Description (optional)"
                                             size="sm"
-                                            colorPalette="blue"
-                                            onClick={handleSubmit}
-                                            loading={loading}
-                                            disabled={!name.trim()}
-                                            rounded="md"
-                                        >
-                                            <Icon><LuPlus /></Icon>
-                                        </IconButton>
-                                    </HStack>
+                                            variant="subtle"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            disabled={loading}
+                                            borderRadius="md"
+                                            rows={2}
+                                            resize="none"
+                                        />
+
+                                        <VStack align="stretch" gap={2}>
+                                            <Input
+                                                placeholder="Add tags (Enter to add)"
+                                                size="sm"
+                                                variant="subtle"
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                onKeyDown={handleTagKeyDown}
+                                                disabled={loading}
+                                                borderRadius="md"
+                                            />
+                                            {tags.length > 0 && (
+                                                <Wrap gap={1}>
+                                                    {tags.map(tag => (
+                                                        <Badge
+                                                            key={tag}
+                                                            size="sm"
+                                                            variant="surface"
+                                                            colorPalette="blue"
+                                                        >
+                                                            {tag}
+                                                            <Box
+                                                                as="span"
+                                                                ml={1}
+                                                                cursor="pointer"
+                                                                onClick={() => handleRemoveTag(tag)}
+                                                                _hover={{ opacity: 0.7 }}
+                                                            >
+                                                                <LuX size={10} />
+                                                            </Box>
+                                                        </Badge>
+                                                    ))}
+                                                </Wrap>
+                                            )}
+                                        </VStack>
+                                    </VStack>
+
+                                    <Button
+                                        size="sm"
+                                        colorPalette="blue"
+                                        onClick={handleSubmit}
+                                        loading={loading}
+                                        disabled={!name.trim()}
+                                        width="full"
+                                        mt={2}
+                                    >
+                                        Create Group
+                                    </Button>
                                 </VStack>
                             </Popover.Body>
                         </Popover.Content>

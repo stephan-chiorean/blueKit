@@ -64,7 +64,7 @@ export function ArtifactToolbar({
             <Icon>
               <LuFolderPlus />
             </Icon>
-            <Text>New Folder</Text>
+            <Text>New Group</Text>
           </HStack>
         </Button>
       </HStack>
@@ -109,6 +109,7 @@ export function ArtifactToolbar({
     </Flex>
   );
 }
+
 
 
 

@@ -426,8 +426,8 @@ export function ResourceSelectionBar({
                                         showArrow={false}
                                         triggerVariant="subtle"
                                         triggerColorPalette="blue"
-                                        popoverTitle="Move to Folder"
-                                        emptyStateMessage="No Folders Found"
+                                        popoverTitle="Move to Group"
+                                        emptyStateMessage="No Groups Found"
                                         emptyStateIcon={
                                             <Icon fontSize="2xl" color="blue.500">
                                                 <MdFolder />
@@ -444,7 +444,7 @@ export function ResourceSelectionBar({
                                             </HStack>
                                         )}
                                         getConfirmLabel={(count) =>
-                                            `Move to ${count} Folder${count !== 1 ? 's' : ''}`
+                                            `Move to ${count} Group${count !== 1 ? 's' : ''}`
                                         }
                                         confirmButtonLabel="Move"
                                         confirmButtonColorPalette="blue"

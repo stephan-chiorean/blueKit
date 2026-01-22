@@ -9,6 +9,8 @@ import {
   Portal,
   Text,
   VStack,
+  Badge,
+  Flex,
 } from "@chakra-ui/react";
 import React, { useState, useRef, useEffect } from "react";
 import { MdFolder } from "react-icons/md";
@@ -21,8 +23,11 @@ import {
   LuPencil,
   LuTrash2,
 } from "react-icons/lu";
+import { motion } from "framer-motion";
 import { ArtifactFile, ArtifactFolder } from "../../ipc";
 import GlassCard from "./GlassCard";
+
+const MotionBox = motion.create(Box);
 
 interface SimpleFolderCardProps {
   folder: ArtifactFolder;
@@ -30,6 +35,7 @@ interface SimpleFolderCardProps {
   onOpenFolder: () => void;
   onDeleteFolder: () => void;
   onRenameFolder: (newName: string) => Promise<void>;
+  index?: number;
 }
 
 export function SimpleFolderCard({
@@ -38,11 +44,17 @@ export function SimpleFolderCard({
   onOpenFolder,
   onDeleteFolder,
   onRenameFolder,
+  index = 0,
 }: SimpleFolderCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [renameName, setRenameName] = useState(folder.name);
   const [renameLoading, setRenameLoading] = useState(false);
+
+  // Extract config data
+  const displayName = folder.config?.name || folder.name;
+  const description = folder.config?.description;
+  const tags = folder.config?.tags || [];
 
   // Refs for positioning and input selection
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -124,7 +136,16 @@ export function SimpleFolderCard({
   }
 
   return (
-    <Box
+    <MotionBox
+      layout
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      transition={{
+        duration: 0.3,
+        delay: index * 0.05,
+        ease: [0.4, 0, 0.2, 1]
+      }}
       position="relative"
       role="group"
       onMouseEnter={() => setIsHovered(true)}
@@ -165,7 +186,7 @@ export function SimpleFolderCard({
           display="flex"
           flexDirection="column"
           justifyContent="center"
-          minH="100px"
+          minH="120px"
         >
           {/* Menu button positioned absolutely in top-right corner */}
           <Box
@@ -173,6 +194,7 @@ export function SimpleFolderCard({
             top={1.5}
             right={1.5}
             onClick={(e) => e.stopPropagation()}
+            zIndex={3}
           >
             <Menu.Root>
               <Menu.Trigger asChild>
@@ -180,7 +202,7 @@ export function SimpleFolderCard({
                   ref={menuButtonRef}
                   variant="ghost"
                   size="xs"
-                  aria-label="Folder options"
+                  aria-label="Group options"
                   onClick={(e) => e.stopPropagation()}
                   bg="transparent"
                   _hover={{ bg: "transparent" }}
@@ -214,13 +236,13 @@ export function SimpleFolderCard({
                       <Icon>
                         <LuPencil />
                       </Icon>
-                      Rename Folder
+                      Rename Group
                     </Menu.Item>
                     <Menu.Item value="delete" onSelect={onDeleteFolder}>
                       <Icon>
                         <LuTrash2 />
                       </Icon>
-                      Delete Folder
+                      Delete Group
                     </Menu.Item>
                   </Menu.Content>
                 </Menu.Positioner>
@@ -243,13 +265,44 @@ export function SimpleFolderCard({
                 lineHeight: "1.2",
               }}
             >
-              {folder.name}
+              {displayName}
             </Heading>
-            {resourceSummary.length > 0 && (
-              <HStack gap={1.5} justify="center" wrap="wrap">
-                {resourceSummary.map((part, index) => (
-                  <HStack key={index} gap={1}>
-                    {index > 0 && (
+
+            {/* Description */}
+            {description && (
+              <Text fontSize="xs" color="text.secondary" lineClamp={2} textAlign="center" lineHeight="short">
+                {description}
+              </Text>
+            )}
+
+            {/* Tags */}
+            {tags.length > 0 && (
+              <Flex gap={1} wrap="wrap" justify="center" maxW="100%">
+                {tags.slice(0, 3).map(tag => (
+                  <Badge key={tag} size="xs" variant="surface" colorPalette="gray">{tag}</Badge>
+                ))}
+                {tags.length > 3 && <Badge size="xs" variant="outline" colorPalette="gray">+{tags.length - 3}</Badge>}
+              </Flex>
+            )}
+
+            {/* Resource Counts */}
+            <Box mt={1}>
+              {resourceSummary.length > 0 ? (
+                <HStack gap={1.5} justify="center" wrap="wrap">
+                  {resourceSummary.map((part, index) => (
+                    <HStack key={index} gap={1}>
+                      {index > 0 && (
+                        <Text
+                          fontSize="sm"
+                          color={isHovered ? "primary.solid" : "secondary.solid"}
+                          _dark={{
+                            color: isHovered ? "primary.solid" : "blue.300"
+                          }}
+                          transition="color 0.2s"
+                        >
+                          •
+                        </Text>
+                      )}
                       <Text
                         fontSize="sm"
                         color={isHovered ? "primary.solid" : "secondary.solid"}
@@ -258,45 +311,34 @@ export function SimpleFolderCard({
                         }}
                         transition="color 0.2s"
                       >
-                        •
+                        {part.count}
                       </Text>
-                    )}
-                    <Text
-                      fontSize="sm"
-                      color={isHovered ? "primary.solid" : "secondary.solid"}
-                      _dark={{
-                        color: isHovered ? "primary.solid" : "blue.300"
-                      }}
-                      transition="color 0.2s"
-                    >
-                      {part.count}
-                    </Text>
-                    <Icon
-                      fontSize="sm"
-                      color={isHovered ? "primary.solid" : "secondary.solid"}
-                      _dark={{
-                        color: isHovered ? "primary.solid" : "blue.300"
-                      }}
-                      transition="color 0.2s"
-                    >
-                      {part.icon}
-                    </Icon>
-                  </HStack>
-                ))}
-              </HStack>
-            )}
-            {resourceSummary.length === 0 && (
-              <Text
-                fontSize="sm"
-                color={isHovered ? "primary.solid" : "secondary.solid"}
-                _dark={{
-                  color: isHovered ? "primary.solid" : "blue.300"
-                }}
-                transition="color 0.2s"
-              >
-                —
-              </Text>
-            )}
+                      <Icon
+                        fontSize="sm"
+                        color={isHovered ? "primary.solid" : "secondary.solid"}
+                        _dark={{
+                          color: isHovered ? "primary.solid" : "blue.300"
+                        }}
+                        transition="color 0.2s"
+                      >
+                        {part.icon}
+                      </Icon>
+                    </HStack>
+                  ))}
+                </HStack>
+              ) : (
+                <Text
+                  fontSize="sm"
+                  color={isHovered ? "primary.solid" : "secondary.solid"}
+                  _dark={{
+                    color: isHovered ? "primary.solid" : "blue.300"
+                  }}
+                  transition="color 0.2s"
+                >
+                  Empty
+                </Text>
+              )}
+            </Box>
           </VStack>
         </Box>
       </GlassCard>
@@ -339,11 +381,11 @@ export function SimpleFolderCard({
               onClick={(e) => e.stopPropagation()}
             >
               <VStack align="stretch" gap={3}>
-                <Text fontSize="sm" fontWeight="semibold">Rename Folder</Text>
+                <Text fontSize="sm" fontWeight="semibold">Rename Group</Text>
                 <HStack gap={2}>
                   <Input
                     ref={inputRef}
-                    placeholder="Folder Name"
+                    placeholder="Group Name"
                     size="sm"
                     variant="subtle"
                     value={renameName}
@@ -385,7 +427,7 @@ export function SimpleFolderCard({
           </Box>
         </Portal>
       )}
-    </Box>
+    </MotionBox>
   );
 }
 

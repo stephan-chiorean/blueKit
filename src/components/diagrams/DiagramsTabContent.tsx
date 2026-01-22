@@ -280,7 +280,7 @@ function DiagramsTabContent({
       await invokeDeleteArtifactFolder(deletingFolder.path);
       toaster.create({
         type: 'success',
-        title: 'Folder deleted',
+        title: 'Group deleted',
         description: `Deleted ${deletingFolder.config?.name || deletingFolder.name}`,
       });
 
@@ -291,7 +291,7 @@ function DiagramsTabContent({
       console.error('Failed to delete folder:', error);
       toaster.create({
         type: 'error',
-        title: 'Failed to delete folder',
+        title: 'Failed to delete group',
         description: error instanceof Error ? error.message : 'Unknown error',
         closable: true,
       });
@@ -354,7 +354,7 @@ function DiagramsTabContent({
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
-                <Heading size="md">Folders</Heading>
+                <Heading size="md">Groups</Heading>
                 <Text fontSize="sm" color="text.muted">
                   {folderTree.length}
                 </Text>
@@ -369,7 +369,7 @@ function DiagramsTabContent({
                     <Icon>
                       <LuFolderPlus />
                     </Icon>
-                    <Text>New Folder</Text>
+                    <Text>New Group</Text>
                   </HStack>
                 </Button>
               </Flex>
@@ -413,8 +413,8 @@ function DiagramsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <SimpleGrid 
-                columns={{ base: 1, md: 2, lg: 3 }} 
+              <SimpleGrid
+                columns={{ base: 1, md: 2, lg: 3 }}
                 gap={4}
                 css={{
                   alignItems: 'start',
@@ -456,7 +456,7 @@ function DiagramsTabContent({
                     const folderDescription = node.folder.config?.description || '';
                     const totalResources = node.artifacts.length;
                     const isExpanded = expandedFolders.has(node.folder.path);
-                    
+
                     return (
                       <>
                         <Table.Row
@@ -598,7 +598,7 @@ function DiagramsTabContent({
                   <Icon>
                     <LuFolderPlus />
                   </Icon>
-                  <Text>New Folder</Text>
+                  <Text>New Group</Text>
                 </HStack>
               </Button>
             )}
@@ -614,7 +614,7 @@ function DiagramsTabContent({
               textAlign="center"
             >
               <Text color="text.muted" fontSize="sm">
-                No diagrams at root level. All diagrams are organized in folders.
+                No diagrams at root level. All diagrams are organized in groups.
               </Text>
             </Box>
           ) : viewMode === 'card' ? (

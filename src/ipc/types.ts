@@ -138,7 +138,7 @@ export interface ArtifactFolder {
   path: string;
   /** @deprecated Always undefined - flat folder structure */
   parentPath?: string;
-  /** @deprecated Always undefined - no config.json used */
+  /** Parsed config.json if exists, undefined otherwise */
   config?: FolderConfig;
   /** Number of direct child artifacts */
   artifactCount: number;

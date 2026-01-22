@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import {
   Box,
   Heading,
@@ -208,7 +209,7 @@ function KitsTabContent({
       await invokeRenameArtifactFolder(folder.path, newName);
       toaster.create({
         type: 'success',
-        title: 'Folder renamed',
+        title: 'Group renamed',
         description: `Renamed to ${newName}`,
       });
       // Reload folders to reflect the change
@@ -218,7 +219,7 @@ function KitsTabContent({
       console.error('Failed to rename folder:', error);
       toaster.create({
         type: 'error',
-        title: 'Failed to rename folder',
+        title: 'Failed to rename group',
         description: error instanceof Error ? error.message : 'Unknown error',
         closable: true,
       });
@@ -238,7 +239,7 @@ function KitsTabContent({
       await invokeDeleteArtifactFolder(deletingFolder.path);
       toaster.create({
         type: 'success',
-        title: 'Folder deleted',
+        title: 'Group deleted',
         description: `Deleted ${deletingFolder.name}`,
       });
 
@@ -249,7 +250,7 @@ function KitsTabContent({
       console.error('Failed to delete folder:', error);
       toaster.create({
         type: 'error',
-        title: 'Failed to delete folder',
+        title: 'Failed to delete group',
         description: error instanceof Error ? error.message : 'Unknown error',
         closable: true,
       });
@@ -325,7 +326,7 @@ function KitsTabContent({
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
-                <Heading size="md">Folders</Heading>
+                <Heading size="md">Groups</Heading>
                 <Text fontSize="sm" color="text.muted">
                   {folders.length}
                 </Text>
@@ -333,7 +334,7 @@ function KitsTabContent({
                 <CreateFolderPopover
                   isOpen={isCreateFolderOpen}
                   onOpenChange={setIsCreateFolderOpen}
-                  onConfirm={(name) => handleCreateFolder(name, {})}
+                  onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
                   trigger={
                     <Button
                       size="sm"
@@ -344,7 +345,7 @@ function KitsTabContent({
                         <Icon>
                           <LuFolderPlus />
                         </Icon>
-                        <Text>New Folder</Text>
+                        <Text>New Group</Text>
                       </HStack>
                     </Button>
                   }
@@ -362,25 +363,28 @@ function KitsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <SimpleGrid
-                columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                gap={4}
-                p={1}
-                width="100%"
-                maxW="100%"
-                overflow="visible"
-              >
-                {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder) => (
-                  <SimpleFolderCard
-                    key={folder.path}
-                    folder={folder}
-                    artifacts={getFolderArtifacts(folder.path)}
-                    onOpenFolder={() => setViewingFolder(folder)}
-                    onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
-                    onDeleteFolder={() => handleDeleteFolder(folder)}
-                  />
-                ))}
-              </SimpleGrid>
+              <AnimatePresence mode="popLayout">
+                <SimpleGrid
+                  columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                  gap={4}
+                  p={1}
+                  width="100%"
+                  maxW="100%"
+                  overflow="visible"
+                >
+                  {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
+                    <SimpleFolderCard
+                      key={folder.path}
+                      folder={folder}
+                      artifacts={getFolderArtifacts(folder.path)}
+                      onOpenFolder={() => setViewingFolder(folder)}
+                      onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
+                      onDeleteFolder={() => handleDeleteFolder(folder)}
+                      index={index}
+                    />
+                  ))}
+                </SimpleGrid>
+              </AnimatePresence>
             ) : (
               <Box
                 p={6}
@@ -465,7 +469,7 @@ function KitsTabContent({
                   <Icon>
                     <LuFolderPlus />
                   </Icon>
-                  <Text>New Folder</Text>
+                  <Text>New Group</Text>
                 </HStack>
               </Button>
             )}
@@ -483,35 +487,38 @@ function KitsTabContent({
               <Text color="text.muted" fontSize="sm">
                 {(nameFilter || selectedTags.length > 0)
                   ? 'No kits match the current filters'
-                  : 'No kits at root level. All kits are organized in folders.'}
+                  : 'No kits at root level. All kits are organized in groups.'}
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3 }}
-              gap={4}
-              p={1}
-              width="100%"
-              maxW="100%"
-              overflow="visible"
-              css={{
-                '> *': {
-                  minHeight: '220px',
-                },
-              }}
-            >
-              {rootKits.map((kit) => (
-                <ResourceCard
-                  key={kit.path}
-                  resource={kit}
-                  isSelected={isSelected(kit.path)}
-                  onToggle={() => handleKitToggle(kit)}
-                  onClick={() => handleViewKit(kit)}
-                  onContextMenu={(e) => handleContextMenu(e, kit)}
-                  resourceType="kit"
-                />
-              ))}
-            </SimpleGrid>
+            <AnimatePresence mode="popLayout">
+              <SimpleGrid
+                columns={{ base: 1, md: 2, lg: 3 }}
+                gap={4}
+                p={1}
+                width="100%"
+                maxW="100%"
+                overflow="visible"
+                css={{
+                  '> *': {
+                    minHeight: '220px',
+                  },
+                }}
+              >
+                {rootKits.map((kit, index) => (
+                  <ResourceCard
+                    key={kit.path}
+                    resource={kit}
+                    isSelected={isSelected(kit.path)}
+                    onToggle={() => handleKitToggle(kit)}
+                    onClick={() => handleViewKit(kit)}
+                    onContextMenu={(e) => handleContextMenu(e, kit)}
+                    resourceType="kit"
+                    index={index}
+                  />
+                ))}
+              </SimpleGrid>
+            </AnimatePresence>
           ) : viewMode === 'blueprints' ? (
             <Box
               p={6}
