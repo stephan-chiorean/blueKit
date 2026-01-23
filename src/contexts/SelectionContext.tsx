@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type SelectionType = 'Kit' | 'Walkthrough' | 'Agent' | 'Diagram' | 'Task' | 'Folder';
+export type SelectionType = 'Kit' | 'Walkthrough' | 'Agent' | 'Diagram' | 'Task' | 'Folder' | 'Plan';
 
 export interface SelectedItem {
   id: string;
@@ -79,7 +79,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     item.type === 'Kit' ||
     item.type === 'Walkthrough' ||
     item.type === 'Agent' ||
-    item.type === 'Diagram'
+    item.type === 'Diagram' ||
+    item.type === 'Plan'
   );
 
   const hasTaskSelection = selectedItems.some((item) => item.type === 'Task');

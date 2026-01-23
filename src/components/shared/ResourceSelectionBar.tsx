@@ -18,6 +18,7 @@ import {
     LuBot,
     LuNetwork,
     LuUpload,
+    LuMap,
 } from 'react-icons/lu';
 import { MdFolder } from 'react-icons/md';
 import { ArtifactFolder, Project, invokeCopyKitToProject, invokeCopyWalkthroughToProject, invokeCopyDiagramToProject, deleteResources } from '../../ipc';
@@ -38,6 +39,7 @@ const artifactTypeIcon: Record<string, React.ReactNode> = {
     Agent: <LuBot />,
     diagram: <LuNetwork />,
     Diagram: <LuNetwork />,
+    Plan: <LuMap />,
 };
 
 // Artifact type label mapping
@@ -50,6 +52,7 @@ const artifactTypeLabels: Record<string, { singular: string; plural: string }> =
     Agent: { singular: 'agent', plural: 'agents' },
     diagram: { singular: 'diagram', plural: 'diagrams' },
     Diagram: { singular: 'diagram', plural: 'diagrams' },
+    Plan: { singular: 'plan', plural: 'plans' },
 };
 
 // Extended folder type for SelectorPopover (needs id)
@@ -144,6 +147,8 @@ export function ResourceSelectionBar({
             }, 100);
         }
     }, []);
+
+    const hasPlanSelection = selectedItems.some(item => item.type === 'Plan');
 
     // Handlers that update both refs and state immediately
     const handleMovePopoverChange = useCallback((open: boolean) => {
@@ -414,7 +419,7 @@ export function ResourceSelectionBar({
                                 </HStack>
                             </Button>
 
-                            {foldersWithId.length > 0 && (
+                            {foldersWithId.length > 0 && !hasPlanSelection && (
                                 <>
                                     <Separator orientation="vertical" height="20px" />
 

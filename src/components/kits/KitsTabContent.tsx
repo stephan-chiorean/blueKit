@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import {
   Box,
   Heading,
@@ -15,9 +14,8 @@ import {
 import { LuFilter, LuFolderPlus } from 'react-icons/lu';
 import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
-import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { ToolkitHeader } from '../shared/ToolkitHeader';
-import { LiquidViewModeSwitcher } from './LiquidViewModeSwitcher';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
@@ -31,6 +29,7 @@ import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
 import FilePreviewPopover from '../sidebar/FilePreviewPopover';
 import { useSmartHover } from '../../hooks/useSmartHover';
+import { SimpleFolderCardSkeleton, ResourceCardSkeleton } from '../shared/Skeletons';
 
 interface KitsTabContentProps {
   kits: ArtifactFile[];
@@ -69,6 +68,7 @@ function KitsTabContent({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
+  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
@@ -154,19 +154,20 @@ function KitsTabContent({
   useEffect(() => {
     const loadFolders = async () => {
       try {
+        setIsFoldersLoading(true);
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'kits');
         setFolders(loadedFolders);
       } catch (err) {
         console.error('Failed to load folders:', err);
+      } finally {
+        setIsFoldersLoading(false);
       }
     };
 
-    // Debounce folder loading to avoid excessive calls when artifacts update rapidly
-    const timeoutId = setTimeout(() => {
-      loadFolders();
-    }, 100); // 100ms debounce
+    // Load folders immediately when dependencies change
+    loadFolders();
 
-    return () => clearTimeout(timeoutId);
+    return () => { };
   }, [projectPath, kits]); // Reload when kits change (from file watcher)
 
   const handleViewKit = (kit: ArtifactFile) => {
@@ -287,8 +288,30 @@ function KitsTabContent({
 
   if (kitsLoading) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
-        Loading kits...
+      <Box position="relative" width="100%" maxW="100%">
+        <VStack align="stretch" gap={6} width="100%">
+          <ToolkitHeader title="Kits" />
+          <Box position="relative">
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Groups</Heading>
+            </Flex>
+            <SimpleGrid columns={{ base: 3, md: 4, lg: 5, xl: 6 }} gap={4} width="100%">
+              {[1, 2, 3, 4].map((i) => (
+                <SimpleFolderCardSkeleton key={i} />
+              ))}
+            </SimpleGrid>
+          </Box>
+          <Box mb={8} position="relative" width="100%">
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Kits</Heading>
+            </Flex>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} width="100%">
+              {[1, 2, 3].map((i) => (
+                <ResourceCardSkeleton key={i} />
+              ))}
+            </SimpleGrid>
+          </Box>
+        </VStack>
       </Box>
     );
   }
@@ -338,8 +361,8 @@ function KitsTabContent({
         {/* Toolkit Header */}
         <ToolkitHeader title="Kits" />
 
-        {/* Folders Section - only show if folders exist */}
-        {folders.length > 0 && (
+        {/* Folders Section - only show if folders exist or loading */}
+        {(folders.length > 0 || isFoldersLoading) && (
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
@@ -369,7 +392,8 @@ function KitsTabContent({
                 />
               </Flex>
               {/* View Mode Switcher */}
-              <LiquidViewModeSwitcher
+              <ViewModeSwitcher
+                variant="liquid"
                 value={viewMode}
                 onChange={(mode) => setViewMode(mode as ViewMode)}
                 modes={[
@@ -380,16 +404,18 @@ function KitsTabContent({
             </Flex>
 
             {viewMode === 'card' ? (
-              <AnimatePresence mode="popLayout">
-                <SimpleGrid
-                  columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                  gap={4}
-                  p={1}
-                  width="100%"
-                  maxW="100%"
-                  overflow="visible"
-                >
-                  {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
+              <SimpleGrid
+                columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+                gap={4}
+                p={1}
+                width="100%"
+                maxW="100%"
+                overflow="visible"
+              >
+                {isFoldersLoading ? (
+                  [1, 2, 3, 4].map((i) => <SimpleFolderCardSkeleton key={i} />)
+                ) : (
+                  [...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
                     <SimpleFolderCard
                       key={folder.path}
                       folder={folder}
@@ -399,10 +425,13 @@ function KitsTabContent({
                       onDeleteFolder={() => handleDeleteFolder(folder)}
                       index={index}
                     />
-                  ))}
-                </SimpleGrid>
-              </AnimatePresence>
+                  ))
+                )}
+              </SimpleGrid>
             ) : (
+
+
+
               <Box
                 p={6}
                 bg="bg.subtle"
@@ -508,37 +537,35 @@ function KitsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <AnimatePresence mode="popLayout">
-              <SimpleGrid
-                columns={{ base: 1, md: 2, lg: 3 }}
-                gap={4}
-                p={1}
-                width="100%"
-                maxW="100%"
-                overflow="visible"
-                css={{
-                  '> *': {
-                    minHeight: '220px',
-                  },
-                }}
-              >
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3 }}
+              gap={4}
+              p={1}
+              width="100%"
+              maxW="100%"
+              overflow="visible"
+              css={{
+                '> *': {
+                  minHeight: '220px',
+                },
+              }}
+            >
 
-                {rootKits.map((kit, index) => (
-                  <ResourceCard
-                    key={kit.path}
-                    resource={kit}
-                    isSelected={isSelected(kit.path)}
-                    onToggle={() => handleKitToggle(kit)}
-                    onClick={() => handleViewKit(kit)}
-                    onContextMenu={(e) => handleContextMenu(e, kit)}
-                    resourceType="kit"
-                    index={index}
-                    onMouseEnter={(e) => handleMouseEnter(kit, e)}
-                    onMouseLeave={(e) => handleMouseLeave(e)}
-                  />
-                ))}
-              </SimpleGrid>
-            </AnimatePresence>
+              {rootKits.map((kit, index) => (
+                <ResourceCard
+                  key={kit.path}
+                  resource={kit}
+                  isSelected={isSelected(kit.path)}
+                  onToggle={() => handleKitToggle(kit)}
+                  onClick={() => handleViewKit(kit)}
+                  onContextMenu={(e) => handleContextMenu(e, kit)}
+                  resourceType="kit"
+                  index={index}
+                  onMouseEnter={(e) => handleMouseEnter(kit, e)}
+                  onMouseLeave={(e) => handleMouseLeave(e)}
+                />
+              ))}
+            </SimpleGrid>
           ) : viewMode === 'blueprints' ? (
             <Box
               p={6}

@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import {
   Box,
   Heading,
@@ -14,8 +13,8 @@ import {
 } from '@chakra-ui/react';
 import { LuFilter, LuFolderPlus, LuBookOpen, LuPlus } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
-import { STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
-import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
+import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { useSelection } from '../../contexts/SelectionContext';
 import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
@@ -29,6 +28,7 @@ import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import CreateWalkthroughDialog from './CreateWalkthroughDialog';
 import FilePreviewPopover from '../sidebar/FilePreviewPopover';
 import { useSmartHover } from '../../hooks/useSmartHover';
+import { SimpleFolderCardSkeleton, ResourceCardSkeleton } from '../shared/Skeletons';
 
 interface WalkthroughsTabContentProps {
   kits: ArtifactFile[];
@@ -84,6 +84,7 @@ function WalkthroughsTabContent({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
+  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
@@ -150,21 +151,20 @@ function WalkthroughsTabContent({
   useEffect(() => {
     const loadFolders = async () => {
       try {
+        setIsFoldersLoading(true);
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
         setFolders(loadedFolders);
       } catch (err) {
         console.error('[WalkthroughFolders] ❌ Failed to load folders:', err);
+      } finally {
+        setIsFoldersLoading(false);
       }
     };
 
-    // Debounce folder loading to avoid excessive calls when artifacts update rapidly
-    const timeoutId = setTimeout(() => {
-      loadFolders();
-    }, 100); // 100ms debounce
+    // Load folders immediately when dependencies change
+    loadFolders();
 
-    return () => {
-      clearTimeout(timeoutId);
-    };
+    return () => { };
   }, [projectPath, walkthroughs]); // Reload when walkthroughs change (from file watcher)
 
   // Get artifacts for a specific folder
@@ -263,8 +263,32 @@ function WalkthroughsTabContent({
 
   if (kitsLoading) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
-        Loading walkthroughs...
+      <Box position="relative">
+        <VStack align="stretch" gap={6}>
+          <Flex align="center" justify="space-between" mb={6} py={2}>
+            <Heading size="2xl">Walkthroughs</Heading>
+          </Flex>
+          <Box>
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Groups</Heading>
+            </Flex>
+            <SimpleGrid columns={{ base: 3, md: 4, lg: 5, xl: 6 }} gap={4}>
+              {[1, 2, 3, 4].map((i) => (
+                <SimpleFolderCardSkeleton key={i} />
+              ))}
+            </SimpleGrid>
+          </Box>
+          <Box>
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Walkthroughs</Heading>
+            </Flex>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              {[1, 2, 3].map((i) => (
+                <ResourceCardSkeleton key={i} />
+              ))}
+            </SimpleGrid>
+          </Box>
+        </VStack>
       </Box>
     );
   }
@@ -310,36 +334,16 @@ function WalkthroughsTabContent({
   return (
     <Box position="relative">
       <VStack align="stretch" gap={6}>
-        {/* Toolkit Header - matches Tasks pattern */}
-        <Flex align="center" justify="space-between" mb={6} py={2}>
-          <Heading
-            size="2xl"
-            css={{
-              textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-              _dark: {
-                textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
-              },
-            }}
-          >
-            Walkthroughs
-          </Heading>
-          {projectId && (
-            <Button
-              colorPalette="primary"
-              variant="solid"
-              size="sm"
-              borderRadius="lg"
-              onClick={() => setIsCreateWalkthroughOpen(true)}
-            >
-              <HStack gap={2}>
-                <Icon>
-                  <LuPlus />
-                </Icon>
-                <Text>Add Walkthrough</Text>
-              </HStack>
-            </Button>
-          )}
-        </Flex>
+        {/* Toolkit Header */}
+        <ToolkitHeader
+          title="Walkthroughs"
+          action={projectId ? {
+            label: "Add Walkthrough",
+            onClick: () => setIsCreateWalkthroughOpen(true),
+            variant: 'solid',
+            icon: LuPlus,
+          } : undefined}
+        />
 
         {/* Folders Section */}
         <Box position="relative">
@@ -419,7 +423,8 @@ function WalkthroughsTabContent({
               />
             </Flex>
             {/* View Mode Switcher */}
-            <LiquidViewModeSwitcher
+            <ViewModeSwitcher
+              variant="liquid"
               value={viewMode}
               onChange={(mode) => setViewMode(mode as ViewMode)}
               modes={[
@@ -429,7 +434,7 @@ function WalkthroughsTabContent({
             />
           </Flex>
 
-          {folders.length === 0 ? (
+          {folders.length === 0 && !isFoldersLoading ? (
             <Box
               p={6}
               bg="bg.subtle"
@@ -443,14 +448,16 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <AnimatePresence mode="popLayout">
-              <SimpleGrid
-                columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                gap={4}
-                p={1}
-                overflow="visible"
-              >
-                {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
+            <SimpleGrid
+              columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
+              gap={4}
+              p={1}
+              overflow="visible"
+            >
+              {isFoldersLoading ? (
+                [1, 2, 3, 4].map((i) => <SimpleFolderCardSkeleton key={i} />)
+              ) : (
+                [...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
                   <SimpleFolderCard
                     key={folder.path}
                     folder={folder}
@@ -460,9 +467,9 @@ function WalkthroughsTabContent({
                     onDeleteFolder={() => handleDeleteFolder(folder)}
                     index={index}
                   />
-                ))}
-              </SimpleGrid>
-            </AnimatePresence>
+                ))
+              )}
+            </SimpleGrid>
           ) : null}
         </Box>
 
@@ -491,23 +498,21 @@ function WalkthroughsTabContent({
               </Text>
             </Box>
           ) : viewMode === 'card' ? (
-            <AnimatePresence mode="popLayout">
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1} overflow="visible">
-                {rootWalkthroughs.map((walkthrough, index) => (
-                  <ResourceCard
-                    key={walkthrough.path}
-                    resource={walkthrough}
-                    isSelected={isSelected(walkthrough.path)}
-                    onToggle={() => handleWalkthroughToggle(walkthrough)}
-                    onClick={() => handleViewWalkthrough(walkthrough)}
-                    resourceType="walkthrough"
-                    index={index}
-                    onMouseEnter={(e) => handleMouseEnter(walkthrough, e)}
-                    onMouseLeave={(e) => handleMouseLeave(e)}
-                  />
-                ))}
-              </SimpleGrid>
-            </AnimatePresence>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1} overflow="visible">
+              {rootWalkthroughs.map((walkthrough, index) => (
+                <ResourceCard
+                  key={walkthrough.path}
+                  resource={walkthrough}
+                  isSelected={isSelected(walkthrough.path)}
+                  onToggle={() => handleWalkthroughToggle(walkthrough)}
+                  onClick={() => handleViewWalkthrough(walkthrough)}
+                  resourceType="walkthrough"
+                  index={index}
+                  onMouseEnter={(e) => handleMouseEnter(walkthrough, e)}
+                  onMouseLeave={(e) => handleMouseLeave(e)}
+                />
+              ))}
+            </SimpleGrid>
           ) : viewMode === 'walkthroughs' ? (
             <Box
               p={6}

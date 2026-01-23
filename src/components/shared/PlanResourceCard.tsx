@@ -5,70 +5,48 @@ import {
     Heading,
     HStack,
     Icon,
-    Tag,
     Text,
     VStack,
+    Tag,
+    Progress,
 } from '@chakra-ui/react';
-import {
-    LuPackage,
-    LuBookOpen,
-    LuBot,
-    LuNetwork,
-} from 'react-icons/lu';
-import { ImTree } from 'react-icons/im';
+import { LuMap } from 'react-icons/lu';
 import { GlassCard } from './GlassCard';
-import { ArtifactFile } from '../../ipc';
+import { Plan } from '../../types/plan';
 
-
-// Artifact type icon mapping
-export const artifactTypeIcon: Record<string, React.ReactNode> = {
-    kit: <LuPackage />,
-    walkthrough: <LuBookOpen />,
-    agent: <LuBot />,
-    implementation_plan: <LuNetwork />,
-    diagram: <LuNetwork />,
-};
-
-interface ResourceCardProps {
-    resource: ArtifactFile;
+interface PlanResourceCardProps {
+    plan: Plan;
     isSelected: boolean;
     onToggle: () => void;
     onClick: () => void;
-    onContextMenu?: (e: React.MouseEvent) => void;
-    resourceType?: 'kit' | 'walkthrough' | 'agent' | 'diagram';
     index?: number;
-    onMouseEnter?: (e: React.MouseEvent) => void;
-    onMouseLeave?: (e: React.MouseEvent) => void;
 }
 
-export function ResourceCard({
-    resource,
+export function PlanResourceCard({
+    plan,
     isSelected,
     onToggle,
     onClick,
-    onContextMenu,
-    resourceType = 'kit',
-    index = 0,
-    onMouseEnter,
-    onMouseLeave,
-}: ResourceCardProps) {
-    const displayName = resource.frontMatter?.alias || resource.name;
-    const description = resource.frontMatter?.description || resource.path;
-    const tags = resource.frontMatter?.tags || [];
-    const isBase = resource.frontMatter?.is_base === true;
-    const icon = artifactTypeIcon[resourceType] || <LuPackage />;
+}: PlanResourceCardProps) {
+    // Plan status badge color
+    const statusColorPalette = {
+        active: 'blue',
+        completed: 'green',
+        archived: 'gray',
+    }[plan.status] || 'gray';
 
     return (
         <Box
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
+            transition="all 0.2s ease-in-out"
+            _hover={{
+                transform: 'translateY(-4px)',
+            }}
         >
             <GlassCard
                 isSelected={isSelected}
                 intensity="medium"
                 cursor="pointer"
                 onClick={onClick}
-                onContextMenu={onContextMenu}
                 _hover={{
                     borderColor: isSelected ? 'primary.600' : 'rgba(255, 255, 255, 0.4)',
                     _dark: {
@@ -77,15 +55,17 @@ export function ResourceCard({
                 }}
             >
                 <Box p={4}>
-                    <VStack align="stretch" gap={2}>
+                    <VStack align="stretch" gap={3}>
                         {/* Header */}
                         <Flex justify="space-between" align="center">
-                            <HStack gap={2} flex={1}>
-                                <Icon color="primary.500">{icon}</Icon>
-                                <Heading size="sm">{displayName}</Heading>
-                                {isBase && (
-                                    <Icon as={ImTree} boxSize={4} color="primary.500" />
-                                )}
+                            <HStack gap={2} flex={1} overflow="hidden">
+                                <Icon color="primary.500" as={LuMap} fontSize="lg" flexShrink={0} />
+                                <Heading size="sm" lineClamp={1} flex={1}>
+                                    {plan.name}
+                                </Heading>
+                                <Tag.Root size="sm" variant="subtle" colorPalette={statusColorPalette} flexShrink={0}>
+                                    <Tag.Label>{plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}</Tag.Label>
+                                </Tag.Root>
                             </HStack>
                             <Checkbox.Root
                                 checked={isSelected}
@@ -95,6 +75,7 @@ export function ResourceCard({
                                 onClick={(e) => e.stopPropagation()}
                                 cursor="pointer"
                                 css={{
+                                    marginLeft: '8px',
                                     _focus: { boxShadow: 'none', outline: 'none' },
                                     _focusVisible: { boxShadow: 'none', outline: 'none' }
                                 }}
@@ -116,9 +97,7 @@ export function ResourceCard({
                                     <Checkbox.Indicator
                                         css={{
                                             color: 'transparent',
-                                            _dark: {
-                                                color: 'transparent',
-                                            },
+                                            _dark: { color: 'transparent' },
                                             _checked: {
                                                 bg: 'primary.500',
                                                 borderColor: 'primary.500',
@@ -131,25 +110,30 @@ export function ResourceCard({
                         </Flex>
 
                         {/* Description */}
-                        <Text fontSize="sm" color="text.secondary" lineClamp={2}>
-                            {description}
+                        <Text fontSize="sm" color="text.secondary" lineClamp={2} minH="40px">
+                            {plan.description || 'No description provided.'}
                         </Text>
 
-                        {/* Tags */}
-                        {tags.length > 0 && (
-                            <HStack gap={2} flexWrap="wrap">
-                                {tags.map((tag: string, idx: number) => (
-                                    <Tag.Root key={`${resource.path}-${tag}-${idx}`} size="sm" variant="subtle" colorPalette="primary">
-                                        <Tag.Label>#{tag}</Tag.Label>
-                                    </Tag.Root>
-                                ))}
-                            </HStack>
-                        )}
+                        {/* Progress */}
+                        <VStack gap={1} align="stretch">
+                            <Flex justify="space-between" align="center">
+                                <Text fontSize="xs" color="text.muted">Progress</Text>
+                                <Text fontSize="xs" fontWeight="bold">{Math.round(plan.progress)}%</Text>
+                            </Flex>
+                            <Progress.Root value={plan.progress} size="sm" colorPalette="primary">
+                                <Progress.Track>
+                                    <Progress.Range />
+                                </Progress.Track>
+                            </Progress.Root>
+                        </VStack>
+
+                        {/* Footer */}
+                        <Text fontSize="xs" color="text.muted" textAlign="right">
+                            Created {new Date(plan.createdAt).toLocaleDateString()}
+                        </Text>
                     </VStack>
                 </Box>
             </GlassCard>
         </Box>
     );
 }
-
-export default ResourceCard;

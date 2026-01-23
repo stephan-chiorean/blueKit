@@ -21,6 +21,11 @@ interface FilterPanelProps {
   selectedTags: string[];
   onToggleTag: (tag: string) => void;
   filterButtonRef?: React.RefObject<HTMLButtonElement>;
+
+  // New props for status filtering
+  statusOptions?: Array<{ value: string; label: string; colorPalette: string }>;
+  selectedStatuses?: string[];
+  onToggleStatus?: (status: string) => void;
 }
 
 /**
@@ -29,6 +34,7 @@ interface FilterPanelProps {
  * Provides consistent filtering UI with:
  * - Name filter input
  * - Tag selection
+ * - Status selection (optional)
  * - Click-outside-to-close behavior
  */
 export function FilterPanel({
@@ -40,6 +46,9 @@ export function FilterPanel({
   selectedTags,
   onToggleTag,
   filterButtonRef,
+  statusOptions,
+  selectedStatuses,
+  onToggleStatus,
 }: FilterPanelProps) {
   const filterPanelRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +118,30 @@ export function FilterPanel({
             />
           </InputGroup>
         </Field.Root>
+
+        {statusOptions && statusOptions.length > 0 && (
+          <Field.Root>
+            <Field.Label>Status</Field.Label>
+            <HStack gap={1} flexWrap="wrap" mt={2}>
+              {statusOptions.map(({ value, label, colorPalette }) => {
+                const isSelected = selectedStatuses?.includes(value);
+                return (
+                  <Tag.Root
+                    key={value}
+                    variant={isSelected ? 'solid' : 'subtle'}
+                    colorPalette={isSelected ? colorPalette : undefined}
+                    cursor="pointer"
+                    onClick={() => onToggleStatus?.(value)}
+                    opacity={isSelected ? 1 : 0.6}
+                    _hover={{ opacity: 1 }}
+                  >
+                    <Tag.Label>{label}</Tag.Label>
+                  </Tag.Root>
+                );
+              })}
+            </HStack>
+          </Field.Root>
+        )}
 
         {allTags.length > 0 && (
           <Field.Root>

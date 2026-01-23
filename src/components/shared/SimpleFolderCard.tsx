@@ -23,11 +23,8 @@ import {
   LuPencil,
   LuTrash2,
 } from "react-icons/lu";
-import { motion } from "framer-motion";
 import { ArtifactFile, ArtifactFolder } from "../../ipc";
 import GlassCard from "./GlassCard";
-
-const MotionBox = motion.create(Box);
 
 interface SimpleFolderCardProps {
   folder: ArtifactFolder;
@@ -136,16 +133,7 @@ export function SimpleFolderCard({
   }
 
   return (
-    <MotionBox
-      layout
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{
-        duration: 0.3,
-        delay: index * 0.05,
-        ease: [0.4, 0, 0.2, 1]
-      }}
+    <Box
       position="relative"
       role="group"
       onMouseEnter={() => setIsHovered(true)}
@@ -427,7 +415,7 @@ export function SimpleFolderCard({
           </Box>
         </Portal>
       )}
-    </MotionBox>
+    </Box>
   );
 }
 
