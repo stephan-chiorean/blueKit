@@ -39,6 +39,8 @@ interface ResourceCardProps {
     onContextMenu?: (e: React.MouseEvent) => void;
     resourceType?: 'kit' | 'walkthrough' | 'agent' | 'diagram';
     index?: number;
+    onMouseEnter?: (e: React.MouseEvent) => void;
+    onMouseLeave?: (e: React.MouseEvent) => void;
 }
 
 export function ResourceCard({
@@ -49,6 +51,8 @@ export function ResourceCard({
     onContextMenu,
     resourceType = 'kit',
     index = 0,
+    onMouseEnter,
+    onMouseLeave,
 }: ResourceCardProps) {
     const displayName = resource.frontMatter?.alias || resource.name;
     const description = resource.frontMatter?.description || resource.path;
@@ -59,6 +63,8 @@ export function ResourceCard({
     return (
         <MotionBox
             layout
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}

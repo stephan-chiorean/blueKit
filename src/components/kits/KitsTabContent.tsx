@@ -29,6 +29,8 @@ import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import { FilterPanel } from '../shared/FilterPanel';
 import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
+import FilePreviewPopover from '../sidebar/FilePreviewPopover';
+import { useSmartHover } from '../../hooks/useSmartHover';
 
 interface KitsTabContentProps {
   kits: ArtifactFile[];
@@ -76,6 +78,21 @@ function KitsTabContent({
     y: number;
     kit: ArtifactFile | null;
   }>({ isOpen: false, x: 0, y: 0, kit: null });
+
+  // Smart hover for kits preview
+  const {
+    hoveredItem: hoveredKit,
+    anchorRect,
+    handleMouseEnter,
+    handleMouseLeave,
+    handlePopoverMouseEnter,
+    handlePopoverMouseLeave,
+  } = useSmartHover<ArtifactFile>({
+    initialDelay: 1000,
+    smartDelay: 1000,
+    gracePeriod: 500,
+    placement: 'top',
+  });
 
   const isSelected = (kitId: string) => isSelectedInContext(kitId);
 
@@ -505,6 +522,7 @@ function KitsTabContent({
                   },
                 }}
               >
+
                 {rootKits.map((kit, index) => (
                   <ResourceCard
                     key={kit.path}
@@ -515,6 +533,8 @@ function KitsTabContent({
                     onContextMenu={(e) => handleContextMenu(e, kit)}
                     resourceType="kit"
                     index={index}
+                    onMouseEnter={(e) => handleMouseEnter(kit, e)}
+                    onMouseLeave={(e) => handleMouseLeave(e)}
                   />
                 ))}
               </SimpleGrid>
@@ -562,6 +582,15 @@ function KitsTabContent({
         y={contextMenu.y}
         kit={contextMenu.kit}
         onClose={closeContextMenu}
+      />
+
+      <FilePreviewPopover
+        file={hoveredKit as any}
+        anchorRect={anchorRect}
+        isOpen={!!hoveredKit}
+        onMouseEnter={handlePopoverMouseEnter}
+        onMouseLeave={handlePopoverMouseLeave}
+        placement="top"
       />
     </Box>
   );
