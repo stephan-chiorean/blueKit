@@ -14,7 +14,7 @@ import {
     LuPalette
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Menu, Portal, IconButton, HStack, Text, Tooltip } from '@chakra-ui/react';
 import { invokeOpenProjectInEditor } from '../../ipc';
 import { toaster } from '../ui/toaster';
@@ -55,6 +55,7 @@ interface SidebarContentProps {
     /** External title to display for titleEditPath node (synced from editor) */
     editingTitle?: string;
     projectName?: string;
+    onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
 }
 
 export default function SidebarContent({
@@ -69,7 +70,8 @@ export default function SidebarContent({
     onNewFileCreated,
     titleEditPath,
     editingTitle,
-    projectName
+    projectName,
+    onHandlersReady
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
     const { colorMode } = useColorMode();
@@ -436,7 +438,10 @@ export default function SidebarContent({
                             onNewFileCreated={onNewFileCreated}
                             titleEditPath={titleEditPath}
                             editingTitle={editingTitle}
-                            onHandlersReady={setTreeHandlers}
+                            onHandlersReady={useCallback((handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => {
+                                setTreeHandlers(handlers);
+                                if (onHandlersReady) onHandlersReady(handlers);
+                            }, [onHandlersReady])}
                         />
                     </Box>
                 </SidebarSection>

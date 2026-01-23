@@ -25,6 +25,7 @@ interface ProjectSidebarProps {
   /** External title to display for titleEditPath node (synced from editor) */
   editingTitle?: string;
   isWorktreeView?: boolean;
+  onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
 }
 
 export default function ProjectSidebar({
@@ -44,6 +45,7 @@ export default function ProjectSidebar({
   titleEditPath,
   editingTitle,
   isWorktreeView = false,
+  onHandlersReady,
 }: ProjectSidebarProps) {
   const { colorMode } = useColorMode();
 
@@ -196,6 +198,7 @@ export default function ProjectSidebar({
           titleEditPath={titleEditPath}
           editingTitle={editingTitle}
           projectName={project.title}
+          onHandlersReady={onHandlersReady}
         />
       </Box>
 

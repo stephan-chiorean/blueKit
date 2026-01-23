@@ -662,15 +662,24 @@ export default function NotebookTree({
         }
     }, [nodes, projectPath]);
 
+    // Use a ref to track if we've already registered handlers to avoid loops
+    const hasRegisteredHandlersRef = useRef(false);
+
     // Expose handlers to parent component (for toolbar)
     useEffect(() => {
-        if (onHandlersReady) {
+        if (onHandlersReady && !hasRegisteredHandlersRef.current) {
             onHandlersReady({
                 onNewFile: handleNewFile,
                 onNewFolder: handleNewFolder
             });
+            hasRegisteredHandlersRef.current = true;
         }
     }, [onHandlersReady, handleNewFile, handleNewFolder]);
+
+    // Reset ref if handlers actually change (e.g. project path changes)
+    useEffect(() => {
+        hasRegisteredHandlersRef.current = false;
+    }, [projectPath]);
 
     // Handler for inline edit value changes
     const handleInlineEditChange = (value: string) => {

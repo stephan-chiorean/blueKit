@@ -5,6 +5,7 @@ import {
   VStack,
   Splitter,
 } from '@chakra-ui/react';
+import { toaster } from '../components/ui/toaster';
 import { listen } from '@tauri-apps/api/event';
 import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -21,6 +22,7 @@ import ResourceViewPage from './ResourceViewPage';
 import NoteViewPage from './NoteViewPage';
 import ProjectSidebar from '../components/sidebar/ProjectSidebar';
 import { ViewType } from '../components/sidebar/SidebarContent';
+import EmptyProjectState from '../components/shared/EmptyProjectState';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
 import { deleteResources } from '../ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '../ipc/walkthroughs';
@@ -59,7 +61,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     };
 
   // Sidebar state
-  const [activeView, setActiveView] = useState<ViewType>('tasks');
+  const [activeView, setActiveView] = useState<ViewType>('file');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
@@ -138,7 +140,13 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     });
   }, []);
 
-  const handleTreeRefresh = () => setFileTreeVersion(v => v + 1);
+  const handleTreeRefresh = useCallback(() => setFileTreeVersion(v => v + 1), []);
+
+  // Notebook handlers (new file/folder) - lifted from SidebarContent -> NotebookTree
+  const [notebookHandlers, setNotebookHandlers] = useState<{
+    onNewFile: (folderPath: string) => void;
+    onNewFolder: (folderPath: string) => void;
+  } | null>(null);
 
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
@@ -681,14 +689,44 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
   }, [dbProject, allProjects, project.id, project.path]);
 
   // Handler to clear resource view
-  const handleClearResourceView = () => {
+  const handleClearResourceView = useCallback(() => {
     setViewingResource(null);
     setResourceContent(null);
     setResourceType(null);
     setNotebookFile(null);
-  };
+  }, []);
 
-  const handleFileSelect = async (node: FileTreeNode) => {
+  // Finalize title edit: clear debounce timer, save content, and clear state
+  // Note: File rename already happens in real-time via debounced handler
+  const finalizeTitleEdit = useCallback(async () => {
+    // Clear any pending debounced rename
+    if (renameDebounceRef.current) {
+      clearTimeout(renameDebounceRef.current);
+      renameDebounceRef.current = null;
+    }
+
+    if (!titleEditPath || !notebookFile) {
+      setTitleEditPath(null);
+      setEditingTitle('Untitled');
+      return;
+    }
+
+    try {
+      // Save the current content to the current path (may have been renamed)
+      await invokeWriteFile(notebookFile.resource.path, notebookFile.content);
+      // Refresh tree to ensure it's up to date
+      handleTreeRefresh();
+    } catch (error) {
+      console.error('Failed to finalize title edit:', error);
+    }
+
+    // Clear title edit state
+    setTitleEditPath(null);
+    setEditingTitle('Untitled');
+  }, [titleEditPath, notebookFile, handleTreeRefresh]);
+
+
+  const handleFileSelect = useCallback(async (node: FileTreeNode) => {
     try {
       // Skip finalize check if we're in the middle of creating a new file (prevents race condition)
       if (!isCreatingNewFileRef.current && titleEditPath && node.path !== titleEditPath) {
@@ -732,39 +770,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     } catch (e) {
       console.error("Failed to read file", e);
     }
-  };
-  // Finalize title edit: clear debounce timer, save content, and clear state
-  // Note: File rename already happens in real-time via debounced handler
-  const finalizeTitleEdit = async () => {
-    // Clear any pending debounced rename
-    if (renameDebounceRef.current) {
-      clearTimeout(renameDebounceRef.current);
-      renameDebounceRef.current = null;
-    }
-
-    if (!titleEditPath || !notebookFile) {
-      setTitleEditPath(null);
-      setEditingTitle('Untitled');
-      return;
-    }
-
-    try {
-      // Save the current content to the current path (may have been renamed)
-      await invokeWriteFile(notebookFile.resource.path, notebookFile.content);
-      // Refresh tree to ensure it's up to date
-      handleTreeRefresh();
-    } catch (error) {
-      console.error('Failed to finalize title edit:', error);
-    }
-
-    // Clear title edit state
-    setTitleEditPath(null);
-    setEditingTitle('Untitled');
-  };
+  }, [titleEditPath, finalizeTitleEdit]);
 
   // Handler for when a new file is created in NotebookTree
   // Opens the file immediately in edit mode with title sync enabled
-  const handleNewFileCreated = async (node: FileTreeNode) => {
+  const handleNewFileCreated = useCallback(async (node: FileTreeNode) => {
     // Set ref FIRST to prevent race condition in handleFileSelect
     isCreatingNewFileRef.current = true;
 
@@ -780,7 +790,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
 
     // Clear the ref after file is loaded
     isCreatingNewFileRef.current = false;
-  };
+  }, [handleFileSelect, finalizeTitleEdit]);
 
   // If viewing any resource, show the generic resource view page
   // For plans and walkthroughs, resourceContent can be empty (they load their own data)
@@ -996,11 +1006,22 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
           />
         );
       case 'file':
-        // Placeholder for file view when selected from tree
+        // Show empty state when no file is selected
         return (
-          <Box p={4} textAlign="center" color="gray.500">
-            Select a file from the notebook to view contents
-          </Box>
+          <EmptyProjectState
+            onCreateNote={() => {
+              if (notebookHandlers) {
+                // Create new note in root directory
+                notebookHandlers.onNewFile(project.path);
+              } else {
+                toaster.create({
+                  title: 'Unable to create note',
+                  description: 'File tree is not ready yet',
+                  type: 'error'
+                });
+              }
+            }}
+          />
         );
       default:
         return null;
@@ -1112,6 +1133,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
                 onNewFileCreated={handleNewFileCreated}
                 titleEditPath={titleEditPath}
                 editingTitle={editingTitle}
+                onHandlersReady={setNotebookHandlers}
               />
             </Splitter.Panel>
 
