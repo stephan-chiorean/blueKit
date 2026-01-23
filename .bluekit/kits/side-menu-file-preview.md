@@ -1,3 +1,20 @@
+---
+type: kit
+description: "Implementation of a file preview popover that appears on hover in the side menu"
+tags: ["ui", "file-preview", "popover", "hover"]
+---
+
+# Side Menu File Preview
+
+This kit captures the implementation of a file preview feature that shows a popover with file content when hovering over file items in the navigation tree (or other lists).
+
+## Components
+
+### FilePreviewPopover.tsx
+
+The main component that renders the popover.
+
+```tsx
 import { Box, VStack, Spinner, Portal, HStack } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState, useRef } from 'react';
@@ -131,18 +148,9 @@ export default function FilePreviewPopover({
 
             // Vertical Overflow Check
             if (placement === 'top') {
-                // If top placement causes top overflow, consider flipping to bottom (if implementing full Popper.js logic)
-                // For now, just ensure it doesn't go off-screen top.
                 if (top < VIEWPORT_MARGIN) {
-                    // If it doesn't fit on top, try anchoring to bottom of viewport?
-                    // Or just clamp to margin?
-                    // If we clamp to margin, it might cover the card.
-                    // Let's just clamp for now, or maybe push it down if it's too high.
                     top = VIEWPORT_MARGIN;
                 }
-
-                // If scrolling down, might need to check bottom?
-                // if (top + POPOVER_HEIGHT > viewportHeight - VIEWPORT_MARGIN) ...
             } else {
                 // Right placement logic (existing)
                 if (top + POPOVER_HEIGHT > viewportHeight - VIEWPORT_MARGIN) {
@@ -246,3 +254,211 @@ export default function FilePreviewPopover({
         </Portal>
     );
 }
+```
+
+## Hook
+
+### useSmartHover.ts
+
+A hook to manage hover state with delays and grace periods, preventing accidental triggers and premature closing.
+
+```ts
+import { useState, useRef, useCallback } from 'react';
+
+export interface SmartHoverOptions<T> {
+    initialDelay?: number;
+    smartDelay?: number;
+    gracePeriod?: number;
+    shouldEnter?: (item: T) => boolean;
+    placement?: 'top' | 'right'; // Added to determine distinct exit direction
+}
+
+export function useSmartHover<T>(options: SmartHoverOptions<T> = {}) {
+    const {
+        initialDelay = 600,
+        smartDelay = 50,
+        gracePeriod = 500,
+        shouldEnter = () => true,
+        placement = 'right',
+    } = options;
+
+    const [hoveredItem, setHoveredItem] = useState<T | null>(null);
+    const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+
+    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const dismissTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isPopoverHoveredRef = useRef(false);
+
+    // We use a ref to track the currently hovered item for instant access in event handlers
+    // This avoids dependency cycles with useCallback
+    const activeItemRef = useRef<T | null>(null);
+
+    const handleMouseEnter = useCallback((item: T, event: React.MouseEvent) => {
+        if (!shouldEnter(item)) return;
+
+        // Clear any pending dismissal
+        if (dismissTimeoutRef.current) {
+            clearTimeout(dismissTimeoutRef.current);
+            dismissTimeoutRef.current = null;
+        }
+
+        // Clear any pending hover trigger
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+        }
+
+        const targetRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+
+        // Determine delay: fast if already showing something, slow if starting from scratch
+        const delay = activeItemRef.current ? smartDelay : initialDelay;
+
+        hoverTimeoutRef.current = setTimeout(() => {
+            setHoveredItem(item);
+            setAnchorRect(targetRect);
+            activeItemRef.current = item;
+        }, delay);
+    }, [initialDelay, smartDelay, shouldEnter]);
+
+    const handleMouseLeave = useCallback((event: React.MouseEvent) => {
+        // Clear pending open
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+        }
+
+        // Determine if we should apply grace period based on exit direction
+        let timeToClose = 0; // Default to immediate close
+
+        if (anchorRect) {
+            const { clientX, clientY } = event;
+            const { top, bottom, left, right } = anchorRect;
+
+            // Buffer to account for borderline cases
+            const BUFFER = 2;
+
+            if (placement === 'top') {
+                // If exiting upwards (clientY < top), allow grace period
+                if (clientY < top + BUFFER) {
+                    timeToClose = gracePeriod;
+                }
+            } else if (placement === 'right') {
+                // If exiting rightwards (clientX > right), allow grace period
+                if (clientX > right - BUFFER) {
+                    timeToClose = gracePeriod;
+                }
+            }
+        } else {
+            // Fallback if no anchor rect (shouldn't happen if open)
+            timeToClose = 0;
+        }
+
+
+        // Start grace period for close
+        dismissTimeoutRef.current = setTimeout(() => {
+            if (!isPopoverHoveredRef.current) {
+                setHoveredItem(null);
+                setAnchorRect(null);
+                activeItemRef.current = null;
+            }
+        }, timeToClose);
+    }, [gracePeriod, anchorRect, placement]);
+
+    const handlePopoverMouseEnter = useCallback(() => {
+        isPopoverHoveredRef.current = true;
+        if (dismissTimeoutRef.current) {
+            clearTimeout(dismissTimeoutRef.current);
+            dismissTimeoutRef.current = null;
+        }
+    }, []);
+
+    const handlePopoverMouseLeave = useCallback(() => {
+        isPopoverHoveredRef.current = false;
+        dismissTimeoutRef.current = setTimeout(() => {
+            setHoveredItem(null);
+            setAnchorRect(null);
+            activeItemRef.current = null;
+        }, gracePeriod);
+    }, [gracePeriod]);
+
+    return {
+        hoveredItem,
+        anchorRect,
+        handleMouseEnter,
+        handleMouseLeave,
+        handlePopoverMouseEnter,
+        handlePopoverMouseLeave
+    };
+}
+```
+
+## Usage Example
+
+Integration in `NotebookTree.tsx`.
+
+### 1. Hook Setup
+
+```tsx
+import { useSmartHover } from '../../hooks/useSmartHover';
+import FilePreviewPopover from './FilePreviewPopover';
+
+// ... inside component
+
+    // File Preview Popover State (via hook)
+    const {
+        hoveredItem: hoveredNode,
+        anchorRect,
+        handleMouseEnter: handleNodeMouseEnterBase,
+        handleMouseLeave: handleNodeMouseLeave,
+        handlePopoverMouseEnter,
+        handlePopoverMouseLeave
+    } = useSmartHover<FileTreeNode>({
+        initialDelay: 600,
+        smartDelay: 50,
+        gracePeriod: 500
+    });
+
+    const handleNodeMouseEnter = (node: FileTreeNode, event: React.MouseEvent) => {
+        if (!node.isFolder) {
+            handleNodeMouseEnterBase(node, event);
+        }
+    };
+```
+
+### 2. Event Handlers
+
+Pass event handlers to the list items (nodes).
+
+```tsx
+<TreeNode
+    // ...
+    onNodeMouseEnter={handleNodeMouseEnter}
+    onNodeMouseLeave={handleNodeMouseLeave}
+/>
+```
+
+Inside `TreeNode`:
+
+```tsx
+<HStack
+    // ...
+    onMouseEnter={(e) => onNodeMouseEnter(node, e)}
+    onMouseLeave={(e) => onNodeMouseLeave(e)}
+>
+```
+
+### 3. Rendering Popover
+
+Render the popover at the root of the component (or via React Portal).
+
+```tsx
+{hoveredNode && anchorRect && (
+    <FilePreviewPopover
+        file={hoveredNode}
+        anchorRect={anchorRect}
+        isOpen={!!hoveredNode}
+        onMouseEnter={handlePopoverMouseEnter}
+        onMouseLeave={handlePopoverMouseLeave}
+    />
+)}
+```

@@ -26,8 +26,6 @@ import { toaster } from '../ui/toaster';
 import { ResourceCard } from '../shared/ResourceCard';
 import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import CreateWalkthroughDialog from './CreateWalkthroughDialog';
-import FilePreviewPopover from '../sidebar/FilePreviewPopover';
-import { useSmartHover } from '../../hooks/useSmartHover';
 import { SimpleFolderCardSkeleton, ResourceCardSkeleton } from '../shared/Skeletons';
 
 interface WalkthroughsTabContentProps {
@@ -67,20 +65,7 @@ function WalkthroughsTabContent({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Smart hover for walkthroughs preview
-  const {
-    hoveredItem: hoveredWalkthrough,
-    anchorRect,
-    handleMouseEnter,
-    handleMouseLeave,
-    handlePopoverMouseEnter,
-    handlePopoverMouseLeave,
-  } = useSmartHover<ArtifactFile>({
-    initialDelay: 1000,
-    smartDelay: 1000,
-    gracePeriod: 500,
-    placement: 'top',
-  });
+
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
@@ -508,8 +493,6 @@ function WalkthroughsTabContent({
                   onClick={() => handleViewWalkthrough(walkthrough)}
                   resourceType="walkthrough"
                   index={index}
-                  onMouseEnter={(e) => handleMouseEnter(walkthrough, e)}
-                  onMouseLeave={(e) => handleMouseLeave(e)}
                 />
               ))}
             </SimpleGrid>
@@ -563,14 +546,7 @@ function WalkthroughsTabContent({
         />
       )}
 
-      <FilePreviewPopover
-        file={hoveredWalkthrough as any}
-        anchorRect={anchorRect}
-        isOpen={!!hoveredWalkthrough}
-        onMouseEnter={handlePopoverMouseEnter}
-        onMouseLeave={handlePopoverMouseLeave}
-        placement="top"
-      />
+
     </Box>
   );
 }

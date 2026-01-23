@@ -16,10 +16,9 @@ import { invokeWriteFile, invokeReadFile, invokeAddBookmark, invokeGetBookmarks 
 import { BookmarkItem } from '../../ipc/types';
 import { invokeCreateFolder } from '../../ipc/fileTree';
 import { invokeRenameArtifactFolder, invokeDeleteArtifactFolder, invokeMoveArtifactToFolder } from '../../ipc/folders';
-import { useSmartHover } from '../../hooks/useSmartHover';
 import { deleteResources } from '../../ipc/artifacts';
 import { toaster } from '../ui/toaster';
-import FilePreviewPopover from './FilePreviewPopover';
+
 
 const MotionBox = motion.create(Box);
 
@@ -236,25 +235,7 @@ export default function NotebookTree({
     // Bookmarked paths state for showing bookmark icons
     const [bookmarkedPaths, setBookmarkedPaths] = useState<Set<string>>(new Set());
 
-    // File Preview Popover State (via hook)
-    const {
-        hoveredItem: hoveredNode,
-        anchorRect,
-        handleMouseEnter: handleNodeMouseEnterBase,
-        handleMouseLeave: handleNodeMouseLeave,
-        handlePopoverMouseEnter,
-        handlePopoverMouseLeave
-    } = useSmartHover<FileTreeNode>({
-        initialDelay: 600,
-        smartDelay: 50,
-        gracePeriod: 500
-    });
 
-    const handleNodeMouseEnter = (node: FileTreeNode, event: React.MouseEvent) => {
-        if (!node.isFolder) {
-            handleNodeMouseEnterBase(node, event);
-        }
-    };
 
 
 
@@ -1041,8 +1022,6 @@ export default function NotebookTree({
                     dropTargetPath={hasDragThresholdMet ? dragState?.dropTargetPath : undefined}
                     isValidDrop={dragState?.isValidDrop ?? false}
                     bookmarkedPaths={bookmarkedPaths}
-                    onNodeMouseEnter={handleNodeMouseEnter}
-                    onNodeMouseLeave={handleNodeMouseLeave}
                 />
 
                 {/* Root drop zone - visible during drag */}
@@ -1175,15 +1154,7 @@ export default function NotebookTree({
                 </Popover.Positioner>
             </Popover.Root>
 
-            {hoveredNode && anchorRect && (
-                <FilePreviewPopover
-                    file={hoveredNode}
-                    anchorRect={anchorRect}
-                    isOpen={!!hoveredNode}
-                    onMouseEnter={handlePopoverMouseEnter}
-                    onMouseLeave={handlePopoverMouseLeave}
-                />
-            )}
+
         </>
     );
 }
@@ -1288,8 +1259,7 @@ interface CustomTreeProps {
     // Bookmark props
     bookmarkedPaths: Set<string>;
     // Hover props
-    onNodeMouseEnter: (node: FileTreeNode, event: React.MouseEvent) => void;
-    onNodeMouseLeave: (event: React.MouseEvent) => void;
+
 }
 
 function CustomTree({
@@ -1313,9 +1283,7 @@ function CustomTree({
     draggedNodePath,
     dropTargetPath,
     isValidDrop,
-    bookmarkedPaths,
-    onNodeMouseEnter,
-    onNodeMouseLeave
+    bookmarkedPaths
 }: CustomTreeProps) {
     return (
         <Box pl={level > 0 ? 4 : 0}>
@@ -1348,8 +1316,6 @@ function CustomTree({
                     dropTargetPath={dropTargetPath}
                     isValidDrop={isValidDrop}
                     bookmarkedPaths={bookmarkedPaths}
-                    onNodeMouseEnter={onNodeMouseEnter}
-                    onNodeMouseLeave={onNodeMouseLeave}
                 />
             ))}
         </Box>
@@ -1382,9 +1348,7 @@ function TreeNode({
     draggedNodePath,
     dropTargetPath,
     isValidDrop,
-    bookmarkedPaths,
-    onNodeMouseEnter,
-    onNodeMouseLeave
+    bookmarkedPaths
 }: {
     node: FileTreeNode,
     onNodeClick: (node: FileTreeNode) => void,
@@ -1417,8 +1381,7 @@ function TreeNode({
     // Bookmark props
     bookmarkedPaths: Set<string>,
     // Hover props
-    onNodeMouseEnter: (node: FileTreeNode, event: React.MouseEvent) => void,
-    onNodeMouseLeave: (event: React.MouseEvent) => void
+
 }) {
     // Check if this node is in title-edit mode (visual only, for files)
     const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
@@ -1547,8 +1510,6 @@ function TreeNode({
                 borderColor={isDraggedOver && node.isFolder ? dragOverBorderColor : 'transparent'}
                 data-droppable-folder={node.isFolder ? node.path : undefined}
                 userSelect="none"
-                onMouseEnter={(e) => onNodeMouseEnter(node, e)}
-                onMouseLeave={(e) => onNodeMouseLeave(e)}
             >
                 <Icon
                     as={getFileIcon()}
@@ -1636,8 +1597,6 @@ function TreeNode({
                             dropTargetPath={dropTargetPath}
                             isValidDrop={isValidDrop}
                             bookmarkedPaths={bookmarkedPaths}
-                            onNodeMouseEnter={onNodeMouseEnter}
-                            onNodeMouseLeave={onNodeMouseLeave}
                         />
                     </MotionBox>
                 )}
