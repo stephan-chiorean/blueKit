@@ -167,7 +167,9 @@ export function ElegantList({
                                         color="fg"
                                         truncate
                                     >
-                                        {'alias' in item && item.alias ? (item as any).alias : item.name}
+                                        {isItemFolder 
+                                            ? item.name 
+                                            : ((item as ArtifactFile).frontMatter?.alias || item.name)}
                                     </Text>
                                     {description && (
                                         <Text fontSize="xs" color="text.muted" truncate>
