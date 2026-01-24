@@ -9,24 +9,21 @@ import {
   VStack,
   Button,
   Badge,
-  SimpleGrid,
+  Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus, LuBookOpen, LuPlus } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuPlus } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
-import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { useSelection } from '../../contexts/SelectionContext';
-import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
 import { CreateFolderPopover } from '../shared/CreateFolderPopover';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { FilterPanel } from '../shared/FilterPanel';
 import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
-import { ResourceCard } from '../shared/ResourceCard';
 import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import CreateWalkthroughDialog from './CreateWalkthroughDialog';
-import { SimpleFolderCardSkeleton, ResourceCardSkeleton } from '../shared/Skeletons';
+import { ElegantList } from '../shared/ElegantList';
 
 interface WalkthroughsTabContentProps {
   kits: ArtifactFile[];
@@ -43,8 +40,6 @@ interface WalkthroughsTabContentProps {
   onViewWalkthrough?: (walkthroughId: string) => void;
 }
 
-type ViewMode = 'card' | 'walkthroughs';
-
 function WalkthroughsTabContent({
   kits,
   kitsLoading,
@@ -60,12 +55,9 @@ function WalkthroughsTabContent({
   onViewWalkthrough,
 }: WalkthroughsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
@@ -158,7 +150,11 @@ function WalkthroughsTabContent({
   };
 
   const handleViewWalkthrough = (walkthrough: ArtifactFile) => {
-    onViewKit(walkthrough);
+    if (onViewWalkthrough) {
+      onViewWalkthrough(walkthrough.path);
+    } else {
+      onViewKit(walkthrough);
+    }
   };
 
   // Handle create folder
@@ -223,10 +219,6 @@ function WalkthroughsTabContent({
         title: 'Group deleted',
         description: `Deleted ${deletingFolder.name}`,
       });
-
-      // Don't reload folders here - file watcher will update artifacts first,
-      // then the folder reload effect (with walkthroughs dependency) will sync folders
-      // Reloading now causes state mismatch with useDeferredValue
     } catch (error) {
       console.error('Failed to delete folder:', error);
       toaster.create({
@@ -253,26 +245,7 @@ function WalkthroughsTabContent({
           <Flex align="center" justify="space-between" mb={6} py={2}>
             <Heading size="2xl">Walkthroughs</Heading>
           </Flex>
-          <Box>
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Groups</Heading>
-            </Flex>
-            <SimpleGrid columns={{ base: 3, md: 4, lg: 5, xl: 6 }} gap={4}>
-              {[1, 2, 3, 4].map((i) => (
-                <SimpleFolderCardSkeleton key={i} />
-              ))}
-            </SimpleGrid>
-          </Box>
-          <Box>
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Walkthroughs</Heading>
-            </Flex>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {[1, 2, 3].map((i) => (
-                <ResourceCardSkeleton key={i} />
-              ))}
-            </SimpleGrid>
-          </Box>
+          <Box p={4}><Text>Loading...</Text></Box>
         </VStack>
       </Box>
     );
@@ -407,16 +380,6 @@ function WalkthroughsTabContent({
                 }
               />
             </Flex>
-            {/* View Mode Switcher */}
-            <ViewModeSwitcher
-              variant="liquid"
-              value={viewMode}
-              onChange={(mode) => setViewMode(mode as ViewMode)}
-              modes={[
-                STANDARD_VIEW_MODES.card,
-                { id: 'walkthroughs', label: 'Walkthroughs', icon: LuBookOpen },
-              ]}
-            />
           </Flex>
 
           {folders.length === 0 && !isFoldersLoading ? (
@@ -432,30 +395,34 @@ function WalkthroughsTabContent({
                 No groups yet. Create one to organize your walkthroughs.
               </Text>
             </Box>
-          ) : viewMode === 'card' ? (
-            <SimpleGrid
-              columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-              gap={4}
-              p={1}
-              overflow="visible"
-            >
-              {isFoldersLoading ? (
-                [1, 2, 3, 4].map((i) => <SimpleFolderCardSkeleton key={i} />)
-              ) : (
-                [...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
-                  <SimpleFolderCard
-                    key={folder.path}
-                    folder={folder}
-                    artifacts={getFolderArtifacts(folder.path)}
-                    onOpenFolder={() => setViewingFolder(folder)}
-                    onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
-                    onDeleteFolder={() => handleDeleteFolder(folder)}
-                    index={index}
-                  />
-                ))
-              )}
-            </SimpleGrid>
-          ) : null}
+          ) : (
+            <ElegantList
+              items={folders}
+              type="folder"
+              onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+              renderActions={(item) => {
+                const folder = item as ArtifactFolder;
+                return (
+                  <>
+                    <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
+                      <HStack gap={2}>
+                        <Icon as={LuFolderPlus} /> <Text>Open</Text>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item
+                      value="delete-folder"
+                      color="fg.error"
+                      onClick={() => handleDeleteFolder(folder)}
+                    >
+                      <HStack gap={2}>
+                        <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                      </HStack>
+                    </Menu.Item>
+                  </>
+                );
+              }}
+            />
+          )}
         </Box>
 
         {/* Walkthroughs Section */}
@@ -482,38 +449,23 @@ function WalkthroughsTabContent({
                   : 'No walkthroughs at root level. All walkthroughs are organized in groups.'}
               </Text>
             </Box>
-          ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1} overflow="visible">
-              {rootWalkthroughs.map((walkthrough, index) => (
-                <ResourceCard
-                  key={walkthrough.path}
-                  resource={walkthrough}
-                  isSelected={isSelected(walkthrough.path)}
-                  onToggle={() => handleWalkthroughToggle(walkthrough)}
-                  onClick={() => handleViewWalkthrough(walkthrough)}
-                  resourceType="walkthrough"
-                  index={index}
-                />
-              ))}
-            </SimpleGrid>
-          ) : viewMode === 'walkthroughs' ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                Walkthroughs view coming soon
-              </Text>
-            </Box>
-          ) : null}
+          ) : (
+            <ElegantList
+              items={rootWalkthroughs}
+              type="walkthrough"
+              onItemClick={(kit) => handleViewWalkthrough(kit as ArtifactFile)}
+              renderActions={(item) => (
+                <Menu.Item value="open-walkthrough" onClick={() => handleViewWalkthrough(item as ArtifactFile)}>
+                  <HStack gap={2}>
+                    <Text>Open</Text>
+                  </HStack>
+                </Menu.Item>
+              )}
+            />
+          )}
         </Box>
       </VStack>
 
-      {/* Selection Bar */}
       <ResourceSelectionBar
         isOpen={selectedItems.length > 0}
         selectedItems={selectedItems}
@@ -566,9 +518,3 @@ export default memo(WalkthroughsTabContent, (prevProps, nextProps) => {
     prevProps.onViewWalkthrough === nextProps.onViewWalkthrough
   );
 });
-
-
-
-
-
-

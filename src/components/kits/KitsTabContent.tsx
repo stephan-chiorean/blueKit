@@ -9,25 +9,21 @@ import {
   VStack,
   Button,
   Badge,
-  SimpleGrid,
+  Menu,
 } from '@chakra-ui/react';
 import { LuFilter, LuFolderPlus } from 'react-icons/lu';
-import { BsBoxes } from 'react-icons/bs';
 import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '../../ipc';
-import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '../shared/ViewModeSwitcher';
 import { ToolkitHeader } from '../shared/ToolkitHeader';
 import { useSelection } from '../../contexts/SelectionContext';
-import { SimpleFolderCard } from '../shared/SimpleFolderCard';
 import FolderView from '../shared/FolderView';
 import { CreateFolderPopover } from '../shared/CreateFolderPopover';
 import DeleteFolderDialog from '../shared/DeleteFolderDialog';
 import { KitContextMenu } from './KitContextMenu';
-import { ResourceCard } from '../shared/ResourceCard';
+import { ElegantList } from '../shared/ElegantList';
 import { ResourceSelectionBar } from '../shared/ResourceSelectionBar';
 import { FilterPanel } from '../shared/FilterPanel';
 import { getRootArtifacts } from '../../utils/buildFolderTree';
 import { toaster } from '../ui/toaster';
-import { SimpleFolderCardSkeleton, ResourceCardSkeleton } from '../shared/Skeletons';
 
 interface KitsTabContentProps {
   kits: ArtifactFile[];
@@ -43,8 +39,6 @@ interface KitsTabContentProps {
   movingArtifacts?: Set<string>;
 }
 
-type ViewMode = 'card' | 'blueprints';
-
 function KitsTabContent({
   kits,
   kitsLoading,
@@ -59,7 +53,6 @@ function KitsTabContent({
   movingArtifacts = new Set(),
 }: KitsTabContentProps) {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection, addItem } = useSelection();
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isKitsFilterOpen, setIsKitsFilterOpen] = useState(false);
@@ -76,8 +69,6 @@ function KitsTabContent({
     y: number;
     kit: ArtifactFile | null;
   }>({ isOpen: false, x: 0, y: 0, kit: null });
-
-
 
   const isSelected = (kitId: string) => isSelectedInContext(kitId);
 
@@ -245,10 +236,6 @@ function KitsTabContent({
         title: 'Group deleted',
         description: `Deleted ${deletingFolder.name}`,
       });
-
-      // Don't reload folders here - file watcher will update artifacts first,
-      // then the folder reload effect (with kits dependency) will sync folders
-      // Reloading now causes state mismatch with useDeferredValue
     } catch (error) {
       console.error('Failed to delete folder:', error);
       toaster.create({
@@ -276,26 +263,7 @@ function KitsTabContent({
       <Box position="relative" width="100%" maxW="100%">
         <VStack align="stretch" gap={6} width="100%">
           <ToolkitHeader title="Kits" />
-          <Box position="relative">
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Groups</Heading>
-            </Flex>
-            <SimpleGrid columns={{ base: 3, md: 4, lg: 5, xl: 6 }} gap={4} width="100%">
-              {[1, 2, 3, 4].map((i) => (
-                <SimpleFolderCardSkeleton key={i} />
-              ))}
-            </SimpleGrid>
-          </Box>
-          <Box mb={8} position="relative" width="100%">
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Kits</Heading>
-            </Flex>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} width="100%">
-              {[1, 2, 3].map((i) => (
-                <ResourceCardSkeleton key={i} />
-              ))}
-            </SimpleGrid>
-          </Box>
+          <Box p={4}><Text>Loading...</Text></Box>
         </VStack>
       </Box>
     );
@@ -326,6 +294,7 @@ function KitsTabContent({
   }
 
   // If viewing a folder, show the FolderView component
+  // Note: FolderView functionality is kept, but internal display is handled by FolderView component.
   if (viewingFolder) {
     return (
       <FolderView
@@ -376,59 +345,37 @@ function KitsTabContent({
                   }
                 />
               </Flex>
-              {/* View Mode Switcher */}
-              <ViewModeSwitcher
-                variant="liquid"
-                value={viewMode}
-                onChange={(mode) => setViewMode(mode as ViewMode)}
-                modes={[
-                  STANDARD_VIEW_MODES.card,
-                  { id: 'blueprints', label: 'Blueprints', icon: BsBoxes },
-                ]}
-              />
             </Flex>
 
-            {viewMode === 'card' ? (
-              <SimpleGrid
-                columns={{ base: 3, md: 4, lg: 5, xl: 6 }}
-                gap={4}
-                p={1}
-                width="100%"
-                maxW="100%"
-                overflow="visible"
-              >
-                {isFoldersLoading ? (
-                  [1, 2, 3, 4].map((i) => <SimpleFolderCardSkeleton key={i} />)
-                ) : (
-                  [...folders].sort((a, b) => a.name.localeCompare(b.name)).map((folder, index) => (
-                    <SimpleFolderCard
-                      key={folder.path}
-                      folder={folder}
-                      artifacts={getFolderArtifacts(folder.path)}
-                      onOpenFolder={() => setViewingFolder(folder)}
-                      onRenameFolder={async (newName) => handleRenameFolder(folder, newName)}
-                      onDeleteFolder={() => handleDeleteFolder(folder)}
-                      index={index}
-                    />
-                  ))
-                )}
-              </SimpleGrid>
+            {isFoldersLoading ? (
+              <Box p={4}><Text>Loading groups...</Text></Box>
             ) : (
-
-
-
-              <Box
-                p={6}
-                bg="bg.subtle"
-                borderRadius="md"
-                borderWidth="1px"
-                borderColor="border.subtle"
-                textAlign="center"
-              >
-                <Text color="text.muted" fontSize="sm">
-                  Blueprints view coming soon
-                </Text>
-              </Box>
+              <ElegantList
+                items={folders}
+                type="folder"
+                onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                renderActions={(item) => {
+                  const folder = item as ArtifactFolder;
+                  return (
+                    <>
+                      <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Open</Text>
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item
+                        value="delete-folder"
+                        color="fg.error"
+                        onClick={() => handleDeleteFolder(folder)}
+                      >
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                        </HStack>
+                      </Menu.Item>
+                    </>
+                  );
+                }}
+              />
             )}
           </Box>
         )}
@@ -521,52 +468,24 @@ function KitsTabContent({
                   : 'No kits at root level. All kits are organized in groups.'}
               </Text>
             </Box>
-          ) : viewMode === 'card' ? (
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3 }}
-              gap={4}
-              p={1}
-              width="100%"
-              maxW="100%"
-              overflow="visible"
-              css={{
-                '> *': {
-                  minHeight: '220px',
-                },
-              }}
-            >
-
-              {rootKits.map((kit, index) => (
-                <ResourceCard
-                  key={kit.path}
-                  resource={kit}
-                  isSelected={isSelected(kit.path)}
-                  onToggle={() => handleKitToggle(kit)}
-                  onClick={() => handleViewKit(kit)}
-                  onContextMenu={(e) => handleContextMenu(e, kit)}
-                  resourceType="kit"
-                  index={index}
-                />
-              ))}
-            </SimpleGrid>
-          ) : viewMode === 'blueprints' ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                Blueprints view coming soon
-              </Text>
-            </Box>
-          ) : null}
+          ) : (
+            <ElegantList
+              items={rootKits}
+              type="kit"
+              onItemClick={(kit) => handleViewKit(kit as ArtifactFile)}
+              onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
+              renderActions={(item) => (
+                <Menu.Item value="open-kit" onClick={() => handleViewKit(item as ArtifactFile)}>
+                  <HStack gap={2}>
+                    <Text>Open</Text>
+                  </HStack>
+                </Menu.Item>
+              )}
+            />
+          )}
         </Box>
       </VStack>
 
-      {/* Selection Bar */}
       <ResourceSelectionBar
         isOpen={selectedItems.length > 0}
         selectedItems={selectedItems}

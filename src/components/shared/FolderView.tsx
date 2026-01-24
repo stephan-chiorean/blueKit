@@ -3,15 +3,15 @@ import {
   Button,
   HStack,
   Icon,
-  SimpleGrid,
   Text,
   VStack,
+  Menu,
 } from "@chakra-ui/react";
 import { LuArrowLeft } from "react-icons/lu";
 import { MdFolder } from "react-icons/md";
 import { ArtifactFile, ArtifactFolder } from "../../ipc";
 import { useColorMode } from "../../contexts/ColorModeContext";
-import { ResourceCard } from "./ResourceCard";
+import { ElegantList } from "./ElegantList";
 
 interface FolderViewProps {
   folder: ArtifactFolder | null;
@@ -113,19 +113,19 @@ export default function FolderView({
             </Text>
           </Box>
         ) : (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} p={1}>
-            {artifacts.map((artifact) => (
-              <ResourceCard
-                key={artifact.path}
-                resource={artifact}
-                isSelected={isSelected(artifact.path)}
-                onToggle={() => onArtifactToggle(artifact)}
-                onClick={() => onViewArtifact(artifact)}
-                onContextMenu={(e) => onContextMenu?.(e, artifact)}
-                resourceType={(artifact.frontMatter?.type as any) || "kit"}
-              />
-            ))}
-          </SimpleGrid>
+          <ElegantList
+            items={artifacts}
+            // Infer type from artifacts. They are ArtifactFiles. 
+            // We'll let ElegantList handle icon logic.
+            onItemClick={(item) => onViewArtifact(item as ArtifactFile)}
+            onItemContextMenu={(e, item) => onContextMenu?.(e, item as ArtifactFile)}
+            selectedIds={new Set(artifacts.filter(a => isSelected(a.path)).map(a => a.path))}
+            renderActions={(item) => (
+              <Menu.Item value="open" onClick={() => onViewArtifact(item as ArtifactFile)}>
+                <Text>Open</Text>
+              </Menu.Item>
+            )}
+          />
         )}
       </Box>
     </Box>
