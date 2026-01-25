@@ -375,13 +375,13 @@ export default function ProjectsTabContent({
 
                     {/* Show git URL if connected */}
                     {project.gitConnected && project.gitUrl && (
-                      <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
+                      <Text fontSize="xs" color="fg.muted" fontFamily="mono" truncate w="100%">
                         {project.gitUrl}
                       </Text>
                     )}
                   </VStack>
 
-                  <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
+                  <Box flexShrink={0} onClick={(e) => e.stopPropagation()} overflow="visible">
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <IconButton
