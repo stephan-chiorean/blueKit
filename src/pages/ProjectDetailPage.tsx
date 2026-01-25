@@ -7,7 +7,6 @@ import {
 } from '@chakra-ui/react';
 import { toaster } from '../components/ui/toaster';
 import { listen } from '@tauri-apps/api/event';
-import Header from '../components/Header';
 import KitsTabContent from '../components/kits/KitsTabContent';
 import WalkthroughsTabContent from '../components/walkthroughs/WalkthroughsTabContent';
 import BlueprintsTabContent from '../components/blueprints/BlueprintsTabContent';
@@ -683,14 +682,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     setResourceType(null);
   }, [resourceType, loadPlans]);
 
-  // Find matching Project for Header (use dbProject if available, otherwise find from allProjects)
-  const currentProjectForHeader = useMemo(() => {
-    if (dbProject) {
-      return dbProject;
-    }
-    return allProjects.find(p => p.id === project.id || p.path === project.path);
-  }, [dbProject, allProjects, project.id, project.path]);
-
   // Handler to clear resource view
   const handleClearResourceView = useCallback(() => {
     setViewingResource(null);
@@ -1056,15 +1047,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
   return (
     <SelectionProvider>
       <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-        {/* Header above everything */}
-        <Box flexShrink={0} bg="transparent">
-          <Header
-            currentProject={currentProjectForHeader}
-            onNavigateToTasks={() => setActiveView('tasks')}
-            hideNavigation={isWorktreeView}
-          />
-        </Box>
-
         {/* Full screen content area with Splitter */}
         <Box
           ref={splitterContainerRef}
