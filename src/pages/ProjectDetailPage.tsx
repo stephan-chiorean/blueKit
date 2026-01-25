@@ -916,7 +916,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
         return (
           <TasksTabContent
             ref={tasksTabRef}
-            context={project}
+            context={isVault ? 'workspace' : project}
             projects={allProjects}
           />
         );
