@@ -74,8 +74,8 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
     >
       <VStack gap={12} pb={16}>
         {/* Logo and Branding */}
-        <VStack gap={6}>
-          <BlueKitLogo size={140} />
+        <VStack gap={0}>
+          <BlueKitLogo size={200} />
           <Box
             as="h1"
             fontSize={{ base: "5xl", md: "7xl", lg: "8xl" }}
