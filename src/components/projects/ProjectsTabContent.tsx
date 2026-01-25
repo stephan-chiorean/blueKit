@@ -284,7 +284,7 @@ export default function ProjectsTabContent({
   };
 
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" gap={4} w="100%" maxW="100%">
       <Box
         display="grid"
         gap={6}
@@ -293,6 +293,7 @@ export default function ProjectsTabContent({
           md: "repeat(2, 1fr)",
           lg: "repeat(3, 1fr)",
         }}
+        w="100%"
         css={{
           '@media (min-width: 1920px)': {
             gridTemplateColumns: 'repeat(4, 1fr)',
@@ -310,9 +311,11 @@ export default function ProjectsTabContent({
               transition="all 0.2s"
               onClick={() => onProjectSelect(project)}
               position="relative"
-              overflow="visible"
+              overflow="hidden"
               borderRadius="lg"
               p={4}
+              w="100%"
+              minW={0}
               style={{
                 background: cardBg,
                 backdropFilter: 'blur(12px)',
@@ -320,14 +323,14 @@ export default function ProjectsTabContent({
                 border: cardBorder,
               }}
             >
-              <Box bg="transparent">
-                <Flex align="start" justify="space-between" gap={4}>
-                  <VStack align="start" gap={3} flex={1}>
-                    <HStack gap={2} align="center">
-                      <Icon boxSize={5} color="primary.500">
+              <Box bg="transparent" w="100%" minW={0}>
+                <Flex align="start" justify="space-between" gap={4} w="100%" minW={0}>
+                  <VStack align="start" gap={3} flex={1} minW={0}>
+                    <HStack gap={2} align="center" w="100%" minW={0}>
+                      <Icon boxSize={5} color="primary.500" flexShrink={0}>
                         <LuFolder />
                       </Icon>
-                      <Heading size="lg">{project.name}</Heading>
+                      <Heading size="lg" truncate>{project.name}</Heading>
                     </HStack>
 
                     {/* GitHub connection status */}
@@ -465,11 +468,11 @@ export default function ProjectsTabContent({
                   </Box>
                 </Flex>
               </Box>
-              <Box bg="transparent" pt={2}>
-                <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'secondary.solid'} mb={3}>
+              <Box bg="transparent" pt={2} w="100%" minW={0}>
+                <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'secondary.solid'} mb={3} lineClamp={2}>
                   {project.description || 'No description'}
                 </Text>
-                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" lineClamp={1}>
+                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" truncate w="100%">
                   {project.path}
                 </Text>
               </Box>
