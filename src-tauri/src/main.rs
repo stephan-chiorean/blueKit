@@ -147,6 +147,7 @@ async fn main() {
             commands::db_create_project, // Create new project in database (Phase 1)
             commands::db_update_project, // Update project in database (Phase 1)
             commands::db_delete_project, // Delete project from database (Phase 1)
+            commands::get_vault_project, // Get vault project (Phase 1 Vault)
             commands::connect_project_git, // Connect project to git (Phase 1)
             commands::disconnect_project_git, // Disconnect project from git (Phase 1)
             commands::list_project_worktrees, // List git worktrees for project

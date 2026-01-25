@@ -365,6 +365,8 @@ export interface Project {
   updatedAt: number;
   /** Last opened timestamp in milliseconds (optional) */
   lastOpenedAt?: number;
+  /** Whether this project is the vault */
+  isVault?: boolean;
 }
 
 /**

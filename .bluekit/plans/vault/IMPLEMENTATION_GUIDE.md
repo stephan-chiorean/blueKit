@@ -2,9 +2,16 @@
 
 ## Quick Start
 
-**Implementation time: 1 week (~20 hours)**
+**⚠️ IMPORTANT: Complete Phase 0 (UI Overhaul) first!**
 
-This guide walks you through implementing Phase 1 of the vault system.
+See [phase-0-ui-overhaul.md](./phase-0-ui-overhaul.md) for the required UI restructure. Phase 1 (vault system) depends on:
+- Tab system infrastructure
+- Left/Right layout normalization
+- Empty state components
+
+**Phase 1 implementation time: 1 week (~20 hours)**
+
+This guide walks you through implementing Phase 1 of the vault system (after Phase 0 is complete).
 
 ---
 

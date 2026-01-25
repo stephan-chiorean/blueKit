@@ -245,3 +245,23 @@ cat ~/.bluekit/projectRegistry.json.backup | grep -c '"id"'
 # Show migration backup files
 ls -lh ~/.bluekit/*.backup
 ```
+
+## Library Configuration
+
+### Check Library Status
+Query the local database to see current Library (Vault) configuration:
+```bash
+sqlite3 ~/.bluekit/bluekit.db "SELECT name, path, is_vault FROM projects WHERE is_vault = 1;"
+```
+
+### Reset Library
+Delete the library project from the database to trigger setup screen again:
+```bash
+sqlite3 ~/.bluekit/bluekit.db "DELETE FROM projects WHERE is_vault = 1;"
+```
+
+### Wipe Database
+Completely remove the database:
+```bash
+rm ~/.bluekit/bluekit.db
+```

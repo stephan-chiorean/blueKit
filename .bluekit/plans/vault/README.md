@@ -64,6 +64,35 @@ The vault system adds a **personal knowledge base** to BlueKit - a central noteb
 
 ---
 
+### 🎨 Phase 0: [phase-0-ui-overhaul.md](./phase-0-ui-overhaul.md)
+**UI Overhaul - Obsidian-Inspired Layout**
+
+**Goal**: Restructure UI with tabs above content, Left/Right layout, and clean empty state. **REQUIRED before Phase 1.**
+
+**Key Features**:
+- Tab system (`.bluekit/workspace/tabs.json`)
+- Left/Right split layout (sidebar full-height on left)
+- Tabs above main content (like Obsidian)
+- Project switcher above sidebar (not in Header)
+- Clean empty state ("Create note ⌘N", "Search ⌘P", "Close")
+- Normalize HomePage and ProjectDetailPage layouts
+- Keyboard shortcuts (⌘N, ⌘P, ⌘W)
+
+**Deliverables**:
+- TabsContext, TabBar component (~200 lines)
+- EmptyTabState component (50 lines)
+- Keyboard shortcuts hook (50 lines)
+- ProjectDetailPage refactor (Left/Right layout)
+- HomePage refactor (match ProjectDetailPage layout)
+- Tab persistence to `.bluekit/workspace/tabs.json`
+- Header.tsx stays mostly intact
+
+**Timeline**: 1 week
+
+**Status**: 📝 Ready to implement (blocks Phase 1)
+
+---
+
 ### 🚀 Phase 1: [phase-1-local-vault.md](./phase-1-local-vault.md)
 **Local Vault Foundation** (Pre-Cloud)
 
@@ -152,6 +181,7 @@ The vault system adds a **personal knowledge base** to BlueKit - a central noteb
 
 | Phase | Focus | Duration | Cloud? | Mobile? |
 |-------|-------|----------|--------|---------|
+| **Phase 0** | UI overhaul (tabs, layout) | 1 week | ❌ No | ❌ No |
 | **Phase 1** | Local vault (vault = project!) | 1 week | ❌ No | ❌ No |
 | **Phase 2** | Search, linking, templates | 4 weeks | ❌ No | ❌ No |
 | **Phase 3** | Sync preparation (metadata) | 3 weeks | ⚠️ Prep only | ❌ No |
@@ -160,9 +190,9 @@ The vault system adds a **personal knowledge base** to BlueKit - a central noteb
 | **Phase 6** | Collaboration features | 4 weeks | ✅ Yes | ✅ Yes |
 | **Phase 7** | AI-powered features | 6 weeks | ✅ Yes | ✅ Yes |
 
-**Total to MVP (Phase 1-3)**: 8 weeks (was 11, saved 3 weeks!)
-**Total to Cloud Sync (Phase 1-4)**: 13 weeks
-**Total to Mobile (Phase 1-5)**: 19 weeks
+**Total to MVP (Phase 0-3)**: 9 weeks (includes UI foundation)
+**Total to Cloud Sync (Phase 0-4)**: 14 weeks
+**Total to Mobile (Phase 0-5)**: 20 weeks
 
 ---
 
@@ -277,14 +307,20 @@ The vault system adds a **personal knowledge base** to BlueKit - a central noteb
 ## Next Steps
 
 1. **Review this plan** with team/stakeholders
-2. **Finalize Phase 1 scope** (ensure no scope creep)
+2. **Finalize Phase 0 scope** (UI overhaul - required first!)
 3. **Set up project tracking** (GitHub issues, milestones)
-4. **Begin Phase 1 implementation**:
+4. **Begin Phase 0 implementation**:
+   - Day 1: Tab system backend + frontend
+   - Day 2-3: Layout restructure (Left/Right split)
+   - Day 4: Empty state + keyboard shortcuts
+   - Day 5: Polish & testing
+5. **Ship Phase 0** and gather feedback on new layout
+6. **Begin Phase 1 implementation** (vault system):
    - Week 1: Backend (vault.rs, database schema)
    - Week 2: File tree & watcher
    - Week 3: Frontend (VaultSetupScreen, VaultPage)
    - Week 4: Integration, migration, polish
-5. **Ship Phase 1** and gather feedback before starting Phase 2
+7. **Ship Phase 1** and gather feedback before starting Phase 2
 
 ---
 

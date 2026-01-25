@@ -111,6 +111,7 @@ pub async fn migrate_json_to_database(
             created_at: Set(created_at),
             updated_at: Set(now),
             last_opened_at: Set(None),
+            is_vault: Set(false),
         };
 
         match project_model.insert(db).await {
@@ -187,6 +188,7 @@ pub async fn create_project(
     path: &str,
     description: Option<String>,
     tags: Option<Vec<String>>,
+    is_vault: Option<bool>,
 ) -> Result<project::Model, DbErr> {
     let now = Utc::now().timestamp_millis();
     let id = uuid::Uuid::new_v4().to_string();
@@ -206,9 +208,27 @@ pub async fn create_project(
         created_at: Set(now),
         updated_at: Set(now),
         last_opened_at: Set(Some(now)),
+        is_vault: Set(is_vault.unwrap_or(false)),
     };
 
-    project.insert(db).await
+    let res = project.insert(db).await?;
+
+    // If this is a vault/library, initialize the structure
+    if is_vault.unwrap_or(false) {
+        let vault_path = std::path::PathBuf::from(path);
+        let bluekit_dir = vault_path.join(".bluekit");
+        
+        // Create standard folders
+        let folders = ["kits", "walkthroughs", "diagrams", "agents", "tasks"];
+        for folder in folders {
+            let folder_path = bluekit_dir.join(folder);
+            if let Err(e) = std::fs::create_dir_all(&folder_path) {
+                eprintln!("Failed to create library folder {}: {}", folder_path.display(), e);
+            }
+        }
+    }
+
+    Ok(res)
 }
 
 /// Gets all projects from the database.
@@ -216,6 +236,7 @@ pub async fn get_all_projects(
     db: &DatabaseConnection,
 ) -> Result<Vec<project::Model>, DbErr> {
     project::Entity::find()
+        .filter(project::Column::IsVault.eq(false))
         .order_by_desc(project::Column::LastOpenedAt)
         .all(db)
         .await

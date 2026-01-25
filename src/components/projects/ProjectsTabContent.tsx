@@ -39,7 +39,7 @@ export default function ProjectsTabContent({
   onProjectsChanged,
 }: ProjectsTabContentProps) {
   const [connectingProjectId, setConnectingProjectId] = useState<string | null>(null);
-  const [localProjects, setLocalProjects] = useState<Project[]>(projects);
+  const [localProjects, setLocalProjects] = useState<Project[]>(projects.filter(p => !p.isVault));
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -55,7 +55,7 @@ export default function ProjectsTabContent({
 
   // Update local projects when props change
   useEffect(() => {
-    setLocalProjects(projects);
+    setLocalProjects(projects.filter(p => !p.isVault));
   }, [projects]);
 
   const handleConnectGit = async (project: Project, e: React.MouseEvent) => {

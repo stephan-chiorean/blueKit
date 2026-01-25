@@ -391,13 +391,15 @@ export async function invokeDbCreateProject(
   name: string,
   path: string,
   description?: string,
-  tags?: string[]
+  tags?: string[],
+  isVault?: boolean
 ): Promise<Project> {
   return await invokeWithTimeout<Project>('db_create_project', {
     name,
     path,
     description,
     tags,
+    isVault,
   });
 }
 
@@ -425,6 +427,15 @@ export async function invokeDbUpdateProject(
     name,
     description,
   });
+}
+
+/**
+ * Gets the vault project if it exists.
+ *
+ * @returns A promise that resolves to the vault Project object or null
+ */
+export async function invokeGetVaultProject(): Promise<Project | null> {
+  return await invokeWithTimeout<Project | null>('get_vault_project');
 }
 
 /**

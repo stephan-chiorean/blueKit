@@ -32,6 +32,11 @@ pub struct Model {
     pub updated_at: i64,
     #[serde(rename = "lastOpenedAt")]
     pub last_opened_at: Option<i64>,
+
+    // Vault identifier
+    #[serde(rename = "isVault")]
+    #[sea_orm(default_value = "false")]
+    pub is_vault: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

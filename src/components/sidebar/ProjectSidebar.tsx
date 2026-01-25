@@ -1,5 +1,5 @@
 import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection } from '@chakra-ui/react';
-import { LuFolder, LuArrowLeft, LuChevronsUpDown, LuNetwork } from 'react-icons/lu';
+import { LuFolder, LuArrowLeft, LuChevronsUpDown, LuNetwork, LuLibrary } from 'react-icons/lu';
 import SidebarContent, { ViewType } from './SidebarContent';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { Project, ProjectEntry, FileTreeNode } from '../../ipc';
@@ -26,6 +26,7 @@ interface ProjectSidebarProps {
   editingTitle?: string;
   isWorktreeView?: boolean;
   onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
+  isVault?: boolean;
 }
 
 export default function ProjectSidebar({
@@ -46,6 +47,7 @@ export default function ProjectSidebar({
   editingTitle,
   isWorktreeView = false,
   onHandlersReady,
+  isVault = false,
 }: ProjectSidebarProps) {
   const { colorMode } = useColorMode();
 
@@ -76,7 +78,17 @@ export default function ProjectSidebar({
       {/* Back button and project selector */}
       <Box px={3} pb={4} pt={0}>
         <VStack gap={3} align="stretch">
-          {!isWorktreeView ? (
+          {isVault ? (
+            <HStack gap={2} px={1} py={1}>
+              {/* Library Header - No back button, just name */}
+              <Icon boxSize={5} color="primary.500">
+                <LuLibrary />
+              </Icon>
+              <Text fontWeight="bold" fontSize="lg" truncate>
+                {project.title}
+              </Text>
+            </HStack>
+          ) : !isWorktreeView ? (
             <HStack>
               <Box as="button" onClick={onBack} title="Back to Projects" cursor="pointer">
                 <Icon
@@ -199,11 +211,12 @@ export default function ProjectSidebar({
           editingTitle={editingTitle}
           projectName={project.title}
           onHandlersReady={onHandlersReady}
+          isVault={isVault}
         />
       </Box>
 
-      {/* Vault Switcher */}
-      {!isWorktreeView && (
+      {/* Library Switcher */}
+      {!isWorktreeView && !isVault && (
         <Box
           px={3}
           py={2}
@@ -232,7 +245,7 @@ export default function ProjectSidebar({
               fontWeight="medium"
               color={colorMode === 'light' ? 'gray.700' : 'gray.300'}
             >
-              .bluekit
+              Library
             </Text>
           </HStack>
         </Box>

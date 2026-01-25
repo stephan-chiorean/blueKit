@@ -23,6 +23,8 @@ import NoteViewPage from './NoteViewPage';
 import ProjectSidebar from '../components/sidebar/ProjectSidebar';
 import { ViewType } from '../components/sidebar/SidebarContent';
 import EmptyProjectState from '../components/shared/EmptyProjectState';
+import ProjectsTabContent from '../components/projects/ProjectsTabContent';
+import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
 import { deleteResources } from '../ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '../ipc/walkthroughs';
@@ -38,9 +40,10 @@ interface ProjectDetailPageProps {
   onBack: () => void;
   onProjectSelect?: (project: Project) => void;
   isWorktreeView?: boolean;
+  isVault?: boolean;
 }
 
-export default function ProjectDetailPage({ project, onBack, onProjectSelect, isWorktreeView = false }: ProjectDetailPageProps) {
+export default function ProjectDetailPage({ project, onBack, onProjectSelect, isWorktreeView = false, isVault = false }: ProjectDetailPageProps) {
   // Feature flags
   const { flags } = useFeatureFlags();
   const { setArtifacts: setGlobalArtifacts } = useProjectArtifacts();
@@ -61,7 +64,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     };
 
   // Sidebar state
-  const [activeView, setActiveView] = useState<ViewType>('file');
+  const [activeView, setActiveView] = useState<ViewType>(isVault ? 'projects' : 'file');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
@@ -818,8 +821,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
 
   // Render content based on active view
   const renderContent = () => {
-    // If a notebook file is selected, show it directly
-    if (notebookFile) {
+    // If a notebook file is selected, show it directly (activeView='file' should be set)
+    // But we check notebookFile just in case
+    if (activeView === 'file' && notebookFile) {
       return (
         <NoteViewPage
           key={newFileKey}
@@ -888,6 +892,25 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
       );
     }
 
+    // Fallback for file view if notebookFile is missing (should ideally show empty state, but for now we follow pattern)
+    if (activeView === 'file') {
+      return (
+        <EmptyProjectState
+          onCreateNote={() => {
+            if (notebookHandlers) {
+              notebookHandlers.onNewFile(project.path);
+            } else {
+              toaster.create({
+                title: 'Unable to create note',
+                description: 'File tree is not ready yet',
+                type: 'error'
+              });
+            }
+          }}
+        />
+      );
+    }
+
     switch (activeView) {
       case 'tasks':
         return (
@@ -897,6 +920,26 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
             projects={allProjects}
           />
         );
+      case 'projects':
+        if (isVault) {
+          return (
+            <ProjectsTabContent
+              projects={allProjects}
+              projectsLoading={false}
+              error={null}
+              onProjectSelect={(p) => onProjectSelect?.(p)}
+              onProjectsChanged={() => {
+                invokeGetProjectRegistry().then(setAllProjects);
+              }}
+            />
+          );
+        }
+        return null;
+      case 'workflows':
+        if (isVault) {
+          return <WorkflowsTabContent />;
+        }
+        return null;
       case 'plans':
         return (
           <PlansTabContent
@@ -1003,24 +1046,6 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
             projectPath={project.path}
             projectId={project.id}
             onViewKit={handleViewKit}
-          />
-        );
-      case 'file':
-        // Show empty state when no file is selected
-        return (
-          <EmptyProjectState
-            onCreateNote={() => {
-              if (notebookHandlers) {
-                // Create new note in root directory
-                notebookHandlers.onNewFile(project.path);
-              } else {
-                toaster.create({
-                  title: 'Unable to create note',
-                  description: 'File tree is not ready yet',
-                  type: 'error'
-                });
-              }
-            }}
           />
         );
       default:
@@ -1134,6 +1159,7 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
                 titleEditPath={titleEditPath}
                 editingTitle={editingTitle}
                 onHandlersReady={setNotebookHandlers}
+                isVault={isVault}
               />
             </Splitter.Panel>
 

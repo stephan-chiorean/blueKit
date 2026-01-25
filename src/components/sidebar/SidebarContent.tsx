@@ -11,7 +11,9 @@ import {
     LuExternalLink,
     LuBookmark,
     LuGithub,
-    LuPalette
+    LuPalette,
+    LuFolder,
+    LuWorkflow
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import { useState, useCallback } from 'react';
@@ -27,6 +29,8 @@ import { useColorMode } from '../../contexts/ColorModeContext';
 import { FileTreeNode } from '../../ipc/fileTree';
 
 export type ViewType =
+    | 'projects' // Library view
+    | 'workflows' // Library view
     | 'tasks'
     | 'plans'
     | 'kits'
@@ -56,6 +60,7 @@ interface SidebarContentProps {
     editingTitle?: string;
     projectName?: string;
     onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
+    isVault?: boolean;
 }
 
 export default function SidebarContent({
@@ -71,7 +76,8 @@ export default function SidebarContent({
     titleEditPath,
     editingTitle,
     projectName,
-    onHandlersReady
+    onHandlersReady,
+    isVault = false
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
     const { colorMode } = useColorMode();
@@ -290,57 +296,85 @@ export default function SidebarContent({
                     )
                 }
             >
-                <SidebarMenuItem
-                    icon={LuListTodo}
-                    label="Tasks"
-                    isActive={activeView !== 'file' && activeView === 'tasks'}
-                    onClick={() => onViewChange('tasks')}
-                    collapsed={collapsed}
-                />
-                <SidebarMenuItem
-                    icon={LuMap}
-                    label="Plans"
-                    isActive={activeView !== 'file' && activeView === 'plans'}
-                    onClick={() => onViewChange('plans')}
-                    collapsed={collapsed}
-                />
-                <SidebarMenuItem
-                    icon={LuPackage}
-                    label="Kits"
-                    isActive={activeView !== 'file' && activeView === 'kits'}
-                    onClick={() => onViewChange('kits')}
-                    collapsed={collapsed}
-                />
-                <SidebarMenuItem
-                    icon={LuBookOpen}
-                    label="Walkthroughs"
-                    isActive={activeView !== 'file' && activeView === 'walkthroughs'}
-                    onClick={() => onViewChange('walkthroughs')}
-                    collapsed={collapsed}
-                />
-                {flags.diagrams && (
-                    <SidebarMenuItem
-                        icon={LuNetwork}
-                        label="Diagrams"
-                        isActive={activeView !== 'file' && activeView === 'diagrams'}
-                        onClick={() => onViewChange('diagrams')}
-                        collapsed={collapsed}
-                    />
+                {isVault ? (
+                    <>
+                        <SidebarMenuItem
+                            icon={LuFolder}
+                            label="Projects"
+                            isActive={activeView !== 'file' && activeView === 'projects'}
+                            onClick={() => onViewChange('projects')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuWorkflow}
+                            label="Workflows"
+                            isActive={activeView !== 'file' && activeView === 'workflows'}
+                            onClick={() => onViewChange('workflows')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuListTodo}
+                            label="Tasks"
+                            isActive={activeView !== 'file' && activeView === 'tasks'}
+                            onClick={() => onViewChange('tasks')}
+                            collapsed={collapsed}
+                        />
+                    </>
+                ) : (
+                    <>
+                        <SidebarMenuItem
+                            icon={LuListTodo}
+                            label="Tasks"
+                            isActive={activeView !== 'file' && activeView === 'tasks'}
+                            onClick={() => onViewChange('tasks')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuMap}
+                            label="Plans"
+                            isActive={activeView !== 'file' && activeView === 'plans'}
+                            onClick={() => onViewChange('plans')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuPackage}
+                            label="Kits"
+                            isActive={activeView !== 'file' && activeView === 'kits'}
+                            onClick={() => onViewChange('kits')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuBookOpen}
+                            label="Walkthroughs"
+                            isActive={activeView !== 'file' && activeView === 'walkthroughs'}
+                            onClick={() => onViewChange('walkthroughs')}
+                            collapsed={collapsed}
+                        />
+                        {flags.diagrams && (
+                            <SidebarMenuItem
+                                icon={LuNetwork}
+                                label="Diagrams"
+                                isActive={activeView !== 'file' && activeView === 'diagrams'}
+                                onClick={() => onViewChange('diagrams')}
+                                collapsed={collapsed}
+                            />
+                        )}
+                        <SidebarMenuItem
+                            icon={LuGitBranch}
+                            label="Git"
+                            isActive={activeView !== 'file' && activeView === 'git'}
+                            onClick={() => onViewChange('git')}
+                            collapsed={collapsed}
+                        />
+                        <SidebarMenuItem
+                            icon={LuBookmark}
+                            label="Bookmarks"
+                            isActive={activeView !== 'file' && activeView === 'bookmarks'}
+                            onClick={() => onViewChange('bookmarks')}
+                            collapsed={collapsed}
+                        />
+                    </>
                 )}
-                <SidebarMenuItem
-                    icon={LuGitBranch}
-                    label="Git"
-                    isActive={activeView !== 'file' && activeView === 'git'}
-                    onClick={() => onViewChange('git')}
-                    collapsed={collapsed}
-                />
-                <SidebarMenuItem
-                    icon={LuBookmark}
-                    label="Bookmarks"
-                    isActive={activeView !== 'file' && activeView === 'bookmarks'}
-                    onClick={() => onViewChange('bookmarks')}
-                    collapsed={collapsed}
-                />
 
                 {(flags.scrapbook || flags.blueprints || flags.agents) && !collapsed && (
                     <SidebarSection title="Extensions" collapsible defaultExpanded={false}>
