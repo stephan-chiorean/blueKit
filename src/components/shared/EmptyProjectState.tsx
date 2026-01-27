@@ -13,9 +13,6 @@ interface EmptyProjectStateProps {
 export default function EmptyProjectState({ onCreateNote }: EmptyProjectStateProps) {
     const { colorMode } = useColorMode();
 
-    // Glass styling matching other empty states
-    const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
-
     return (
         <MotionFlex
             h="100%"
@@ -25,9 +22,10 @@ export default function EmptyProjectState({ onCreateNote }: EmptyProjectStatePro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             style={{
-                background: cardBg,
+                background: colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
+                borderTopLeftRadius: '0px', // Reset radius since parent handles it or it's full width
             }}
         >
             <VStack gap={6}>

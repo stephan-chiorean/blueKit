@@ -1,4 +1,4 @@
-import { Flex, Heading, Button, HStack, Icon, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Button, Text } from '@chakra-ui/react';
 import { LuPlus } from 'react-icons/lu';
 import { IconType } from 'react-icons';
 
@@ -8,9 +8,11 @@ import { IconType } from 'react-icons';
 export interface ToolkitHeaderProps {
     /** The title to display (e.g., "Tasks", "Plans", "Kits") */
     title: string;
+    /** Optional parent name for breadcrumbs (e.g. Project Name) */
+    parentName?: string;
     /** Optional action button configuration */
     action?: {
-        /** Button label (e.g., "Add Task", "Create Plan") */
+        /** Button label (e.g., "Add Task", "Create Plan") - used for tooltip or text */
         label: string;
         /** Click handler for the action button */
         onClick: () => void;
@@ -18,89 +20,77 @@ export interface ToolkitHeaderProps {
         icon?: IconType;
         /** Color palette for the button (defaults to "primary") */
         colorPalette?: string;
-        /** Variant style: 'glass' (default) or 'solid' */
-        variant?: 'glass' | 'solid';
+        /** Variant style: 'glass', 'solid', or 'icon' (new default mirroring NoteView) */
+        variant?: 'glass' | 'solid' | 'icon';
     };
 }
 
-/**
- * ToolkitHeader - A consistent header component for toolkit tab content views
- * 
- * Displays a left-aligned title with an optional action button on the right.
- * 
- * @example
- * ```tsx
- * <ToolkitHeader
- *   title="Tasks"
- *   action={{
- *     label: "Add Task",
- *     onClick: handleAddTask,
- *   }}
- * />
- * ```
- */
-export function ToolkitHeader({ title, action }: ToolkitHeaderProps) {
-    const isSolid = action?.variant === 'solid';
+export function ToolkitHeader({ title, parentName, action }: ToolkitHeaderProps) {
+    const ActionIcon = action?.icon || LuPlus;
 
     return (
-        <Flex
-            align="center"
-            justify="space-between"
-            mb={6}
+        <Box
+            position="sticky"
+            top={0}
+            zIndex={100}
+            bg="transparent"
+            px={4}
             py={2}
         >
-            {/* Left-aligned Title */}
-            <Heading
-                size="2xl"
-                css={{
-                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                    _dark: {
-                        textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
-                    },
-                }}
-            >
-                {title}
-            </Heading>
+            <HStack justify="space-between" align="center" gap={4}>
+                {/* Left: Placeholder to balance layout */}
+                <Box w={action ? "auto" : 0} minW={action ? "40px" : 0} />
 
-            {/* Action Button on the right */}
-            {action && (
-                <Button
-                    colorPalette={action.colorPalette || 'primary'}
-                    variant={isSolid ? 'solid' : 'solid'} // Use solid variant for both but override CSS for glass
-                    size="sm"
-                    onClick={action.onClick}
-                    borderRadius="lg"
-                    borderWidth={isSolid ? undefined : "1px"}
-                    css={isSolid ? undefined : {
-                        background: 'rgba(255, 255, 255, 0.25)',
-                        backdropFilter: 'blur(20px) saturate(180%)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                        borderColor: 'rgba(0, 0, 0, 0.08)',
-                        boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                        color: 'var(--chakra-colors-text-primary)', // Ensure text contrast for glass
-                        _dark: {
-                            background: 'rgba(0, 0, 0, 0.2)',
-                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                        },
-                        _hover: {
-                            background: 'rgba(255, 255, 255, 0.35)',
-                            transform: 'scale(1.02)',
-                            _dark: {
-                                background: 'rgba(0, 0, 0, 0.3)',
-                            },
-                        },
-                    }}
+                {/* Center: Breadcrumbs */}
+                <HStack
+                    gap={2}
+                    flex={1}
+                    justify="center"
+                    minW={0}
                 >
-                    <HStack gap={2}>
-                        <Icon>
-                            {action.icon ? <action.icon /> : <LuPlus />}
-                        </Icon>
-                        <Text>{action.label}</Text>
-                    </HStack>
-                </Button>
-            )}
-        </Flex>
+                    {parentName && (
+                        <>
+                            <Text fontSize="sm" color="text.secondary" lineClamp={1}>
+                                {parentName}
+                            </Text>
+                            <Text fontSize="sm" color="text.tertiary">
+                                {'>'}
+                            </Text>
+                        </>
+                    )}
+                    <Text
+                        fontSize="sm"
+                        color="text.primary"
+                        fontWeight="medium"
+                        lineClamp={1}
+                    >
+                        {title}
+                    </Text>
+                </HStack>
+
+                {/* Right: Action Button */}
+                <HStack gap={1} minW={action ? "40px" : 0} justify="flex-end">
+                    {action && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            px={2}
+                            onClick={action.onClick}
+                            colorPalette={action.colorPalette || 'gray'}
+                            bg="transparent"
+                            _hover={{
+                                bg: 'bg.subtle', // Subtle hover effect like NoteViewHeader
+                            }}
+                            title={action.label} // Basic tooltip
+                        >
+                            <Icon boxSize={4}>
+                                <ActionIcon />
+                            </Icon>
+                        </Button>
+                    )}
+                </HStack>
+            </HStack>
+        </Box>
     );
 }
 

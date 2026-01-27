@@ -253,6 +253,8 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
     );
   };
 
+  const projectName = projectPath.split('/').pop() || 'Project';
+
   return (
     <Box position="relative">
       <CreatePlanDialog
@@ -265,10 +267,12 @@ const PlansTabContent = forwardRef<PlansTabContentRef, PlansTabContentProps>(({
 
       <StandardPageLayout
         title="Plans"
+        parentName={projectName}
         headerAction={{
           label: "Create Plan",
           onClick: handleOpenCreateDialog,
-          variant: "solid",
+          variant: "icon",
+          icon: LuPlus,
         }}
         filterControl={
           <Box position="relative">

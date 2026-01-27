@@ -289,180 +289,186 @@ function WalkthroughsTabContent({
     );
   }
 
+  const projectName = projectPath.split('/').pop() || 'Project';
+
   return (
-    <Box position="relative">
-      <VStack align="stretch" gap={6}>
+    <Flex direction="column" h="100%" overflow="hidden">
+      <VStack align="stretch" gap={0} h="100%">
         {/* Toolkit Header */}
         <ToolkitHeader
           title="Walkthroughs"
+          parentName={projectName}
           action={projectId ? {
             label: "Add Walkthrough",
             onClick: () => setIsCreateWalkthroughOpen(true),
-            variant: 'solid',
+            variant: 'icon', // Explicitly use new icon variant
             icon: LuPlus,
           } : undefined}
         />
 
-        {/* Folders Section */}
-        <Box position="relative">
-          <Flex align="center" justify="space-between" gap={2} mb={4}>
-            <Flex align="center" gap={2}>
-              <Heading size="md">Groups</Heading>
-              <Text fontSize="sm" color="text.muted">
-                {folders.length}
-              </Text>
-              {/* Filter Button */}
-              <Box position="relative" overflow="visible">
-                <Button
-                  ref={filterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  borderWidth="1px"
-                  borderRadius="lg"
-                  css={{
-                    background: 'rgba(255, 255, 255, 0.25)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                    borderColor: 'rgba(0, 0, 0, 0.08)',
-                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                    transition: 'none',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                    },
-                  }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFilter />
-                    </Icon>
-                    <Text>Filter</Text>
-                    {(nameFilter || selectedTags.length > 0) && (
-                      <Badge size="sm" colorPalette="primary" variant="solid">
-                        {[nameFilter && 1, selectedTags.length]
-                          .filter(Boolean)
-                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
-                <FilterPanel
-                  isOpen={isFilterOpen}
-                  onClose={() => setIsFilterOpen(false)}
-                  nameFilter={nameFilter}
-                  onNameFilterChange={setNameFilter}
-                  allTags={allTags}
-                  selectedTags={selectedTags}
-                  onToggleTag={toggleTag}
-                  filterButtonRef={filterButtonRef}
-                />
-              </Box>
-              {/* New Folder Button with Spotlight Popover */}
-              <CreateFolderPopover
-                isOpen={isCreateFolderOpen}
-                onOpenChange={setIsCreateFolderOpen}
-                onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
-                trigger={
+        {/* Scrollable Content Area */}
+        <Box flex={1} overflowY="auto" p={6}>
+          {/* Folders Section */}
+          <Box position="relative">
+            <Flex align="center" justify="space-between" gap={2} mb={4}>
+              <Flex align="center" gap={2}>
+                <Heading size="md">Groups</Heading>
+                <Text fontSize="sm" color="text.muted">
+                  {folders.length}
+                </Text>
+                {/* Filter Button */}
+                <Box position="relative" overflow="visible">
                   <Button
+                    ref={filterButtonRef}
+                    variant="ghost"
                     size="sm"
-                    colorPalette="blue"
-                    variant="subtle"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    borderWidth="1px"
+                    borderRadius="lg"
+                    css={{
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                      transition: 'none',
+                      _dark: {
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                      },
+                    }}
                   >
                     <HStack gap={2}>
                       <Icon>
-                        <LuFolderPlus />
+                        <LuFilter />
                       </Icon>
-                      <Text>New Group</Text>
+                      <Text>Filter</Text>
+                      {(nameFilter || selectedTags.length > 0) && (
+                        <Badge size="sm" colorPalette="primary" variant="solid">
+                          {[nameFilter && 1, selectedTags.length]
+                            .filter(Boolean)
+                            .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                        </Badge>
+                      )}
                     </HStack>
                   </Button>
-                }
-              />
-            </Flex>
-          </Flex>
-
-          {folders.length === 0 && !isFoldersLoading ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                No groups yet. Create one to organize your walkthroughs.
-              </Text>
-            </Box>
-          ) : (
-            <ElegantList
-              items={folders}
-              type="folder"
-              onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
-              renderActions={(item) => {
-                const folder = item as ArtifactFolder;
-                return (
-                  <>
-                    <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
-                      <HStack gap={2}>
-                        <Icon as={LuFolderPlus} /> <Text>Open</Text>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item
-                      value="delete-folder"
-                      color="fg.error"
-                      onClick={() => handleDeleteFolder(folder)}
+                  <FilterPanel
+                    isOpen={isFilterOpen}
+                    onClose={() => setIsFilterOpen(false)}
+                    nameFilter={nameFilter}
+                    onNameFilterChange={setNameFilter}
+                    allTags={allTags}
+                    selectedTags={selectedTags}
+                    onToggleTag={toggleTag}
+                    filterButtonRef={filterButtonRef}
+                  />
+                </Box>
+                {/* New Folder Button with Spotlight Popover */}
+                <CreateFolderPopover
+                  isOpen={isCreateFolderOpen}
+                  onOpenChange={setIsCreateFolderOpen}
+                  onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
+                  trigger={
+                    <Button
+                      size="sm"
+                      colorPalette="blue"
+                      variant="subtle"
                     >
                       <HStack gap={2}>
-                        <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                        <Icon>
+                          <LuFolderPlus />
+                        </Icon>
+                        <Text>New Group</Text>
                       </HStack>
-                    </Menu.Item>
-                  </>
-                );
-              }}
-            />
-          )}
-        </Box>
+                    </Button>
+                  }
+                />
+              </Flex>
+            </Flex>
 
-        {/* Walkthroughs Section */}
-        <Box mb={8} position="relative">
-          <Flex align="center" gap={2} mb={4}>
-            <Heading size="md">Walkthroughs</Heading>
-            <Text fontSize="sm" color="text.muted">
-              {rootWalkthroughs.length}
-            </Text>
-          </Flex>
+            {folders.length === 0 && !isFoldersLoading ? (
+              <Box
+                p={6}
+                bg="bg.subtle"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                textAlign="center"
+              >
+                <Text color="text.muted" fontSize="sm">
+                  No groups yet. Create one to organize your walkthroughs.
+                </Text>
+              </Box>
+            ) : (
+              <ElegantList
+                items={folders}
+                type="folder"
+                onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                renderActions={(item) => {
+                  const folder = item as ArtifactFolder;
+                  return (
+                    <>
+                      <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Open</Text>
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item
+                        value="delete-folder"
+                        color="fg.error"
+                        onClick={() => handleDeleteFolder(folder)}
+                      >
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                        </HStack>
+                      </Menu.Item>
+                    </>
+                  );
+                }}
+              />
+            )}
+          </Box>
 
-          {rootWalkthroughs.length === 0 ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                {(nameFilter || selectedTags.length > 0)
-                  ? 'No walkthroughs match the current filters'
-                  : 'No walkthroughs at root level. All walkthroughs are organized in groups.'}
+          {/* Walkthroughs Section */}
+          <Box mb={8} position="relative">
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Walkthroughs</Heading>
+              <Text fontSize="sm" color="text.muted">
+                {rootWalkthroughs.length}
               </Text>
-            </Box>
-          ) : (
-            <ElegantList
-              items={rootWalkthroughs}
-              type="walkthrough"
-              onItemClick={(kit) => handleViewWalkthrough(kit as ArtifactFile)}
-              renderActions={(item) => (
-                <Menu.Item value="open-walkthrough" onClick={() => handleViewWalkthrough(item as ArtifactFile)}>
-                  <HStack gap={2}>
-                    <Text>Open</Text>
-                  </HStack>
-                </Menu.Item>
-              )}
-            />
-          )}
+            </Flex>
+
+            {rootWalkthroughs.length === 0 ? (
+              <Box
+                p={6}
+                bg="bg.subtle"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                textAlign="center"
+              >
+                <Text color="text.muted" fontSize="sm">
+                  {(nameFilter || selectedTags.length > 0)
+                    ? 'No walkthroughs match the current filters'
+                    : 'No walkthroughs at root level. All walkthroughs are organized in groups.'}
+                </Text>
+              </Box>
+            ) : (
+              <ElegantList
+                items={rootWalkthroughs}
+                type="walkthrough"
+                onItemClick={(kit) => handleViewWalkthrough(kit as ArtifactFile)}
+                renderActions={(item) => (
+                  <Menu.Item value="open-walkthrough" onClick={() => handleViewWalkthrough(item as ArtifactFile)}>
+                    <HStack gap={2}>
+                      <Text>Open</Text>
+                    </HStack>
+                  </Menu.Item>
+                )}
+              />
+            )}
+          </Box>
         </Box>
       </VStack>
 
@@ -499,7 +505,7 @@ function WalkthroughsTabContent({
       )}
 
 
-    </Box>
+    </Flex>
   );
 }
 

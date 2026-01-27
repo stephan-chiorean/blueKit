@@ -1,8 +1,11 @@
-import { Box, VStack, Flex, Text, IconButton } from '@chakra-ui/react';
+import { Box, VStack, Flex, Text, Icon } from '@chakra-ui/react';
 import { ReactNode, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
 import { useColorMode } from '../../contexts/ColorModeContext';
+
+const MotionBox = motion.create(Box);
 
 interface SidebarSectionProps {
     title: string;
@@ -50,60 +53,77 @@ export default function SidebarSection({
         >
             <Box
                 px={3}
-                py={2}
+                pb={2}
                 display="flex"
                 alignItems="center"
                 justifyContent="space-between"
                 cursor={collapsible ? "pointer" : "default"}
                 onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
+                // Determine group hover state for chevron if needed
+                role="group"
             >
-                <Text
-                    fontSize="xs"
-                    fontWeight="bold"
-                    textTransform="uppercase"
-                    letterSpacing="wider"
-                    color={labelColor}
-                    css={{
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                        _dark: {
-                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                        },
-                    }}
-                >
-                    {title}
-                </Text>
+                <Flex alignItems="center" gap={1}>
+                    <Text
+                        fontSize="xs"
+                        fontWeight="bold"
+                        textTransform="uppercase"
+                        letterSpacing="wider"
+                        color={labelColor}
+                        css={{
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                            _dark: {
+                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                            },
+                        }}
+                    >
+                        {title}
+                    </Text>
+
+                    {collapsible && (
+                        <Icon
+                            boxSize={4}
+                            color={labelColor}
+                            as={isExpanded ? LuChevronDown : LuChevronRight}
+                            opacity={0.6}
+                            _groupHover={{ opacity: 1 }}
+                            transition="opacity 0.2s"
+                        />
+                    )}
+                </Flex>
 
                 <Box display="flex" alignItems="center">
                     {rightElement}
-
-                    {collapsible && (
-                        <IconButton
-                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                            size="xs"
-                            variant="ghost"
-                            color={labelColor}
-                            boxSize={5}
-                            minW={5}
-                            ml={1}
-                        >
-                            {isExpanded ? <LuChevronDown /> : <LuChevronRight />}
-                        </IconButton>
-                    )}
                 </Box>
             </Box>
 
-            {(!collapsible || isExpanded) && (
-                <ChildrenContainer
-                    gap={flex ? 0 : 0}
-                    align="stretch"
-                    direction={flex ? "column" : undefined}
-                    flex={flex ? "1" : undefined}
-                    minH={flex ? 0 : undefined}
-                    overflow={flex ? "hidden" : undefined}
-                >
-                    {children}
-                </ChildrenContainer>
-            )}
+            <AnimatePresence initial={false}>
+                {(!collapsible || isExpanded) && (
+                    <MotionBox
+                        key="content"
+                        initial={collapsible ? { opacity: 0, height: 0 } : undefined}
+                        animate={collapsible ? { opacity: 1, height: 'auto' } : undefined}
+                        exit={collapsible ? { opacity: 0, height: 0 } : undefined}
+                        transition={{
+                            height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                            opacity: { duration: 0.15, delay: 0.05 }
+                        }}
+                        style={{ overflow: flex ? undefined : 'hidden' }}
+                        flex={flex ? "1" : undefined}
+                        minH={flex ? 0 : undefined}
+                    >
+                        <ChildrenContainer
+                            gap={flex ? 0 : 0}
+                            align="stretch"
+                            direction={flex ? "column" : undefined}
+                            flex={flex ? "1" : undefined}
+                            minH={flex ? 0 : undefined}
+                            overflow={flex ? "hidden" : undefined}
+                        >
+                            {children}
+                        </ChildrenContainer>
+                    </MotionBox>
+                )}
+            </AnimatePresence>
         </Container>
     );
 }

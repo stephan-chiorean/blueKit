@@ -1,10 +1,11 @@
-import { Box, Flex, Heading, Text, VStack } from '@chakra-ui/react';
+import { Box, Flex, Heading, Text } from '@chakra-ui/react';
 import { ToolkitHeader, ToolkitHeaderProps } from './ToolkitHeader';
 
 interface StandardPageLayoutProps {
     // Header
     title: string;
     headerAction?: ToolkitHeaderProps['action'];
+    parentName?: string; // For breadcrumbs
 
     // Optional sections
     topSection?: React.ReactNode; // For folders or other content above main list
@@ -27,6 +28,7 @@ interface StandardPageLayoutProps {
 export function StandardPageLayout({
     title,
     headerAction,
+    parentName,
     topSection,
     filterControl,
     viewSwitcher,
@@ -40,36 +42,38 @@ export function StandardPageLayout({
     children,
 }: StandardPageLayoutProps) {
     return (
-        <VStack align="stretch" gap={6} width="100%">
-            <ToolkitHeader title={title} action={headerAction} />
+        <Flex direction="column" h="100%" w="100%" overflow="hidden">
+            <ToolkitHeader title={title} action={headerAction} parentName={parentName} />
 
-            {topSection}
+            <Box flex={1} overflowY="auto" p={6}>
+                {topSection}
 
-            <Box position="relative" width="100%">
-                <Flex align="center" justify="space-between" mb={4} minH="40px">
-                    <Flex align="center" gap={2}>
-                        <Heading size="md" textTransform="capitalize">
-                            {itemLabel}
-                        </Heading>
-                        {itemCount !== undefined && (
-                            <Text fontSize="sm" color="text.muted">
-                                {itemCount}
-                            </Text>
-                        )}
-                        {filterControl}
-                        {extraActions}
+                <Box position="relative" width="100%">
+                    <Flex align="center" justify="space-between" mb={4} minH="40px">
+                        <Flex align="center" gap={2}>
+                            <Heading size="md" textTransform="capitalize">
+                                {itemLabel}
+                            </Heading>
+                            {itemCount !== undefined && (
+                                <Text fontSize="sm" color="text.muted">
+                                    {itemCount}
+                                </Text>
+                            )}
+                            {filterControl}
+                            {extraActions}
+                        </Flex>
+                        {viewSwitcher}
                     </Flex>
-                    {viewSwitcher}
-                </Flex>
 
-                {isLoading ? (
-                    loadingSkeleton
-                ) : isEmpty ? (
-                    emptyState
-                ) : (
-                    children
-                )}
+                    {isLoading ? (
+                        loadingSkeleton
+                    ) : isEmpty ? (
+                        emptyState
+                    ) : (
+                        children
+                    )}
+                </Box>
             </Box>
-        </VStack>
+        </Flex>
     );
 }

@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { LuFile, LuFolder, LuFolderOpen, LuArrowRight, LuX } from 'react-icons/lu';
+import { LuFile, LuChevronRight, LuArrowRight, LuX } from 'react-icons/lu';
 import { FaStar, FaBookmark } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
-import { BsDiagram2 } from 'react-icons/bs';
+import { RxFileText } from 'react-icons/rx';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '../../ipc/fileTree';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { DirectoryContextMenu } from './DirectoryContextMenu';
@@ -1187,7 +1187,7 @@ function DragTooltip({ node, targetFolderName, position, isValidDrop, colorMode 
         actionColor = 'blue.500';
     }
 
-    const IconComponent = node.isFolder ? LuFolder :
+    const IconComponent = node.isFolder ? LuChevronRight :
         (node.name.endsWith('.md') || node.name.endsWith('.markdown') ? AiOutlineFileText : LuFile);
 
     // Strip extension from display name
@@ -1389,6 +1389,9 @@ function TreeNode({
     // Check if this file is bookmarked
     const isBookmarked = !node.isFolder && bookmarkedPaths.has(node.path);
 
+    // Track hover state for blue square opacity
+    const [isHovered, setIsHovered] = useState(false);
+
     // Track if text has been selected to prevent re-selecting on every render
     const hasSelectedTextRef = useRef<boolean>(false);
 
@@ -1424,11 +1427,6 @@ function TreeNode({
 
     const isSelected = selectedId === node.path;
 
-    // Check if file is a markdown file
-    const isMarkdownFile = !node.isFolder && (node.name.endsWith('.md') || node.name.endsWith('.markdown'));
-    // Check if file is a mermaid diagram file
-    const isMermaidFile = !node.isFolder && node.name.endsWith('.mmd');
-
     // Helper function to strip file extension (.mmd or .md) from display name
     const getDisplayName = (fileName: string): string => {
         if (fileName.endsWith('.mmd')) {
@@ -1452,17 +1450,6 @@ function TreeNode({
         ? (colorMode === 'light' ? 'red.50' : 'red.900')
         : (colorMode === 'light' ? 'blue.50' : 'blue.900');
     const dragOverBorderColor = isDraggedOverInvalid ? 'red.400' : 'blue.400';
-
-    // Determine the icon to use
-    const getFileIcon = () => {
-        if (node.isFolder) {
-            return isExpanded ? LuFolderOpen : LuFolder;
-        }
-        if (isMermaidFile) {
-            return BsDiagram2;
-        }
-        return isMarkdownFile ? AiOutlineFileText : LuFile;
-    };
 
     // Handle input key events
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1491,6 +1478,8 @@ function TreeNode({
                 cursor={getCursor()}
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 onContextMenu={(e) => onContextMenu(e, node)}
                 bg={
                     isDraggedOver ? dragOverBg :
@@ -1511,12 +1500,26 @@ function TreeNode({
                 data-droppable-folder={node.isFolder ? node.path : undefined}
                 userSelect="none"
             >
-                <Icon
-                    as={getFileIcon()}
-                    color={node.isFolder ? "blue.400" : (isSelected ? "currentColor" : "gray.500")}
-                    boxSize={4}
-                    flexShrink={0}
-                />
+                {node.isFolder && (
+                    <Icon
+                        as={LuChevronRight}
+                        color={colorMode === 'light' ? 'gray.600' : 'gray.400'}
+                        boxSize={3.5}
+                        flexShrink={0}
+                        transform={isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}
+                        transition="transform 0.2s"
+                    />
+                )}
+                {!node.isFolder && (
+                    <Icon
+                        as={RxFileText}
+                        color="blue.500"
+                        boxSize={3.5}
+                        opacity={isHovered ? 1 : 0.6}
+                        flexShrink={0}
+                        transition="opacity 0.15s"
+                    />
+                )}
                 {isEditing ? (
                     <Input
                         size="xs"

@@ -25,15 +25,16 @@ import {
 import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
 import { LiquidViewModeSwitcher } from '../kits/LiquidViewModeSwitcher';
 import { Task, TaskPriority, TaskType } from '../../types/task';
-import { ProjectEntry, Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
+import { Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '../../ipc';
 import TasksActionBar from './TasksActionBar';
+import { ToolkitHeader } from '../shared/ToolkitHeader';
 import EditTaskDialog from './EditTaskDialog';
 import { useQuickTaskPopover } from '../../contexts/QuickTaskPopoverContext';
 import { toaster } from '../ui/toaster';
 import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from '../../utils/taskUtils';
 
 interface TasksTabContentProps {
-  context: 'workspace' | ProjectEntry;  // workspace view or specific project
+  context: 'workspace' | Project;  // workspace view or specific project
   projects: Project[];  // All projects for multi-select
 }
 
@@ -80,7 +81,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       setLoading(true);
       const loadedTasks: Task[] = context === 'workspace'
         ? await invokeDbGetTasks()
-        : await invokeDbGetProjectTasks((context as ProjectEntry).id);
+        : await invokeDbGetProjectTasks((context as Project).id);
       setTasks(loadedTasks);
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -160,7 +161,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
   const handleAddTask = () => {
     openPopover({
       defaultView: 'create',
-      defaultProjectId: context !== 'workspace' ? (context as ProjectEntry).id : undefined,
+      defaultProjectId: context !== 'workspace' ? (context as Project).id : undefined,
       onTaskCreated: handleTaskCreated,
     });
   };
@@ -169,7 +170,7 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     openCreateDialog: () => {
       openPopover({
         defaultView: 'create',
-        defaultProjectId: context !== 'workspace' ? (context as ProjectEntry).id : undefined,
+        defaultProjectId: context !== 'workspace' ? (context as Project).id : undefined,
         onTaskCreated: handleTaskCreated,
       });
     },
@@ -522,8 +523,10 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
     );
   };
 
+  const parentName = context === 'workspace' ? 'Workspace' : context.name;
+
   return (
-    <Box position="relative">
+    <Flex direction="column" h="100%" overflow="hidden" position="relative">
       <EditTaskDialog
         task={selectedTask}
         isOpen={isDialogOpen}
@@ -542,548 +545,534 @@ const TasksTabContent = forwardRef<TasksTabContentRef, TasksTabContentProps>(({
       />
 
       {/* Toolkit Header */}
-      <Flex align="center" justify="space-between" mb={6} py={2}>
-        <Heading
-          size="2xl"
-          css={{
-            textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-            _dark: {
-              textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
-            },
-          }}
-        >
-          Tasks
-        </Heading>
-        <Button
-          colorPalette="primary"
-          variant="solid"
-          size="sm"
-          borderRadius="lg"
-          onClick={handleAddTask}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuPlus />
-            </Icon>
-            <Text>Add Task</Text>
-          </HStack>
-        </Button>
-      </Flex>
+      <ToolkitHeader
+        title="Tasks"
+        parentName={parentName}
+        action={{
+          label: "Add Task",
+          onClick: handleAddTask,
+          variant: "icon",
+          icon: LuPlus,
+        }}
+      />
 
-      {/* In Progress Section */}
-      <Box mb={8} position="relative">
-        <Flex align="center" justify="space-between" gap={2} mb={4}>
-          <Flex align="center" gap={2}>
-            <Heading size="md">In Progress</Heading>
-            <Text fontSize="sm" color="text.muted">
-              {inProgressTasks.length}
-            </Text>
-            {/* Filter Button - with liquid glass styling */}
-            <Box position="relative" overflow="visible">
-              <Button
-                ref={filterButtonRef}
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                borderRadius="lg"
-                borderWidth="1px"
-                css={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  borderColor: 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                  },
-                  _hover: {
-                    background: 'rgba(255, 255, 255, 0.35)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.3)',
-                    },
-                  },
-                }}
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                  {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0) && (
-                    <Badge size="sm" colorPalette="primary" variant="solid">
-                      {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length, selectedTypes.length]
-                        .filter(Boolean)
-                        .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                    </Badge>
-                  )}
-                </HStack>
-              </Button>
-              {/* Filter Overlay */}
-              {isFilterOpen && (
-                <Box
-                  ref={filterPanelRef}
-                  position="absolute"
-                  top="100%"
-                  left={0}
-                  zIndex={10}
-                  w="400px"
-                  mt={2}
+      {/* Scrollable Content */}
+      <Box flex={1} overflowY="auto" p={6}>
+        {/* In Progress Section */}
+        <Box mb={8} position="relative">
+          <Flex align="center" justify="space-between" gap={2} mb={4}>
+            <Flex align="center" gap={2}>
+              <Heading size="md">In Progress</Heading>
+              <Text fontSize="sm" color="text.muted">
+                {inProgressTasks.length}
+              </Text>
+              {/* Filter Button - with liquid glass styling */}
+              <Box position="relative" overflow="visible">
+                <Button
+                  ref={filterButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  borderRadius="lg"
                   borderWidth="1px"
-                  borderColor="border.subtle"
-                  borderRadius="md"
-                  p={4}
-                  bg="bg.surface"
-                  boxShadow="lg"
+                  css={{
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                    borderColor: 'rgba(0, 0, 0, 0.08)',
+                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                    _dark: {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                    },
+                    _hover: {
+                      background: 'rgba(255, 255, 255, 0.35)',
+                      _dark: {
+                        background: 'rgba(0, 0, 0, 0.3)',
+                      },
+                    },
+                  }}
                 >
-                  <VStack align="stretch" gap={4}>
-                    <Field.Root>
-                      <Field.Label>Title</Field.Label>
-                      <InputGroup
-                        endElement={titleFilter ? (
-                          <IconButton
-                            size="xs"
-                            variant="ghost"
-                            aria-label="Clear title filter"
-                            onClick={() => setTitleFilter('')}
-                          >
-                            <Icon>
-                              <LuX />
-                            </Icon>
-                          </IconButton>
-                        ) : undefined}
-                      >
-                        <Input
-                          placeholder="Search by title or description..."
-                          value={titleFilter}
-                          onChange={(e) => setTitleFilter(e.target.value)}
-                        />
-                      </InputGroup>
-                    </Field.Root>
-
-                    {allTags.length > 0 && (
+                  <HStack gap={2}>
+                    <Icon>
+                      <LuFilter />
+                    </Icon>
+                    <Text>Filter</Text>
+                    {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0) && (
+                      <Badge size="sm" colorPalette="primary" variant="solid">
+                        {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length, selectedTypes.length]
+                          .filter(Boolean)
+                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                      </Badge>
+                    )}
+                  </HStack>
+                </Button>
+                {/* Filter Overlay */}
+                {isFilterOpen && (
+                  <Box
+                    ref={filterPanelRef}
+                    position="absolute"
+                    top="100%"
+                    left={0}
+                    zIndex={10}
+                    w="400px"
+                    mt={2}
+                    borderWidth="1px"
+                    borderColor="border.subtle"
+                    borderRadius="md"
+                    p={4}
+                    bg="bg.surface"
+                    boxShadow="lg"
+                  >
+                    <VStack align="stretch" gap={4}>
                       <Field.Root>
-                        <Field.Label>Tags</Field.Label>
+                        <Field.Label>Title</Field.Label>
+                        <InputGroup
+                          endElement={titleFilter ? (
+                            <IconButton
+                              size="xs"
+                              variant="ghost"
+                              aria-label="Clear title filter"
+                              onClick={() => setTitleFilter('')}
+                            >
+                              <Icon>
+                                <LuX />
+                              </Icon>
+                            </IconButton>
+                          ) : undefined}
+                        >
+                          <Input
+                            placeholder="Search by title or description..."
+                            value={titleFilter}
+                            onChange={(e) => setTitleFilter(e.target.value)}
+                          />
+                        </InputGroup>
+                      </Field.Root>
+
+                      {allTags.length > 0 && (
+                        <Field.Root>
+                          <Field.Label>Tags</Field.Label>
+                          <HStack gap={1} flexWrap="wrap" mt={2}>
+                            {allTags.map((tag) => {
+                              const isSelected = selectedTags.includes(tag);
+                              return (
+                                <Tag.Root
+                                  key={tag}
+                                  size="sm"
+                                  variant={isSelected ? 'solid' : 'subtle'}
+                                  colorPalette={isSelected ? 'primary' : undefined}
+                                  cursor="pointer"
+                                  onClick={() => toggleTag(tag)}
+                                  opacity={isSelected ? 1 : 0.6}
+                                  _hover={{ opacity: 1 }}
+                                >
+                                  <Tag.Label>{tag}</Tag.Label>
+                                </Tag.Root>
+                              );
+                            })}
+                          </HStack>
+                        </Field.Root>
+                      )}
+
+                      <Field.Root>
+                        <Field.Label>Priority</Field.Label>
                         <HStack gap={1} flexWrap="wrap" mt={2}>
-                          {allTags.map((tag) => {
-                            const isSelected = selectedTags.includes(tag);
+                          {allPriorities.map((priority) => {
+                            const isSelected = selectedPriorities.includes(priority);
+                            const priorityIcon = getPriorityIcon(priority);
                             return (
                               <Tag.Root
-                                key={tag}
+                                key={priority}
                                 size="sm"
                                 variant={isSelected ? 'solid' : 'subtle'}
-                                colorPalette={isSelected ? 'primary' : undefined}
+                                colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
                                 cursor="pointer"
-                                onClick={() => toggleTag(tag)}
+                                onClick={() => togglePriority(priority)}
                                 opacity={isSelected ? 1 : 0.6}
                                 _hover={{ opacity: 1 }}
                               >
-                                <Tag.Label>{tag}</Tag.Label>
+                                <HStack gap={1}>
+                                  {priorityIcon && (
+                                    <Icon color={priorityIcon.color} boxSize={3}>
+                                      <priorityIcon.icon />
+                                    </Icon>
+                                  )}
+                                  <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
+                                </HStack>
                               </Tag.Root>
                             );
                           })}
                         </HStack>
                       </Field.Root>
-                    )}
 
-                    <Field.Root>
-                      <Field.Label>Priority</Field.Label>
-                      <HStack gap={1} flexWrap="wrap" mt={2}>
-                        {allPriorities.map((priority) => {
-                          const isSelected = selectedPriorities.includes(priority);
-                          const priorityIcon = getPriorityIcon(priority);
-                          return (
-                            <Tag.Root
-                              key={priority}
-                              size="sm"
-                              variant={isSelected ? 'solid' : 'subtle'}
-                              colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
-                              cursor="pointer"
-                              onClick={() => togglePriority(priority)}
-                              opacity={isSelected ? 1 : 0.6}
-                              _hover={{ opacity: 1 }}
-                            >
-                              <HStack gap={1}>
-                                {priorityIcon && (
-                                  <Icon color={priorityIcon.color} boxSize={3}>
-                                    <priorityIcon.icon />
-                                  </Icon>
-                                )}
-                                <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
-                              </HStack>
-                            </Tag.Root>
-                          );
-                        })}
-                      </HStack>
-                    </Field.Root>
+                      <Field.Root>
+                        <Field.Label>Complexity</Field.Label>
+                        <HStack gap={1} flexWrap="wrap" mt={2}>
+                          {allComplexities.map((complexity) => {
+                            const isSelected = selectedComplexities.includes(complexity);
+                            return (
+                              <Tag.Root
+                                key={complexity}
+                                size="sm"
+                                variant={isSelected ? 'solid' : 'subtle'}
+                                colorPalette={isSelected ? 'primary' : undefined}
+                                cursor="pointer"
+                                onClick={() => toggleComplexity(complexity)}
+                                opacity={isSelected ? 1 : 0.6}
+                                _hover={{ opacity: 1 }}
+                              >
+                                <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
+                              </Tag.Root>
+                            );
+                          })}
+                        </HStack>
+                      </Field.Root>
 
-                    <Field.Root>
-                      <Field.Label>Complexity</Field.Label>
-                      <HStack gap={1} flexWrap="wrap" mt={2}>
-                        {allComplexities.map((complexity) => {
-                          const isSelected = selectedComplexities.includes(complexity);
-                          return (
-                            <Tag.Root
-                              key={complexity}
-                              size="sm"
-                              variant={isSelected ? 'solid' : 'subtle'}
-                              colorPalette={isSelected ? 'primary' : undefined}
-                              cursor="pointer"
-                              onClick={() => toggleComplexity(complexity)}
-                              opacity={isSelected ? 1 : 0.6}
-                              _hover={{ opacity: 1 }}
-                            >
-                              <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
-                            </Tag.Root>
-                          );
-                        })}
-                      </HStack>
-                    </Field.Root>
-
-                    <Field.Root>
-                      <Field.Label>Type</Field.Label>
-                      <HStack gap={1} flexWrap="wrap" mt={2}>
-                        {allTypes.map((type) => {
-                          const isSelected = selectedTypes.includes(type);
-                          return (
-                            <Tag.Root
-                              key={type}
-                              size="sm"
-                              variant={isSelected ? 'solid' : 'subtle'}
-                              colorPalette={isSelected ? 'primary' : undefined}
-                              cursor="pointer"
-                              onClick={() => toggleType(type)}
-                              opacity={isSelected ? 1 : 0.6}
-                              _hover={{ opacity: 1 }}
-                            >
-                              <Tag.Label>{getTypeLabel(type)}</Tag.Label>
-                            </Tag.Root>
-                          );
-                        })}
-                      </HStack>
-                    </Field.Root>
-                  </VStack>
-                </Box>
-              )}
-            </Box>
+                      <Field.Root>
+                        <Field.Label>Type</Field.Label>
+                        <HStack gap={1} flexWrap="wrap" mt={2}>
+                          {allTypes.map((type) => {
+                            const isSelected = selectedTypes.includes(type);
+                            return (
+                              <Tag.Root
+                                key={type}
+                                size="sm"
+                                variant={isSelected ? 'solid' : 'subtle'}
+                                colorPalette={isSelected ? 'primary' : undefined}
+                                cursor="pointer"
+                                onClick={() => toggleType(type)}
+                                opacity={isSelected ? 1 : 0.6}
+                                _hover={{ opacity: 1 }}
+                              >
+                                <Tag.Label>{getTypeLabel(type)}</Tag.Label>
+                              </Tag.Root>
+                            );
+                          })}
+                        </HStack>
+                      </Field.Root>
+                    </VStack>
+                  </Box>
+                )}
+              </Box>
+            </Flex>
+            {/* View Mode Switcher */}
+            <LiquidViewModeSwitcher
+              value={viewMode}
+              onChange={(mode) => setViewMode(mode as ViewMode)}
+              modes={[
+                { id: 'card', label: 'Cards', icon: LuLayoutGrid },
+                { id: 'table', label: 'Table', icon: LuTable },
+              ]}
+            />
           </Flex>
-          {/* View Mode Switcher */}
-          <LiquidViewModeSwitcher
-            value={viewMode}
-            onChange={(mode) => setViewMode(mode as ViewMode)}
-            modes={[
-              { id: 'card', label: 'Cards', icon: LuLayoutGrid },
-              { id: 'table', label: 'Table', icon: LuTable },
-            ]}
-          />
-        </Flex>
 
-        {inProgressTasks.length === 0 ? (
-          <Box
-            p={6}
-            bg="bg.subtle"
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            textAlign="center"
-          >
-            <Text color="text.muted" fontSize="sm">
-              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
-                ? 'No tasks in progress match the current filters'
-                : context === 'workspace'
-                  ? 'No tasks in progress'
-                  : `No tasks in progress for ${(context as ProjectEntry).title}`
-              }
-            </Text>
-          </Box>
-        ) : viewMode === 'card' ? (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-            {inProgressTasks.map(renderTaskCard)}
-          </SimpleGrid>
-        ) : (
-          <Table.Root size="sm" variant="outline">
-            <Table.Header>
-              <Table.Row bg="bg.subtle">
-                <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
-                <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
-                <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
-                <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
-                <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
-                <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {inProgressTasks.map((task) => {
-                const taskSelected = isSelected(task.id);
-                const complexityLabel = getComplexityLabel(task.complexity);
-                const typeLabel = getTypeLabel(task.type);
-                const typeIcon = task.type ? getTypeIcon(task.type) : null;
-                const priorityIcon = getPriorityIcon(task.priority);
-                const hoverColors = getPriorityHoverColors(task.priority);
-                return (
-                  <Table.Row
-                    key={task.id}
-                    cursor="pointer"
-                    onClick={() => handleViewTask(task)}
-                    bg="bg.surface"
-                    _hover={{ borderColor: hoverColors.borderColor }}
-                    data-selected={taskSelected ? "" : undefined}
-                  >
-                    <Table.Cell>
-                      <Checkbox.Root
-                        size="sm"
-                        checked={taskSelected}
-                        colorPalette="blue"
-                        onCheckedChange={() => {
-                          handleTaskToggle(task);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        cursor="pointer"
-                      >
-                        <Checkbox.HiddenInput />
-                        <Checkbox.Control cursor="pointer">
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                      </Checkbox.Root>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <HStack gap={2}>
-                        <Text fontWeight="medium">{task.title}</Text>
-                        {priorityIcon && (
-                          <Icon color={priorityIcon.color}>
-                            <priorityIcon.icon />
-                          </Icon>
-                        )}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {complexityLabel ? (
-                        <Badge size="sm" variant="outline" colorPalette="gray">
-                          {complexityLabel}
-                        </Badge>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {typeLabel && typeIcon ? (
-                        <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
-                          <HStack gap={1}>
-                            <Icon color={typeIcon.color} boxSize={3}>
-                              <typeIcon.icon />
+          {inProgressTasks.length === 0 ? (
+            <Box
+              p={6}
+              bg="bg.subtle"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <Text color="text.muted" fontSize="sm">
+                {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
+                  ? 'No tasks in progress match the current filters'
+                  : context === 'workspace'
+                    ? 'No tasks in progress'
+                    : `No tasks in progress for ${(context as Project).name}`
+                }
+              </Text>
+            </Box>
+          ) : viewMode === 'card' ? (
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              {inProgressTasks.map(renderTaskCard)}
+            </SimpleGrid>
+          ) : (
+            <Table.Root size="sm" variant="outline">
+              <Table.Header>
+                <Table.Row bg="bg.subtle">
+                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                  <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
+                  <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
+                  <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
+                  <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
+                  <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
+                  <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {inProgressTasks.map((task) => {
+                  const taskSelected = isSelected(task.id);
+                  const complexityLabel = getComplexityLabel(task.complexity);
+                  const typeLabel = getTypeLabel(task.type);
+                  const typeIcon = task.type ? getTypeIcon(task.type) : null;
+                  const priorityIcon = getPriorityIcon(task.priority);
+                  const hoverColors = getPriorityHoverColors(task.priority);
+                  return (
+                    <Table.Row
+                      key={task.id}
+                      cursor="pointer"
+                      onClick={() => handleViewTask(task)}
+                      bg="bg.surface"
+                      _hover={{ borderColor: hoverColors.borderColor }}
+                      data-selected={taskSelected ? "" : undefined}
+                    >
+                      <Table.Cell>
+                        <Checkbox.Root
+                          size="sm"
+                          checked={taskSelected}
+                          colorPalette="blue"
+                          onCheckedChange={() => {
+                            handleTaskToggle(task);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          cursor="pointer"
+                        >
+                          <Checkbox.HiddenInput />
+                          <Checkbox.Control cursor="pointer">
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                        </Checkbox.Root>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Text fontWeight="medium">{task.title}</Text>
+                          {priorityIcon && (
+                            <Icon color={priorityIcon.color}>
+                              <priorityIcon.icon />
                             </Icon>
-                            <Text>{typeLabel}</Text>
-                          </HStack>
-                        </Badge>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {task.projectIds.length > 0 ? (
-                        <HStack gap={1} flexWrap="wrap">
-                          {task.projectIds.map(projectId => {
-                            const project = projects.find(p => p.id === projectId);
-                            return project ? (
-                              <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
-                                <HStack gap={1}>
-                                  <LuFolder size={10} />
-                                  <Text>{project.name}</Text>
-                                </HStack>
-                              </Badge>
-                            ) : null;
-                          })}
+                          )}
                         </HStack>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {task.tags && task.tags.length > 0 ? (
-                        <HStack gap={1} flexWrap="wrap">
-                          {task.tags.map((tag) => (
-                            <Tag.Root key={tag} size="sm" variant="subtle">
-                              <Tag.Label>{tag}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="sm" color="text.secondary">
-                        {formatDate(task.updatedAt)}
-                      </Text>
-                    </Table.Cell>
-                  </Table.Row>
-                );
-              })}
-            </Table.Body>
-          </Table.Root>
-        )}
-      </Box>
-
-      {/* Backlog Section */}
-      <Box>
-        <Flex align="center" gap={2} mb={4}>
-          <Heading size="md">Backlog</Heading>
-          <Text fontSize="sm" color="text.muted">
-            {backlogTasks.length}
-          </Text>
-        </Flex>
-
-        {backlogTasks.length === 0 ? (
-          <Box
-            p={6}
-            bg="bg.subtle"
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            textAlign="center"
-          >
-            <Text color="text.muted" fontSize="sm">
-              {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
-                ? 'No tasks in backlog match the current filters'
-                : 'No tasks in backlog'
-              }
-            </Text>
-          </Box>
-        ) : viewMode === 'card' ? (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-            {backlogTasks.map(renderTaskCard)}
-          </SimpleGrid>
-        ) : (
-          <Table.Root size="sm" variant="outline">
-            <Table.Header>
-              <Table.Row bg="bg.subtle">
-                <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
-                <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
-                <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
-                <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
-                <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
-                <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {backlogTasks.map((task) => {
-                const taskSelected = isSelected(task.id);
-                const complexityLabel = getComplexityLabel(task.complexity);
-                const typeLabel = getTypeLabel(task.type);
-                const typeIcon = task.type ? getTypeIcon(task.type) : null;
-                const priorityIcon = getPriorityIcon(task.priority);
-                const hoverColors = getPriorityHoverColors(task.priority);
-                return (
-                  <Table.Row
-                    key={task.id}
-                    cursor="pointer"
-                    onClick={() => handleViewTask(task)}
-                    bg="bg.surface"
-                    _hover={{ borderColor: hoverColors.borderColor }}
-                    data-selected={taskSelected ? "" : undefined}
-                  >
-                    <Table.Cell>
-                      <Checkbox.Root
-                        size="sm"
-                        checked={taskSelected}
-                        colorPalette="blue"
-                        onCheckedChange={() => {
-                          handleTaskToggle(task);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        cursor="pointer"
-                      >
-                        <Checkbox.HiddenInput />
-                        <Checkbox.Control cursor="pointer">
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                      </Checkbox.Root>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <HStack gap={2}>
-                        <Text fontWeight="medium">{task.title}</Text>
-                        {priorityIcon && (
-                          <Icon color={priorityIcon.color}>
-                            <priorityIcon.icon />
-                          </Icon>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {complexityLabel ? (
+                          <Badge size="sm" variant="outline" colorPalette="gray">
+                            {complexityLabel}
+                          </Badge>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
                         )}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {complexityLabel ? (
-                        <Badge size="sm" variant="outline" colorPalette="gray">
-                          {complexityLabel}
-                        </Badge>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {typeLabel && typeIcon ? (
-                        <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
-                          <HStack gap={1}>
-                            <Icon color={typeIcon.color} boxSize={3}>
-                              <typeIcon.icon />
-                            </Icon>
-                            <Text>{typeLabel}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {typeLabel && typeIcon ? (
+                          <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                            <HStack gap={1}>
+                              <Icon color={typeIcon.color} boxSize={3}>
+                                <typeIcon.icon />
+                              </Icon>
+                              <Text>{typeLabel}</Text>
+                            </HStack>
+                          </Badge>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {task.projectIds.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {task.projectIds.map(projectId => {
+                              const project = projects.find(p => p.id === projectId);
+                              return project ? (
+                                <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
+                                  <HStack gap={1}>
+                                    <LuFolder size={10} />
+                                    <Text>{project.name}</Text>
+                                  </HStack>
+                                </Badge>
+                              ) : null;
+                            })}
                           </HStack>
-                        </Badge>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {task.projectIds.length > 0 ? (
-                        <HStack gap={1} flexWrap="wrap">
-                          {task.projectIds.map(projectId => {
-                            const project = projects.find(p => p.id === projectId);
-                            return project ? (
-                              <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
-                                <HStack gap={1}>
-                                  <LuFolder size={10} />
-                                  <Text>{project.name}</Text>
-                                </HStack>
-                              </Badge>
-                            ) : null;
-                          })}
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {task.tags && task.tags.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {task.tags.map((tag) => (
+                              <Tag.Root key={tag} size="sm" variant="subtle">
+                                <Tag.Label>{tag}</Tag.Label>
+                              </Tag.Root>
+                            ))}
+                          </HStack>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.secondary">
+                          {formatDate(task.updatedAt)}
+                        </Text>
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Root>
+          )}
+        </Box>
+
+        {/* Backlog Section */}
+        <Box>
+          <Flex align="center" gap={2} mb={4}>
+            <Heading size="md">Backlog</Heading>
+            <Text fontSize="sm" color="text.muted">
+              {backlogTasks.length}
+            </Text>
+          </Flex>
+
+          {backlogTasks.length === 0 ? (
+            <Box
+              p={6}
+              bg="bg.subtle"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.subtle"
+              textAlign="center"
+            >
+              <Text color="text.muted" fontSize="sm">
+                {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0)
+                  ? 'No tasks in backlog match the current filters'
+                  : 'No tasks in backlog'
+                }
+              </Text>
+            </Box>
+          ) : viewMode === 'card' ? (
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+              {backlogTasks.map(renderTaskCard)}
+            </SimpleGrid>
+          ) : (
+            <Table.Root size="sm" variant="outline">
+              <Table.Header>
+                <Table.Row bg="bg.subtle">
+                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
+                  <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
+                  <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
+                  <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
+                  <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
+                  <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
+                  <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {backlogTasks.map((task) => {
+                  const taskSelected = isSelected(task.id);
+                  const complexityLabel = getComplexityLabel(task.complexity);
+                  const typeLabel = getTypeLabel(task.type);
+                  const typeIcon = task.type ? getTypeIcon(task.type) : null;
+                  const priorityIcon = getPriorityIcon(task.priority);
+                  const hoverColors = getPriorityHoverColors(task.priority);
+                  return (
+                    <Table.Row
+                      key={task.id}
+                      cursor="pointer"
+                      onClick={() => handleViewTask(task)}
+                      bg="bg.surface"
+                      _hover={{ borderColor: hoverColors.borderColor }}
+                      data-selected={taskSelected ? "" : undefined}
+                    >
+                      <Table.Cell>
+                        <Checkbox.Root
+                          size="sm"
+                          checked={taskSelected}
+                          colorPalette="blue"
+                          onCheckedChange={() => {
+                            handleTaskToggle(task);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          cursor="pointer"
+                        >
+                          <Checkbox.HiddenInput />
+                          <Checkbox.Control cursor="pointer">
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                        </Checkbox.Root>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Text fontWeight="medium">{task.title}</Text>
+                          {priorityIcon && (
+                            <Icon color={priorityIcon.color}>
+                              <priorityIcon.icon />
+                            </Icon>
+                          )}
                         </HStack>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {task.tags && task.tags.length > 0 ? (
-                        <HStack gap={1} flexWrap="wrap">
-                          {task.tags.map((tag) => (
-                            <Tag.Root key={tag} size="sm" variant="subtle">
-                              <Tag.Label>{tag}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      ) : (
-                        <Text fontSize="sm" color="text.tertiary">—</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="sm" color="text.secondary">
-                        {formatDate(task.updatedAt)}
-                      </Text>
-                    </Table.Cell>
-                  </Table.Row>
-                );
-              })}
-            </Table.Body>
-          </Table.Root>
-        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {complexityLabel ? (
+                          <Badge size="sm" variant="outline" colorPalette="gray">
+                            {complexityLabel}
+                          </Badge>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {typeLabel && typeIcon ? (
+                          <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                            <HStack gap={1}>
+                              <Icon color={typeIcon.color} boxSize={3}>
+                                <typeIcon.icon />
+                              </Icon>
+                              <Text>{typeLabel}</Text>
+                            </HStack>
+                          </Badge>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {task.projectIds.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {task.projectIds.map(projectId => {
+                              const project = projects.find(p => p.id === projectId);
+                              return project ? (
+                                <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
+                                  <HStack gap={1}>
+                                    <LuFolder size={10} />
+                                    <Text>{project.name}</Text>
+                                  </HStack>
+                                </Badge>
+                              ) : null;
+                            })}
+                          </HStack>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {task.tags && task.tags.length > 0 ? (
+                          <HStack gap={1} flexWrap="wrap">
+                            {task.tags.map((tag) => (
+                              <Tag.Root key={tag} size="sm" variant="subtle">
+                                <Tag.Label>{tag}</Tag.Label>
+                              </Tag.Root>
+                            ))}
+                          </HStack>
+                        ) : (
+                          <Text fontSize="sm" color="text.tertiary">—</Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="text.secondary">
+                          {formatDate(task.updatedAt)}
+                        </Text>
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Root>
+          )}
+        </Box>
       </Box>
-    </Box>
+    </Flex>
   );
 });
 

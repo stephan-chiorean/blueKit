@@ -112,6 +112,8 @@ export default function SidebarContent({
         <Flex direction="column" width="100%" h="100%" gap={1} pb={0}>
             <SidebarSection
                 title="Toolkit"
+                collapsible={true}
+                defaultExpanded={true}
                 collapsed={collapsed}
                 rightElement={
                     !collapsed && (

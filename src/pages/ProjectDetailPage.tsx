@@ -4,7 +4,10 @@ import {
   Box,
   VStack,
   Splitter,
+  Flex,
 } from '@chakra-ui/react';
+import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo } from 'react-icons/lu';
+import { BsStack } from 'react-icons/bs';
 import { toaster } from '../components/ui/toaster';
 import { listen } from '@tauri-apps/api/event';
 import KitsTabContent from '../components/kits/KitsTabContent';
@@ -24,7 +27,8 @@ import { ViewType } from '../components/sidebar/SidebarContent';
 import EmptyProjectState from '../components/shared/EmptyProjectState';
 import ProjectsTabContent from '../components/projects/ProjectsTabContent';
 import WorkflowsTabContent from '../components/workflows/WorkflowsTabContent';
-import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, ProjectEntry, TimeoutError, FileTreeNode } from '../ipc';
+import { BrowserTabs, Tab } from '../components/tabs';
+import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, TimeoutError, FileTreeNode } from '../ipc';
 import { deleteResources } from '../ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '../ipc/walkthroughs';
 import { ResourceFile, ResourceType } from '../types/resource';
@@ -35,7 +39,7 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import { SelectionProvider } from '../contexts/SelectionContext';
 
 interface ProjectDetailPageProps {
-  project: ProjectEntry;
+  project: Project;
   onBack: () => void;
   onProjectSelect?: (project: Project) => void;
   isWorktreeView?: boolean;
@@ -54,17 +58,86 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
   // Border styling for main content area (left border is the ResizeTrigger)
   const contentBorderStyle = colorMode === 'light'
     ? {
-      borderTop: '1px solid rgba(0, 0, 0, 0.08)',
       borderLeft: '1px solid rgba(0, 0, 0, 0.08)',
     }
     : {
-      borderTop: '1px solid rgba(99, 102, 241, 0.2)',
-      borderLeft: '1px solid rgba(99, 102, 241, 0.2)',
+      borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
     };
 
   // Sidebar state
   const [activeView, setActiveView] = useState<ViewType>(isVault ? 'projects' : 'file');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
+
+  // Browser tabs state - tracks open document tabs
+  const [openTabs, setOpenTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // Helper to get icon for a view/resource type
+  const getTabIcon = (type: string) => {
+    switch (type) {
+      case 'file':
+      case 'kit':
+        return LuFile;
+      case 'walkthrough':
+        return LuBookOpen;
+      case 'agent':
+        return LuBot;
+      case 'diagram':
+        return LuPalette;
+      case 'plan':
+        return LuMap;
+      case 'task':
+        return LuListTodo;
+      case 'blueprint':
+        return BsStack;
+      default:
+        return LuFile;
+    }
+  };
+
+  // Add a new tab or switch to existing tab
+  const openTab = useCallback((id: string, label: string, type: string) => {
+    setOpenTabs(prev => {
+      const existingTab = prev.find(t => t.id === id);
+      if (existingTab) {
+        // Tab already exists, just switch to it
+        return prev;
+      }
+      // Add new tab
+      return [...prev, {
+        id,
+        label,
+        icon: getTabIcon(type),
+        closable: true,
+      }];
+    });
+    setActiveTabId(id);
+  }, []);
+
+  // Close a tab
+  const closeTab = useCallback((tabId: string) => {
+    setOpenTabs(prev => {
+      const newTabs = prev.filter(t => t.id !== tabId);
+      // If closing active tab, switch to another tab or clear
+      if (activeTabId === tabId) {
+        if (newTabs.length > 0) {
+          // Find the index of the closed tab
+          const closedIndex = prev.findIndex(t => t.id === tabId);
+          // Switch to the tab before the closed one, or the first tab
+          const newActiveIndex = Math.max(0, closedIndex - 1);
+          setActiveTabId(newTabs[newActiveIndex]?.id || null);
+        } else {
+          setActiveTabId(null);
+        }
+      }
+      return newTabs;
+    });
+  }, [activeTabId]);
+
+  // Handle tab selection - restore the associated view
+  const handleTabSelect = useCallback((tabId: string) => {
+    setActiveTabId(tabId);
+  }, []);
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
   const SIDEBAR_STORAGE_KEY = 'bluekit-sidebar-width';
@@ -172,16 +245,11 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
   // Defer artifact updates to prevent blocking UI
   const deferredArtifacts = useDeferredValue(artifacts);
 
-  // Generic resource view state - for viewing any resource type
+  // Resource viewing state
   const [viewingResource, setViewingResource] = useState<ResourceFile | null>(null);
   const [resourceContent, setResourceContent] = useState<string | null>(null);
   const [resourceType, setResourceType] = useState<ResourceType | null>(null);
-
-  // Notebook file selection - separate from resource view to avoid ResourceViewPage
-  const [notebookFile, setNotebookFile] = useState<{
-    resource: ResourceFile;
-    content: string;
-  } | null>(null);
+  const [notebookFile, setNotebookFile] = useState<{ resource: ResourceFile; content: string } | null>(null);
 
   // Track if current file is newly created (to open in edit mode)
   const [isNewFile, setIsNewFile] = useState(false);
@@ -577,6 +645,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
       setViewingResource(resource);
       setResourceContent(content);
       setResourceType(type);
+      // Open a tab for this resource
+      const label = resource.frontMatter?.alias || resource.name;
+      openTab(resource.path, label, type);
     } catch (error) {
       // Failed to load resource content
     }
@@ -594,11 +665,12 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
   const handleViewTask = async (blueprintPath: string, taskFile: string, taskDescription: string) => {
     try {
       const content = await invokeGetBlueprintTaskFile(blueprintPath, taskFile);
+      const taskPath = `${blueprintPath}/${taskFile}`;
 
       // Create a ResourceFile object for the task
       const taskResource: ResourceFile = {
         name: taskFile.replace('.md', ''),
-        path: `${blueprintPath}/${taskFile}`,
+        path: taskPath,
         frontMatter: {
           alias: taskDescription,
           type: 'task',
@@ -609,6 +681,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
       setViewingResource(taskResource);
       setResourceContent(content);
       setResourceType('task');
+      // Open a tab for this task
+      openTab(taskPath, taskDescription || taskFile.replace('.md', ''), 'task');
     } catch (error) {
       // Failed to load task content
     }
@@ -633,6 +707,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
     setViewingResource(planResource);
     setResourceContent(''); // Plan content is loaded separately
     setResourceType('plan');
+    // Open a tab for this plan
+    openTab(plan.id, plan.name, 'plan');
   };
 
   const handleViewWalkthrough = async (walkthrough: ArtifactFile) => {
@@ -659,6 +735,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
       setViewingResource(walkthroughResource);
       setResourceContent(''); // Walkthrough content is loaded by WalkthroughWorkspace
       setResourceType('walkthrough');
+      // Open a tab for this walkthrough
+      openTab(walkthrough.path, walkthroughData.name || walkthrough.frontMatter?.alias || walkthrough.name, 'walkthrough');
     } catch (error) {
       console.error('Failed to load walkthrough:', error);
     }
@@ -734,6 +812,9 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
       // Set activeView to 'file' to indicate we're viewing a notebook file
       setActiveView('file');
 
+      // Get display label
+      const label = node.frontMatter?.alias || node.name;
+
       if (isDiagram) {
         // Diagrams use existing ResourceViewPage flow for MermaidDiagramViewer
         setViewingResource({
@@ -745,6 +826,8 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
         setResourceContent(content);
         setResourceType('diagram');
         setNotebookFile(null);
+        // Open a tab for this diagram
+        openTab(node.path, label, 'diagram');
       } else {
         // Markdown files render directly in content area
         setNotebookFile({
@@ -760,11 +843,14 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
         setViewingResource(null);
         setResourceContent(null);
         setResourceType(null);
+        // Open a tab for this file
+        const type = node.artifactType || 'file';
+        openTab(node.path, label, type);
       }
     } catch (e) {
       console.error("Failed to read file", e);
     }
-  }, [titleEditPath, finalizeTitleEdit]);
+  }, [titleEditPath, finalizeTitleEdit, openTab]);
 
   // Handler for when a new file is created in NotebookTree
   // Opens the file immediately in edit mode with title sync enabled
@@ -1232,21 +1318,33 @@ export default function ProjectDetailPage({ project, onBack, onProjectSelect, is
             <Splitter.Panel id="content">
               <Box
                 h="100%"
-                minH={0}
-                overflowY="auto"
-                overflowX="hidden"
-
+                overflow="hidden"
                 position="relative"
-                p={notebookFile ? 0 : 6}
-                borderTopLeftRadius="2xl"
+                p={0}
                 style={contentBorderStyle}
-                css={{
-                  background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-                  backdropFilter: 'blur(30px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                }}
               >
-                {renderContent()}
+                {openTabs.length > 0 ? (
+                  <BrowserTabs
+                    tabs={openTabs}
+                    selectedId={activeTabId || openTabs[0]?.id || ''}
+                    onSelect={handleTabSelect}
+                    onClose={closeTab}
+                    colorMode={colorMode}
+                  >
+                    {renderContent()}
+                  </BrowserTabs>
+                ) : (
+                  <Box
+                    h="100%"
+                    css={activeView !== 'file' ? {
+                      background: colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                    } : undefined}
+                  >
+                    {renderContent()}
+                  </Box>
+                )}
               </Box>
             </Splitter.Panel>
           </Splitter.Root>

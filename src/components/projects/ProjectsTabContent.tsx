@@ -22,6 +22,7 @@ import { LuFolder, LuChevronRight, LuPencil, LuTrash2, LuCopy } from 'react-icon
 import { IoIosMore } from 'react-icons/io';
 import { FaGithub } from 'react-icons/fa';
 import { toaster } from '../ui/toaster';
+import AddProjectDialog from './AddProjectDialog';
 
 interface ProjectsTabContentProps {
   projects: Project[];
@@ -47,6 +48,7 @@ export default function ProjectsTabContent({
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const { colorMode } = useColorMode();
 
   // Glass styling for light/dark mode
@@ -284,201 +286,215 @@ export default function ProjectsTabContent({
   };
 
   return (
-    <VStack align="stretch" gap={4} w="100%" maxW="100%">
-      <Box
-        display="grid"
-        gap={6}
-        gridTemplateColumns={{
-          base: "1fr",
-          md: "repeat(2, 1fr)",
-          lg: "repeat(3, 1fr)",
-        }}
-        w="100%"
-        css={{
-          '@media (min-width: 1920px)': {
-            gridTemplateColumns: 'repeat(4, 1fr)',
-          },
-        }}
-      >
-        {localProjects.map((project) => {
-          const isConnectingThis = connectingProjectId === project.id;
+    <Flex direction="column" h="100%" w="100%" overflow="hidden">
+      <Box flex={1} overflowY="auto" p={6}>
+        {/* Add Project button in top-right corner */}
+        <Flex justify="space-between" align="center" mb={6}>
+          <Heading size="2xl">Projects</Heading>
+          <Button
+            onClick={() => setIsAddProjectOpen(true)}
+            variant="solid"
+            colorPalette="primary"
+          >
+            Add Project
+          </Button>
+        </Flex>
 
-          return (
-            <Box
-              key={project.id}
-              cursor="pointer"
-              _hover={{ borderColor: "primary.400" }}
-              transition="all 0.2s"
-              onClick={() => onProjectSelect(project)}
-              position="relative"
-              overflow="hidden"
-              borderRadius="lg"
-              p={4}
-              w="100%"
-              minW={0}
-              style={{
-                background: cardBg,
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: cardBorder,
-              }}
-            >
-              <Box bg="transparent" w="100%" minW={0}>
-                <Flex align="start" justify="space-between" gap={4} w="100%" minW={0}>
-                  <VStack align="start" gap={3} flex={1} minW={0}>
-                    <HStack gap={2} align="center" w="100%" minW={0}>
-                      <Icon boxSize={5} color="primary.500" flexShrink={0}>
-                        <LuFolder />
-                      </Icon>
-                      <Heading size="lg" truncate>{project.name}</Heading>
-                    </HStack>
+        <Box
+          display="grid"
+          gap={6}
+          gridTemplateColumns={{
+            base: "1fr",
+            md: "repeat(2, 1fr)",
+            lg: "repeat(3, 1fr)",
+          }}
+          w="100%"
+          css={{
+            '@media (min-width: 1920px)': {
+              gridTemplateColumns: 'repeat(4, 1fr)',
+            },
+          }}
+        >
+          {localProjects.map((project) => {
+            const isConnectingThis = connectingProjectId === project.id;
 
-                    {/* GitHub connection status */}
-                    <HStack gap={3}>
-                      <HStack gap={2}>
-                        <Icon boxSize={4} color={project.gitConnected ? "green.500" : "gray.400"}>
-                          <FaGithub />
+            return (
+              <Box
+                key={project.id}
+                cursor="pointer"
+                _hover={{ borderColor: "primary.400" }}
+                transition="all 0.2s"
+                onClick={() => onProjectSelect(project)}
+                position="relative"
+                overflow="hidden"
+                borderRadius="lg"
+                p={4}
+                w="100%"
+                minW={0}
+                style={{
+                  background: cardBg,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: cardBorder,
+                }}
+              >
+                <Box bg="transparent" w="100%" minW={0}>
+                  <Flex align="start" justify="space-between" gap={4} w="100%" minW={0}>
+                    <VStack align="start" gap={3} flex={1} minW={0}>
+                      <HStack gap={2} align="center" w="100%" minW={0}>
+                        <Icon boxSize={5} color="primary.500" flexShrink={0}>
+                          <LuFolder />
                         </Icon>
-                        <Status.Root size="sm">
-                          <Status.Indicator colorPalette={project.gitConnected ? "green" : "gray"} />
-                          <Text fontSize="sm" color="fg.muted">
-                            {project.gitConnected ? 'Connected' : 'Not connected'}
-                          </Text>
-                        </Status.Root>
+                        <Heading size="lg" truncate>{project.name}</Heading>
                       </HStack>
 
-                      {/* Connect/Disconnect button */}
-                      {project.gitConnected ? (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="red"
-                          onClick={(e) => handleDisconnectGit(project, e)}
-                          loading={isConnectingThis}
-                          loadingText="Disconnecting..."
-                        >
-                          Disconnect
-                        </Button>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="green"
-                          onClick={(e) => handleConnectGit(project, e)}
-                          loading={isConnectingThis}
-                          loadingText="Connecting..."
-                        >
-                          Connect
-                        </Button>
-                      )}
-                    </HStack>
-
-                    {/* Show git URL if connected */}
-                    {project.gitConnected && project.gitUrl && (
-                      <Text fontSize="xs" color="fg.muted" fontFamily="mono" truncate w="100%">
-                        {project.gitUrl}
-                      </Text>
-                    )}
-                  </VStack>
-
-                  <Box flexShrink={0} onClick={(e) => e.stopPropagation()} overflow="visible">
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Project options"
-                          onClick={(e) => e.stopPropagation()}
-                          bg="transparent"
-                          _hover={{ bg: "transparent" }}
-                          _active={{ bg: "transparent" }}
-                          _focus={{ bg: "transparent" }}
-                          _focusVisible={{ bg: "transparent" }}
-                        >
-                          <Icon>
-                            <IoIosMore />
+                      {/* GitHub connection status */}
+                      <HStack gap={3}>
+                        <HStack gap={2}>
+                          <Icon boxSize={4} color={project.gitConnected ? "green.500" : "gray.400"}>
+                            <FaGithub />
                           </Icon>
-                        </IconButton>
-                      </Menu.Trigger>
-                      <Portal>
-                        <Menu.Positioner>
-                          <Menu.Content>
-                            <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-                              <Menu.TriggerItem>
-                                Open <LuChevronRight />
-                              </Menu.TriggerItem>
-                              <Portal>
-                                <Menu.Positioner>
-                                  <Menu.Content>
-                                    <Menu.Item
-                                      value="terminal"
-                                      onSelect={() => handleOpenInTerminal(project)}
-                                    >
-                                      Terminal
-                                    </Menu.Item>
-                                    <Menu.Item
-                                      value="cursor"
-                                      onSelect={() => handleOpenInEditor(project, 'cursor')}
-                                    >
-                                      Cursor
-                                    </Menu.Item>
-                                    <Menu.Item
-                                      value="vscode"
-                                      onSelect={() => handleOpenInEditor(project, 'vscode')}
-                                    >
-                                      VSCode
-                                    </Menu.Item>
-                                    <Menu.Item
-                                      value="antigravity"
-                                      onSelect={() => handleOpenInEditor(project, 'antigravity')}
-                                    >
-                                      Antigravity
-                                    </Menu.Item>
-                                  </Menu.Content>
-                                </Menu.Positioner>
-                              </Portal>
-                            </Menu.Root>
-                            <Menu.Separator />
-                            <Menu.Item
-                              value="copy-path"
-                              onSelect={() => handleCopyPath(project)}
-                            >
-                              <Icon><LuCopy /></Icon>
-                              Copy Path
-                            </Menu.Item>
-                            <Menu.Item
-                              value="edit"
-                              onSelect={() => handleEditProject(project)}
-                            >
-                              <Icon><LuPencil /></Icon>
-                              Edit Project
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              onSelect={() => handleDeleteProject(project)}
-                              color="fg.error"
-                            >
-                              <Icon><LuTrash2 /></Icon>
-                              Remove Project
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Positioner>
-                      </Portal>
-                    </Menu.Root>
-                  </Box>
-                </Flex>
+                          <Status.Root size="sm">
+                            <Status.Indicator colorPalette={project.gitConnected ? "green" : "gray"} />
+                            <Text fontSize="sm" color="fg.muted">
+                              {project.gitConnected ? 'Connected' : 'Not connected'}
+                            </Text>
+                          </Status.Root>
+                        </HStack>
+
+                        {/* Connect/Disconnect button */}
+                        {project.gitConnected ? (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="red"
+                            onClick={(e) => handleDisconnectGit(project, e)}
+                            loading={isConnectingThis}
+                            loadingText="Disconnecting..."
+                          >
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="green"
+                            onClick={(e) => handleConnectGit(project, e)}
+                            loading={isConnectingThis}
+                            loadingText="Connecting..."
+                          >
+                            Connect
+                          </Button>
+                        )}
+                      </HStack>
+
+                      {/* Show git URL if connected */}
+                      {project.gitConnected && project.gitUrl && (
+                        <Text fontSize="xs" color="fg.muted" fontFamily="mono" truncate w="100%">
+                          {project.gitUrl}
+                        </Text>
+                      )}
+                    </VStack>
+
+                    <Box flexShrink={0} onClick={(e) => e.stopPropagation()} overflow="visible">
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <IconButton
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Project options"
+                            onClick={(e) => e.stopPropagation()}
+                            bg="transparent"
+                            _hover={{ bg: "transparent" }}
+                            _active={{ bg: "transparent" }}
+                            _focus={{ bg: "transparent" }}
+                            _focusVisible={{ bg: "transparent" }}
+                          >
+                            <Icon>
+                              <IoIosMore />
+                            </Icon>
+                          </IconButton>
+                        </Menu.Trigger>
+                        <Portal>
+                          <Menu.Positioner>
+                            <Menu.Content>
+                              <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                                <Menu.TriggerItem>
+                                  Open <LuChevronRight />
+                                </Menu.TriggerItem>
+                                <Portal>
+                                  <Menu.Positioner>
+                                    <Menu.Content>
+                                      <Menu.Item
+                                        value="terminal"
+                                        onSelect={() => handleOpenInTerminal(project)}
+                                      >
+                                        Terminal
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        value="cursor"
+                                        onSelect={() => handleOpenInEditor(project, 'cursor')}
+                                      >
+                                        Cursor
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        value="vscode"
+                                        onSelect={() => handleOpenInEditor(project, 'vscode')}
+                                      >
+                                        VSCode
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        value="antigravity"
+                                        onSelect={() => handleOpenInEditor(project, 'antigravity')}
+                                      >
+                                        Antigravity
+                                      </Menu.Item>
+                                    </Menu.Content>
+                                  </Menu.Positioner>
+                                </Portal>
+                              </Menu.Root>
+                              <Menu.Separator />
+                              <Menu.Item
+                                value="copy-path"
+                                onSelect={() => handleCopyPath(project)}
+                              >
+                                <Icon><LuCopy /></Icon>
+                                Copy Path
+                              </Menu.Item>
+                              <Menu.Item
+                                value="edit"
+                                onSelect={() => handleEditProject(project)}
+                              >
+                                <Icon><LuPencil /></Icon>
+                                Edit Project
+                              </Menu.Item>
+                              <Menu.Item
+                                value="delete"
+                                onSelect={() => handleDeleteProject(project)}
+                                color="fg.error"
+                              >
+                                <Icon><LuTrash2 /></Icon>
+                                Remove Project
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Positioner>
+                        </Portal>
+                      </Menu.Root>
+                    </Box>
+                  </Flex>
+                </Box>
+                <Box bg="transparent" pt={2} w="100%" minW={0}>
+                  <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'secondary.solid'} mb={3} lineClamp={2}>
+                    {project.description || 'No description'}
+                  </Text>
+                  <Text fontSize="xs" color="text.tertiary" fontFamily="mono" truncate w="100%">
+                    {project.path}
+                  </Text>
+                </Box>
               </Box>
-              <Box bg="transparent" pt={2} w="100%" minW={0}>
-                <Text fontSize="sm" color={colorMode === 'dark' ? 'blue.300' : 'secondary.solid'} mb={3} lineClamp={2}>
-                  {project.description || 'No description'}
-                </Text>
-                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" truncate w="100%">
-                  {project.path}
-                </Text>
-              </Box>
-            </Box>
-          );
-        })}
+            );
+          })}
+        </Box>
       </Box>
 
       {/* Edit Project Dialog */}
@@ -611,6 +627,15 @@ export default function ProjectsTabContent({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-    </VStack>
+
+      {/* Add Project Dialog */}
+      <AddProjectDialog
+        isOpen={isAddProjectOpen}
+        onClose={() => setIsAddProjectOpen(false)}
+        onProjectCreated={() => {
+          onProjectsChanged?.();
+        }}
+      />
+    </Flex>
   );
 }
