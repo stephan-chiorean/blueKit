@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -18,8 +19,13 @@ export default defineConfig({
   // Node polyfills for browser
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@/app': path.resolve(__dirname, './src/app'),
+      '@/views': path.resolve(__dirname, './src/views'),
+      '@/features': path.resolve(__dirname, './src/features'),
+      '@/shared': path.resolve(__dirname, './src/shared'),
+      '@/tabs': path.resolve(__dirname, './src/tabs'),
       path: 'path-browserify',
     },
   },
 })
-

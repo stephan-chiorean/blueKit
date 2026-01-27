@@ -10,12 +10,12 @@ import {
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
-import KitOverview from '../components/kits/KitOverview';
-import PlanWorkspace from '../components/plans/PlanWorkspace';
-import WalkthroughWorkspace from '../components/walkthroughs/WalkthroughWorkspace';
-import Workstation from '../components/workstation/Workstation';
-import MermaidDiagramViewer from '../components/workstation/MermaidDiagramViewer';
-import { useResource } from '../contexts/ResourceContext';
+import KitOverview from '@/features/kits/components/KitOverview';
+import PlanWorkspace from '@/features/plans/components/PlanWorkspace';
+import WalkthroughWorkspace from '@/features/walkthroughs/components/WalkthroughWorkspace';
+import Workstation from '@/features/workstation/components/Workstation';
+import MermaidDiagramViewer from '@/features/workstation/components/MermaidDiagramViewer';
+import { useResource } from '@/shared/contexts/ResourceContext';
 import { ResourceFile, ResourceType, ResourceViewMode } from '../types/resource';
 
 interface ResourceViewPageProps {

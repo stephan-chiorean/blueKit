@@ -8,7 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
-import MermaidDiagramViewer from '../components/workstation/MermaidDiagramViewer';
+import MermaidDiagramViewer from '@/features/workstation/components/MermaidDiagramViewer';
 import { ArtifactFile } from '../ipc';
 
 interface DiagramViewPageProps {
@@ -48,4 +48,3 @@ export default function DiagramViewPage({ diagram, diagramContent, onBack }: Dia
     </VStack>
   );
 }
-

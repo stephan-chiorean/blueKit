@@ -22,7 +22,7 @@ import {
   invokeAuthStartAuthorization,
   invokeAuthExchangeCode,
 } from '../../ipc';
-import { toaster } from '../../components/ui/toaster';
+import { toaster } from '@/shared/components/ui/toaster';
 
 interface GitHubAuthScreenProps {
   onSuccess?: () => void;

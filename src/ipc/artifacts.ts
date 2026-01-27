@@ -2,7 +2,7 @@
  * IPC commands for artifact operations (kits, walkthroughs, diagrams, blueprints, scrapbook, plans, clones).
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { ArtifactFile, Blueprint, ScrapbookItem, CloneMetadata } from './types';
 
 /**

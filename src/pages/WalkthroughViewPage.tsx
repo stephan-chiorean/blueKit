@@ -5,9 +5,9 @@ import {
   Splitter,
 } from '@chakra-ui/react';
 import Header from '../components/Header';
-import KitOverview from '../components/kits/KitOverview';
-import Workstation from '../components/workstation/Workstation';
-import { useResource } from '../contexts/ResourceContext';
+import KitOverview from '@/features/kits/components/KitOverview';
+import Workstation from '@/features/workstation/components/Workstation';
+import { useResource } from '@/shared/contexts/ResourceContext';
 import { ArtifactFile } from '../ipc';
 
 interface WalkthroughViewPageProps {
@@ -74,4 +74,3 @@ export default function WalkthroughViewPage({ kit, kitContent, onBack }: Walkthr
     </VStack>
   );
 }
-

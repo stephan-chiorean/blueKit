@@ -16,17 +16,17 @@ import {
   LuSearch,
 } from "react-icons/lu";
 import { Project } from "../ipc";
-import QuickTaskPopover from "./tasks/QuickTaskPopover";
-import { useColorMode } from "../contexts/ColorModeContext";
-import { useNotepad } from "../contexts/NotepadContext";
-import { useTimer } from "../contexts/TimerContext";
-import { useQuickTaskPopover } from "../contexts/QuickTaskPopoverContext";
-import TimerPopover from "./shared/TimerPopover";
-import UserProfileButton from "./shared/UserProfileButton";
+import QuickTaskPopover from "@/features/tasks/components/QuickTaskPopover";
+import { useColorMode } from "@/shared/contexts/ColorModeContext";
+import { useNotepad } from "@/shared/contexts/NotepadContext";
+import { useTimer } from "@/shared/contexts/TimerContext";
+import { useQuickTaskPopover } from "@/shared/contexts/QuickTaskPopoverContext";
+import TimerPopover from "@/shared/components/TimerPopover";
+import UserProfileButton from "@/shared/components/UserProfileButton";
 import { FaMoon, FaSun } from "react-icons/fa";
-import { ActiveLogo as BlueKitLogo } from "./logo";
+import { ActiveLogo as BlueKitLogo } from "@/shared/components/logo";
 
-import NavigationMenu from "./NavigationDrawer";
+import NavigationMenu from "@/shared/components/navigation/NavigationDrawer";
 
 interface HeaderProps {
   currentProject?: Project;

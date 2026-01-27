@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from './theme';
-import App from './App';
-import { Toaster } from './components/ui/toaster';
+import App from './app/App';
+import { Toaster } from '@/shared/components/ui/toaster';
 
 const rootElement = document.getElementById('root');
 

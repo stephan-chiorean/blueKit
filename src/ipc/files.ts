@@ -2,7 +2,7 @@
  * IPC commands for file operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 
 /**
  * Reads the contents of a file.

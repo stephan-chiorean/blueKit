@@ -2,7 +2,7 @@
  * IPC commands for GitHub commit fetching and management (Phase 2).
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { GitHubCommit } from './types';
 
 // ============================================================================

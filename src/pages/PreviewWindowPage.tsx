@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, VStack, Spinner, Text } from '@chakra-ui/react';
 import Header from '../components/Header';
-import ResourceMarkdownViewer from '../components/workstation/ResourceMarkdownViewer';
+import ResourceMarkdownViewer from '@/features/workstation/components/ResourceMarkdownViewer';
 import { invokeReadFile } from '../ipc/files';
 import { ResourceFile, ResourceType } from '../types/resource';
 

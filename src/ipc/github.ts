@@ -2,7 +2,7 @@
  * IPC commands for GitHub API operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import { GitHubUser, GitHubRepo, GitHubFileResponse, GitHubTreeResponse } from '../types/github';
 
 /**

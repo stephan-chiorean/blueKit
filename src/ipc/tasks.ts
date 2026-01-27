@@ -2,7 +2,7 @@
  * IPC commands for database-backed task operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '../types/task';
 
 /**

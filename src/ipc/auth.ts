@@ -2,7 +2,7 @@
  * IPC commands for authentication operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import { AuthStatus } from '../types/github';
 
 /**

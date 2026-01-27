@@ -3,7 +3,7 @@
  * These functions provide type-safe communication between the frontend and Rust backend.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type {
   Plan,
   PlanDetails,

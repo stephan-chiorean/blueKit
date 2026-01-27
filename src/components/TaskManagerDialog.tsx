@@ -15,7 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { LuPlus, LuTrash2, LuCheck } from 'react-icons/lu';
 import { useState, useRef, useEffect } from 'react';
-import { useTasks } from '../contexts/TaskContext';
+import { useTasks } from '@/shared/contexts/TaskContext';
 
 interface TaskManagerDialogProps {
   open: boolean;

@@ -2,7 +2,7 @@
  * Core IPC commands for basic application functionality.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { AppInfo } from './types';
 
 /**

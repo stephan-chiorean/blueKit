@@ -2,7 +2,7 @@
  * IPC commands for folder operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { ArtifactFolder, FolderConfig } from './types';
 
 /**

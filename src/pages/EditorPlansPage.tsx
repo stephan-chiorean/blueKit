@@ -11,10 +11,10 @@ import {
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
 import Header from '../components/Header';
-import EditorPlansContent from '../components/plans/EditorPlansContent';
+import EditorPlansContent from '@/features/plans/components/EditorPlansContent';
 import ResourceViewPage from './ResourceViewPage';
 import { invokeGetPlansFiles, invokeReadFile, ArtifactFile } from '../ipc';
-import { parseFrontMatter, extractFirstHeading } from '../utils/parseFrontMatter';
+import { parseFrontMatter, extractFirstHeading } from '@/shared/utils/parseFrontMatter';
 import { ResourceFile, ResourceType } from '../types/resource';
 
 interface EditorPlansPageProps {
@@ -176,4 +176,3 @@ export default function EditorPlansPage({ plansSource, onBack }: EditorPlansPage
     </VStack>
   );
 }
-

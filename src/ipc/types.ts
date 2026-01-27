@@ -6,7 +6,7 @@
  */
 
 // Re-export TimeoutError for convenience
-export { TimeoutError } from '../utils/ipcTimeout';
+export { TimeoutError } from '@/shared/utils/ipcTimeout';
 
 /**
  * Type definition for the AppInfo structure returned by `get_app_info`.

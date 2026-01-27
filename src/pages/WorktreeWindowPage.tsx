@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { VStack, Spinner, Text } from '@chakra-ui/react';
-import ProjectDetailPage from './ProjectDetailPage';
-import { ProjectEntry } from '../ipc';
-import { useColorMode } from '../contexts/ColorModeContext';
+import ProjectView from '@/views/project/ProjectView';
+import { ProjectEntry } from '@/ipc';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 /**
  * Worktree window page - displays worktree info in a standalone window.
  * 
- * Reuses ProjectDetailPage but disables navigation features.
+ * Reuses ProjectView but disables navigation features.
  *
  * URL format: /worktree?path=<path>&branch=<branch>&projectId=<projectId>
  */
@@ -66,7 +66,7 @@ export default function WorktreeWindowPage() {
     }
 
     return (
-        <ProjectDetailPage
+        <ProjectView
             project={project}
             onBack={() => { }} // No-op for back button (it's hidden anyway)
             isWorktreeView={true}

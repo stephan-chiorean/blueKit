@@ -2,7 +2,7 @@
  * IPC commands for project management, registry, artifacts, and watchers.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { ProjectEntry, ArtifactFile, Project } from './types';
 
 // ============================================================================

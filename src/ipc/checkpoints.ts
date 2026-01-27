@@ -7,7 +7,7 @@
  * - Organize and categorize project history
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import type { Checkpoint } from './types';
 
 /**

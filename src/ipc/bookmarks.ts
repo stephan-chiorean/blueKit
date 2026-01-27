@@ -2,7 +2,7 @@
  * IPC commands for bookmark operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import { BookmarksData, BookmarkItem } from './types';
 
 /**

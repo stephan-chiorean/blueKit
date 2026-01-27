@@ -1,0 +1,20 @@
+// Barrel exports for workstation components
+export { default as DraggableNotepad } from './DraggableNotepad';
+export * from './DraggableNotepad';
+export { default as EditableMarkdownViewer } from './EditableMarkdownViewer';
+export * from './EditableMarkdownViewer';
+export { default as KitMarkdownViewer } from './KitMarkdownViewer';
+export * from './KitMarkdownViewer';
+export { default as MermaidDiagramViewer } from './MermaidDiagramViewer';
+export * from './MermaidDiagramViewer';
+export * from './NoteViewHeader';
+export * from './ResourceMarkdownContent';
+export * from './ResourceMarkdownHeader';
+export { default as ResourceMarkdownViewer } from './ResourceMarkdownViewer';
+export * from './ResourceMarkdownViewer';
+export { default as SearchInMarkdown } from './SearchInMarkdown';
+export * from './SearchInMarkdown';
+export { default as ShikiCodeBlock } from './ShikiCodeBlock';
+export * from './ShikiCodeBlock';
+export { default as Workstation } from './Workstation';
+export * from './Workstation';

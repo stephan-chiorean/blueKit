@@ -2,7 +2,7 @@
  * IPC commands for Library operations.
  */
 
-import { invokeWithTimeout } from '../utils/ipcTimeout';
+import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
 import {
   LibraryWorkspace,
   LibraryArtifact,
