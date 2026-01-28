@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { listen } from '@tauri-apps/api/event';
-import { LuCopy, LuCheck, LuTrash2, LuCircleCheck, LuPartyPopper, LuChevronDown, LuFileText, LuNotebook } from 'react-icons/lu';
+import { LuCopy, LuCheck, LuTrash2, LuCircleCheck, LuPartyPopper, LuChevronDown, LuFileText, LuNotebook, LuTarget } from 'react-icons/lu';
 import { ResourceFile } from '@/types/resource';
 import { invokeWatchPlanFolder, invokeStopWatcher, invokeUpdatePlan, invokeGetPlanDocuments, invokeReorderPlanDocuments } from '@/ipc';
 import { PlanDetails, PlanDocument } from '@/types/plan';
@@ -228,6 +228,11 @@ export default function PlanOverviewPanel({
     // Unified Expand State - Default to expanded
     const [isUnifiedExpanded, setIsUnifiedExpanded] = useState(true);
 
+    // Individual section expand states
+    const [isMilestonesExpanded, setIsMilestonesExpanded] = useState(true);
+    const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(true);
+    const [isNotesExpanded, setIsNotesExpanded] = useState(true);
+
     return (
         <Box
             h="100%"
@@ -428,17 +433,63 @@ export default function PlanOverviewPanel({
                                             </HStack>
 
                                             {/* Milestones */}
-                                            <MilestoneTimeline
-                                                key={`milestone-${planDetails.id}`}
-                                                planId={planDetails.id}
-                                                phases={planDetails.phases}
-                                                onUpdate={onUpdate}
-                                                embedded={true}
-                                            />
+                                            <VStack align="stretch" gap={3}>
+                                                <HStack
+                                                    gap={2}
+                                                    color="text.secondary"
+                                                    cursor="pointer"
+                                                    onClick={() => setIsMilestonesExpanded(!isMilestonesExpanded)}
+                                                >
+                                                    <Icon
+                                                        size="sm"
+                                                        transform={isMilestonesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
+                                                        transition="transform 0.2s ease"
+                                                    >
+                                                        <LuChevronDown />
+                                                    </Icon>
+                                                    <Icon size="sm">
+                                                        <LuTarget />
+                                                    </Icon>
+                                                    <Text fontSize="sm" fontWeight="medium">
+                                                        Milestones ({planDetails.phases.reduce((sum, p) => sum + p.milestones.filter(m => m.completed).length, 0)}/{planDetails.phases.reduce((sum, p) => sum + p.milestones.length, 0)})
+                                                    </Text>
+                                                </HStack>
+                                                <AnimatePresence>
+                                                    {isMilestonesExpanded && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                                                            style={{ overflow: 'hidden' }}
+                                                        >
+                                                            <MilestoneTimeline
+                                                                key={`milestone-${planDetails.id}`}
+                                                                planId={planDetails.id}
+                                                                phases={planDetails.phases}
+                                                                onUpdate={onUpdate}
+                                                                embedded={true}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </VStack>
 
                                             {/* Documents */}
                                             <VStack align="stretch" gap={3}>
-                                                <HStack gap={2} color="text.secondary">
+                                                <HStack
+                                                    gap={2}
+                                                    color="text.secondary"
+                                                    cursor="pointer"
+                                                    onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
+                                                >
+                                                    <Icon
+                                                        size="sm"
+                                                        transform={isDocumentsExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
+                                                        transition="transform 0.2s ease"
+                                                    >
+                                                        <LuChevronDown />
+                                                    </Icon>
                                                     <Icon size="sm">
                                                         <LuFileText />
                                                     </Icon>
@@ -446,28 +497,40 @@ export default function PlanOverviewPanel({
                                                         Documents ({planDetails.documents.length})
                                                     </Text>
                                                 </HStack>
-                                                <PlanDocumentList
-                                                    key={`documents-${planDetails.id}`}
-                                                    documents={planDetails.documents}
-                                                    selectedDocumentId={selectedDocumentId}
-                                                    onSelectDocument={handleSelectDocument}
-                                                    onDocumentDeleted={onUpdate}
-                                                    onReorder={async (reorderedDocs) => {
-                                                        try {
-                                                            const docIds = reorderedDocs.map(d => d.id);
-                                                            await invokeReorderPlanDocuments(planDetails.id, docIds);
-                                                            onUpdate();
-                                                        } catch (error) {
-                                                            console.error("Failed to reorder documents:", error);
-                                                            toaster.create({
-                                                                type: 'error',
-                                                                title: 'Failed to reorder documents',
-                                                                description: String(error),
-                                                            });
-                                                        }
-                                                    }}
-                                                    hideHeader={true}
-                                                />
+                                                <AnimatePresence>
+                                                    {isDocumentsExpanded && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                                                            style={{ overflow: 'hidden' }}
+                                                        >
+                                                            <PlanDocumentList
+                                                                key={`documents-${planDetails.id}`}
+                                                                documents={planDetails.documents}
+                                                                selectedDocumentId={selectedDocumentId}
+                                                                onSelectDocument={handleSelectDocument}
+                                                                onDocumentDeleted={onUpdate}
+                                                                onReorder={async (reorderedDocs) => {
+                                                                    try {
+                                                                        const docIds = reorderedDocs.map(d => d.id);
+                                                                        await invokeReorderPlanDocuments(planDetails.id, docIds);
+                                                                        onUpdate();
+                                                                    } catch (error) {
+                                                                        console.error("Failed to reorder documents:", error);
+                                                                        toaster.create({
+                                                                            type: 'error',
+                                                                            title: 'Failed to reorder documents',
+                                                                            description: String(error),
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                hideHeader={true}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </VStack>
                                         </VStack>
                                     </motion.div>
@@ -479,44 +542,69 @@ export default function PlanOverviewPanel({
                         <Box h="1px" bg="border.subtle" />
                         <VStack align="stretch" gap={3}>
                             <Flex justify="space-between" align="center">
-                                <HStack gap={2} color="text.secondary">
+                                <HStack
+                                    gap={2}
+                                    color="text.secondary"
+                                    cursor="pointer"
+                                    onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                                >
+                                    <Icon
+                                        size="sm"
+                                        transform={isNotesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
+                                        transition="transform 0.2s ease"
+                                    >
+                                        <LuChevronDown />
+                                    </Icon>
                                     <Icon size="sm">
                                         <LuNotebook />
                                     </Icon>
                                     <Text fontSize="sm" fontWeight="medium">Notes</Text>
                                 </HStack>
-                                <IconButton
-                                    aria-label="Copy notes"
-                                    variant="ghost"
-                                    size="xs"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        copyNotes();
-                                    }}
-                                    disabled={!notes}
-                                >
-                                    <Icon>
-                                        {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
-                                    </Icon>
-                                </IconButton>
+                                {notes && (
+                                    <IconButton
+                                        aria-label="Copy notes"
+                                        variant="ghost"
+                                        size="xs"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyNotes();
+                                        }}
+                                    >
+                                        <Icon>
+                                            {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
+                                        </Icon>
+                                    </IconButton>
+                                )}
                             </Flex>
-                            <VStack align="stretch" gap={1}>
-                                <Textarea
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="Take notes about this plan..."
-                                    rows={6}
-                                    resize="vertical"
-                                    css={{
-                                        borderRadius: '10px',
-                                        fontSize: '13px',
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <Text fontSize="xs" color="text.tertiary" textAlign="right">
-                                    Auto-saved
-                                </Text>
-                            </VStack>
+                            <AnimatePresence>
+                                {isNotesExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                                        style={{ overflow: 'hidden' }}
+                                    >
+                                        <VStack align="stretch" gap={1}>
+                                            <Textarea
+                                                value={notes}
+                                                onChange={(e) => setNotes(e.target.value)}
+                                                placeholder="Take notes about this plan..."
+                                                rows={6}
+                                                resize="vertical"
+                                                css={{
+                                                    borderRadius: '10px',
+                                                    fontSize: '13px',
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            <Text fontSize="xs" color="text.tertiary" textAlign="right">
+                                                Auto-saved
+                                            </Text>
+                                        </VStack>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </VStack>
 
                     </VStack>

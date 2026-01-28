@@ -4,8 +4,7 @@ import {
   Text,
   HStack,
   Icon,
-  Card,
-  CardBody,
+  Box,
   IconButton,
   EmptyState,
 } from '@chakra-ui/react';
@@ -83,80 +82,77 @@ const SortableDocumentItem = ({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card.Root
-        variant="subtle"
-        borderWidth="1px"
-        borderColor={isSelected ? 'primary.500' : 'border.subtle'}
+      <Box
         cursor="pointer"
         onClick={() => onClick(document)}
         onContextMenu={(e) => onContextMenu(e, document)}
-        transition="all 0.2s ease-in-out"
-        _hover={{
-          transform: 'translateY(-2px)',
-          shadow: 'sm',
-          '& .drag-handle': { opacity: 1 },
-        }}
         role="group"
+        px={2}
+        py={1.5}
+        borderRadius="6px"
+        transition="all 0.15s ease"
+        bg={isSelected ? 'rgba(var(--chakra-colors-primary-500) / 0.08)' : 'transparent'}
+        _hover={{
+          bg: isSelected ? 'rgba(var(--chakra-colors-primary-500) / 0.12)' : 'rgba(128, 128, 128, 0.05)',
+          '& .drag-handle': { opacity: 1 },
+          '& .delete-btn': { opacity: 1 },
+        }}
       >
-        <CardBody>
-          <HStack justify="space-between" align="center" gap={3}>
-            {/* Drag Handle */}
-            {onReorder && (
-              <Icon
-                className="drag-handle"
-                color="text.tertiary"
-                cursor="grab"
-                opacity={0}
-                transition="opacity 0.2s"
-                {...attributes}
-                {...listeners}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <LuGripVertical />
-              </Icon>
-            )}
-
-            <HStack gap={2} flex="1" minW={0}>
-              <Icon color="primary.500">
-                <LuFileText />
-              </Icon>
-              <VStack align="start" gap={1} flex="1" minW={0}>
-                <Text
-                  fontSize="sm"
-                  fontWeight="medium"
-                  lineClamp={1}
-                  title={document.fileName}
-                >
-                  {document.fileName}
-                </Text>
-              </VStack>
-            </HStack>
-
-            <IconButton
-              aria-label="Delete document"
-              variant="ghost"
-              size="xs"
-              colorPalette="red"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(document);
-              }}
-              disabled={isDeleting}
-              css={{
-                opacity: 0,
-                transition: 'opacity 0.2s ease-in-out',
-                '[role="group"]:hover &': {
-                  opacity: 1,
-                },
-              }}
+        <HStack justify="space-between" align="center" gap={2}>
+          {/* Drag Handle */}
+          {onReorder && (
+            <Icon
+              className="drag-handle"
+              color="text.tertiary"
+              cursor="grab"
+              opacity={0}
+              transition="opacity 0.15s"
+              fontSize="xs"
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Icon>
-                <LuTrash2 />
-              </Icon>
-            </IconButton>
+              <LuGripVertical />
+            </Icon>
+          )}
+
+          <HStack gap={2} flex="1" minW={0}>
+            <Icon color="text.secondary" fontSize="sm">
+              <LuFileText />
+            </Icon>
+            <Text
+              fontSize="13px"
+              fontWeight="normal"
+              lineClamp={1}
+              title={document.fileName}
+              color="text.primary"
+            >
+              {document.fileName}
+            </Text>
           </HStack>
-        </CardBody>
-      </Card.Root>
+
+          <IconButton
+            className="delete-btn"
+            aria-label="Delete document"
+            variant="ghost"
+            size="2xs"
+            colorPalette="red"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(document);
+            }}
+            disabled={isDeleting}
+            css={{
+              opacity: 0,
+              transition: 'opacity 0.15s ease',
+            }}
+          >
+            <Icon fontSize="xs">
+              <LuTrash2 />
+            </Icon>
+          </IconButton>
+        </HStack>
+      </Box>
     </div>
   );
 };
@@ -275,23 +271,20 @@ const PlanDocumentList = memo(function PlanDocumentList({
 
   if (documents.length === 0) {
     return (
-      <Card.Root variant="subtle">
-        <CardBody>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Title>No Documents</EmptyState.Title>
-              <EmptyState.Description>
-                Add markdown files to the plan folder to see them here
-              </EmptyState.Description>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </CardBody>
-      </Card.Root>
+      <Box px={2} py={3}>
+        <EmptyState.Root size="sm">
+          <EmptyState.Content>
+            <EmptyState.Description fontSize="xs" color="text.tertiary">
+              No documents yet
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Box>
     );
   }
 
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack align="stretch" gap={0}>
       {!hideHeader && (
         <Text fontSize="sm" fontWeight="medium" color="text.secondary">
           Documents ({documents.length})
@@ -307,18 +300,20 @@ const PlanDocumentList = memo(function PlanDocumentList({
           items={documents.map(d => d.id)}
           strategy={verticalListSortingStrategy}
         >
-          {documents.map((document) => (
-            <SortableDocumentItem
-              key={document.id}
-              document={document}
-              isSelected={selectedDocumentId === document.id}
-              isDeleting={deletingDocument === document.id}
-              onClick={handleDocumentClick}
-              onContextMenu={handleContextMenu}
-              onDelete={handleDeleteDocument}
-              onReorder={onReorder}
-            />
-          ))}
+          <VStack align="stretch" gap={0}>
+            {documents.map((document) => (
+              <SortableDocumentItem
+                key={document.id}
+                document={document}
+                isSelected={selectedDocumentId === document.id}
+                isDeleting={deletingDocument === document.id}
+                onClick={handleDocumentClick}
+                onContextMenu={handleContextMenu}
+                onDelete={handleDeleteDocument}
+                onReorder={onReorder}
+              />
+            ))}
+          </VStack>
         </SortableContext>
       </DndContext>
 

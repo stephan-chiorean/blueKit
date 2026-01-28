@@ -15,7 +15,7 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LuPlus, LuTrash2, LuChevronDown, LuChevronUp, LuSparkles } from 'react-icons/lu';
+import { LuPlus, LuTrash2, LuChevronDown, LuChevronUp, LuSparkles, LuTarget } from 'react-icons/lu';
 import { PlanPhaseWithMilestones } from '@/types/plan';
 import { invokeDeletePlanMilestone, invokeToggleMilestoneCompletion, invokeCreatePlanMilestone, invokeCreatePlanPhase } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
@@ -144,55 +144,7 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
 
   if (embedded) {
     return (
-      <VStack align="stretch" gap={0}>
-        <Flex
-          justify="space-between"
-          align="center"
-          py={1}
-        >
-          <HStack gap={2}>
-            <Text fontSize="sm" fontWeight="medium">
-              Milestones
-            </Text>
-            <Box
-              px={2}
-              py={0.5}
-              borderRadius="full"
-              bg={completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.100' : 'primary.100'}
-              _dark={{ bg: completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.900/40' : 'primary.900/40' }}
-            >
-              <Text
-                fontSize="xs"
-                fontWeight="semibold"
-                color={completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.600' : 'primary.600'}
-                _dark={{ color: completedMilestones.length === allMilestones.length && allMilestones.length > 0 ? 'green.300' : 'primary.300' }}
-              >
-                {completedMilestones.length}/{allMilestones.length}
-              </Text>
-            </Box>
-          </HStack>
-          {completedMilestones.length > 0 && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowCompleted(!showCompleted);
-              }}
-            >
-              <HStack gap={1}>
-                <Icon boxSize={3}>
-                  {showCompleted ? <LuChevronUp /> : <LuChevronDown />}
-                </Icon>
-                <Text fontSize="xs">
-                  {showCompleted ? 'Hide' : 'Show'} completed ({completedMilestones.length})
-                </Text>
-              </HStack>
-            </Button>
-          )}
-        </Flex>
-
-        <VStack align="stretch" gap={4} pt={4}>
+      <VStack align="stretch" gap={4}>
           {/* Add Milestone */}
           <HStack gap={2}>
             <Input
@@ -350,7 +302,6 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
               </AnimatePresence>
             </VStack>
           )}
-        </VStack>
       </VStack>
     );
   }
