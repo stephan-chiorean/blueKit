@@ -223,11 +223,6 @@ export default function PlanOverviewPanel({
         onSelectDocument?.(document);
     }, [onSelectDocument]);
 
-
-
-    // Unified Expand State - Default to expanded
-    const [isUnifiedExpanded, setIsUnifiedExpanded] = useState(true);
-
     // Individual section expand states
     const [isMilestonesExpanded, setIsMilestonesExpanded] = useState(true);
     const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(true);
@@ -306,14 +301,12 @@ export default function PlanOverviewPanel({
 
                         <VStack
                             align="stretch"
-                            gap={0}
+                            gap={6}
                         >
-                            {/* Collapsed Header Area */}
+                            {/* Header Area */}
                             <VStack
                                 align="stretch"
                                 gap={3}
-                                cursor="pointer"
-                                onClick={() => setIsUnifiedExpanded(!isUnifiedExpanded)}
                                 py={1}
                             >
                                 <Flex justify="space-between" align="start">
@@ -356,35 +349,9 @@ export default function PlanOverviewPanel({
                                         <Progress.Range />
                                     </Progress.Track>
                                 </Progress.Root>
-
-                                <Center pt={1}>
-                                    <Icon
-                                        color="text.tertiary"
-                                        size="lg"
-                                        transform={isUnifiedExpanded ? 'rotate(180deg)' : 'rotate(0deg)'}
-                                        transition="transform 0.2s ease"
-                                    >
-                                        <LuChevronDown />
-                                    </Icon>
-                                </Center>
                             </VStack>
 
-                            {/* Expanded Content */}
-                            <AnimatePresence>
-                                {isUnifiedExpanded && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                                        style={{ overflow: 'hidden' }}
-                                    >
-                                        <VStack align="stretch" gap={6} pt={4}>
-                                            <Box h="1px" bg="border.subtle" />
-
-
-
-                                            {/* Action Buttons */}
+                            {/* Action Buttons */}
                                             <HStack gap={2}>
                                                 {planDetails.status !== 'completed' && (
                                                     <Button
@@ -533,13 +500,6 @@ export default function PlanOverviewPanel({
                                                 </AnimatePresence>
                                             </VStack>
                                         </VStack>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </VStack>
-
-
-                        <Box h="1px" bg="border.subtle" />
                         <VStack align="stretch" gap={3}>
                             <Flex justify="space-between" align="center">
                                 <HStack

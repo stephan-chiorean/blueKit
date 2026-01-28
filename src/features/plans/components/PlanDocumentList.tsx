@@ -300,20 +300,18 @@ const PlanDocumentList = memo(function PlanDocumentList({
           items={documents.map(d => d.id)}
           strategy={verticalListSortingStrategy}
         >
-          <VStack align="stretch" gap={0}>
-            {documents.map((document) => (
-              <SortableDocumentItem
-                key={document.id}
-                document={document}
-                isSelected={selectedDocumentId === document.id}
-                isDeleting={deletingDocument === document.id}
-                onClick={handleDocumentClick}
-                onContextMenu={handleContextMenu}
-                onDelete={handleDeleteDocument}
-                onReorder={onReorder}
-              />
-            ))}
-          </VStack>
+          {documents.map((document) => (
+            <SortableDocumentItem
+              key={document.id}
+              document={document}
+              isSelected={selectedDocumentId === document.id}
+              isDeleting={deletingDocument === document.id}
+              onClick={handleDocumentClick}
+              onContextMenu={handleContextMenu}
+              onDelete={handleDeleteDocument}
+              onReorder={onReorder}
+            />
+          ))}
         </SortableContext>
       </DndContext>
 

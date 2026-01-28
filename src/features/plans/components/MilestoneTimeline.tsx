@@ -1,7 +1,5 @@
 import { useState, useRef, memo } from 'react';
 import {
-  Card,
-  CardBody,
   VStack,
   HStack,
   Text,
@@ -13,6 +11,8 @@ import {
   Input,
   Badge,
   Box,
+  Card,
+  CardBody,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LuPlus, LuTrash2, LuChevronDown, LuChevronUp, LuSparkles, LuTarget } from 'react-icons/lu';
@@ -20,7 +20,6 @@ import { PlanPhaseWithMilestones } from '@/types/plan';
 import { invokeDeletePlanMilestone, invokeToggleMilestoneCompletion, invokeCreatePlanMilestone, invokeCreatePlanPhase } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
 
-const MotionCard = motion.create(Card.Root);
 const MotionBox = motion.create(Box);
 
 interface MilestoneTimelineProps {
@@ -203,101 +202,99 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
             <VStack align="stretch" gap={2}>
               <AnimatePresence mode="popLayout">
                 {visibleMilestones.map((milestone, index) => (
-                  <MotionCard
+                  <MotionBox
                     key={milestone.id}
                     layout
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
                     transition={{ duration: 0.2, delay: index * 0.02 }}
-                    variant="outline"
-                    size="sm"
+                    px={3}
+                    py={2}
                     bg={milestone.completed ? 'green.50' : 'transparent'}
-                    borderColor={milestone.completed ? 'green.200' : 'border.subtle'}
+                    borderWidth={milestone.completed ? '1px' : '0px'}
+                    borderColor={milestone.completed ? 'green.200' : 'transparent'}
                     cursor="pointer"
                     role="group"
                     onClick={() => handleToggleMilestone(milestone.id)}
                     css={{
                       borderRadius: '12px',
-                      transition: 'all 0.2s ease',
+                      transition: 'all 0.15s ease',
                       _dark: {
                         bg: milestone.completed ? 'green.950/30' : 'transparent',
-                        borderColor: milestone.completed ? 'green.800/50' : 'border.subtle',
+                        borderColor: milestone.completed ? 'green.800/50' : 'transparent',
                       },
                       _hover: {
-                        transform: 'translateX(4px)',
-                        borderColor: milestone.completed ? 'green.300' : 'primary.300',
+                        bg: milestone.completed ? 'rgba(var(--chakra-colors-green-500) / 0.12)' : 'rgba(128, 128, 128, 0.05)',
                       },
                     }}
                   >
-                    <CardBody py={2} px={3}>
-                      <Flex justify="space-between" align="center" gap={2}>
-                        <HStack gap={3} flex="1">
-                          <MotionBox
-                            initial={false}
-                            animate={milestone.completed ? { scale: [1, 1.2, 1] } : { scale: 1 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Checkbox.Root
-                              checked={milestone.completed}
-                              onCheckedChange={() => handleToggleMilestone(milestone.id)}
-                              colorPalette="green"
-                              size="md"
-                              cursor="pointer"
-                              p={1}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Checkbox.HiddenInput />
-                              <Checkbox.Control
-                                css={{
-                                  borderRadius: '6px',
-                                  transition: 'all 0.2s ease',
-                                }}
-                              >
-                                <Checkbox.Indicator />
-                              </Checkbox.Control>
-                            </Checkbox.Root>
-                          </MotionBox>
-                          <VStack align="start" gap={1} flex="1">
-                            <Text
-                              fontSize="sm"
-                              textDecoration={milestone.completed ? 'line-through' : 'none'}
-                              color={milestone.completed ? 'text.tertiary' : 'text.primary'}
-                              transition="all 0.2s ease-in-out"
-                            >
-                              {milestone.name}
-                            </Text>
-                            {milestone.phase.name !== 'Ungrouped' && milestone.phase.name !== 'Milestones' && (
-                              <Badge size="xs" variant="subtle" colorPalette="blue">
-                                {milestone.phase.name}
-                              </Badge>
-                            )}
-                          </VStack>
-                        </HStack>
-                        <IconButton
-                          aria-label="Delete milestone"
-                          variant="ghost"
-                          size="xs"
-                          colorPalette="red"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteMilestone(milestone.id, milestone.name);
-                          }}
-                          css={{
-                            opacity: 0,
-                            transition: 'opacity 0.15s ease',
-                            '[role="group"]:hover &': {
-                              opacity: 1,
-                            },
-                          }}
+                    <Flex justify="space-between" align="center" gap={2}>
+                      <HStack gap={3} flex="1">
+                        <MotionBox
+                          initial={false}
+                          animate={milestone.completed ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                          transition={{ duration: 0.3 }}
                         >
-                          <Icon>
-                            <LuTrash2 />
-                          </Icon>
-                        </IconButton>
-                      </Flex>
-                    </CardBody>
-                  </MotionCard>
+                          <Checkbox.Root
+                            checked={milestone.completed}
+                            onCheckedChange={() => handleToggleMilestone(milestone.id)}
+                            colorPalette="green"
+                            size="md"
+                            cursor="pointer"
+                            p={1}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control
+                              css={{
+                                borderRadius: '6px',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                          </Checkbox.Root>
+                        </MotionBox>
+                        <VStack align="start" gap={1} flex="1">
+                          <Text
+                            fontSize="sm"
+                            textDecoration={milestone.completed ? 'line-through' : 'none'}
+                            color={milestone.completed ? 'text.tertiary' : 'text.primary'}
+                            transition="all 0.2s ease-in-out"
+                          >
+                            {milestone.name}
+                          </Text>
+                          {milestone.phase.name !== 'Ungrouped' && milestone.phase.name !== 'Milestones' && (
+                            <Badge size="xs" variant="subtle" colorPalette="blue">
+                              {milestone.phase.name}
+                            </Badge>
+                          )}
+                        </VStack>
+                      </HStack>
+                      <IconButton
+                        aria-label="Delete milestone"
+                        variant="ghost"
+                        size="xs"
+                        colorPalette="red"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMilestone(milestone.id, milestone.name);
+                        }}
+                        css={{
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                          '[role="group"]:hover &': {
+                            opacity: 1,
+                          },
+                        }}
+                      >
+                        <Icon>
+                          <LuTrash2 />
+                        </Icon>
+                      </IconButton>
+                    </Flex>
+                  </MotionBox>
                 ))}
               </AnimatePresence>
             </VStack>
@@ -452,101 +449,99 @@ const MilestoneTimeline = memo(function MilestoneTimeline({
                     <VStack align="stretch" gap={2}>
                       <AnimatePresence mode="popLayout">
                         {visibleMilestones.map((milestone, index) => (
-                          <MotionCard
+                          <MotionBox
                             key={milestone.id}
                             layout
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
                             transition={{ duration: 0.2, delay: index * 0.02 }}
-                            variant="outline"
-                            size="sm"
+                            px={3}
+                            py={2}
                             bg={milestone.completed ? 'green.50' : 'transparent'}
-                            borderColor={milestone.completed ? 'green.200' : 'border.subtle'}
+                            borderWidth={milestone.completed ? '1px' : '0px'}
+                            borderColor={milestone.completed ? 'green.200' : 'transparent'}
                             cursor="pointer"
                             role="group"
                             onClick={() => handleToggleMilestone(milestone.id)}
                             css={{
                               borderRadius: '12px',
-                              transition: 'all 0.2s ease',
+                              transition: 'all 0.15s ease',
                               _dark: {
                                 bg: milestone.completed ? 'green.950/30' : 'transparent',
-                                borderColor: milestone.completed ? 'green.800/50' : 'border.subtle',
+                                borderColor: milestone.completed ? 'green.800/50' : 'transparent',
                               },
                               _hover: {
-                                transform: 'translateX(4px)',
-                                borderColor: milestone.completed ? 'green.300' : 'primary.300',
+                                bg: milestone.completed ? 'rgba(var(--chakra-colors-green-500) / 0.12)' : 'rgba(128, 128, 128, 0.05)',
                               },
                             }}
                           >
-                            <CardBody py={2} px={3}>
-                              <Flex justify="space-between" align="center" gap={2}>
-                                <HStack gap={3} flex="1">
-                                  <MotionBox
-                                    initial={false}
-                                    animate={milestone.completed ? { scale: [1, 1.2, 1] } : { scale: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                  >
-                                    <Checkbox.Root
-                                      checked={milestone.completed}
-                                      onCheckedChange={() => handleToggleMilestone(milestone.id)}
-                                      colorPalette="green"
-                                      size="md"
-                                      cursor="pointer"
-                                      p={1}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Checkbox.HiddenInput />
-                                      <Checkbox.Control
-                                        css={{
-                                          borderRadius: '6px',
-                                          transition: 'all 0.2s ease',
-                                        }}
-                                      >
-                                        <Checkbox.Indicator />
-                                      </Checkbox.Control>
-                                    </Checkbox.Root>
-                                  </MotionBox>
-                                  <VStack align="start" gap={1} flex="1">
-                                    <Text
-                                      fontSize="sm"
-                                      textDecoration={milestone.completed ? 'line-through' : 'none'}
-                                      color={milestone.completed ? 'text.tertiary' : 'text.primary'}
-                                      transition="all 0.2s ease-in-out"
-                                    >
-                                      {milestone.name}
-                                    </Text>
-                                    {milestone.phase.name !== 'Ungrouped' && milestone.phase.name !== 'Milestones' && (
-                                      <Badge size="xs" variant="subtle" colorPalette="blue">
-                                        {milestone.phase.name}
-                                      </Badge>
-                                    )}
-                                  </VStack>
-                                </HStack>
-                                <IconButton
-                                  aria-label="Delete milestone"
-                                  variant="ghost"
-                                  size="xs"
-                                  colorPalette="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteMilestone(milestone.id, milestone.name);
-                                  }}
-                                  css={{
-                                    opacity: 0,
-                                    transition: 'opacity 0.15s ease',
-                                    '[role="group"]:hover &': {
-                                      opacity: 1,
-                                    },
-                                  }}
+                            <Flex justify="space-between" align="center" gap={2}>
+                              <HStack gap={3} flex="1">
+                                <MotionBox
+                                  initial={false}
+                                  animate={milestone.completed ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                                  transition={{ duration: 0.3 }}
                                 >
-                                  <Icon>
-                                    <LuTrash2 />
-                                  </Icon>
-                                </IconButton>
-                              </Flex>
-                            </CardBody>
-                          </MotionCard>
+                                  <Checkbox.Root
+                                    checked={milestone.completed}
+                                    onCheckedChange={() => handleToggleMilestone(milestone.id)}
+                                    colorPalette="green"
+                                    size="md"
+                                    cursor="pointer"
+                                    p={1}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Checkbox.HiddenInput />
+                                    <Checkbox.Control
+                                      css={{
+                                        borderRadius: '6px',
+                                        transition: 'all 0.2s ease',
+                                      }}
+                                    >
+                                      <Checkbox.Indicator />
+                                    </Checkbox.Control>
+                                  </Checkbox.Root>
+                                </MotionBox>
+                                <VStack align="start" gap={1} flex="1">
+                                  <Text
+                                    fontSize="sm"
+                                    textDecoration={milestone.completed ? 'line-through' : 'none'}
+                                    color={milestone.completed ? 'text.tertiary' : 'text.primary'}
+                                    transition="all 0.2s ease-in-out"
+                                  >
+                                    {milestone.name}
+                                  </Text>
+                                  {milestone.phase.name !== 'Ungrouped' && milestone.phase.name !== 'Milestones' && (
+                                    <Badge size="xs" variant="subtle" colorPalette="blue">
+                                      {milestone.phase.name}
+                                    </Badge>
+                                  )}
+                                </VStack>
+                              </HStack>
+                              <IconButton
+                                aria-label="Delete milestone"
+                                variant="ghost"
+                                size="xs"
+                                colorPalette="red"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMilestone(milestone.id, milestone.name);
+                                }}
+                                css={{
+                                  opacity: 0,
+                                  transition: 'opacity 0.15s ease',
+                                  '[role="group"]:hover &': {
+                                    opacity: 1,
+                                  },
+                                }}
+                              >
+                                <Icon>
+                                  <LuTrash2 />
+                                </Icon>
+                              </IconButton>
+                            </Flex>
+                          </MotionBox>
                         ))}
                       </AnimatePresence>
                     </VStack>
