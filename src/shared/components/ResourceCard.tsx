@@ -17,7 +17,7 @@ import {
 } from 'react-icons/lu';
 import { ImTree } from 'react-icons/im';
 import { GlassCard } from './GlassCard';
-import { ArtifactFile } from '../../ipc';
+import { ArtifactFile } from '@/ipc';
 
 
 // Artifact type icon mapping

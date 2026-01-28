@@ -4,11 +4,10 @@ import {
   VStack,
   Splitter,
 } from '@chakra-ui/react';
-import Header from '../components/Header';
 import KitOverview from '@/features/kits/components/KitOverview';
 import Workstation from '@/features/workstation/components/Workstation';
 import { useResource } from '@/shared/contexts/ResourceContext';
-import { ArtifactFile } from '../ipc';
+import { ArtifactFile } from '@/ipc';
 
 interface WalkthroughViewPageProps {
   kit: ArtifactFile;
@@ -31,12 +30,7 @@ export default function WalkthroughViewPage({ kit, kitContent, onBack }: Walkthr
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-      {/* Header above everything */}
-      <Box flexShrink={0} bg="transparent">
-        <Header />
-      </Box>
-      
-      {/* Splitter layout below header */}
+      {/* Splitter layout */}
       <Box 
         flex="1" 
         minH={0} 

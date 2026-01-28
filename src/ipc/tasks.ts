@@ -3,7 +3,7 @@
  */
 
 import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
-import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '../types/task';
+import { Task as DbTask, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '@/types/task';
 
 /**
  * Get all tasks, optionally filtered by project IDs

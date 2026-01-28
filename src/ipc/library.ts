@@ -13,7 +13,7 @@ import {
   PublishResult,
   ResourceStatus,
   PullResult,
-} from '../types/github';
+} from '@/types/github';
 
 /**
  * Creates a new Library workspace.

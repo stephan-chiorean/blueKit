@@ -23,7 +23,7 @@ import {
   LuPencil,
   LuTrash2,
 } from "react-icons/lu";
-import { ArtifactFile, ArtifactFolder } from "../../ipc";
+import { ArtifactFile, ArtifactFolder } from "@/ipc";
 import GlassCard from "./GlassCard";
 
 interface SimpleFolderCardProps {

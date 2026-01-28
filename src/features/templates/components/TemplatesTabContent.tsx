@@ -30,9 +30,9 @@ import { Branch } from './AddBranchDialog';
 import FeaturedTemplatesModal from './FeaturedTemplatesModal';
 import AddBranchDialog from './AddBranchDialog';
 import SelectTemplateModal from './SelectTemplateModal';
-import featuredPic1 from '../../assets/featured-pic-1.png';
-import featuredPic2 from '../../assets/featured-pic-2.avif';
-import featuredPic3 from '../../assets/featured-pic-3.png';
+import featuredPic1 from '@/assets/featured-pic-1.png';
+import featuredPic2 from '@/assets/featured-pic-2.avif';
+import featuredPic3 from '@/assets/featured-pic-3.png';
 
 interface Template {
   id: string;

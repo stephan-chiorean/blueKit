@@ -1,17 +1,16 @@
 /**
  * WalkthroughWorkspace - Main container for the walkthrough view
- * 
+ *
  * Combines:
- * - Left sidebar: WalkthroughOverviewPanel
- * - Right content: WalkthroughDocViewPage
- * 
- * Styled to match PlanWorkspace with:
- * - Glassmorphic sidebar
- * - Minimal invisible resize trigger  
- * - Rounded content panel with border styling
+ * - Right sidebar: WalkthroughOverviewPanel
+ * - Main content: WalkthroughDocViewPage
+ *
+ * Simple two-panel layout with:
+ * - Fixed-width sidebar (toggleable)
+ * - Main content area
  */
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { Box, Splitter, VStack, Spinner, Text } from '@chakra-ui/react';
+import { useState, useCallback, useEffect } from 'react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import type { WalkthroughDetails, Takeaway } from '@/types/walkthrough';
 import {
     invokeGetWalkthroughDetails,
@@ -21,83 +20,29 @@ import {
 } from '@/ipc/walkthroughs';
 import { invokeReadFile } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
-import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import WalkthroughOverviewPanel from './WalkthroughOverviewPanel';
 import WalkthroughDocViewPage from './WalkthroughDocViewPage';
 
-// Sidebar drag UX constants - matching PlanWorkspace/ProjectDetailPage
-const SIDEBAR_STORAGE_KEY = 'bluekit-walkthrough-sidebar-width';
-const SIDEBAR_MIN_PX = 240;
-const SIDEBAR_MAX_PX = 500;
-const SIDEBAR_MAX_PERCENT = 40;
-const SIDEBAR_DEFAULT_PERCENT = 25;
-const SNAP_COLLAPSE_THRESHOLD = 0.55;
+// Sidebar constants
+const SIDEBAR_WIDTH = 480; // Fixed width in pixels
 
 interface WalkthroughWorkspaceProps {
     walkthroughId: string;
-    onBack: () => void;
+    onBack?: () => void;
 }
 
 export default function WalkthroughWorkspace({
     walkthroughId,
     onBack,
 }: WalkthroughWorkspaceProps) {
-    const { colorMode } = useColorMode();
-
     const [details, setDetails] = useState<WalkthroughDetails | null>(null);
     const [content, setContent] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    const [isPanelOpen, setIsPanelOpen] = useState(true);
 
-    // Sidebar state - matching PlanWorkspace
-    const [splitSizes, setSplitSizes] = useState<[number, number]>(() => {
-        try {
-            const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length === 2) {
-                    return parsed as [number, number];
-                }
-            }
-        } catch {
-            // Invalid stored value, use default
-        }
-        return [SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT];
-    });
-    const [isSidebarDragging, setIsSidebarDragging] = useState(false);
-    const splitterContainerRef = useRef<HTMLDivElement>(null);
-
-    // Styling matching PlanWorkspace exactly
-    const sidebarBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
-    const contentBorderStyle = colorMode === 'light'
-        ? {
-            borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-            borderLeft: '1px solid rgba(0, 0, 0, 0.08)',
-        }
-        : {
-            borderTop: '1px solid rgba(99, 102, 241, 0.2)',
-            borderLeft: '1px solid rgba(99, 102, 241, 0.2)',
-        };
-
-    // Persist sidebar width to localStorage
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(splitSizes));
-        }, 300);
-        return () => clearTimeout(timeoutId);
-    }, [splitSizes]);
-
-    // Toggle sidebar collapse/expand
-    const toggleSidebar = useCallback(() => {
-        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-
-        setSplitSizes(prev => {
-            if (prev[0] < 5) {
-                return [minSidebarPercent, 100 - minSidebarPercent];
-            } else {
-                return [0, 100];
-            }
-        });
+    // Toggle sidebar
+    const togglePanel = useCallback(() => {
+        setIsPanelOpen(prev => !prev);
     }, []);
 
     // Load walkthrough details and content
@@ -192,21 +137,7 @@ export default function WalkthroughWorkspace({
         return (completed / takeaways.length) * 100;
     };
 
-    if (loading) {
-        return (
-            <Box
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                h="100%"
-                bg="bg.canvas"
-            >
-                <Spinner size="lg" color="orange.500" />
-            </Box>
-        );
-    }
-
-    if (!details) {
+    if (!loading && !details) {
         return (
             <Box p={8}>
                 <Text color="text.secondary">Walkthrough not found</Text>
@@ -215,178 +146,52 @@ export default function WalkthroughWorkspace({
     }
 
     return (
-        <Box
-            ref={splitterContainerRef}
-            h="100%"
-            w="100%"
-            overflow="hidden"
-        >
-            <Splitter.Root
-                defaultSize={[SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT]}
-                size={splitSizes}
-                onResize={(resizeDetails) => {
-                    if (resizeDetails.size && resizeDetails.size.length >= 2) {
-                        const [sidebar, sidebarContent] = resizeDetails.size;
-                        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-                        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-                        const pixelMaxPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
-                        const maxSidebarPercent = Math.min(pixelMaxPercent, SIDEBAR_MAX_PERCENT);
-                        const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
-
-                        let newSidebar = sidebar;
-                        let newContent = sidebarContent;
-
-                        if (sidebar > 0 && sidebar < snapThresholdPercent) {
-                            newSidebar = 0;
-                            newContent = 100;
-                        } else if (sidebar >= snapThresholdPercent && sidebar < minSidebarPercent) {
-                            newSidebar = minSidebarPercent;
-                            newContent = 100 - minSidebarPercent;
-                        } else if (sidebar > maxSidebarPercent) {
-                            newSidebar = maxSidebarPercent;
-                            newContent = 100 - newSidebar;
-                        } else {
-                            newSidebar = sidebar;
-                            newContent = sidebarContent;
-                        }
-
-                        setSplitSizes([newSidebar, newContent]);
-                    }
-                }}
-                panels={[
-                    { id: 'overview', minSize: 0, maxSize: 100 },
-                    { id: 'docview', minSize: 30 },
-                ]}
+        <Flex h="100%" w="100%" overflow="hidden">
+            {/* Main Content Area - matches tab content styling */}
+            <Box
+                flex="1"
                 h="100%"
-                orientation="horizontal"
+                minH={0}
+                overflowY="auto"
+                overflowX="hidden"
+                position="relative"
             >
-                {/* Overview Panel - glassmorphic sidebar */}
-                <Splitter.Panel
-                    id="overview"
-                    bg="transparent"
-                    style={{
-                        background: sidebarBg,
-                        backdropFilter: 'blur(12px)',
-                        WebkitBackdropFilter: 'blur(12px)',
-                        transition: isSidebarDragging ? 'none' : 'flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-                        willChange: isSidebarDragging ? 'flex-basis' : 'auto',
+                {loading ? (
+                    <Box h="100%" display="flex" alignItems="center" justifyContent="center">
+                        Loading...
+                    </Box>
+                ) : (
+                    <WalkthroughDocViewPage
+                        details={details}
+                        content={content}
+                        onBack={onBack}
+                        isPanelOpen={isPanelOpen}
+                        onTogglePanel={togglePanel}
+                        onContentChange={(newContent) => setContent(newContent)}
+                    />
+                )}
+            </Box>
+
+            {/* Sidebar Panel - No extra blur since we're inside BrowserTabs content */}
+            {isPanelOpen && (
+                <Box
+                    w={`${SIDEBAR_WIDTH}px`}
+                    h="100%"
+                    overflow="hidden"
+                    css={{
+                        // Transparent - inherits from parent's blur
+                        background: 'transparent',
                     }}
                 >
                     <WalkthroughOverviewPanel
                         details={details}
                         loading={loading}
-                        onBack={onBack}
                         onToggleTakeaway={handleToggleTakeaway}
                         onAddTakeaway={handleAddTakeaway}
                         onDeleteTakeaway={handleDeleteTakeaway}
                     />
-                </Splitter.Panel>
-
-                {/* Minimal Resize Handle - matching PlanWorkspace exactly */}
-                <Splitter.ResizeTrigger
-                    id="overview:docview"
-                    w="20px"
-                    minW="20px"
-                    maxW="20px"
-                    p={0}
-                    mx="-10px"
-                    bg="transparent"
-                    cursor="col-resize"
-                    border="none"
-                    outline="none"
-                    boxShadow="none"
-                    position="relative"
-                    zIndex={10}
-                    onDoubleClick={toggleSidebar}
-                    onPointerDown={() => setIsSidebarDragging(true)}
-                    onPointerUp={() => setIsSidebarDragging(false)}
-                    onPointerLeave={() => setIsSidebarDragging(false)}
-                    css={{
-                        // Hide default splitter decorations
-                        '&::before': { display: 'none' },
-                        '&::after': { display: 'none' },
-                        '&': {
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        },
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none',
-                    }}
-                >
-                    {/* Invisible resize hit area */}
-                    <Box
-                        position="absolute"
-                        left="50%"
-                        top={0}
-                        bottom={0}
-                        w="2px"
-                        transform="translateX(-50%)"
-                        bg="transparent"
-                    />
-                    {/* Drag dots indicator (shows on hover) */}
-                    <Box
-                        position="absolute"
-                        left="50%"
-                        top="50%"
-                        transform="translate(-50%, -50%)"
-                        opacity={0}
-                        transition="opacity 0.2s ease, transform 0.2s ease"
-                        css={{
-                            '[data-part="resize-trigger"]:hover &': {
-                                opacity: 0.7,
-                                transform: 'translate(-50%, -50%) scale(1)',
-                            },
-                            '[data-part="resize-trigger"][data-state="dragging"] &': {
-                                opacity: 1,
-                                transform: 'translate(-50%, -50%) scale(1.1)',
-                            },
-                        }}
-                    >
-                        <VStack gap="3px">
-                            {[0, 1, 2].map((i) => (
-                                <Box
-                                    key={i}
-                                    w="4px"
-                                    h="4px"
-                                    borderRadius="full"
-                                    bg={{ _light: 'rgba(99,102,241,0.7)', _dark: 'rgba(129,140,248,0.9)' }}
-                                    transition="transform 0.15s ease"
-                                    css={{
-                                        '[data-part="resize-trigger"][data-state="dragging"] &': {
-                                            transform: 'scale(1.2)',
-                                        },
-                                    }}
-                                />
-                            ))}
-                        </VStack>
-                    </Box>
-                </Splitter.ResizeTrigger>
-
-                {/* Document Viewer Panel - rounded content with borders */}
-                <Splitter.Panel id="docview">
-                    <Box
-                        h="100%"
-                        minH={0}
-                        overflowY="auto"
-                        overflowX="hidden"
-                        position="relative"
-                        borderTopLeftRadius="2xl"
-                        style={contentBorderStyle}
-                        css={{
-                            background: { _light: 'rgba(255, 255, 255, 0.1)', _dark: 'rgba(0, 0, 0, 0.15)' },
-                            backdropFilter: 'blur(30px) saturate(180%)',
-                            WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-                        }}
-                    >
-                        <WalkthroughDocViewPage
-                            details={details}
-                            content={content}
-                            onContentChange={(newContent) => setContent(newContent)}
-                        />
-                    </Box>
-                </Splitter.Panel>
-            </Splitter.Root>
-        </Box>
+                </Box>
+            )}
+        </Flex>
     );
 }

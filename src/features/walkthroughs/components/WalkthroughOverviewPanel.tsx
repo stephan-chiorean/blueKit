@@ -6,7 +6,7 @@
  * - Takeaways section (like milestones in plans)
  * - Notes section
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
     Card,
     CardBody,
@@ -26,7 +26,6 @@ import {
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LuArrowLeft,
     LuCopy,
     LuCheck,
     LuChevronDown,
@@ -41,9 +40,8 @@ import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import TakeawayItem from './TakeawayItem';
 
 interface WalkthroughOverviewPanelProps {
-    details: WalkthroughDetails;
+    details: WalkthroughDetails | null;
     loading: boolean;
-    onBack?: () => void;
     onToggleTakeaway: (takeawayId: string) => void;
     onAddTakeaway: (title: string) => void;
     onDeleteTakeaway: (takeawayId: string) => void;
@@ -52,7 +50,6 @@ interface WalkthroughOverviewPanelProps {
 export default function WalkthroughOverviewPanel({
     details,
     loading,
-    onBack,
     onToggleTakeaway,
     onAddTakeaway,
     onDeleteTakeaway,
@@ -68,25 +65,30 @@ export default function WalkthroughOverviewPanel({
 
     // Note state
     const [notes, setNotes] = useState<string>('');
-    const notesKey = `bluekit-walkthrough-notes-${details.id}`;
+    const notesKey = details ? `bluekit-walkthrough-notes-${details.id}` : null;
 
-    // Load notes from localStorage on mount
-    useState(() => {
+    // Load notes from localStorage when details become available
+    useEffect(() => {
+        if (!notesKey) return;
         const savedNotes = localStorage.getItem(notesKey);
-        if (savedNotes !== null) {
-            setNotes(savedNotes);
-        }
-    });
+        setNotes(savedNotes ?? '');
+    }, [notesKey]);
 
-    // Calculate progress
-    const completedCount = details.takeaways.filter((t) => t.completed).length;
-    const totalCount = details.takeaways.length;
-    const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+    const panelStyles = {
+        background: colorMode === 'light'
+            ? '#EBEFF7'
+            : 'rgba(255, 255, 255, 0.05)',
+        borderWidth: '0px',
+        borderLeftWidth: '1px',
+        borderColor: colorMode === 'light'
+            ? 'rgba(0, 0, 0, 0.06)'
+            : 'rgba(255, 255, 255, 0.08)',
+        borderRadius: '0px',
+        boxShadow: 'none',
+        transition: 'all 0.2s ease',
+    };
 
-    // Filter takeaways
-    const visibleTakeaways = hideCompleted
-        ? details.takeaways.filter((t) => !t.completed)
-        : details.takeaways;
+    const filePath = details?.filePath;
 
     // Handle add takeaway
     const handleAddTakeaway = useCallback(() => {
@@ -106,6 +108,7 @@ export default function WalkthroughOverviewPanel({
     // Handle notes save
     const handleNotesChange = useCallback((value: string) => {
         setNotes(value);
+        if (!notesKey) return;
         try {
             localStorage.setItem(notesKey, value);
         } catch (error) {
@@ -127,115 +130,118 @@ export default function WalkthroughOverviewPanel({
 
     // Open in editor
     const handleOpenInEditor = useCallback(async () => {
+        if (!filePath) return;
         try {
-            await invokeOpenFileInEditor(details.filePath, 'cursor');
+            await invokeOpenFileInEditor(filePath, 'cursor');
         } catch (error) {
             console.error('Failed to open file:', error);
             toaster.create({ type: 'error', title: 'Failed to open file in editor' });
         }
-    }, [details.filePath]);
+    }, [filePath]);
 
-    const cardStyle = {
-        background: colorMode === 'light'
-            ? 'rgba(255, 255, 255, 0.65)'
-            : 'rgba(40, 40, 50, 0.5)',
-        backdropFilter: 'blur(24px) saturate(200%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(200%)',
-        borderWidth: '1px',
-        borderColor: colorMode === 'light'
-            ? 'rgba(255, 255, 255, 0.5)'
-            : 'rgba(255, 255, 255, 0.12)',
-        borderRadius: '16px',
-        boxShadow: colorMode === 'light'
-            ? '0 4px 16px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.5)'
-            : '0 4px 24px -8px rgba(0, 0, 0, 0.4)',
-        transition: 'all 0.2s ease',
-    };
-
-    if (loading) {
+    if (loading || !details) {
         return (
-            <VStack h="100%" p={5} align="stretch" gap={5}>
-                <Text color="text.secondary">Loading walkthrough details...</Text>
-            </VStack>
+            <Box
+                h="100%"
+                position="relative"
+                display="flex"
+                flexDirection="column"
+                css={panelStyles}
+            >
+                <VStack
+                    className="walkthrough-overview-scroll"
+                    flex="1"
+                    minH={0}
+                    p={4}
+                    align="stretch"
+                    gap={4}
+                    overflowY="auto"
+                >
+                    <Text color="text.secondary">
+                        {loading ? 'Loading walkthrough details...' : 'Walkthrough not found'}
+                    </Text>
+                </VStack>
+            </Box>
         );
     }
 
+    // Calculate progress
+    const completedCount = details.takeaways.filter((t) => t.completed).length;
+    const totalCount = details.takeaways.length;
+    const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+    // Filter takeaways
+    const visibleTakeaways = hideCompleted
+        ? details.takeaways.filter((t) => !t.completed)
+        : details.takeaways;
+
+    const cardStyle = {
+        background: 'transparent',
+        borderWidth: '0px',
+        borderRadius: '16px',
+        boxShadow: 'none',
+        transition: 'all 0.2s ease',
+    };
+
     return (
-        <VStack
-            className="walkthrough-overview-scroll"
+        <Box
             h="100%"
-            p={5}
-            align="stretch"
-            gap={5}
-            overflowY="auto"
             position="relative"
+            display="flex"
+            flexDirection="column"
+            css={panelStyles}
         >
-            {/* Back Button */}
-            {onBack && (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onBack}
-                    alignSelf="flex-start"
-                    css={{
-                        borderRadius: '10px',
-                        _hover: {
-                            bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
-                        },
-                    }}
-                >
-                    <HStack gap={2}>
-                        <Icon>
-                            <LuArrowLeft />
-                        </Icon>
-                        <Text>Back</Text>
-                    </HStack>
-                </Button>
-            )}
-
-            {/* Main Unified Card */}
-            <Card.Root variant="subtle" css={cardStyle}>
-                <CardBody>
-                    <VStack align="stretch" gap={0}>
-                        {/* Collapsed Header Area */}
-                        <VStack
-                            align="stretch"
-                            gap={3}
-                            cursor="pointer"
-                            onClick={() => setIsUnifiedExpanded(!isUnifiedExpanded)}
-                            py={1}
-                        >
-                            <Flex justify="space-between" align="start">
-                                <VStack align="start" gap={1} flex="1">
-                                    <HStack gap={2}>
-                                        <Icon boxSize={5} color="orange.500">
-                                            <LuLightbulb />
-                                        </Icon>
-                                        <Text fontWeight="semibold" fontSize="md" lineClamp={2}>
-                                            {details.name}
+            <VStack
+                className="walkthrough-overview-scroll"
+                flex="1"
+                minH={0}
+                p={4}
+                align="stretch"
+                gap={4}
+                overflowY="auto"
+            >
+                {/* Main Unified Card */}
+                <Card.Root variant="subtle" css={cardStyle}>
+                    <CardBody>
+                        <VStack align="stretch" gap={0}>
+                            {/* Collapsed Header Area */}
+                            <VStack
+                                align="stretch"
+                                gap={3}
+                                cursor="pointer"
+                                onClick={() => setIsUnifiedExpanded(!isUnifiedExpanded)}
+                                py={1}
+                            >
+                                <Flex justify="space-between" align="start">
+                                    <VStack align="start" gap={1} flex="1">
+                                        <HStack gap={2}>
+                                            <Icon boxSize={5} color="orange.500">
+                                                <LuLightbulb />
+                                            </Icon>
+                                            <Text fontWeight="semibold" fontSize="md" lineClamp={2}>
+                                                {details.name}
+                                            </Text>
+                                        </HStack>
+                                        <Text fontSize="xs" color="text.secondary">
+                                            {completedCount} / {totalCount} takeaways
+                                            {progress > 0 && ` · ${Math.round(progress)}%`}
                                         </Text>
-                                    </HStack>
-
-                                    <Text fontSize="xs" color="text.secondary">
-                                        {completedCount} / {totalCount} takeaways
-                                        {progress > 0 && ` · ${Math.round(progress)}%`}
-                                    </Text>
-                                </VStack>
-                                <IconButton
-                                    aria-label="Open in editor"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenInEditor();
-                                    }}
-                                    css={{ borderRadius: '10px' }}
-                                >
-                                    <Icon>
-                                        <LuExternalLink />
-                                    </Icon>
-                                </IconButton>
-                            </Flex>
+                                    </VStack>
+                                    <IconButton
+                                        aria-label="Open in editor"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenInEditor();
+                                        }}
+                                        css={{ borderRadius: '10px' }}
+                                    >
+                                        <Icon>
+                                            <LuExternalLink />
+                                        </Icon>
+                                    </IconButton>
+                                </Flex>
 
                             {totalCount > 0 && (
                                 <Progress.Root
@@ -384,10 +390,10 @@ export default function WalkthroughOverviewPanel({
                         </AnimatePresence>
                     </VStack>
                 </CardBody>
-            </Card.Root>
+            </Card.Root >
 
             {/* Notes Card */}
-            <Card.Root variant="subtle" css={cardStyle}>
+            < Card.Root variant="subtle" css={cardStyle} >
                 <CardBody>
                     <VStack align="stretch" gap={3}>
                         <Flex justify="space-between" align="center">
@@ -428,6 +434,7 @@ export default function WalkthroughOverviewPanel({
                     </VStack>
                 </CardBody>
             </Card.Root>
-        </VStack>
+            </VStack>
+        </Box>
     );
 }

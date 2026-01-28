@@ -1,16 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, VStack, Portal } from '@chakra-ui/react';
-import { ResourceFile } from '../types/resource';
+import { ResourceFile } from '@/types/resource';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { NoteViewHeader } from '@/features/workstation/components/NoteViewHeader';
 import { ResourceMarkdownContent } from '@/features/workstation/components/ResourceMarkdownContent';
 import MarkdownEditor, { MarkdownEditorRef } from '@/shared/components/editor/MarkdownEditor';
 import SearchInMarkdown from '@/features/workstation/components/SearchInMarkdown';
 import { useWorkstation } from '@/app/WorkstationContext';
-import { useAutoSave } from '../hooks/useAutoSave';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { toaster } from '@/shared/components/ui/toaster';
-import { invokeGetFolderMarkdownFiles } from '../ipc/artifacts';
-import { invokeReadFile } from '../ipc/files';
+import { invokeGetFolderMarkdownFiles } from '@/ipc/artifacts';
+import { invokeReadFile } from '@/ipc/files';
 import path from 'path';
 
 interface NoteViewPageProps {
@@ -196,20 +196,12 @@ export default function NoteViewPage({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [setIsSearchOpen]);
 
-  // Glass styling for light/dark mode - matching project cards
-  const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
-
   return (
     <Box
       h="100%"
       w="100%"
       display="flex"
       flexDirection="column"
-      style={{
-        background: cardBg,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       <NoteViewHeader
         resource={resource}

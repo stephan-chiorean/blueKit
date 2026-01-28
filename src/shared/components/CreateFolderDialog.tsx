@@ -9,7 +9,7 @@ import {
   Portal,
   CloseButton,
 } from '@chakra-ui/react';
-import { FolderConfig } from '../../ipc';
+import { FolderConfig } from '@/ipc';
 
 interface CreateFolderDialogProps {
   isOpen: boolean;

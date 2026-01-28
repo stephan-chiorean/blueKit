@@ -4,7 +4,7 @@
  * (kits, walkthroughs, agents, blueprints, diagrams, scrapbook) in a unified way.
  */
 
-import { ArtifactFile } from '../ipc';
+import { ArtifactFile } from '@/ipc';
 
 /**
  * Resource type discriminator

@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { invokeWriteFile } from '../ipc/files';
+import { invokeWriteFile } from '@/ipc/files';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
 

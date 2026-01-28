@@ -1,5 +1,5 @@
 import { Box, Flex, Heading, Text } from '@chakra-ui/react';
-import { ToolkitHeader, ToolkitHeaderProps } from '../ToolkitHeader';
+import { ToolkitHeader, ToolkitHeaderProps } from '@/shared/components/ToolkitHeader';
 
 interface StandardPageLayoutProps {
     // Header

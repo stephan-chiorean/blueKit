@@ -23,6 +23,7 @@ import { useSelection } from '@/shared/contexts/SelectionContext';
 import { open } from '@tauri-apps/api/dialog';
 import { toaster } from '@/shared/components/ui/toaster';
 import TaskDetailModal from '@/features/blueprints/components/TaskDetailModal';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 interface BlueprintsSectionProps {
   projectPath: string;
@@ -36,6 +37,7 @@ export default function BlueprintsSection({
   onViewTask,
 }: BlueprintsSectionProps) {
   const { isSelected } = useSelection();
+  const { colorMode } = useColorMode();
   const [blueprints, setBlueprints] = useState<Blueprint[]>([]);
   const [blueprintsLoading, setBlueprintsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,9 +116,22 @@ export default function BlueprintsSection({
     }
   };
 
+  // Glass styling for light/dark mode - matching NoteViewPage
+  const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+
   if (blueprintsLoading) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         Loading blueprints...
       </Box>
     );
@@ -124,7 +139,17 @@ export default function BlueprintsSection({
 
   if (error) {
     return (
-      <Box textAlign="center" py={12} color="red.500">
+      <Box
+        textAlign="center"
+        py={12}
+        color="red.500"
+        h="100%"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         Error: {error}
       </Box>
     );
@@ -132,7 +157,17 @@ export default function BlueprintsSection({
 
   if (projectsCount === 0) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         No projects linked. Projects are managed via CLI and will appear here automatically.
       </Box>
     );
@@ -140,24 +175,44 @@ export default function BlueprintsSection({
 
   if (blueprints.length === 0) {
     return (
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <Icon size="xl" color="primary.500">
-              <LuPackage />
-            </Icon>
-          </EmptyState.Indicator>
-          <EmptyState.Title>No blueprints found</EmptyState.Title>
-          <EmptyState.Description>
-            Blueprints will appear here once they are created in your .bluekit directory.
-          </EmptyState.Description>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <Box
+        h="100%"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <EmptyState.Root>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <Icon size="xl" color="primary.500">
+                <LuPackage />
+              </Icon>
+            </EmptyState.Indicator>
+            <EmptyState.Title>No blueprints found</EmptyState.Title>
+            <EmptyState.Description>
+              Blueprints will appear here once they are created in your .bluekit directory.
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Box>
     );
   }
 
   return (
-    <Box>
+    <Box
+      h="100%"
+      p={6}
+      style={{
+        background: cardBg,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
       <SimpleGrid columns={{ base: 1, md: 1, lg: 1 }} gap={4}>
         {blueprints.map((blueprint) => {
           const isExpanded = expandedBlueprints.has(blueprint.metadata.id);

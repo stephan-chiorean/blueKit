@@ -12,7 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { LuMap } from 'react-icons/lu';
 import { GlassCard } from './GlassCard';
-import { Plan } from '../../types/plan';
+import { Plan } from '@/types/plan';
 
 interface PlanResourceCardProps {
     plan: Plan;

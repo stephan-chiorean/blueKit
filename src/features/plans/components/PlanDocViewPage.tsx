@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Box, VStack, HStack, Text, Button, Icon, Badge, Flex, Portal } from '@chakra-ui/react';
+import { Box, VStack, HStack, Text, Button, Icon, Badge, Flex, Portal, IconButton } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LuArrowLeft, LuArrowRight, LuFileText } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight, LuFileText, LuPanelRightOpen, LuPanelRightClose } from 'react-icons/lu';
 import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
 import { listen } from '@tauri-apps/api/event';
 import { ResourceFile } from '@/types/resource';
@@ -32,6 +32,10 @@ interface PlanDocViewPageProps {
     onNavigate: (index: number, document: PlanDocument) => void;
     /** Callback when content changes */
     onContentChange?: (newContent: string) => void;
+    /** Whether the overview panel is open */
+    isPanelOpen?: boolean;
+    /** Callback to toggle the overview panel */
+    onTogglePanel?: () => void;
 }
 
 export default function PlanDocViewPage({
@@ -40,6 +44,8 @@ export default function PlanDocViewPage({
     planId,
     onNavigate,
     onContentChange,
+    isPanelOpen = true,
+    onTogglePanel,
 }: PlanDocViewPageProps) {
     const { colorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -219,8 +225,7 @@ export default function PlanDocViewPage({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [setIsSearchOpen, viewMode, canNavigatePrev, canNavigateNext, handleNavigatePrev, handleNavigateNext]);
 
-    // Match NoteViewPage styling (card-like)
-    const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+
 
     if (!currentDoc) {
         return (
@@ -232,9 +237,7 @@ export default function PlanDocViewPage({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 style={{
-                    background: cardBg,
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
+                    background: 'transparent',
                 }}
             >
                 <VStack gap={3}>
@@ -259,9 +262,7 @@ export default function PlanDocViewPage({
             display="flex"
             flexDirection="column"
             style={{
-                background: cardBg,
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
+                background: 'transparent',
             }}
         >
             {/* Header - matching NoteViewHeader style */}
@@ -410,6 +411,26 @@ export default function PlanDocViewPage({
                             </Icon>
                         </Button>
                     </HStack>
+
+
+
+                    <IconButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={onTogglePanel}
+                        aria-label={isPanelOpen ? "Close side panel" : "Open side panel"}
+                        css={{
+                            borderRadius: '10px',
+                            color: "text.secondary",
+                            _hover: {
+                                bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                            },
+                        }}
+                    >
+                        <Icon boxSize={4}>
+                            {isPanelOpen ? <LuPanelRightClose /> : <LuPanelRightOpen />}
+                        </Icon>
+                    </IconButton>
                 </Flex>
             </Box>
 

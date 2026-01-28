@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box, VStack, Text, Button, Icon, Input, HStack } from '@chakra-ui/react';
 import { LuArrowRight, LuLibrary } from 'react-icons/lu';
 import { open } from '@tauri-apps/api/dialog';
-import { invokeDbCreateProject, invokeCreateNewProject, invokeDbGetProjects, invokeDbDeleteProject } from '../ipc';
+import { invokeDbCreateProject, invokeCreateNewProject, invokeDbGetProjects, invokeDbDeleteProject } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { ActiveLogo as BlueKitLogo } from '@/shared/components/logo';

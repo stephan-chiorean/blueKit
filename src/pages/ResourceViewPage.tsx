@@ -9,14 +9,13 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
-import Header from '../components/Header';
 import KitOverview from '@/features/kits/components/KitOverview';
 import PlanWorkspace from '@/features/plans/components/PlanWorkspace';
 import WalkthroughWorkspace from '@/features/walkthroughs/components/WalkthroughWorkspace';
 import Workstation from '@/features/workstation/components/Workstation';
 import MermaidDiagramViewer from '@/features/workstation/components/MermaidDiagramViewer';
 import { useResource } from '@/shared/contexts/ResourceContext';
-import { ResourceFile, ResourceType, ResourceViewMode } from '../types/resource';
+import { ResourceFile, ResourceType, ResourceViewMode } from '@/types/resource';
 
 interface ResourceViewPageProps {
   resource: ResourceFile;
@@ -25,14 +24,25 @@ interface ResourceViewPageProps {
   viewMode?: ResourceViewMode;
   onBack: () => void;
   onPlanDeleted?: () => void | Promise<void>;
+  /** When true, fill the parent container instead of the viewport */
+  contained?: boolean;
 }
 
-export default function ResourceViewPage({ resource, resourceContent, resourceType, viewMode, onBack, onPlanDeleted }: ResourceViewPageProps) {
+export default function ResourceViewPage({
+  resource,
+  resourceContent,
+  resourceType,
+  viewMode,
+  onBack,
+  onPlanDeleted,
+  contained = false,
+}: ResourceViewPageProps) {
   const { setSelectedResource, clearSelectedResource } = useResource();
   const hasInitialized = useRef(false);
   const resourcePathRef = useRef<string | null>(null);
   const viewModeRef = useRef(viewMode);
   const clearSelectedResourceRef = useRef(clearSelectedResource);
+  const rootHeight = contained ? '100%' : '100vh';
 
   // Keep refs in sync with latest values
   useEffect(() => {
@@ -76,12 +86,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   // Diagrams use a different layout (full-screen viewer without split view)
   if (resourceType === 'diagram') {
     return (
-      <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-        {/* Header above everything */}
-        <Box flexShrink={0} bg="transparent">
-          <Header />
-        </Box>
-
+      <VStack align="stretch" h={rootHeight} minH={0} gap={0} overflow="hidden" bg="transparent">
         {/* Back button */}
         <Box p={4} borderBottomWidth="1px" borderColor="border.subtle" bg="transparent">
           <Button
@@ -119,12 +124,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
   // Plan mode uses PlanWorkspace for unified experience
   if (viewMode === 'plan') {
     return (
-      <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-        {/* Header above everything */}
-        <Box flexShrink={0} bg="transparent">
-          <Header />
-        </Box>
-
+      <VStack align="stretch" h={rootHeight} minH={0} gap={0} overflow="hidden" bg="transparent">
         {/* Plan Workspace below header - matches ProjectDetailPage content styling */}
         <Box
           flex="1"
@@ -132,7 +132,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
           overflow="hidden"
           bg="transparent"
         >
-          <PlanWorkspace plan={resource} onBack={onBack} onPlanDeleted={onPlanDeleted} />
+          <PlanWorkspace plan={resource} onPlanDeleted={onPlanDeleted} />
         </Box>
       </VStack>
     );
@@ -145,12 +145,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
 
     if (walkthroughId) {
       return (
-        <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-          {/* Header above everything */}
-          <Box flexShrink={0} bg="transparent">
-            <Header />
-          </Box>
-
+        <VStack align="stretch" h={rootHeight} minH={0} gap={0} overflow="hidden" bg="transparent">
           {/* Walkthrough Workspace */}
           <Box
             flex="1"
@@ -167,12 +162,7 @@ export default function ResourceViewPage({ resource, resourceContent, resourceTy
 
   // All other resource types use the split view layout (overview + workstation)
   return (
-    <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-      {/* Header above everything */}
-      <Box flexShrink={0} bg="transparent">
-        <Header />
-      </Box>
-
+    <VStack align="stretch" h={rootHeight} minH={0} gap={0} overflow="hidden" bg="transparent">
       {/* Splitter layout below header */}
       <Box
         flex="1"

@@ -260,7 +260,12 @@ function KitsSection({
 
   if (kitsLoading) {
     return (
-      <Box position="relative" width="100%" maxW="100%">
+      <Box
+        position="relative"
+        width="100%"
+        maxW="100%"
+        h="100%"
+      >
         <VStack align="stretch" gap={6} width="100%">
           <ToolkitHeader title="Kits" />
           <Box p={4}><Text>Loading...</Text></Box>
@@ -271,7 +276,12 @@ function KitsSection({
 
   if (error) {
     return (
-      <Box textAlign="center" py={12} color="red.500">
+      <Box
+        textAlign="center"
+        py={12}
+        color="red.500"
+        h="100%"
+      >
         Error: {error}
       </Box>
     );
@@ -279,7 +289,12 @@ function KitsSection({
 
   if (projectsCount === 0) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+      >
         No projects linked. Projects are managed via CLI and will appear here automatically.
       </Box>
     );
@@ -287,7 +302,12 @@ function KitsSection({
 
   if (kits.length === 0) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+      >
         No kits found in any linked project's .bluekit directory.
       </Box>
     );
@@ -310,12 +330,19 @@ function KitsSection({
   }
 
   return (
-    <Box position="relative" width="100%" maxW="100%">
-      <VStack align="stretch" gap={6} width="100%">
+    <Flex
+      direction="column"
+      h="100%"
+      overflow="hidden"
+      position="relative"
+    >
+      <VStack align="stretch" gap={0} h="100%">
         {/* Toolkit Header */}
         <ToolkitHeader title="Kits" />
 
-        {/* Folders Section - only show if folders exist or loading */}
+        {/* Scrollable Content Area */}
+        <Box flex={1} overflowY="auto" p={6}>
+          {/* Folders Section - only show if folders exist or loading */}
         {(folders.length > 0 || isFoldersLoading) && (
           <Box position="relative">
             <Flex align="center" justify="space-between" gap={2} mb={4}>
@@ -484,6 +511,7 @@ function KitsSection({
             />
           )}
         </Box>
+        </Box>
       </VStack>
 
       <ResourceSelectionBar
@@ -514,7 +542,7 @@ function KitsSection({
       />
 
 
-    </Box>
+    </Flex>
   );
 }
 

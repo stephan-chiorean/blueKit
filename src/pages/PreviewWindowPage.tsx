@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Box, VStack, Spinner, Text } from '@chakra-ui/react';
-import Header from '../components/Header';
 import ResourceMarkdownViewer from '@/features/workstation/components/ResourceMarkdownViewer';
-import { invokeReadFile } from '../ipc/files';
-import { ResourceFile, ResourceType } from '../types/resource';
+import { invokeReadFile } from '@/ipc/files';
+import { ResourceFile, ResourceType } from '@/types/resource';
 
 /**
  * Preview window page - displays resource content in a standalone window.
@@ -112,11 +111,6 @@ export default function PreviewWindowPage() {
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden">
-      {/* Header */}
-      <Box flexShrink={0}>
-        <Header />
-      </Box>
-
       {/* Content */}
       <Box flex="1" minH={0} overflow="auto">
         <ResourceMarkdownViewer resource={resource} content={content} />

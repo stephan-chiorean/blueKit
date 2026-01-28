@@ -1,5 +1,6 @@
-import { Fragment } from 'react';
-import { Box, Flex } from '@chakra-ui/react';
+import { Fragment, ReactNode } from 'react';
+import { Box, Flex, IconButton, Icon } from '@chakra-ui/react';
+import { LuPanelLeft } from 'react-icons/lu';
 import BrowserTab, { Tab } from './BrowserTab';
 import TabDivider from './TabDivider';
 import { getTabColors, TAB_SPECS } from './tabStyles';
@@ -10,7 +11,9 @@ interface BrowserTabsProps {
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   colorMode: 'light' | 'dark';
-  children?: React.ReactNode;
+  children?: ReactNode;
+  onToggleSidebar?: () => void;
+  isSidebarCollapsed?: boolean;
 }
 
 /**
@@ -29,6 +32,8 @@ export default function BrowserTabs({
   onClose,
   colorMode,
   children,
+  onToggleSidebar,
+  isSidebarCollapsed,
 }: BrowserTabsProps) {
   const colors = getTabColors(colorMode);
 
@@ -48,19 +53,57 @@ export default function BrowserTabs({
   };
 
   return (
-    <Box position="relative" h="100%" display="flex" flexDirection="column">
+    <Box
+      position="relative"
+      h="100%"
+      display="flex"
+      flexDirection="column"
+      bg={colors.tabBarBg}
+      css={{
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+      }}
+    >
       {/* Tab Bar */}
       <Flex
         h={TAB_SPECS.barHeight}
-        px={TAB_SPECS.barPaddingX}
         alignItems="flex-end"
-        bg={colors.tabBarBg}
         flexShrink={0}
-        css={{
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
+        position="relative" // Ensure z-index works for tabs overlapping border
+        zIndex={1}
       >
+        {/* Start Spacer - provides border before first tab */}
+        <Box
+          w={`${TAB_SPECS.barPaddingX * 4}px`} // Convert chakra spacing (4px per unit)
+          h="100%"
+          borderBottom={`1px solid ${colors.borderColor}`}
+        />
+
+        {/* Sidebar Toggle - only show when sidebar is collapsed */}
+        {onToggleSidebar && isSidebarCollapsed && (
+          <Box
+            h="100%"
+            display="flex"
+            alignItems="center"
+            borderBottom={`1px solid ${colors.borderColor}`}
+            pr={2}
+          >
+            <IconButton
+              aria-label="Expand Sidebar"
+              size="xs"
+              variant="ghost"
+              onClick={onToggleSidebar}
+              color={colors.selectedText}
+              _hover={{ bg: colors.hoverBg, color: colors.selectedText }}
+              alignSelf="center"
+            >
+              <Icon fontSize="16px">
+                <LuPanelLeft />
+              </Icon>
+            </IconButton>
+          </Box>
+        )}
+
         {tabs.map((tab, index) => (
           <Fragment key={tab.id}>
             {shouldShowDivider(index) && (
@@ -75,6 +118,13 @@ export default function BrowserTabs({
             />
           </Fragment>
         ))}
+
+        {/* End Spacer - fills remaining space with border */}
+        <Box
+          flex={1}
+          h="100%"
+          borderBottom={`1px solid ${colors.borderColor}`}
+        />
       </Flex>
 
       {/* Content Area - seamlessly connected to selected tab */}
@@ -86,6 +136,9 @@ export default function BrowserTabs({
         css={{
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
+          borderLeft: colorMode === 'light'
+            ? '1px solid rgba(0, 0, 0, 0.08)'
+            : '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
         {children}

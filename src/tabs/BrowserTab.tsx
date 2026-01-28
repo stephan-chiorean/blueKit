@@ -1,7 +1,7 @@
 import { Box, Flex, Text, Icon } from '@chakra-ui/react';
 import { LuX } from 'react-icons/lu';
 import { getTabColors, TAB_SPECS } from './tabStyles';
-import InvertedCorner from './InvertedCorner';
+
 
 export interface Tab {
   id: string;
@@ -42,7 +42,7 @@ export default function BrowserTab({
         onClick={onSelect}
         alignItems="center"
         gap={TAB_SPECS.iconGap}
-        h={TAB_SPECS.barHeight}
+        h={TAB_SPECS.tabHeight}
         minW={TAB_SPECS.tabMinWidth}
         maxW={TAB_SPECS.tabMaxWidth}
         px={TAB_SPECS.tabPaddingX}
@@ -58,19 +58,23 @@ export default function BrowserTab({
         cursor="pointer"
         transition={`all ${TAB_SPECS.hoverTransition}`}
         position="relative"
-        zIndex={isSelected ? 1 : 0}
-        border="none"
+        zIndex={isSelected ? 2 : 1}
+        marginBottom="0px"
         outline="none"
         role="tab"
         tabIndex={0}
         aria-selected={isSelected}
+        borderTop={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+        borderLeft={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+        borderRight={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+        borderBottom={`1px solid ${isSelected ? colors.selectedBg : colors.borderColor}`}
         _hover={
           isSelected
             ? {}
             : {
-                bg: colors.hoverBg,
-                color: colors.selectedText,
-              }
+              bg: colors.hoverBg,
+              color: colors.selectedText,
+            }
         }
         _focus={{
           outline: 'none',
@@ -82,23 +86,8 @@ export default function BrowserTab({
             onSelect();
           }
         }}
-        css={
-          isSelected
-            ? {
-                // Bottom extension to cover any gap with content
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  bottom: '-1px',
-                  left: 0,
-                  right: 0,
-                  height: '1px',
-                  background: colors.selectedBg,
-                },
-              }
-            : undefined
-        }
       >
+
         {/* Tab Icon */}
         {tab.icon && (
           <Icon
@@ -106,6 +95,8 @@ export default function BrowserTab({
             boxSize={TAB_SPECS.iconSize}
             color={isSelected ? colors.iconSelected : colors.iconUnselected}
             flexShrink={0}
+            zIndex={2} // Ensure content is above borders
+            position="relative"
           />
         )}
 
@@ -116,6 +107,8 @@ export default function BrowserTab({
           whiteSpace="nowrap"
           flex={1}
           textAlign="left"
+          zIndex={2}
+          position="relative"
         >
           {tab.label}
         </Text>
@@ -137,6 +130,8 @@ export default function BrowserTab({
               opacity: 1,
               bg: colors.closeHover,
             }}
+            zIndex={2}
+            position="relative"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onClose();
@@ -152,13 +147,7 @@ export default function BrowserTab({
         )}
       </Flex>
 
-      {/* Inverted corners for selected tab */}
-      {isSelected && (
-        <>
-          <InvertedCorner colorMode={colorMode} position="left" />
-          <InvertedCorner colorMode={colorMode} position="right" />
-        </>
-      )}
+
     </Box>
   );
 }

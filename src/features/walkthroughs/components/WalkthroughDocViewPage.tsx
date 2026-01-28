@@ -4,11 +4,12 @@
  * Mirrors PlanDocViewPage structure with:
  * - Header bar with view mode icons (preview/source/edit)
  * - No navigation arrows (single document)
- * - Same glassmorphic styling
+ * - Matching PlanDocViewPage styling
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Box, HStack, Text, Button, Icon, Badge, Flex, Portal } from '@chakra-ui/react';
+import { Box, HStack, Text, Button, Icon, Badge, Flex, Portal, IconButton } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LuArrowLeft, LuPanelRightOpen, LuPanelRightClose } from 'react-icons/lu';
 import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
 import { ResourceFile } from '@/types/resource';
 import type { WalkthroughDetails } from '@/types/walkthrough';
@@ -30,14 +31,23 @@ interface WalkthroughDocViewPageProps {
     details: WalkthroughDetails;
     /** Markdown content */
     content: string;
+    /** Callback when user wants to go back */
+    onBack?: () => void;
     /** Callback when content changes */
     onContentChange?: (newContent: string) => void;
+    /** Whether the side panel is open */
+    isPanelOpen?: boolean;
+    /** Callback to toggle the side panel */
+    onTogglePanel?: () => void;
 }
 
 export default function WalkthroughDocViewPage({
     details,
     content: initialContent,
+    onBack,
     onContentChange,
+    isPanelOpen = true,
+    onTogglePanel,
 }: WalkthroughDocViewPageProps) {
     const { colorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -116,9 +126,6 @@ export default function WalkthroughDocViewPage({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [setIsSearchOpen]);
 
-    // Match PlanDocViewPage styling
-    const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
-
     return (
         <Box
             h="100%"
@@ -126,9 +133,7 @@ export default function WalkthroughDocViewPage({
             display="flex"
             flexDirection="column"
             style={{
-                background: cardBg,
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
+                background: 'transparent',
             }}
         >
             {/* Header - matching PlanDocViewPage style */}
@@ -141,8 +146,24 @@ export default function WalkthroughDocViewPage({
                 py={2}
             >
                 <Flex justify="space-between" align="center" gap={4}>
-                    {/* Left: Spacer (no navigation for single doc) */}
-                    <Box w="60px" />
+                    {/* Left: Back button */}
+                    <HStack gap={1}>
+                        {onBack && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                px={2}
+                                bg="transparent"
+                                onClick={onBack}
+                                _hover={{}}
+                                aria-label="Back"
+                            >
+                                <Icon boxSize={4}>
+                                    <LuArrowLeft />
+                                </Icon>
+                            </Button>
+                        )}
+                    </HStack>
 
                     {/* Center: Filename */}
                     <HStack
@@ -239,6 +260,24 @@ export default function WalkthroughDocViewPage({
                             </Icon>
                         </Button>
                     </HStack>
+
+                    <IconButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={onTogglePanel}
+                        aria-label={isPanelOpen ? "Close side panel" : "Open side panel"}
+                        css={{
+                            borderRadius: '10px',
+                            color: "text.secondary",
+                            _hover: {
+                                bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                            },
+                        }}
+                    >
+                        <Icon boxSize={4}>
+                            {isPanelOpen ? <LuPanelRightClose /> : <LuPanelRightOpen />}
+                        </Icon>
+                    </IconButton>
                 </Flex>
             </Box>
 

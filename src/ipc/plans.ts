@@ -10,7 +10,7 @@ import type {
   PlanPhase,
   PlanMilestone,
   PlanDocument,
-} from '../types/plan';
+} from '@/types/plan';
 
 // ============================================================================
 // PLAN CRUD OPERATIONS

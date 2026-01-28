@@ -32,6 +32,7 @@ import EditTaskDialog from '@/features/tasks/components/EditTaskDialog';
 import { useQuickTaskPopover } from '@/shared/contexts/QuickTaskPopoverContext';
 import { toaster } from '@/shared/components/ui/toaster';
 import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from '@/shared/utils/taskUtils';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 interface TasksSectionProps {
   context: 'workspace' | Project;  // workspace view or specific project
@@ -49,6 +50,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   context,
   projects,
 }, ref) => {
+  const { colorMode } = useColorMode();
   // Local state for tasks (loaded from database)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -356,9 +358,21 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     });
   };
 
+  // Glass styling for light/dark mode - matching NoteViewPage
+  const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
+
   if (loading) {
     return (
-      <Box textAlign="center" py={12}>
+      <Box
+        textAlign="center"
+        py={12}
+        h="100%"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         <Spinner size="lg" />
       </Box>
     );
@@ -366,28 +380,40 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
 
   if (tasks.length === 0) {
     return (
-      <VStack py={12} gap={3}>
-        <Button
-          colorPalette="primary"
-          variant="solid"
-          size="sm"
-          borderRadius="lg"
-          onClick={handleAddTask}
-        >
-          <HStack gap={2}>
-            <Icon>
-              <LuPlus />
-            </Icon>
-            <Text>Add Task</Text>
-          </HStack>
-        </Button>
-        <Text color="text.secondary" fontSize="lg">
-          No tasks yet
-        </Text>
-        <Text color="text.tertiary" fontSize="sm">
-          Click "Add Task" to create your first task
-        </Text>
-      </VStack>
+      <Box
+        h="100%"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        style={{
+          background: cardBg,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <VStack py={12} gap={3}>
+          <Button
+            colorPalette="primary"
+            variant="solid"
+            size="sm"
+            borderRadius="lg"
+            onClick={handleAddTask}
+          >
+            <HStack gap={2}>
+              <Icon>
+                <LuPlus />
+              </Icon>
+              <Text>Add Task</Text>
+            </HStack>
+          </Button>
+          <Text color="text.secondary" fontSize="lg">
+            No tasks yet
+          </Text>
+          <Text color="text.tertiary" fontSize="sm">
+            Click "Add Task" to create your first task
+          </Text>
+        </VStack>
+      </Box>
     );
   }
 
@@ -526,7 +552,17 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   const parentName = context === 'workspace' ? 'Workspace' : context.name;
 
   return (
-    <Flex direction="column" h="100%" overflow="hidden" position="relative">
+    <Flex
+      direction="column"
+      h="100%"
+      overflow="hidden"
+      position="relative"
+      style={{
+        background: cardBg,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
       <EditTaskDialog
         task={selectedTask}
         isOpen={isDialogOpen}

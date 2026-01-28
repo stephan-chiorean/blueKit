@@ -6,13 +6,13 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { GitHubToken, AuthStatus, GitHubUser } from '../../types/github';
+import { GitHubToken, AuthStatus, GitHubUser } from '@/types/github';
 import {
   invokeKeychainRetrieveToken,
   invokeKeychainDeleteToken,
   invokeAuthGetStatus,
   invokeGitHubGetUser,
-} from '../../ipc';
+} from '@/ipc';
 
 interface GitHubAuthContextValue {
   // Auth state

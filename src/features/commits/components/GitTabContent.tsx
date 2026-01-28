@@ -860,7 +860,7 @@ export default function GitTabContent({
 
   // Commit timeline
   return (
-    <VStack align="stretch" gap={2} pt={2} pb={4}>
+    <VStack align="stretch" gap={2} pt={2} pb={4} px={6}>
       {/* Toolkit Header */}
       <ToolkitHeader title="Git" />
 

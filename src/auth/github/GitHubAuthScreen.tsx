@@ -21,7 +21,7 @@ import { useGitHubAuth } from './GitHubAuthProvider';
 import {
   invokeAuthStartAuthorization,
   invokeAuthExchangeCode,
-} from '../../ipc';
+} from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
 
 interface GitHubAuthScreenProps {

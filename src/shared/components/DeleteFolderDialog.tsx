@@ -9,7 +9,7 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { LuTrash2, LuFolder } from 'react-icons/lu';
-import { ArtifactFolder } from '../../ipc';
+import { ArtifactFolder } from '@/ipc';
 
 interface DeleteFolderDialogProps {
   isOpen: boolean;

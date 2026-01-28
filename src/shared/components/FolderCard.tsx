@@ -1,7 +1,7 @@
 import { Box, Card, CardHeader, CardBody, Heading, HStack, Icon, Text, VStack, Flex, Menu, IconButton, Badge, Checkbox, Portal, Spinner } from '@chakra-ui/react';
 import { LuFolder, LuChevronRight, LuPackage, LuBookOpen, LuNetwork, LuPencil, LuTrash2, LuPlus, LuMinus } from 'react-icons/lu';
 import { IoIosMore } from 'react-icons/io';
-import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '../../ipc';
+import { FolderTreeNode, ArtifactFile, ArtifactFolder, FolderGroup } from '@/ipc';
 import { useSelection } from '@/shared/contexts/SelectionContext';
 
 interface FolderCardProps {

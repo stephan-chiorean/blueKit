@@ -14,11 +14,17 @@ export default function TabDivider({ colorMode }: TabDividerProps) {
 
   return (
     <Box
-      w={TAB_SPECS.dividerWidth}
-      h={TAB_SPECS.dividerHeight}
-      alignSelf="center"
-      bg={colors.divider}
-      flexShrink={0}
-    />
+      h="100%"
+      borderBottom={`1px solid ${colors.borderColor}`}
+      display="flex"
+      alignItems="center"
+    >
+      <Box
+        w={TAB_SPECS.dividerWidth}
+        h={TAB_SPECS.dividerHeight}
+        bg={colors.divider}
+        flexShrink={0}
+      />
+    </Box>
   );
 }

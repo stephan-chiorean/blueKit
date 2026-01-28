@@ -3,7 +3,7 @@
  */
 
 import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
-import { GitHubUser, GitHubRepo, GitHubFileResponse, GitHubTreeResponse } from '../types/github';
+import { GitHubUser, GitHubRepo, GitHubFileResponse, GitHubTreeResponse } from '@/types/github';
 
 /**
  * Gets the authenticated user's information from GitHub.

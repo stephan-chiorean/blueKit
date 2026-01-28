@@ -4,7 +4,6 @@ import {
   Box,
   VStack,
   Splitter,
-  Flex,
 } from '@chakra-ui/react';
 import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
@@ -55,14 +54,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   // Glass styling for sidebar to match header
   const sidebarBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(20, 20, 25, 0.15)';
 
-  // Border styling for main content area (left border is the ResizeTrigger)
-  const contentBorderStyle = colorMode === 'light'
-    ? {
-      borderLeft: '1px solid rgba(0, 0, 0, 0.08)',
-    }
-    : {
-      borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-    };
+
 
   // Sidebar state
   const [activeView, setActiveView] = useState<ViewType>(isVault ? 'projects' : 'file');
@@ -141,11 +133,12 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
   const SIDEBAR_STORAGE_KEY = 'bluekit-sidebar-width';
-  const SIDEBAR_MIN_PX = 240;           // Compact-friendly minimum (allows readable content)
-  const SIDEBAR_MAX_PX = 500;           // Absolute max in pixels
-  const SIDEBAR_MAX_PERCENT = 40;       // Never more than 40% of viewport
-  const SIDEBAR_DEFAULT_PERCENT = 18;   // ~280px on typical 1440px screens
-  const SNAP_COLLAPSE_THRESHOLD = 0.55; // Collapse if below 55% of min (more forgiving)
+  const SIDEBAR_MIN_PX = 240;              // Compact-friendly minimum (allows readable content)
+  const SIDEBAR_MAX_PX = 500;              // Absolute max in pixels
+  const SIDEBAR_MAX_PERCENT = 40;          // Never more than 40% of viewport
+  const SIDEBAR_DEFAULT_PERCENT = 18;      // ~280px on typical 1440px screens
+  const SNAP_COLLAPSE_THRESHOLD = 0.55;    // Collapse if below 55% of min (more forgiving)
+  const COLLAPSED_SIDEBAR_PERCENT = 0;     // True "zero" – content hidden completely
 
   // Sidebar width with localStorage persistence
   const [splitSizes, setSplitSizes] = useState<[number, number]>(() => {
@@ -163,6 +156,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     return [SIDEBAR_DEFAULT_PERCENT, 100 - SIDEBAR_DEFAULT_PERCENT];
   });
 
+  // Track the last valid sidebar size (size before collapse)
+  const [lastSidebarSize, setLastSidebarSize] = useState<number>(SIDEBAR_DEFAULT_PERCENT);
+
   // Track whether sidebar is being actively dragged (for animation control)
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
 
@@ -177,21 +173,97 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     return () => clearTimeout(timeoutId);
   }, [splitSizes]);
 
+
+
+  // Handle drag end snapping
+  useEffect(() => {
+    if (!isSidebarDragging) {
+      // Drag just finished (or initial load). Check if we need to snap.
+      setSplitSizes(prev => {
+        const [sidebar] = prev;
+        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+        const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
+
+        // Visual "zero" check (allow small variance)
+        if (sidebar <= COLLAPSED_SIDEBAR_PERCENT + 0.1) return prev;
+
+        // 1. If below threshold, snap to ZERO
+        if (sidebar < snapThresholdPercent) {
+          return [COLLAPSED_SIDEBAR_PERCENT, 100 - COLLAPSED_SIDEBAR_PERCENT];
+        }
+        // 2. If between threshold and min, snap to MIN
+        else if (sidebar < minSidebarPercent) {
+          return [minSidebarPercent, 100 - minSidebarPercent];
+        }
+
+        return prev;
+      });
+    }
+  }, [isSidebarDragging, SIDEBAR_MIN_PX]);
+
+  // Handle responsive resizing
+  useEffect(() => {
+    const container = splitterContainerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const containerWidth = entry.contentRect.width;
+        if (containerWidth <= 0) continue;
+
+        setSplitSizes(prev => {
+          const currentSidebarPercent = prev[0];
+
+          // Don't auto-expand if collapsed
+          if (currentSidebarPercent <= COLLAPSED_SIDEBAR_PERCENT + 0.1) {
+            return prev;
+          }
+
+          // Calculate current pixel width
+          const currentPx = (currentSidebarPercent / 100) * containerWidth;
+
+          // Enforce min pixel width
+          if (currentPx < SIDEBAR_MIN_PX) {
+            const newPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+            // If min width is too large (e.g. > max percent), clamp it
+            if (newPercent > SIDEBAR_MAX_PERCENT) {
+              return [SIDEBAR_MAX_PERCENT, 100 - SIDEBAR_MAX_PERCENT];
+            }
+            return [newPercent, 100 - newPercent];
+          }
+
+          // Enforce max pixel width
+          if (currentPx > SIDEBAR_MAX_PX) {
+            const newPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
+            return [newPercent, 100 - newPercent];
+          }
+
+          return prev;
+        });
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [SIDEBAR_MIN_PX, SIDEBAR_MAX_PX, SIDEBAR_MAX_PERCENT]);
+
   // Keyboard shortcut: Cmd/Ctrl + \ to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault();
-        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-
         setSplitSizes(prev => {
-          if (prev[0] < 5) {
-            // Currently collapsed - expand to default
+          const isCollapsed = prev[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1;
+          const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+          const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+          if (isCollapsed) {
+            // Currently collapsed - expand to minimum readable width
             return [minSidebarPercent, 100 - minSidebarPercent];
           } else {
             // Currently expanded - collapse
-            return [0, 100];
+            return [COLLAPSED_SIDEBAR_PERCENT, 100 - COLLAPSED_SIDEBAR_PERCENT];
           }
         });
       }
@@ -203,17 +275,24 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
   // Toggle sidebar collapse/expand with animation
   const toggleSidebar = useCallback(() => {
-    const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
-    const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
-
     setSplitSizes(prev => {
-      if (prev[0] < 5) {
-        return [minSidebarPercent, 100 - minSidebarPercent];
+      const isCollapsed = prev[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1;
+
+      if (isCollapsed) {
+        // Restore to last valid size, or default, or min
+        const containerWidth = splitterContainerRef.current?.clientWidth || window.innerWidth;
+        const minSidebarPercent = (SIDEBAR_MIN_PX / containerWidth) * 100;
+
+        // Use lastSize if it's substantial, otherwise ensure minimum
+        const targetSize = Math.max(lastSidebarSize, minSidebarPercent);
+        return [targetSize, 100 - targetSize];
       } else {
-        return [0, 100];
+        // Save current size before collapsing
+        setLastSidebarSize(prev[0]);
+        return [COLLAPSED_SIDEBAR_PERCENT, 100 - COLLAPSED_SIDEBAR_PERCENT];
       }
     });
-  }, []);
+  }, [lastSidebarSize, SIDEBAR_MIN_PX]);
 
   const handleTreeRefresh = useCallback(() => setFileTreeVersion(v => v + 1), []);
 
@@ -872,32 +951,36 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     isCreatingNewFileRef.current = false;
   }, [handleFileSelect, finalizeTitleEdit]);
 
-  // If viewing any resource, show the generic resource view page
-  // For plans and walkthroughs, resourceContent can be empty (they load their own data)
-  if (viewingResource && resourceType) {
-    // Determine view mode based on resource type
-    const viewMode = resourceType === 'plan' ? 'plan' : resourceType === 'walkthrough' ? 'walkthrough' : undefined;
-
-    // For plans and walkthroughs, we allow empty content (they load their own data)
-    // For other resources, require content
-    if (resourceType === 'plan' || resourceType === 'walkthrough' || resourceContent) {
-      // Provide onPlanDeleted callback for plan views to ensure list is refreshed after deletion
-      const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
-      return (
-        <ResourceViewPage
-          resource={viewingResource}
-          resourceContent={resourceContent || ''}
-          resourceType={resourceType}
-          viewMode={viewMode}
-          onBack={handleBackFromResourceView}
-          onPlanDeleted={planDeletedCallback}
-        />
-      );
-    }
-  }
-
   // Render content based on active view
   const renderContent = () => {
+    // If viewing any resource, render it within the tab content area
+    // For plans and walkthroughs, resourceContent can be empty (they load their own data)
+    if (viewingResource && resourceType) {
+      const viewMode =
+        resourceType === 'plan'
+          ? 'plan'
+          : resourceType === 'walkthrough'
+            ? 'walkthrough'
+            : undefined;
+
+      if (resourceType === 'plan' || resourceType === 'walkthrough' || resourceContent) {
+        const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
+        return (
+          <Box h="100%" minH={0} overflow="hidden">
+            <ResourceViewPage
+              resource={viewingResource}
+              resourceContent={resourceContent || ''}
+              resourceType={resourceType}
+              viewMode={viewMode}
+              onBack={handleBackFromResourceView}
+              onPlanDeleted={planDeletedCallback}
+              contained
+            />
+          </Box>
+        );
+      }
+    }
+
     // If a notebook file is selected, show it directly (activeView='file' should be set)
     // But we check notebookFile just in case
     if (activeView === 'file' && notebookFile) {
@@ -1138,7 +1221,6 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
           ref={splitterContainerRef}
           flex="1"
           minH={0}
-          overflow="hidden"
           bg="transparent"
         >
           <Splitter.Root
@@ -1158,36 +1240,22 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 const pixelMaxPercent = (SIDEBAR_MAX_PX / containerWidth) * 100;
                 const maxSidebarPercent = Math.min(pixelMaxPercent, SIDEBAR_MAX_PERCENT);
 
-                // Calculate snap threshold (percentage below which we collapse)
-                // Using 55% of min creates a comfortable "decision zone"
-                const snapThresholdPercent = minSidebarPercent * SNAP_COLLAPSE_THRESHOLD;
-
                 let newSidebar = sidebar;
                 let newContent = content;
 
-                // COLLAPSE ZONE: if below threshold, snap to fully collapsed
-                if (sidebar > 0 && sidebar < snapThresholdPercent) {
-                  newSidebar = 0;
-                  newContent = 100;
-                }
-                // SNAP-TO-MIN ZONE: if between threshold and minimum, snap to minimum
-                // This prevents awkward "almost collapsed" states
-                else if (sidebar >= snapThresholdPercent && sidebar < minSidebarPercent) {
-                  newSidebar = minSidebarPercent;
-                  newContent = 100 - minSidebarPercent;
-                }
-                // MAX CONSTRAINT: enforce maximum width (responsive to viewport)
-                else if (sidebar > maxSidebarPercent) {
+                // MAX CONSTRAINT ONLY (Allow free movement below min for smooth expansion/collapse)
+                if (sidebar > maxSidebarPercent) {
                   newSidebar = maxSidebarPercent;
                   newContent = 100 - newSidebar;
                 }
-                // NORMAL ZONE: free resize within valid bounds
-                else {
-                  newSidebar = sidebar;
-                  newContent = content;
-                }
 
+                // Update state
                 setSplitSizes([newSidebar, newContent]);
+
+                // If we are resizing to a valid non-collapsed size, update lastSidebarSize
+                if (newSidebar > minSidebarPercent) {
+                  setLastSidebarSize(newSidebar);
+                }
               }
             }}
             panels={[
@@ -1207,6 +1275,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 WebkitBackdropFilter: 'blur(12px)',
                 transition: isSidebarDragging ? 'none' : 'flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1)',
                 willChange: isSidebarDragging ? 'flex-basis' : 'auto',
+                // When "collapsed", visually hide content. The resize handle remains accessible.
+                opacity: splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1 ? 0 : 1,
+                pointerEvents: splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1 ? 'none' : 'auto',
               }}
             >
               <ProjectSidebar
@@ -1228,6 +1299,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 editingTitle={editingTitle}
                 onHandlersReady={setNotebookHandlers}
                 isVault={isVault}
+                onToggleSidebar={toggleSidebar}
               />
             </Splitter.Panel>
 
@@ -1245,11 +1317,18 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               outline="none"
               boxShadow="none"
               position="relative"
-              zIndex={10}
+              zIndex={100}
               onDoubleClick={toggleSidebar}
-              onPointerDown={() => setIsSidebarDragging(true)}
-              onPointerUp={() => setIsSidebarDragging(false)}
-              onPointerLeave={() => setIsSidebarDragging(false)}
+              onPointerDown={() => {
+                setIsSidebarDragging(true);
+                // Attach global listener to handle drag end robustly (even if mouse leaves Trigger)
+                const handleGlobalUp = () => {
+                  setIsSidebarDragging(false);
+                  window.removeEventListener('pointerup', handleGlobalUp);
+                };
+                window.addEventListener('pointerup', handleGlobalUp);
+              }}
+              // Removed onPointerUp/onPointerLeave in favor of global listener for robustness
               css={{
                 // Hide default splitter decorations
                 '&::before': { display: 'none' },
@@ -1321,35 +1400,23 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 overflow="hidden"
                 position="relative"
                 p={0}
-                style={contentBorderStyle}
               >
-                {openTabs.length > 0 ? (
-                  <BrowserTabs
-                    tabs={openTabs}
-                    selectedId={activeTabId || openTabs[0]?.id || ''}
-                    onSelect={handleTabSelect}
-                    onClose={closeTab}
-                    colorMode={colorMode}
-                  >
-                    {renderContent()}
-                  </BrowserTabs>
-                ) : (
-                  <Box
-                    h="100%"
-                    css={activeView !== 'file' ? {
-                      background: colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                    } : undefined}
-                  >
-                    {renderContent()}
-                  </Box>
-                )}
+                <BrowserTabs
+                  tabs={openTabs}
+                  selectedId={activeTabId || openTabs[0]?.id || ''}
+                  onSelect={handleTabSelect}
+                  onClose={closeTab}
+                  colorMode={colorMode}
+                  onToggleSidebar={toggleSidebar}
+                  isSidebarCollapsed={splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1}
+                >
+                  {renderContent()}
+                </BrowserTabs>
               </Box>
             </Splitter.Panel>
           </Splitter.Root>
         </Box>
       </VStack>
-    </SelectionProvider>
+    </SelectionProvider >
   );
 }

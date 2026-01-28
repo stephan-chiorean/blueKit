@@ -9,7 +9,7 @@ import type {
     WalkthroughDetails,
     Takeaway,
     WalkthroughNote,
-} from '../types/walkthrough';
+} from '@/types/walkthrough';
 
 // ============================================================================
 // WALKTHROUGH CRUD OPERATIONS

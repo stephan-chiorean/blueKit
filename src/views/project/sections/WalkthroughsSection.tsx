@@ -240,7 +240,10 @@ function WalkthroughsSection({
 
   if (kitsLoading) {
     return (
-      <Box position="relative">
+      <Box
+        position="relative"
+        h="100%"
+      >
         <VStack align="stretch" gap={6}>
           <Flex align="center" justify="space-between" mb={6} py={2}>
             <Heading size="2xl">Walkthroughs</Heading>
@@ -253,7 +256,12 @@ function WalkthroughsSection({
 
   if (error) {
     return (
-      <Box textAlign="center" py={12} color="red.500">
+      <Box
+        textAlign="center"
+        py={12}
+        color="red.500"
+        h="100%"
+      >
         Error: {error}
       </Box>
     );
@@ -261,7 +269,12 @@ function WalkthroughsSection({
 
   if (projectsCount === 0) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+      >
         No projects linked. Projects are managed via CLI and will appear here automatically.
       </Box>
     );
@@ -269,7 +282,12 @@ function WalkthroughsSection({
 
   if (walkthroughs.length === 0) {
     return (
-      <Box textAlign="center" py={12} color="text.secondary">
+      <Box
+        textAlign="center"
+        py={12}
+        color="text.secondary"
+        h="100%"
+      >
         No walkthroughs found in any linked project's .bluekit directory.
       </Box>
     );
@@ -292,7 +310,11 @@ function WalkthroughsSection({
   const projectName = projectPath.split('/').pop() || 'Project';
 
   return (
-    <Flex direction="column" h="100%" overflow="hidden">
+    <Flex
+      direction="column"
+      h="100%"
+      overflow="hidden"
+    >
       <VStack align="stretch" gap={0} h="100%">
         {/* Toolkit Header */}
         <ToolkitHeader

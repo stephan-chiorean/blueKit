@@ -1,9 +1,11 @@
-import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection, Avatar, Tooltip } from '@chakra-ui/react';
-import { LuFolder, LuArrowLeft, LuNetwork, LuLibrary, LuMoon, LuSun, LuSettings, LuUser } from 'react-icons/lu';
+import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection, Avatar, Tooltip, IconButton } from '@chakra-ui/react';
+import { LuFolder, LuArrowLeft, LuNetwork, LuLibrary, LuMoon, LuSun, LuSettings, LuUser, LuPanelLeft } from 'react-icons/lu';
 import SidebarContent, { ViewType } from './components/SidebarContent';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { useSupabaseAuth } from '@/shared/contexts/SupabaseAuthContext';
 import { Project, FileTreeNode } from '@/ipc';
+
+
 
 // Helper for consistent Tooltip styling matching NotebookToolbar
 const TooltipContent = ({ children, colorMode }: { children: React.ReactNode, colorMode: string }) => (
@@ -57,6 +59,8 @@ interface ProjectSidebarProps {
   isWorktreeView?: boolean;
   onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
   isVault?: boolean;
+  /** Toggle sidebar collapsed/expanded */
+  onToggleSidebar?: () => void;
 }
 
 export default function ProjectSidebar({
@@ -78,9 +82,13 @@ export default function ProjectSidebar({
   isWorktreeView = false,
   onHandlersReady,
   isVault = false,
+  onToggleSidebar,
 }: ProjectSidebarProps) {
   const { colorMode, toggleColorMode } = useColorMode();
   const { user } = useSupabaseAuth();
+
+  // Handle opening project in external editor
+
 
   // User display name and avatar derivation
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
@@ -114,9 +122,8 @@ export default function ProjectSidebar({
       <Box
         h="40px"
         px={3}
-        pb={1}
         display="flex"
-        alignItems="flex-end"
+        alignItems="center"
       >
         {isVault ? (
           <HStack w="100%" h="34px" gap={2} alignItems="center">
@@ -145,6 +152,31 @@ export default function ProjectSidebar({
                 </Text>
               </HStack>
             </Box>
+            {/* Panel toggle icon - collapses sidebar */}
+            {onToggleSidebar && (
+              <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
+                <Tooltip.Trigger asChild>
+                  <IconButton
+                    variant="ghost"
+                    size="xs"
+                    aria-label="Collapse Sidebar"
+                    onClick={onToggleSidebar}
+                    color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                    _hover={{
+                      color: colorMode === 'light' ? 'black' : 'white',
+                      bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                    }}
+                    minW={5}
+                    h={5}
+                  >
+                    <LuPanelLeft />
+                  </IconButton>
+                </Tooltip.Trigger>
+                <TooltipContent colorMode={colorMode}>
+                  Collapse sidebar
+                </TooltipContent>
+              </Tooltip.Root>
+            )}
           </HStack>
         ) : !isWorktreeView ? (
           <HStack w="100%" h="34px" gap={2} alignItems="center">
@@ -161,7 +193,8 @@ export default function ProjectSidebar({
               value={[project.id]}
               onValueChange={handleProjectChange}
               size="sm"
-              width="100%"
+              flex="1"
+              width="auto"
             >
               <Select.HiddenSelect />
               <Select.Control
@@ -235,6 +268,31 @@ export default function ProjectSidebar({
                 </Select.Positioner>
               </Portal>
             </Select.Root>
+            {/* Panel toggle icon - collapses sidebar */}
+            {onToggleSidebar && (
+              <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
+                <Tooltip.Trigger asChild>
+                  <IconButton
+                    variant="ghost"
+                    size="xs"
+                    aria-label="Collapse Sidebar"
+                    onClick={onToggleSidebar}
+                    color={colorMode === 'light' ? 'gray.500' : 'gray.400'}
+                    _hover={{
+                      color: colorMode === 'light' ? 'black' : 'white',
+                      bg: colorMode === 'light' ? 'blackAlpha.50' : 'whiteAlpha.50',
+                    }}
+                    minW={5}
+                    h={5}
+                  >
+                    <LuPanelLeft />
+                  </IconButton>
+                </Tooltip.Trigger>
+                <TooltipContent colorMode={colorMode}>
+                  Collapse sidebar
+                </TooltipContent>
+              </Tooltip.Root>
+            )}
           </HStack>
         ) : (
           <HStack gap={2} px={1} h="34px" alignItems="center">
@@ -248,13 +306,14 @@ export default function ProjectSidebar({
         )}
       </Box>
 
-      {/* Sidebar Menu Content */}
+      {/* Sidebar Menu Content - with border separator */}
       <Box
         flex="1"
         overflowX="hidden"
         overflowY="auto"
         pb={1}
         px={2}
+        pt={2}
       >
         <SidebarContent
           activeView={activeView}

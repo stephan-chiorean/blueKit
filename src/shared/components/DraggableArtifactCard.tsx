@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core';
-import { ArtifactFile } from '../../ipc';
+import { ArtifactFile } from '@/ipc';
 
 interface DraggableArtifactCardProps {
   artifact: ArtifactFile;

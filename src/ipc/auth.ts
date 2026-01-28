@@ -3,7 +3,7 @@
  */
 
 import { invokeWithTimeout } from '@/shared/utils/ipcTimeout';
-import { AuthStatus } from '../types/github';
+import { AuthStatus } from '@/types/github';
 
 /**
  * Starts the GitHub authorization code flow.

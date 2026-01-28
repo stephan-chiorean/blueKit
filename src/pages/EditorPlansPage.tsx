@@ -10,12 +10,11 @@ import {
   Flex,
 } from '@chakra-ui/react';
 import { LuArrowLeft } from 'react-icons/lu';
-import Header from '../components/Header';
 import EditorPlansContent from '@/features/plans/components/EditorPlansContent';
 import ResourceViewPage from './ResourceViewPage';
-import { invokeGetPlansFiles, invokeReadFile, ArtifactFile } from '../ipc';
+import { invokeGetPlansFiles, invokeReadFile, ArtifactFile } from '@/ipc';
 import { parseFrontMatter, extractFirstHeading } from '@/shared/utils/parseFrontMatter';
-import { ResourceFile, ResourceType } from '../types/resource';
+import { ResourceFile, ResourceType } from '@/types/resource';
 
 interface EditorPlansPageProps {
   plansSource: 'claude' | 'cursor';
@@ -122,11 +121,6 @@ export default function EditorPlansPage({ plansSource, onBack }: EditorPlansPage
 
   return (
     <VStack align="stretch" h="100vh" gap={0} overflow="hidden" bg="transparent">
-      {/* Header above everything */}
-      <Box flexShrink={0} bg="transparent">
-        <Header />
-      </Box>
-      
       {/* Full screen content area */}
       <Box flex="1" minH={0} overflow="hidden" bg="transparent">
         <Box 

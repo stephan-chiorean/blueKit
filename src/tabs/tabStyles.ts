@@ -39,12 +39,18 @@ export const getTabColors = (colorMode: 'light' | 'dark') => ({
   closeHover: colorMode === 'light'
     ? 'rgba(0, 0, 0, 0.1)'
     : 'rgba(255, 255, 255, 0.1)',
+
+  // Border color for tabs and container
+  borderColor: colorMode === 'light'
+    ? 'rgba(0, 0, 0, 0.08)'
+    : 'rgba(255, 255, 255, 0.08)',
 });
 
 // Visual specifications
 export const TAB_SPECS = {
   // Tab bar
-  barHeight: '36px',
+  barHeight: '40px',
+  tabHeight: '34px',
   barPaddingX: 2, // Chakra spacing units
 
   // Individual tab

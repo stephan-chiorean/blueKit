@@ -25,6 +25,7 @@ import { StandardPageLayout } from '@/shared/components/layouts/StandardPageLayo
 import { FilterPanel } from '@/shared/components/FilterPanel';
 import { ResourceSelectionBar } from '@/shared/components/ResourceSelectionBar';
 import { useSelection } from '@/shared/contexts/SelectionContext';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 interface PlansSectionProps {
   plans: Plan[];
@@ -50,6 +51,7 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
   onPlansChanged,
 }, ref) => {
   const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
+
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [nameFilter, setNameFilter] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -256,7 +258,14 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
   const projectName = projectPath.split('/').pop() || 'Project';
 
   return (
-    <Box position="relative">
+    <Box
+      position="relative"
+      h="100%"
+      w="100%"
+      display="flex"
+      flexDirection="column"
+      bg="transparent"
+    >
       <CreatePlanDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
