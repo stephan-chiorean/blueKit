@@ -411,7 +411,7 @@ export default function SidebarContent({
             {/* Notebook Section - Only show when expanded and projectPath is available */}
             {!collapsed && projectPath && onFileSelect && (
                 <SidebarSection
-                    title="Notebook"
+                    title={isVault ? 'Library' : 'Notebook'}
                     flex={true}
                     rightElement={
                         <NotebookToolbar

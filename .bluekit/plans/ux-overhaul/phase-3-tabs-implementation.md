@@ -1,5 +1,11 @@
 # Phase 3: Tab Infrastructure Implementation
 
+
+## Before you begin
+
+Ensure that the projectSidebar.tsx is ready for migration, right now we house logic for this component
+When we switch tabs back and forth and then come back to other tabs that are in other contexts, does the sidebar basically adjust to the context of what tab we're on?
+
 ## Goal
 
 Implement persistent tab state management to enable multi-context workflows where tabs persist across navigation between HomeView and ProjectView.
