@@ -312,7 +312,7 @@ export default function ProjectSidebar({
         overflowX="hidden"
         overflowY="auto"
         pb={1}
-        px={2}
+        px={3}
         pt={2}
       >
         <SidebarContent

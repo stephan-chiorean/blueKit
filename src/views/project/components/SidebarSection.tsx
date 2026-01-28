@@ -52,7 +52,6 @@ export default function SidebarSection({
             minH={flex ? 0 : undefined}
         >
             <Box
-                px={3}
                 pb={2}
                 display="flex"
                 alignItems="center"

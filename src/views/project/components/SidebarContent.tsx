@@ -422,7 +422,6 @@ export default function SidebarContent({
                     }
                 >
                     <Box
-                        pl={2}
                         flex="1"
                         minH={0}
                         overflowY="auto"

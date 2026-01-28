@@ -1474,7 +1474,8 @@ function TreeNode({
         <Box mb={0.5}>
             <HStack
                 py={1}
-                px={2}
+                pl={2}
+                pr={0}
                 cursor={getCursor()}
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}

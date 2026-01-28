@@ -358,20 +358,12 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     });
   };
 
-  // Glass styling for light/dark mode - matching NoteViewPage
-  const cardBg = colorMode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(20, 20, 25, 0.5)';
-
   if (loading) {
     return (
       <Box
         textAlign="center"
         py={12}
         h="100%"
-        style={{
-          background: cardBg,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
       >
         <Spinner size="lg" />
       </Box>
@@ -385,11 +377,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
         display="flex"
         alignItems="center"
         justifyContent="center"
-        style={{
-          background: cardBg,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
       >
         <VStack py={12} gap={3}>
           <Button
@@ -557,11 +544,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
       h="100%"
       overflow="hidden"
       position="relative"
-      style={{
-        background: cardBg,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
     >
       <EditTaskDialog
         task={selectedTask}

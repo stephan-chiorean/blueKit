@@ -50,9 +50,9 @@ import {
   getCheckpointTypeColorPalette,
   parseCheckpointTags,
 } from "@/shared/utils/checkpointUtils";
-import PinCheckpointModal from "./PinCheckpointModal";
-import BranchOffModal from "./BranchOffModal";
-import RollbackModal from "./RollbackModal";
+import PinCheckpointModal from "@/features/commits/components/PinCheckpointModal";
+import BranchOffModal from "@/features/commits/components/BranchOffModal";
+import RollbackModal from "@/features/commits/components/RollbackModal";
 import { FilterPanel } from "@/shared/components/FilterPanel";
 import { LiquidViewModeSwitcher } from "@/features/kits/components/LiquidViewModeSwitcher";
 import { ToolkitHeader } from "@/shared/components/ToolkitHeader";
@@ -60,7 +60,7 @@ import { useGitHubIntegration } from "@/shared/contexts/GitHubIntegrationContext
 import { useSupabaseAuth } from "@/shared/contexts/SupabaseAuthContext";
 import { GitHubConnectButton } from "@/features/auth/components/GitHubConnectButton";
 
-interface GitTabContentProps {
+interface GitSectionProps {
   projectId: string;
   gitUrl?: string;
   gitConnected: boolean;
@@ -243,12 +243,12 @@ const DateHeader = ({
   </Box>
 );
 
-export default function GitTabContent({
+export default function GitSection({
   projectId,
   gitUrl,
   gitConnected,
   onGitConnected,
-}: GitTabContentProps) {
+}: GitSectionProps) {
   const { accessToken, isConnected: isGitHubConnected, isLoading: isGitHubLoading } = useGitHubIntegration();
   const { isAuthenticated } = useSupabaseAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("commits");
@@ -860,11 +860,19 @@ export default function GitTabContent({
 
   // Commit timeline
   return (
-    <VStack align="stretch" gap={2} pt={2} pb={4} px={6}>
-      {/* Toolkit Header */}
-      <ToolkitHeader title="Git" />
+    <Flex
+      direction="column"
+      h="100%"
+      overflow="hidden"
+      position="relative"
+    >
+      <VStack align="stretch" gap={0} h="100%">
+        {/* Toolkit Header */}
+        <ToolkitHeader title="Git" />
 
-      {renderViewModeSwitcher()}
+        {/* Scrollable Content Area */}
+        <Box flex={1} overflowY="auto" px={6} pt={2} pb={4}>
+          {renderViewModeSwitcher()}
 
       {viewMode === "commits" ? (
         <>
@@ -1085,6 +1093,8 @@ export default function GitTabContent({
           onReload={loadWorktrees}
         />
       )}
+        </Box>
+      </VStack>
 
       {/* Pin Checkpoint Modal */}
       <PinCheckpointModal
@@ -1099,7 +1109,7 @@ export default function GitTabContent({
         gitUrl={gitUrl}
         onCheckpointPinned={handleCheckpointPinned}
       />
-    </VStack>
+    </Flex>
   );
 }
 

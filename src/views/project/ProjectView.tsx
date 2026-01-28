@@ -15,7 +15,7 @@ import BlueprintsSection from './sections/BlueprintsSection';
 import AgentsTabContent from '@/features/agents/components/AgentsTabContent';
 import ScrapbookTabContent from '@/features/scrapbook/components/ScrapbookTabContent';
 import DiagramsTabContent from '@/features/diagrams/components/DiagramsTabContent';
-import GitTabContent from '@/features/commits/components/GitTabContent';
+import GitSection from './sections/GitSection';
 import BookmarksTabContent from '@/features/bookmarks/components/BookmarksTabContent';
 import TasksSection, { TasksSectionRef } from './sections/TasksSection';
 import PlansSection, { PlansSectionRef } from './sections/PlansSection';
@@ -1161,7 +1161,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         );
       case 'git':
         return (
-          <GitTabContent
+          <GitSection
             projectId={dbProject?.id || ''}
             gitUrl={dbProject?.gitUrl}
             gitConnected={dbProject?.gitConnected || false}

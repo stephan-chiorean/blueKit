@@ -35,7 +35,8 @@ export default function SidebarMenuItem({
             onClick={onClick}
             w="100%"
             py={2}
-            px={3}
+            pl={2}
+            pr={0}
             mb={0.5}
             borderRadius="md"
             bg={isActive ? activeBg : 'transparent'}
