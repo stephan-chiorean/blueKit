@@ -1,12 +1,9 @@
 /**
  * TakeawayItem component - Individual takeaway with checkbox for completion
  */
-import { HStack, Box, Text, Checkbox, Icon, IconButton } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
-import { LuLightbulb, LuTrash2 } from 'react-icons/lu';
+import { HStack, Box, Text, Icon, IconButton, Flex } from '@chakra-ui/react';
+import { LuCheck, LuLightbulb, LuTrash2 } from 'react-icons/lu';
 import type { Takeaway } from '@/types/walkthrough';
-
-const MotionBox = motion.create(Box);
 
 interface TakeawayItemProps {
     takeaway: Takeaway;
@@ -22,95 +19,94 @@ export default function TakeawayItem({
     showDelete = false,
 }: TakeawayItemProps) {
     return (
-        <MotionBox
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.2 }}
-            role="group"
-        >
-            <HStack
-                gap={3}
-                p={3}
-                borderRadius="12px"
-                bg={takeaway.completed ? 'green.50' : 'bg.subtle'}
-                borderWidth="1px"
-                borderColor={takeaway.completed ? 'green.200' : 'border.subtle'}
-                _dark={{
-                    bg: takeaway.completed ? 'green.900/20' : 'bg.subtle',
-                    borderColor: takeaway.completed ? 'green.700/50' : 'border.subtle',
-                }}
+        <Box role="group">
+            <Box
+                px={3}
+                py={2}
+                bg={takeaway.completed ? 'green.50' : 'transparent'}
+                borderWidth={takeaway.completed ? '1px' : '0px'}
+                borderColor={takeaway.completed ? 'green.200' : 'transparent'}
                 cursor="pointer"
                 onClick={() => onToggle(takeaway.id)}
-                transition="all 0.2s ease"
-                _hover={{
-                    borderColor: takeaway.completed ? 'green.300' : 'orange.300',
-                    transform: 'translateX(2px)',
+                css={{
+                    borderRadius: '12px',
+                    transition: 'all 0.15s ease',
                     _dark: {
-                        borderColor: takeaway.completed ? 'green.600' : 'orange.600',
+                        bg: takeaway.completed ? 'green.950/30' : 'transparent',
+                        borderColor: takeaway.completed ? 'green.800/50' : 'transparent',
+                    },
+                    _hover: {
+                        bg: takeaway.completed ? 'rgba(var(--chakra-colors-green-500) / 0.12)' : 'rgba(128, 128, 128, 0.05)',
                     },
                 }}
             >
-                <Checkbox.Root
-                    checked={takeaway.completed}
-                    onCheckedChange={() => onToggle(takeaway.id)}
-                    colorPalette="green"
-                >
-                    <Checkbox.HiddenInput />
-                    <Checkbox.Control
-                        cursor="pointer"
-                        borderRadius="6px"
-                        css={{
-                            transition: 'all 0.2s ease',
-                            borderWidth: '2px',
-                        }}
-                    >
-                        <Checkbox.Indicator />
-                    </Checkbox.Control>
-                </Checkbox.Root>
+                <Flex justify="space-between" align="center" gap={2}>
+                    <HStack gap={3} flex="1" minW={0}>
+                        {/* Milestone-style marker (no checkbox) */}
+                        <Box
+                            w="22px"
+                            h="22px"
+                            borderRadius="full"
+                            display="grid"
+                            placeItems="center"
+                            flexShrink={0}
+                            bg={takeaway.completed ? 'green.500' : 'transparent'}
+                            borderWidth="2px"
+                            borderColor={takeaway.completed ? 'green.500' : 'orange.300'}
+                            _dark={{
+                                bg: takeaway.completed ? 'green.400' : 'transparent',
+                                borderColor: takeaway.completed ? 'green.400' : 'orange.600',
+                            }}
+                        >
+                            {takeaway.completed ? (
+                                <Icon boxSize={3.5} color="white">
+                                    <LuCheck />
+                                </Icon>
+                            ) : (
+                                <Icon boxSize={3.5} color="orange.500" _dark={{ color: 'orange.400' }}>
+                                    <LuLightbulb />
+                                </Icon>
+                            )}
+                        </Box>
 
-                <Icon
-                    boxSize={4}
-                    color={takeaway.completed ? 'green.500' : 'orange.500'}
-                    opacity={takeaway.completed ? 0.6 : 1}
-                >
-                    <LuLightbulb />
-                </Icon>
+                        <Text
+                            flex="1"
+                            minW={0}
+                            fontSize="sm"
+                            textDecoration={takeaway.completed ? 'line-through' : 'none'}
+                            color={takeaway.completed ? 'text.tertiary' : 'text.primary'}
+                            transition="all 0.2s ease-in-out"
+                            noOfLines={2}
+                        >
+                            {takeaway.title}
+                        </Text>
+                    </HStack>
 
-                <Text
-                    flex="1"
-                    fontSize="sm"
-                    fontWeight="medium"
-                    textDecoration={takeaway.completed ? 'line-through' : 'none'}
-                    color={takeaway.completed ? 'text.tertiary' : 'text.primary'}
-                >
-                    {takeaway.title}
-                </Text>
-
-                {showDelete && onDelete && (
-                    <IconButton
-                        aria-label="Delete takeaway"
-                        variant="ghost"
-                        size="xs"
-                        colorPalette="red"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(takeaway.id);
-                        }}
-                        css={{
-                            opacity: 0,
-                            transition: 'opacity 0.15s ease',
-                            '[role="group"]:hover &': {
-                                opacity: 1,
-                            },
-                        }}
-                    >
-                        <Icon>
-                            <LuTrash2 />
-                        </Icon>
-                    </IconButton>
-                )}
-            </HStack>
-        </MotionBox>
+                    {showDelete && onDelete && (
+                        <IconButton
+                            aria-label="Delete takeaway"
+                            variant="ghost"
+                            size="xs"
+                            colorPalette="red"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(takeaway.id);
+                            }}
+                            css={{
+                                opacity: 0,
+                                transition: 'opacity 0.15s ease',
+                                '[role="group"]:hover &': {
+                                    opacity: 1,
+                                },
+                            }}
+                        >
+                            <Icon>
+                                <LuTrash2 />
+                            </Icon>
+                        </IconButton>
+                    )}
+                </Flex>
+            </Box>
+        </Box>
     );
 }

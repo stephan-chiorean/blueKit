@@ -32,62 +32,61 @@ export default function BrowserTab({
   const colors = getTabColors(colorMode);
 
   return (
-    <Box
+    <Flex
+      onClick={onSelect}
+      alignItems="center"
+      w={TAB_SPECS.tabWidth}
+      minW={TAB_SPECS.tabMinWidth}
+      maxW={TAB_SPECS.tabMaxWidth}
+      flex="1 1 auto"
+      px={1}
+      py={1}
+      borderTopLeftRadius={TAB_SPECS.borderRadius}
+      borderTopRightRadius={TAB_SPECS.borderRadius}
+      borderBottomLeftRadius={0}
+      borderBottomRightRadius={0}
+      bg={isSelected ? colors.selectedBg : colors.unselectedBg}
+      color={isSelected ? colors.selectedText : colors.unselectedText}
+      fontSize={TAB_SPECS.fontSize}
+      fontWeight={TAB_SPECS.fontWeight}
+      cursor="pointer"
       position="relative"
-      h="100%"
-      display="flex"
-      alignItems="flex-end"
+      zIndex={isSelected ? 2 : 1}
+      marginBottom="0px"
+      outline="none"
+      role="tab"
+      tabIndex={0}
+      aria-selected={isSelected}
+      borderTop={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+      borderLeft={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+      borderRight={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
+      borderBottom={`1px solid ${isSelected ? colors.selectedBg : colors.borderColor}`}
+      _focus={{
+        outline: 'none',
+        boxShadow: 'none',
+      }}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="tab-container"
     >
+      {/* Inner hover pill - only this gets background on hover */}
       <Flex
-        onClick={onSelect}
         alignItems="center"
         gap={TAB_SPECS.iconGap}
-        h={TAB_SPECS.tabHeight}
-        minW={TAB_SPECS.tabMinWidth}
-        maxW={TAB_SPECS.tabMaxWidth}
         px={TAB_SPECS.tabPaddingX}
         py={TAB_SPECS.tabPaddingY}
-        borderTopLeftRadius={TAB_SPECS.borderRadius}
-        borderTopRightRadius={TAB_SPECS.borderRadius}
-        borderBottomLeftRadius={0}
-        borderBottomRightRadius={0}
-        bg={isSelected ? colors.selectedBg : colors.unselectedBg}
-        color={isSelected ? colors.selectedText : colors.unselectedText}
-        fontSize={TAB_SPECS.fontSize}
-        fontWeight={TAB_SPECS.fontWeight}
-        cursor="pointer"
+        borderRadius="md"
         transition={`all ${TAB_SPECS.hoverTransition}`}
-        position="relative"
-        zIndex={isSelected ? 2 : 1}
-        marginBottom="0px"
-        outline="none"
-        role="tab"
-        tabIndex={0}
-        aria-selected={isSelected}
-        borderTop={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
-        borderLeft={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
-        borderRight={`1px solid ${isSelected ? colors.borderColor : 'transparent'}`}
-        borderBottom={`1px solid ${isSelected ? colors.selectedBg : colors.borderColor}`}
-        _hover={
-          isSelected
-            ? {}
-            : {
-              bg: colors.hoverBg,
-              color: colors.selectedText,
-            }
-        }
-        _focus={{
-          outline: 'none',
-          boxShadow: 'none',
-        }}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
+        bg="transparent"
+        flex={1}
+        minW={0}
+        _hover={isSelected ? {} : { bg: colors.hoverBg }}
+        className="tab-inner-hover"
       >
-
         {/* Tab Icon */}
         {tab.icon && (
           <Icon
@@ -95,25 +94,22 @@ export default function BrowserTab({
             boxSize={TAB_SPECS.iconSize}
             color={isSelected ? colors.iconSelected : colors.iconUnselected}
             flexShrink={0}
-            zIndex={2} // Ensure content is above borders
-            position="relative"
           />
         )}
 
-        {/* Tab Label */}
+        {/* Tab Label - takes remaining space, truncates */}
         <Text
           overflow="hidden"
           textOverflow="ellipsis"
           whiteSpace="nowrap"
           flex={1}
+          minW={0}
           textAlign="left"
-          zIndex={2}
-          position="relative"
         >
           {tab.label}
         </Text>
 
-        {/* Close Button */}
+        {/* Close Button - always in DOM, visible on hover or when selected */}
         {tab.closable && onClose && (
           <Box
             as="span"
@@ -123,21 +119,19 @@ export default function BrowserTab({
             w={TAB_SPECS.closeSize}
             h={TAB_SPECS.closeSize}
             borderRadius="sm"
-            ml={1}
+            flexShrink={0}
             opacity={isSelected ? 0.7 : 0}
             transition={`all ${TAB_SPECS.hoverTransition}`}
             _hover={{
               opacity: 1,
               bg: colors.closeHover,
             }}
-            zIndex={2}
-            position="relative"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onClose();
             }}
             css={{
-              '[data-parent]:hover &': {
+              '.tab-container:hover &': {
                 opacity: 0.5,
               },
             }}
@@ -146,8 +140,6 @@ export default function BrowserTab({
           </Box>
         )}
       </Flex>
-
-
-    </Box>
+    </Flex>
   );
 }

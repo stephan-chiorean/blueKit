@@ -147,10 +147,8 @@ export function ElegantList({
                             borderBottomWidth="1px"
                             borderColor={borderColor}
                             bg={isSelected ? selectedBg : "transparent"}
-                            transition="all 0.2s"
                             _hover={{
                                 bg: isSelected ? selectedBg : hoverBg,
-                                transform: "translateX(2px)",
                             }}
                             onClick={(e) => {
                                 onItemClick(item);

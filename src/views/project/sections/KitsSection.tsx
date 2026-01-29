@@ -59,7 +59,6 @@ function KitsSection({
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
-  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
@@ -130,13 +129,10 @@ function KitsSection({
   useEffect(() => {
     const loadFolders = async () => {
       try {
-        setIsFoldersLoading(true);
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'kits');
         setFolders(loadedFolders);
       } catch (err) {
         console.error('Failed to load folders:', err);
-      } finally {
-        setIsFoldersLoading(false);
       }
     };
 
@@ -338,72 +334,103 @@ function KitsSection({
     >
       <VStack align="stretch" gap={0} h="100%">
         {/* Toolkit Header */}
-        <ToolkitHeader title="Kits" />
+        <ToolkitHeader
+          title="Kits"
+          leftActions={
+            <HStack gap={1}>
+              {/* Filter Button */}
+              <Box position="relative">
+                <Button
+                  ref={kitsFilterButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  px={2}
+                  onClick={() => setIsKitsFilterOpen(!isKitsFilterOpen)}
+                  bg="transparent"
+                  _hover={{
+                    bg: 'bg.subtle',
+                  }}
+                  title="Filter kits"
+                >
+                  <Icon boxSize={4}>
+                    <LuFilter />
+                  </Icon>
+                </Button>
+                <FilterPanel
+                  isOpen={isKitsFilterOpen}
+                  onClose={() => setIsKitsFilterOpen(false)}
+                  nameFilter={nameFilter}
+                  onNameFilterChange={setNameFilter}
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  onToggleTag={toggleTag}
+                  filterButtonRef={kitsFilterButtonRef}
+                />
+              </Box>
+              {/* New Group Button */}
+              <CreateFolderPopover
+                isOpen={isCreateFolderOpen}
+                onOpenChange={setIsCreateFolderOpen}
+                onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    px={2}
+                    bg="transparent"
+                    _hover={{
+                      bg: 'bg.subtle',
+                    }}
+                    title="New group"
+                  >
+                    <Icon boxSize={4}>
+                      <LuFolderPlus />
+                    </Icon>
+                  </Button>
+                }
+              />
+            </HStack>
+          }
+        />
 
         {/* Scrollable Content Area */}
         <Box flex={1} overflowY="auto" p={6}>
-          {/* Folders Section - only show if folders exist or loading */}
-        {(folders.length > 0 || isFoldersLoading) && (
+          {/* Folders Section - only show if folders exist */}
+        {folders.length > 0 && (
           <Box position="relative">
-            <Flex align="center" justify="space-between" gap={2} mb={4}>
-              <Flex align="center" gap={2}>
-                <Heading size="md">Groups</Heading>
-                <Text fontSize="sm" color="text.muted">
-                  {folders.length}
-                </Text>
-                {/* New Folder Button with Spotlight Popover */}
-                <CreateFolderPopover
-                  isOpen={isCreateFolderOpen}
-                  onOpenChange={setIsCreateFolderOpen}
-                  onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
-                  trigger={
-                    <Button
-                      size="sm"
-                      colorPalette="blue"
-                      variant="subtle"
-                    >
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuFolderPlus />
-                        </Icon>
-                        <Text>New Group</Text>
-                      </HStack>
-                    </Button>
-                  }
-                />
-              </Flex>
+            <Flex align="center" gap={2} mb={4}>
+              <Heading size="md">Groups</Heading>
+              <Text fontSize="sm" color="text.muted">
+                {folders.length}
+              </Text>
             </Flex>
 
-            {isFoldersLoading ? (
-              <Box p={4}><Text>Loading groups...</Text></Box>
-            ) : (
-              <ElegantList
-                items={folders}
-                type="folder"
-                onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
-                renderActions={(item) => {
-                  const folder = item as ArtifactFolder;
-                  return (
-                    <>
-                      <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
-                        <HStack gap={2}>
-                          <Icon as={LuFolderPlus} /> <Text>Open</Text>
-                        </HStack>
-                      </Menu.Item>
-                      <Menu.Item
-                        value="delete-folder"
-                        color="fg.error"
-                        onClick={() => handleDeleteFolder(folder)}
-                      >
-                        <HStack gap={2}>
-                          <Icon as={LuFolderPlus} /> <Text>Delete</Text>
-                        </HStack>
-                      </Menu.Item>
-                    </>
-                  );
-                }}
-              />
-            )}
+            <ElegantList
+              items={folders}
+              type="folder"
+              onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+              renderActions={(item) => {
+                const folder = item as ArtifactFolder;
+                return (
+                  <>
+                    <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
+                      <HStack gap={2}>
+                        <Icon as={LuFolderPlus} /> <Text>Open</Text>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item
+                      value="delete-folder"
+                      color="fg.error"
+                      onClick={() => handleDeleteFolder(folder)}
+                    >
+                      <HStack gap={2}>
+                        <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                      </HStack>
+                    </Menu.Item>
+                  </>
+                );
+              }}
+            />
           </Box>
         )}
 
@@ -414,73 +441,9 @@ function KitsSection({
             <Text fontSize="sm" color="text.muted">
               {rootKits.length}
             </Text>
-            {/* Filter Button - always visible */}
-            <Box position="relative">
-              <Button
-                ref={kitsFilterButtonRef}
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsKitsFilterOpen(!isKitsFilterOpen)}
-                borderWidth="1px"
-                borderRadius="lg"
-                css={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  borderColor: 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                  transition: 'none',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                  },
-                }}
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                  {(nameFilter || selectedTags.length > 0) && (
-                    <Badge size="sm" colorPalette="primary" variant="solid">
-                      {[nameFilter && 1, selectedTags.length]
-                        .filter(Boolean)
-                        .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                    </Badge>
-                  )}
-                </HStack>
-              </Button>
-              <FilterPanel
-                isOpen={isKitsFilterOpen}
-                onClose={() => setIsKitsFilterOpen(false)}
-                nameFilter={nameFilter}
-                onNameFilterChange={setNameFilter}
-                allTags={allTags}
-                selectedTags={selectedTags}
-                onToggleTag={toggleTag}
-                filterButtonRef={kitsFilterButtonRef}
-              />
-            </Box>
-            {/* Show New Folder button if no folders exist */}
-            {folders.length === 0 && (
-              <Button
-                size="sm"
-                onClick={() => setIsCreateFolderOpen(true)}
-                colorPalette="blue"
-                variant="subtle"
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFolderPlus />
-                  </Icon>
-                  <Text>New Group</Text>
-                </HStack>
-              </Button>
-            )}
           </Flex>
 
-          {rootKits.length === 0 ? (
+          {rootKits.length === 0 && !kitsLoading && (nameFilter || selectedTags.length > 0) ? (
             <Box
               p={6}
               bg="bg.subtle"
@@ -490,12 +453,10 @@ function KitsSection({
               textAlign="center"
             >
               <Text color="text.muted" fontSize="sm">
-                {(nameFilter || selectedTags.length > 0)
-                  ? 'No kits match the current filters'
-                  : 'No kits at root level. All kits are organized in groups.'}
+                No kits match the current filters
               </Text>
             </Box>
-          ) : (
+          ) : rootKits.length > 0 ? (
             <ElegantList
               items={rootKits}
               type="kit"
@@ -509,7 +470,7 @@ function KitsSection({
                 </Menu.Item>
               )}
             />
-          )}
+          ) : null}
         </Box>
         </Box>
       </VStack>

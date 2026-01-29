@@ -1,6 +1,6 @@
 import { Fragment, ReactNode } from 'react';
 import { Box, Flex, IconButton, Icon } from '@chakra-ui/react';
-import { LuPanelLeft } from 'react-icons/lu';
+import { LuPanelLeft, LuPlus } from 'react-icons/lu';
 import BrowserTab, { Tab } from './BrowserTab';
 import TabDivider from './TabDivider';
 import { getTabColors, TAB_SPECS } from './tabStyles';
@@ -10,6 +10,7 @@ interface BrowserTabsProps {
   selectedId: string;
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
+  onAddTab?: () => void;
   colorMode: 'light' | 'dark';
   children?: ReactNode;
   onToggleSidebar?: () => void;
@@ -30,6 +31,7 @@ export default function BrowserTabs({
   selectedId,
   onSelect,
   onClose,
+  onAddTab,
   colorMode,
   children,
   onToggleSidebar,
@@ -118,6 +120,39 @@ export default function BrowserTabs({
             />
           </Fragment>
         ))}
+
+        {/* Add Tab Button */}
+        {onAddTab && (
+          <>
+            {/* Divider only shows if last tab is unselected */}
+            {tabs.length > 0 && tabs[tabs.length - 1].id !== selectedId && (
+              <TabDivider colorMode={colorMode} />
+            )}
+            <Box
+              h="100%"
+              display="flex"
+              alignItems="center"
+              borderBottom={`1px solid ${colors.borderColor}`}
+              px={1}
+            >
+              <IconButton
+                aria-label="New tab"
+                size="xs"
+                variant="ghost"
+                onClick={onAddTab}
+                color={colors.unselectedText}
+                _hover={{ bg: colors.hoverBg, color: colors.selectedText }}
+                w={TAB_SPECS.addButtonSize}
+                h={TAB_SPECS.addButtonSize}
+                minW={TAB_SPECS.addButtonSize}
+              >
+                <Icon fontSize="14px">
+                  <LuPlus />
+                </Icon>
+              </IconButton>
+            </Box>
+          </>
+        )}
 
         {/* End Spacer - fills remaining space with border */}
         <Box

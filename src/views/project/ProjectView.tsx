@@ -5,10 +5,11 @@ import {
   VStack,
   Splitter,
 } from '@chakra-ui/react';
-import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo } from 'react-icons/lu';
+import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo, LuLibrary, LuFolder } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import { toaster } from '@/shared/components/ui/toaster';
 import { listen } from '@tauri-apps/api/event';
+import path from 'path';
 import KitsSection from './sections/KitsSection';
 import WalkthroughsSection from './sections/WalkthroughsSection';
 import BlueprintsSection from './sections/BlueprintsSection';
@@ -26,7 +27,7 @@ import { ViewType } from './components/SidebarContent';
 import EmptyProjectState from '@/shared/components/EmptyProjectState';
 import ProjectsTabContent from '@/features/projects/components/ProjectsTabContent';
 import WorkflowsTabContent from '@/features/workflows/components/WorkflowsTabContent';
-import { BrowserTabs, Tab } from '@/tabs';
+import { BrowserTabs } from '@/tabs';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, TimeoutError, FileTreeNode } from '@/ipc';
 import { deleteResources } from '@/ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '@/ipc/walkthroughs';
@@ -36,6 +37,7 @@ import { useFeatureFlags } from '@/shared/contexts/FeatureFlagsContext';
 import { useProjectArtifacts } from '@/shared/contexts/ProjectArtifactsContext';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { SelectionProvider } from '@/shared/contexts/SelectionContext';
+import { useTabContext } from '@/app/TabContext';
 
 interface ProjectViewProps {
   project: Project;
@@ -56,80 +58,99 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
 
 
-  // Sidebar state
-  const [activeView, setActiveView] = useState<ViewType>(isVault ? 'projects' : 'file');
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
+  const { tabs, activeTabId, selectTab, closeTab, openInNewTab, openInCurrentTab, updateTabResource } = useTabContext();
+  const activeTab = useMemo(() => tabs.find(tab => tab.id === activeTabId), [tabs, activeTabId]);
 
-  // Browser tabs state - tracks open document tabs
-  const [openTabs, setOpenTabs] = useState<Tab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-
-  // Helper to get icon for a view/resource type
-  const getTabIcon = (type: string) => {
-    switch (type) {
-      case 'file':
-      case 'kit':
-        return LuFile;
+  const getTabIconComponent = useCallback((iconId?: string) => {
+    switch (iconId) {
+      case 'book':
       case 'walkthrough':
         return LuBookOpen;
+      case 'bot':
       case 'agent':
         return LuBot;
+      case 'palette':
       case 'diagram':
         return LuPalette;
+      case 'map':
       case 'plan':
+      case 'editor-plans':
         return LuMap;
+      case 'list':
       case 'task':
         return LuListTodo;
+      case 'stack':
       case 'blueprint':
         return BsStack;
+      case 'library':
+      case 'home':
+        return LuLibrary;
+      case 'folder':
+      case 'project':
+        return LuFolder;
+      case 'file':
+      case 'kit':
+      case 'scrapbook':
       default:
         return LuFile;
     }
-  };
-
-  // Add a new tab or switch to existing tab
-  const openTab = useCallback((id: string, label: string, type: string) => {
-    setOpenTabs(prev => {
-      const existingTab = prev.find(t => t.id === id);
-      if (existingTab) {
-        // Tab already exists, just switch to it
-        return prev;
-      }
-      // Add new tab
-      return [...prev, {
-        id,
-        label,
-        icon: getTabIcon(type),
-        closable: true,
-      }];
-    });
-    setActiveTabId(id);
   }, []);
 
-  // Close a tab
-  const closeTab = useCallback((tabId: string) => {
-    setOpenTabs(prev => {
-      const newTabs = prev.filter(t => t.id !== tabId);
-      // If closing active tab, switch to another tab or clear
-      if (activeTabId === tabId) {
-        if (newTabs.length > 0) {
-          // Find the index of the closed tab
-          const closedIndex = prev.findIndex(t => t.id === tabId);
-          // Switch to the tab before the closed one, or the first tab
-          const newActiveIndex = Math.max(0, closedIndex - 1);
-          setActiveTabId(newTabs[newActiveIndex]?.id || null);
-        } else {
-          setActiveTabId(null);
-        }
-      }
-      return newTabs;
-    });
-  }, [activeTabId]);
+  const getViewForTabType = useCallback((tabType?: string): ViewType => {
+    switch (tabType) {
+      case 'home':
+        return 'projects';
+      case 'project':
+        return isVault ? 'projects' : 'file';
+      case 'kit':
+        return 'kits';
+      case 'walkthrough':
+        return 'walkthroughs';
+      case 'plan':
+        return 'plans';
+      case 'diagram':
+        return 'diagrams';
+      case 'agent':
+        return 'agents';
+      case 'blueprint':
+        return 'blueprints';
+      case 'task':
+        return 'blueprints';
+      case 'scrapbook':
+        return 'scrapbook';
+      case 'file':
+        return 'file';
+      default:
+        return isVault ? 'projects' : 'file';
+    }
+  }, [isVault]);
 
-  // Handle tab selection - restore the associated view
-  const handleTabSelect = useCallback((tabId: string) => {
-    setActiveTabId(tabId);
+  const activeView: ViewType = activeTab?.resource.view ?? getViewForTabType(activeTab?.type);
+
+  const getTabLabel = useCallback((tab: { title?: string; resource?: { path?: string }; type?: string }) => {
+    if (tab.title) return tab.title;
+    if (tab.resource?.path) {
+      return path.basename(tab.resource.path).replace(/\.(md|mmd|mermaid)$/i, '');
+    }
+    return tab.type ?? 'Tab';
   }, []);
+
+  const browserTabs = useMemo(() => {
+    return tabs.map(tab => ({
+      id: tab.id,
+      label: getTabLabel(tab),
+      icon: getTabIconComponent(tab.icon || tab.type),
+      closable: tab.closable,
+    }));
+  }, [getTabIconComponent, getTabLabel, tabs]);
+
+  useEffect(() => {
+    if (!activeTabId || !activeTab) return;
+    if (activeTab.resource.view) return;
+    const defaultView = getViewForTabType(activeTab.type);
+    updateTabResource(activeTabId, { view: defaultView });
+  }, [activeTab, activeTabId, getViewForTabType, updateTabResource]);
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
   const SIDEBAR_STORAGE_KEY = 'bluekit-sidebar-width';
@@ -330,6 +351,142 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   const [resourceType, setResourceType] = useState<ResourceType | null>(null);
   const [notebookFile, setNotebookFile] = useState<{ resource: ResourceFile; content: string } | null>(null);
 
+  useEffect(() => {
+    let isActive = true;
+
+    const resetResourceState = () => {
+      setViewingResource(null);
+      setResourceContent(null);
+      setResourceType(null);
+      setNotebookFile(null);
+    };
+
+    const loadResourceFromTab = async () => {
+      if (!activeTab || activeTab.type === 'project' || activeTab.type === 'home') {
+        resetResourceState();
+        return;
+      }
+
+      const tabType = activeTab.type as ResourceType;
+      const tabPath = activeTab.resource.path;
+      const tabTitle = activeTab.title || (tabPath ? path.basename(tabPath).replace(/\.(md|mmd|mermaid)$/i, '') : 'Untitled');
+
+      if (tabType === 'file') {
+        if (!tabPath) {
+          resetResourceState();
+          return;
+        }
+        const fileResource: ResourceFile = {
+          name: tabTitle,
+          path: tabPath,
+          resourceType: 'file',
+          frontMatter: { type: 'file', alias: tabTitle },
+        };
+        setNotebookFile({
+          resource: fileResource,
+          content: '',
+        });
+        try {
+          const content = await invokeReadFile(tabPath);
+          if (!isActive) return;
+          setNotebookFile({
+            resource: fileResource,
+            content,
+          });
+          setViewingResource(null);
+          setResourceType(null);
+          setResourceContent(null);
+        } catch (error) {
+          if (!isActive) return;
+          resetResourceState();
+        }
+        return;
+      }
+
+      const resource: ResourceFile & { id?: string } = {
+        name: tabTitle,
+        path: tabPath || '',
+        resourceType: tabType,
+        frontMatter: {
+          type: tabType,
+          alias: tabTitle,
+          id: activeTab.resource.planId || activeTab.resource.walkthroughId,
+        },
+      };
+
+      if (tabType === 'plan' && activeTab.resource.planId) {
+        resource.id = activeTab.resource.planId;
+        if (!isActive) return;
+        setViewingResource(resource);
+        setResourceType('plan');
+        setResourceContent('');
+        setNotebookFile(null);
+        return;
+      }
+
+      if (tabType === 'walkthrough' && activeTab.resource.walkthroughId) {
+        resource.id = activeTab.resource.walkthroughId;
+        if (!isActive) return;
+        setViewingResource(resource);
+        setResourceType('walkthrough');
+        setResourceContent('');
+        setNotebookFile(null);
+        return;
+      }
+
+      if (tabType === 'task') {
+        const blueprintPath = activeTab.resource.blueprintPath;
+        const taskFile = activeTab.resource.taskFile;
+        if (!blueprintPath || !taskFile) {
+          if (!isActive) return;
+          resetResourceState();
+          return;
+        }
+        try {
+          const content = await invokeGetBlueprintTaskFile(blueprintPath, taskFile);
+          if (!isActive) return;
+          setViewingResource(resource);
+          setResourceType('task');
+          setResourceContent(content);
+          setNotebookFile(null);
+        } catch (error) {
+          if (!isActive) return;
+          setViewingResource(resource);
+          setResourceType('task');
+          setResourceContent('');
+          setNotebookFile(null);
+        }
+        return;
+      }
+
+      if (!tabPath) {
+        resetResourceState();
+        return;
+      }
+
+      try {
+        const content = await invokeReadFile(tabPath);
+        if (!isActive) return;
+        setViewingResource(resource);
+        setResourceType(tabType);
+        setResourceContent(content);
+        setNotebookFile(null);
+      } catch (error) {
+        if (!isActive) return;
+        setViewingResource(resource);
+        setResourceType(tabType);
+        setResourceContent('');
+        setNotebookFile(null);
+      }
+    };
+
+    loadResourceFromTab();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeTab]);
+
   // Track if current file is newly created (to open in edit mode)
   const [isNewFile, setIsNewFile] = useState(false);
 
@@ -409,15 +566,15 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   // Handle restricted views
   useEffect(() => {
     if (activeView === 'blueprints' && !flags.blueprints) {
-      setActiveView('tasks');
+      if (activeTabId) updateTabResource(activeTabId, { view: 'tasks' });
     } else if (activeView === 'scrapbook' && !flags.scrapbook) {
-      setActiveView('tasks');
+      if (activeTabId) updateTabResource(activeTabId, { view: 'tasks' });
     } else if (activeView === 'agents' && !flags.agents) {
-      setActiveView('tasks');
+      if (activeTabId) updateTabResource(activeTabId, { view: 'tasks' });
     } else if (activeView === 'diagrams' && !flags.diagrams) {
-      setActiveView('tasks');
+      if (activeTabId) updateTabResource(activeTabId, { view: 'tasks' });
     }
-  }, [activeView, flags.blueprints, flags.scrapbook, flags.agents, flags.diagrams]);
+  }, [activeTabId, activeView, flags.blueprints, flags.scrapbook, flags.agents, flags.diagrams, updateTabResource]);
 
   // Load all artifacts from this project
   // This loads EVERYTHING from .bluekit/ (kits, walkthroughs, agents, diagrams, etc.)
@@ -431,8 +588,11 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     lastLoadTimestampRef.current = now;
 
     try {
-      // Only show loading on initial load
-      setArtifactsLoading(true);
+      // Only show loading if we have no artifacts yet (true initial load)
+      // When switching projects, keep showing old artifacts until new ones load
+      if (artifacts.length === 0) {
+        setArtifactsLoading(true);
+      }
       setError(null);
 
       const projectArtifacts = await invokeGetProjectArtifacts(project.path);
@@ -541,6 +701,11 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   };
 
   useEffect(() => {
+    // Clear old artifacts immediately when project changes to avoid showing wrong data
+    // This creates a brief empty state, but we've optimized sections to handle this gracefully
+    setArtifacts([]);
+    setError(null);
+
     // Load artifacts on mount (direct call, no debounce)
     loadProjectArtifacts();
 
@@ -717,135 +882,128 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     );
   }, [deferredArtifacts]);
 
-  // Generic handler to view any resource type
-  const handleViewResource = async (resource: ResourceFile, type: ResourceType) => {
-    try {
-      const content = await invokeReadFile(resource.path);
-      setViewingResource(resource);
-      setResourceContent(content);
-      setResourceType(type);
-      // Open a tab for this resource
-      const label = resource.frontMatter?.alias || resource.name;
-      openTab(resource.path, label, type);
-    } catch (error) {
-      // Failed to load resource content
-    }
-  };
-
-  // Convenience handlers for different resource types (backwards compatibility)
-  const handleViewKit = async (artifact: ArtifactFile) => {
-    await handleViewResource(artifact, (artifact.frontMatter?.type as ResourceType) || 'kit');
-  };
-
-  const handleViewDiagram = async (diagram: ArtifactFile) => {
-    await handleViewResource(diagram, 'diagram');
-  };
-
-  const handleViewTask = async (blueprintPath: string, taskFile: string, taskDescription: string) => {
-    try {
-      const content = await invokeGetBlueprintTaskFile(blueprintPath, taskFile);
-      const taskPath = `${blueprintPath}/${taskFile}`;
-
-      // Create a ResourceFile object for the task
-      const taskResource: ResourceFile = {
-        name: taskFile.replace('.md', ''),
-        path: taskPath,
-        frontMatter: {
-          alias: taskDescription,
-          type: 'task',
-        },
-        resourceType: 'task',
-      };
-
-      setViewingResource(taskResource);
-      setResourceContent(content);
-      setResourceType('task');
-      // Open a tab for this task
-      openTab(taskPath, taskDescription || taskFile.replace('.md', ''), 'task');
-    } catch (error) {
-      // Failed to load task content
-    }
-  };
-
-  const handleViewPlan = async (plan: Plan) => {
-    // Create a ResourceFile object for the plan
-    const planResource: ResourceFile & { id?: string } = {
-      id: plan.id, // Add plan ID to resource
-      name: plan.name,
-      path: plan.folderPath,
-      frontMatter: {
-        id: plan.id, // Also add to frontMatter for fallback
-        alias: plan.name,
-        type: 'plan',
-        description: plan.description,
+  const handleViewKit = useCallback((artifact: ArtifactFile) => {
+    const resourceType = (artifact.frontMatter?.type as ResourceType) || 'kit';
+    const label = artifact.frontMatter?.alias || artifact.name;
+    openInNewTab(
+      {
+        type: resourceType,
+        path: artifact.path,
+        projectId: project.id,
+        view: getViewForTabType(resourceType),
       },
-      resourceType: 'plan',
-    };
+      { title: label }
+    );
+  }, [getViewForTabType, openInNewTab, project.id]);
 
-    // For now, set empty content - plan view will load its own data
-    setViewingResource(planResource);
-    setResourceContent(''); // Plan content is loaded separately
-    setResourceType('plan');
-    // Open a tab for this plan
-    openTab(plan.id, plan.name, 'plan');
-  };
+  const handleViewDiagram = useCallback((diagram: ArtifactFile) => {
+    const label = diagram.frontMatter?.alias || diagram.name;
+    openInNewTab(
+      {
+        type: 'diagram',
+        path: diagram.path,
+        projectId: project.id,
+        view: getViewForTabType('diagram'),
+      },
+      { title: label }
+    );
+  }, [getViewForTabType, openInNewTab, project.id]);
 
-  const handleViewWalkthrough = async (walkthrough: ArtifactFile) => {
+  const handleViewTask = useCallback((blueprintPath: string, taskFile: string, taskDescription: string) => {
+    const taskPath = `${blueprintPath}/${taskFile}`;
+    openInNewTab(
+      {
+        type: 'task',
+        path: taskPath,
+        projectId: project.id,
+        view: getViewForTabType('task'),
+        blueprintPath,
+        taskFile,
+      },
+      { title: taskDescription || taskFile.replace('.md', '') }
+    );
+  }, [getViewForTabType, openInNewTab, project.id]);
+
+  const handleViewPlan = useCallback((plan: Plan) => {
+    openInNewTab(
+      {
+        type: 'plan',
+        path: plan.folderPath,
+        projectId: project.id,
+        view: getViewForTabType('plan'),
+        planId: plan.id,
+      },
+      { title: plan.name }
+    );
+  }, [getViewForTabType, openInNewTab, project.id]);
+
+  const handleViewWalkthrough = useCallback(async (walkthrough: ArtifactFile) => {
     try {
-      // Get or create the walkthrough in DB (ensures file-based walkthroughs are synced)
       const walkthroughData = await invokeGetOrCreateWalkthroughByPath(
         project.id,
         walkthrough.path
       );
-
-      // Create a ResourceFile object with the DB ID
-      const walkthroughResource: ResourceFile & { id?: string } = {
-        id: walkthroughData.id,
-        name: walkthroughData.name,
-        path: walkthrough.path,
-        frontMatter: {
-          ...walkthrough.frontMatter,
-          id: walkthroughData.id, // Include ID in frontMatter for ResourceViewPage
+      const title = walkthroughData.name || walkthrough.frontMatter?.alias || walkthrough.name;
+      openInNewTab(
+        {
           type: 'walkthrough',
+          path: walkthrough.path,
+          projectId: project.id,
+          view: getViewForTabType('walkthrough'),
+          walkthroughId: walkthroughData.id,
         },
-        resourceType: 'walkthrough',
-      };
-
-      setViewingResource(walkthroughResource);
-      setResourceContent(''); // Walkthrough content is loaded by WalkthroughWorkspace
-      setResourceType('walkthrough');
-      // Open a tab for this walkthrough
-      openTab(walkthrough.path, walkthroughData.name || walkthrough.frontMatter?.alias || walkthrough.name, 'walkthrough');
+        { title }
+      );
     } catch (error) {
       console.error('Failed to load walkthrough:', error);
     }
-  };
+  }, [getViewForTabType, openInNewTab, project.id]);
 
-  // Handler to go back from resource view - wrapped in useCallback for stable reference
   const handleBackFromResourceView = useCallback(() => {
-    // Store resourceType before clearing it
-    const wasViewingPlan = resourceType === 'plan';
+    openInCurrentTab(
+      {
+        type: 'project',
+        projectId: project.id,
+        view: activeView,
+      },
+      { title: project.name }
+    );
+  }, [activeView, openInCurrentTab, project.id, project.name]);
 
-    // If returning from a plan view, set activeView to 'plans' to show PlansTabContent
-    if (wasViewingPlan) {
-      setActiveView('plans');
-      // Fallback refresh: reload plans when returning from plan view
-      // This ensures the list is updated even if onPlanDeleted callback wasn't triggered
-      loadPlans();
-    }
-
-    setViewingResource(null);
-    setResourceContent(null);
-    setResourceType(null);
-  }, [resourceType, loadPlans]);
-
-  // Handler to clear resource view
   const handleClearResourceView = useCallback(() => {
     setViewingResource(null);
     setResourceContent(null);
     setResourceType(null);
     setNotebookFile(null);
   }, []);
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    if (!activeTabId) return;
+    if (activeTab?.type && activeTab.type !== 'project' && activeTab.type !== 'home') {
+      openInCurrentTab(
+        {
+          type: 'project',
+          projectId: project.id,
+          view,
+        },
+        { title: project.name }
+      );
+      return;
+    }
+    updateTabResource(activeTabId, { view });
+    handleClearResourceView();
+  }, [activeTab?.type, activeTabId, handleClearResourceView, openInCurrentTab, project.id, project.name, updateTabResource]);
+
+  const handleOpenViewInNewTab = useCallback((view: ViewType) => {
+    openInNewTab(
+      {
+        type: 'project',
+        projectId: project.id,
+        view,
+      },
+      { title: project.name }
+    );
+  }, [openInNewTab, project.id, project.name]);
 
   // Finalize title edit: clear debounce timer, save content, and clear state
   // Note: File rename already happens in real-time via debounced handler
@@ -884,52 +1042,24 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         await finalizeTitleEdit();
         setIsNewFile(false);
       }
-
-      const content = await invokeReadFile(node.path);
       const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
-
-      // Set activeView to 'file' to indicate we're viewing a notebook file
-      setActiveView('file');
 
       // Get display label
       const label = node.frontMatter?.alias || node.name;
-
-      if (isDiagram) {
-        // Diagrams use existing ResourceViewPage flow for MermaidDiagramViewer
-        setViewingResource({
-          name: node.name,
+      const resourceType: ResourceType = isDiagram ? 'diagram' : 'file';
+      openInNewTab(
+        {
+          type: resourceType,
           path: node.path,
-          resourceType: 'diagram',
-          frontMatter: node.frontMatter
-        });
-        setResourceContent(content);
-        setResourceType('diagram');
-        setNotebookFile(null);
-        // Open a tab for this diagram
-        openTab(node.path, label, 'diagram');
-      } else {
-        // Markdown files render directly in content area
-        setNotebookFile({
-          resource: {
-            name: node.name,
-            path: node.path,
-            resourceType: (node.artifactType as ResourceType) || 'file',
-            frontMatter: node.frontMatter
-          },
-          content
-        });
-        // Clear the main resource view if any
-        setViewingResource(null);
-        setResourceContent(null);
-        setResourceType(null);
-        // Open a tab for this file
-        const type = node.artifactType || 'file';
-        openTab(node.path, label, type);
-      }
+          projectId: project.id,
+          view: getViewForTabType(resourceType),
+        },
+        { title: label }
+      );
     } catch (e) {
-      console.error("Failed to read file", e);
+      console.error("Failed to open file", e);
     }
-  }, [titleEditPath, finalizeTitleEdit, openTab]);
+  }, [finalizeTitleEdit, getViewForTabType, openInNewTab, project.id, titleEditPath]);
 
   // Handler for when a new file is created in NotebookTree
   // Opens the file immediately in edit mode with title sync enabled
@@ -963,22 +1093,20 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
             ? 'walkthrough'
             : undefined;
 
-      if (resourceType === 'plan' || resourceType === 'walkthrough' || resourceContent) {
-        const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
-        return (
-          <Box h="100%" minH={0} overflow="hidden">
-            <ResourceViewPage
-              resource={viewingResource}
-              resourceContent={resourceContent || ''}
-              resourceType={resourceType}
-              viewMode={viewMode}
-              onBack={handleBackFromResourceView}
-              onPlanDeleted={planDeletedCallback}
-              contained
-            />
-          </Box>
-        );
-      }
+      const planDeletedCallback = resourceType === 'plan' ? handlePlanDeleted : undefined;
+      return (
+        <Box h="100%" minH={0} overflow="hidden">
+          <ResourceViewPage
+            resource={viewingResource}
+            resourceContent={resourceContent || ''}
+            resourceType={resourceType}
+            viewMode={viewMode}
+            onBack={handleBackFromResourceView}
+            onPlanDeleted={planDeletedCallback}
+            contained
+          />
+        </Box>
+      );
     }
 
     // If a notebook file is selected, show it directly (activeView='file' should be set)
@@ -1027,6 +1155,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                           path: newPath,
                         }
                       } : null);
+                      if (activeTabId) {
+                        updateTabResource(activeTabId, { path: newPath }, { title: sanitizedTitle });
+                      }
                       // Refresh tree
                       handleTreeRefresh();
                     } catch (error) {
@@ -1047,6 +1178,13 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               resource: newResource,
               content: newContent,
             });
+            if (activeTabId) {
+              updateTabResource(
+                activeTabId,
+                { path: newResource.path },
+                { title: newResource.frontMatter?.alias || newResource.name }
+              );
+            }
           }}
         />
       );
@@ -1280,13 +1418,14 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 pointerEvents: splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1 ? 'none' : 'auto',
               }}
             >
-              <ProjectSidebar
+                <ProjectSidebar
                 project={project}
                 allProjects={allProjects}
                 activeView={activeView}
                 onBack={onBack}
                 onProjectSelect={onProjectSelect}
-                onViewChange={setActiveView}
+                onViewChange={handleViewChange}
+                onOpenViewInNewTab={handleOpenViewInNewTab}
                 isWorktreeView={isWorktreeView}
                 projectPath={project.path}
                 onFileSelect={handleFileSelect}
@@ -1402,10 +1541,11 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 p={0}
               >
                 <BrowserTabs
-                  tabs={openTabs}
-                  selectedId={activeTabId || openTabs[0]?.id || ''}
-                  onSelect={handleTabSelect}
+                  tabs={browserTabs}
+                  selectedId={activeTabId || browserTabs[0]?.id || ''}
+                  onSelect={selectTab}
                   onClose={closeTab}
+                  onAddTab={() => console.log('Add tab clicked - not implemented yet')}
                   colorMode={colorMode}
                   onToggleSidebar={toggleSidebar}
                   isSidebarCollapsed={splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1}

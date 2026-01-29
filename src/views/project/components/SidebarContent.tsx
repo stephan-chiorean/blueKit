@@ -17,7 +17,8 @@ import {
 } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs'; // For Blueprints
 import { useState, useCallback } from 'react';
-import { Menu, Portal, IconButton, HStack, Text, Tooltip } from '@chakra-ui/react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { Menu, Portal, IconButton, HStack, Text, Tooltip, Icon } from '@chakra-ui/react';
 import { invokeOpenProjectInEditor } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
 import SidebarSection from './SidebarSection';
@@ -46,6 +47,7 @@ export type ViewType =
 interface SidebarContentProps {
     activeView: ViewType;
     onViewChange: (view: ViewType) => void;
+    onOpenViewInNewTab?: (view: ViewType) => void;
     collapsed?: boolean;
     projectPath?: string;
     onFileSelect?: (node: FileTreeNode) => void;
@@ -66,6 +68,7 @@ interface SidebarContentProps {
 export default function SidebarContent({
     activeView,
     onViewChange,
+    onOpenViewInNewTab,
     collapsed = false,
     projectPath,
     onFileSelect,
@@ -85,6 +88,42 @@ export default function SidebarContent({
         onNewFile: (folderPath: string) => void;
         onNewFolder: (folderPath: string) => void;
     } | null>(null);
+    const [viewContextMenu, setViewContextMenu] = useState<{
+        isOpen: boolean;
+        x: number;
+        y: number;
+        view: ViewType | null;
+    }>({ isOpen: false, x: 0, y: 0, view: null });
+
+    const handleViewClick = useCallback((view: ViewType, event?: ReactMouseEvent) => {
+        if (event && (event.metaKey || event.ctrlKey)) {
+            onOpenViewInNewTab?.(view);
+            return;
+        }
+        onViewChange(view);
+    }, [onOpenViewInNewTab, onViewChange]);
+
+    const handleViewContextMenu = useCallback((event: ReactMouseEvent, view: ViewType) => {
+        if (!onOpenViewInNewTab) return;
+        event.preventDefault();
+        setViewContextMenu({
+            isOpen: true,
+            x: event.clientX,
+            y: event.clientY,
+            view,
+        });
+    }, [onOpenViewInNewTab]);
+
+    const closeViewContextMenu = useCallback(() => {
+        setViewContextMenu({ isOpen: false, x: 0, y: 0, view: null });
+    }, []);
+
+    const handleOpenViewInNewTab = useCallback(() => {
+        if (viewContextMenu.view) {
+            onOpenViewInNewTab?.(viewContextMenu.view);
+        }
+        closeViewContextMenu();
+    }, [closeViewContextMenu, onOpenViewInNewTab, viewContextMenu.view]);
 
     // Handle opening project in external editor
     const handleOpenInEditor = async (editor: 'cursor' | 'vscode' | 'antigravity') => {
@@ -304,21 +343,24 @@ export default function SidebarContent({
                             icon={LuFolder}
                             label="Projects"
                             isActive={activeView !== 'file' && activeView === 'projects'}
-                            onClick={() => onViewChange('projects')}
+                            onClick={(event) => handleViewClick('projects', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'projects')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuWorkflow}
                             label="Workflows"
                             isActive={activeView !== 'file' && activeView === 'workflows'}
-                            onClick={() => onViewChange('workflows')}
+                            onClick={(event) => handleViewClick('workflows', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'workflows')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuListTodo}
                             label="Tasks"
                             isActive={activeView !== 'file' && activeView === 'tasks'}
-                            onClick={() => onViewChange('tasks')}
+                            onClick={(event) => handleViewClick('tasks', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'tasks')}
                             collapsed={collapsed}
                         />
                     </>
@@ -328,28 +370,32 @@ export default function SidebarContent({
                             icon={LuListTodo}
                             label="Tasks"
                             isActive={activeView !== 'file' && activeView === 'tasks'}
-                            onClick={() => onViewChange('tasks')}
+                            onClick={(event) => handleViewClick('tasks', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'tasks')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuMap}
                             label="Plans"
                             isActive={activeView !== 'file' && activeView === 'plans'}
-                            onClick={() => onViewChange('plans')}
+                            onClick={(event) => handleViewClick('plans', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'plans')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuPackage}
                             label="Kits"
                             isActive={activeView !== 'file' && activeView === 'kits'}
-                            onClick={() => onViewChange('kits')}
+                            onClick={(event) => handleViewClick('kits', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'kits')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuBookOpen}
                             label="Walkthroughs"
                             isActive={activeView !== 'file' && activeView === 'walkthroughs'}
-                            onClick={() => onViewChange('walkthroughs')}
+                            onClick={(event) => handleViewClick('walkthroughs', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'walkthroughs')}
                             collapsed={collapsed}
                         />
                         {flags.diagrams && (
@@ -357,7 +403,8 @@ export default function SidebarContent({
                                 icon={LuNetwork}
                                 label="Diagrams"
                                 isActive={activeView !== 'file' && activeView === 'diagrams'}
-                                onClick={() => onViewChange('diagrams')}
+                                onClick={(event) => handleViewClick('diagrams', event)}
+                                onContextMenu={(event) => handleViewContextMenu(event, 'diagrams')}
                                 collapsed={collapsed}
                             />
                         )}
@@ -365,14 +412,16 @@ export default function SidebarContent({
                             icon={LuGitBranch}
                             label="Git"
                             isActive={activeView !== 'file' && activeView === 'git'}
-                            onClick={() => onViewChange('git')}
+                            onClick={(event) => handleViewClick('git', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'git')}
                             collapsed={collapsed}
                         />
                         <SidebarMenuItem
                             icon={LuBookmark}
                             label="Bookmarks"
                             isActive={activeView !== 'file' && activeView === 'bookmarks'}
-                            onClick={() => onViewChange('bookmarks')}
+                            onClick={(event) => handleViewClick('bookmarks', event)}
+                            onContextMenu={(event) => handleViewContextMenu(event, 'bookmarks')}
                             collapsed={collapsed}
                         />
                     </>
@@ -385,7 +434,8 @@ export default function SidebarContent({
                                 icon={LuNotebook}
                                 label="Scrapbook"
                                 isActive={activeView !== 'file' && activeView === 'scrapbook'}
-                                onClick={() => onViewChange('scrapbook')}
+                                onClick={(event) => handleViewClick('scrapbook', event)}
+                                onContextMenu={(event) => handleViewContextMenu(event, 'scrapbook')}
                             />
                         )}
                         {flags.blueprints && (
@@ -393,7 +443,8 @@ export default function SidebarContent({
                                 icon={BsStack}
                                 label="Blueprints"
                                 isActive={activeView !== 'file' && activeView === 'blueprints'}
-                                onClick={() => onViewChange('blueprints')}
+                                onClick={(event) => handleViewClick('blueprints', event)}
+                                onContextMenu={(event) => handleViewContextMenu(event, 'blueprints')}
                             />
                         )}
                         {flags.agents && (
@@ -401,7 +452,8 @@ export default function SidebarContent({
                                 icon={LuBot}
                                 label="Agents"
                                 isActive={activeView !== 'file' && activeView === 'agents'}
-                                onClick={() => onViewChange('agents')}
+                                onClick={(event) => handleViewClick('agents', event)}
+                                onContextMenu={(event) => handleViewContextMenu(event, 'agents')}
                             />
                         )}
                     </SidebarSection>
@@ -480,6 +532,60 @@ export default function SidebarContent({
                         />
                     </Box>
                 </SidebarSection>
+            )}
+
+            {/* View context menu */}
+            {viewContextMenu.isOpen && viewContextMenu.view && onOpenViewInNewTab && (
+                <Portal>
+                    <Menu.Root open={viewContextMenu.isOpen} onOpenChange={({ open }) => !open && closeViewContextMenu()}>
+                        <Menu.Positioner>
+                            <Menu.Content
+                                minW="200px"
+                                borderWidth="1px"
+                                borderRadius="lg"
+                                css={{
+                                    background: 'rgba(255, 255, 255, 0.7)',
+                                    backdropFilter: 'blur(20px) saturate(180%)',
+                                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                                    borderColor: 'rgba(0, 0, 0, 0.08)',
+                                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.12)',
+                                    _dark: {
+                                        background: 'rgba(20, 20, 25, 0.85)',
+                                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.35)',
+                                    },
+                                }}
+                                style={{
+                                    position: 'fixed',
+                                    left: `${viewContextMenu.x}px`,
+                                    top: `${viewContextMenu.y}px`,
+                                }}
+                            >
+                                <Menu.Item
+                                    value="open-new-tab"
+                                    onSelect={handleOpenViewInNewTab}
+                                    css={{
+                                        _hover: {
+                                            bg: 'rgba(0, 0, 0, 0.05)',
+                                        },
+                                        _dark: {
+                                            _hover: {
+                                                bg: 'rgba(255, 255, 255, 0.1)',
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <HStack gap={2} width="100%">
+                                        <Icon>
+                                            <LuExternalLink />
+                                        </Icon>
+                                        <Text fontSize="sm">Open in New Tab</Text>
+                                    </HStack>
+                                </Menu.Item>
+                            </Menu.Content>
+                        </Menu.Positioner>
+                    </Menu.Root>
+                </Portal>
             )}
         </Flex>
     );

@@ -50,15 +50,18 @@ export const getTabColors = (colorMode: 'light' | 'dark') => ({
 export const TAB_SPECS = {
   // Tab bar
   barHeight: '40px',
-  tabHeight: '34px',
   barPaddingX: 2, // Chakra spacing units
 
-  // Individual tab
-  tabMinWidth: '120px',
-  tabMaxWidth: '200px',
-  tabPaddingX: 3, // Chakra spacing units
-  tabPaddingY: 2,
+  // Individual tab - consistent sizing
+  tabWidth: '200px', // Default tab width
+  tabMinWidth: '100px', // Minimum when space is tight
+  tabMaxWidth: '240px', // Maximum tab width
+  tabPaddingX: 2, // Padding inside tab (Chakra units)
+  tabPaddingY: 1.5,
   borderRadius: '8px',
+
+  // Add tab button
+  addButtonSize: '28px',
 
   // Inverted corner
   cornerSize: 8, // pixels

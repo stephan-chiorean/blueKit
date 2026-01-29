@@ -46,122 +46,28 @@ Replace all user-facing occurrences of "Folder" with "Group" in the UI layer. Ba
 
 ## Files to Modify
 
-### 1. `src/components/kits/KitsTabContent.tsx`
+### 1. `src/views/project/sections/KitsSection.tsx`
 
-**Line 328:** Heading
-```tsx
-// Old:
-<Heading size="md">Folders</Heading>
+**Status:** ✅ ALREADY UPDATED
 
-// New:
-<Heading size="md">Groups</Heading>
-```
+The following changes have already been implemented:
+- Groups heading present
+- New Group button text updated
+- Toast messages use "Group renamed" and "Group deleted"
+- Empty state message removed (was "All kits are organized in groups")
+- Filter and New Group buttons moved to header as icon-only buttons
 
-**Line 333-351:** New Folder button
-```tsx
-// Old:
-<CreateFolderPopover
-  // ...
-  trigger={
-    <Button ...>
-      <HStack gap={2}>
-        <Icon><LuFolderPlus /></Icon>
-        <Text>New Folder</Text>
-      </HStack>
-    </Button>
-  }
-/>
+**No further changes needed** - this file is already compliant with Phase 4 goals.
 
-// New:
-<CreateFolderPopover
-  // ...
-  trigger={
-    <Button ...>
-      <HStack gap={2}>
-        <Icon><LuFolderPlus /></Icon>
-        <Text>New Group</Text>
-      </HStack>
-    </Button>
-  }
-/>
-```
+### 2. `src/views/project/sections/WalkthroughsSection.tsx`
 
-**Line 457-470:** New Folder button (no folders exist)
-```tsx
-// Old:
-<Text>New Folder</Text>
+**Apply same pattern as KitsSection:**
+- [ ] Heading: "Folders" → "Groups"
+- [ ] Button text: "New Folder" → "New Group"
+- [ ] Toast messages: "Group renamed" / "Group deleted"
+- [ ] Remove empty state: "All walkthroughs are organized in groups"
 
-// New:
-<Text>New Group</Text>
-```
-
-**Line 486:** Empty state message
-```tsx
-// Old:
-: 'No kits at root level. All kits are organized in folders.'
-
-// New:
-: 'No kits at root level. All kits are organized in groups.'
-```
-
-**Toast messages in handlers:**
-```tsx
-// handleRenameFolder (line 209-224)
-toaster.create({
-  type: 'success',
-  title: 'Group renamed',  // Changed
-  description: `Renamed to ${newName}`,
-});
-
-toaster.create({
-  type: 'error',
-  title: 'Failed to rename group',  // Changed
-  // ...
-});
-
-// handleDeleteFolder (line 239-255)
-toaster.create({
-  type: 'success',
-  title: 'Group deleted',  // Changed
-  description: `Deleted ${deletingFolder.name}`,
-});
-
-toaster.create({
-  type: 'error',
-  title: 'Failed to delete group',  // Changed
-  // ...
-});
-```
-
-### 2. `src/components/walkthroughs/WalkthroughsTabContent.tsx`
-
-**Same changes as KitsTabContent:**
-
-**Line 330:** Heading
-```tsx
-<Heading size="md">Groups</Heading>
-```
-
-**Line 382-401:** New Folder button
-```tsx
-<Text>New Group</Text>
-```
-
-**Line 424:** Empty state
-```tsx
-No groups yet. Create one to organize your walkthroughs.
-```
-
-**Line 469:** Root-level message
-```tsx
-: 'No walkthroughs at root level. All walkthroughs are organized in groups.'
-```
-
-**Toast messages (lines 188-234):**
-- "Group renamed" / "Failed to rename group"
-- "Group deleted" / "Failed to delete group"
-
-### 3. `src/components/shared/CreateFolderPopover.tsx`
+### 3. `src/shared/components/CreateFolderPopover.tsx`
 
 **Dialog title and labels:**
 ```tsx
@@ -184,69 +90,56 @@ No groups yet. Create one to organize your walkthroughs.
 </Button>
 ```
 
-### 4. `src/components/shared/DeleteFolderDialog.tsx`
+### 4. `src/shared/components/DeleteFolderDialog.tsx`
 
 **Update dialog text:**
-```tsx
-// Title:
-<DialogHeader>Delete Group</DialogHeader>
+- [ ] Title: "Delete Folder" → "Delete Group"
+- [ ] Body text: "delete the group" and "delete the group and all its contents"
+- [ ] Button: "Delete Folder" → "Delete Group"
 
-// Body text:
-<DialogBody>
-  <Text>
-    Are you sure you want to delete the group "{folder?.name}"?
-    This will permanently delete the group and all its contents.
-  </Text>
-</DialogBody>
+### 5. `src/shared/components/FolderView.tsx`
 
-// Buttons:
-<Button variant="outline" onClick={onClose}>
-  Cancel
-</Button>
-<Button colorPalette="red" onClick={handleConfirm}>
-  Delete Group
-</Button>
-```
+**Check for any folder-related text in the folder detail view**
+- [ ] Breadcrumbs or titles mentioning "folder"
+- [ ] Action buttons or menus
 
-### 5. `src/components/shared/SimpleFolderCard.tsx`
-
-**Rename action tooltip/label:**
-```tsx
-// In popover menu:
-<MenuItem onClick={() => setIsRenameOpen(true)}>
-  Rename Group
-</MenuItem>
-
-<MenuItem onClick={onDeleteFolder}>
-  Delete Group
-</MenuItem>
-```
-
-**Component display name (optional):**
-```tsx
-SimpleFolderCard.displayName = 'SimpleFolderCard';
-// Keep as-is (internal name) or change to SimpleGroupCard
-```
-
-### 6. `src/components/shared/ResourceSelectionBar.tsx`
+### 6. `src/shared/components/ResourceSelectionBar.tsx`
 
 **If it has folder-related actions:**
-```tsx
-// Move to Folder → Move to Group
-<Button onClick={() => setIsMoveModalOpen(true)}>
-  Move to Group
-</Button>
+- [ ] "Move to Folder" → "Move to Group"
+- [ ] Modal title if applicable
 
-// Modal title:
-<DialogHeader>Move to Group</DialogHeader>
-```
-
-### 7. `src/components/diagrams/DiagramsTabContent.tsx`
+### 7. `src/features/diagrams/components/DiagramsTabContent.tsx`
 
 **Apply same pattern if it uses folders:**
-- "Folders" → "Groups"
-- "New Folder" → "New Group"
-- Toast messages updated
+- [ ] "Folders" → "Groups"
+- [ ] "New Folder" → "New Group"
+- [ ] Toast messages updated
+
+## Critical: Preserve Cross-Project Caching
+
+**DO NOT MODIFY** the following files during this refactor:
+- `src/app/TabContent.tsx` - Contains project registry caching logic
+- `src/app/TabContext.tsx` - Tab state management
+- `src/views/project/ProjectView.tsx` - Artifact loading optimization
+
+These files implement performance-critical caching that enables smooth tab switching between projects. The refactor is **purely cosmetic** and should only touch:
+- UI string literals
+- JSX text content
+- Toast messages
+- Dialog titles
+
+**Architecture to preserve:**
+1. **Project registry caching** (TabContent.tsx) - Cache-first lookup prevents redundant API calls
+2. **Optimistic artifact loading** (ProjectView.tsx) - Only shows loading on true initial load
+3. **Graceful empty states** - Sections handle transitions without flicker
+
+If you touch these files, you MUST:
+- Verify project registry cache (`projectsCache`) logic remains intact
+- Verify artifact loading optimization (`artifacts.length === 0` check) unchanged
+- Run cross-project tab switching tests to ensure no performance regression
+
+See `.bluekit/walkthroughs/cross-project-tab-switching-architecture.md` for details.
 
 ## Testing Checklist
 
@@ -267,13 +160,21 @@ SimpleFolderCard.displayName = 'SimpleFolderCard';
 
 ### Empty States
 - [ ] "No groups yet" message
-- [ ] "All kits are organized in groups" message
-- [ ] "All walkthroughs are organized in groups" message
+- [ ] "All kits are organized in groups" message (REMOVED - see note below)
+- [ ] "All walkthroughs are organized in groups" message (REMOVED - see note below)
+
+**Note:** The empty state messages "All X are organized in groups" have been removed as they add no value and create visual noise during tab switches. Only show "No kits/walkthroughs match the current filters" when filters are active.
 
 ### Consistency Check
 - [ ] No remaining "folder" text in UI
 - [ ] Backend code still uses "folder" (IPC unchanged)
 - [ ] File paths still use folder terminology
+
+### Performance Regression Testing
+- [ ] Tab switching between different projects is instant (<200ms)
+- [ ] No "Loading project..." flash when switching to cached projects
+- [ ] Artifact sections don't show flicker during project switches
+- [ ] Browser DevTools Network shows minimal API calls during tab switches
 
 ## Search & Replace Strategy
 
@@ -303,6 +204,9 @@ grep -r "Folder" src/components/
 - ✅ Dialog titles updated
 - ✅ Button labels updated
 - ✅ No broken functionality
+- ✅ **CRITICAL:** Cross-project tab switching performance unchanged (sub-200ms)
+- ✅ **CRITICAL:** Project registry caching still works (cache hits on repeated switches)
+- ✅ **CRITICAL:** No loading flicker when switching between cached projects
 
 ## Dependencies
 **Before:** Phase 3 (animations)
@@ -332,3 +236,27 @@ Keep `LuFolderPlus` icon despite name change:
 - `LuFolders` - multiple folders (group concept)
 
 **Recommendation:** Keep `LuFolderPlus` for familiarity
+
+## Implementation Strategy
+
+### Phase 4A: Remaining UI Updates (KitsSection ✅ Already Done)
+1. Update WalkthroughsSection.tsx
+2. Update DiagramsTabContent.tsx (if applicable)
+3. Update shared components (CreateFolderPopover, DeleteFolderDialog)
+4. Update ResourceSelectionBar (if applicable)
+
+### Phase 4B: Verification
+1. Visual inspection of all tabs
+2. Test all folder→group operations (create, rename, delete)
+3. **Performance regression test**: Switch between projects rapidly, verify no loading flicker
+4. Check browser DevTools Network tab for cache hits
+
+### Key Principle
+**This is a find-and-replace operation on string literals only.** Do NOT:
+- Refactor component logic
+- Change state management
+- Modify data loading code
+- Touch TabContent.tsx or ProjectView.tsx
+- Rename internal types or functions
+
+The goal is 100% cosmetic UI change with 0% behavior change.

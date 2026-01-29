@@ -304,6 +304,16 @@ export function ResourceMarkdownContent({
         '& li': {
           mb: 2,
         },
+        // Task list items (checkboxes) - remove bullet/number
+        '& li:has(input[type="checkbox"])': {
+          listStyleType: 'none',
+          marginLeft: '-1.5em',
+        },
+        // Checkbox styling
+        '& input[type="checkbox"]': {
+          marginRight: '0.5em',
+          cursor: 'pointer',
+        },
         // Code blocks
         '& pre': {
           mb: 4,

@@ -148,6 +148,14 @@ export default function TaskDetailModal({
                       '& li': {
                         mb: 2,
                       },
+                      '& li:has(input[type="checkbox"])': {
+                        listStyleType: 'none',
+                        marginLeft: '-1.5em',
+                      },
+                      '& input[type="checkbox"]': {
+                        marginRight: '0.5em',
+                        cursor: 'pointer',
+                      },
                       '& pre': {
                         mb: 4,
                       },

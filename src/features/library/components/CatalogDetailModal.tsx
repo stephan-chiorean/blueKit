@@ -846,6 +846,8 @@ export function CatalogDetailModal({
                                                                             '& p': { lineHeight: '1.75', color: 'text.primary' },
                                                                             '& ul, & ol': { pl: 4, mb: 4 },
                                                                             '& li': { mb: 2 },
+                                                                            '& li:has(input[type="checkbox"])': { listStyleType: 'none', marginLeft: '-1.5em' },
+                                                                            '& input[type="checkbox"]': { marginRight: '0.5em', cursor: 'pointer' },
                                                                             '& pre': { mb: 4 },
                                                                             '& code': { fontSize: '0.9em' },
                                                                             '& a': { color: 'primary.500', textDecoration: 'underline' },

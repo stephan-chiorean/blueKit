@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@chakra-ui/react';
 import WelcomeView from '@/views/home/WelcomeView';
-import HomeView from '@/views/home/HomeView';
-import ProjectView from '@/views/project/ProjectView';
-import EditorPlansPage from '@/pages/EditorPlansPage';
+import TabManager from '@/app/TabManager';
 import PreviewWindowPage from '@/pages/PreviewWindowPage';
 import WorktreeWindowPage from '@/pages/WorktreeWindowPage';
 import { SelectionProvider } from '@/shared/contexts/SelectionContext';
@@ -18,47 +16,21 @@ import { ProjectArtifactsProvider } from '@/shared/contexts/ProjectArtifactsCont
 import { QuickTaskPopoverProvider } from '@/shared/contexts/QuickTaskPopoverContext';
 import { GitHubIntegrationProvider } from '@/shared/contexts/GitHubIntegrationContext';
 import { SupabaseAuthProvider } from '@/shared/contexts/SupabaseAuthContext';
-import { Project } from '@/ipc';
 
 import DraggableNotepad from '@/features/workstation/components/DraggableNotepad';
 import { useNotepad } from '@/shared/contexts/NotepadContext';
 import GradientBackground from '@/shared/components/GradientBackground';
 
-type View = 'welcome' | 'home' | 'project-detail' | 'plans';
-
 function AppContent() {
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
-  const [currentView, setCurrentView] = useState<View>('welcome');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [plansSource, setPlansSource] = useState<'claude' | 'cursor' | null>(null);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // Check if this is a preview window
   const isPreviewWindow = window.location.pathname === '/preview';
   const isWorktreeWindow = window.location.pathname === '/worktree';
 
-  // Go directly to home - no auth required
   const handleGetStarted = () => {
-    setCurrentView('home');
-  };
-
-  const handleProjectSelect = (project: Project) => {
-    setSelectedProject(project);
-    setCurrentView('project-detail');
-  };
-
-  const handleBackToHome = () => {
-    setCurrentView('home');
-    setSelectedProject(null);
-  };
-
-  const handleNavigateToPlans = (source: 'claude' | 'cursor') => {
-    setPlansSource(source);
-    setCurrentView('plans');
-  };
-
-  const handleBackFromPlans = () => {
-    setCurrentView('home');
-    setPlansSource(null);
+    setShowWelcome(false);
   };
 
   // If this is a preview window, render only the preview page
@@ -108,26 +80,10 @@ function AppContent() {
               <SelectionProvider>
                 <GradientBackground />
                 <Box position="relative" zIndex={1}>
-                  {currentView === 'welcome' ? (
+                  {showWelcome ? (
                     <WelcomeView onGetStarted={handleGetStarted} />
-                  ) : currentView === 'project-detail' && selectedProject ? (
-                    <ProjectView
-                      project={{
-                        id: selectedProject.id,
-                        title: selectedProject.name,
-                        description: selectedProject.description || '',
-                        path: selectedProject.path,
-                      }}
-                      onBack={handleBackToHome}
-                      onProjectSelect={handleProjectSelect}
-                    />
-                  ) : currentView === 'plans' && plansSource ? (
-                    <EditorPlansPage
-                      plansSource={plansSource}
-                      onBack={handleBackFromPlans}
-                    />
                   ) : (
-                    <HomeView onProjectSelect={handleProjectSelect} onNavigateToPlans={handleNavigateToPlans} />
+                    <TabManager />
                   )}
 
                   <DraggableNotepad

@@ -1,12 +1,13 @@
 import { Box, HStack, Text, Icon, Badge } from '@chakra-ui/react';
-import { ElementType } from 'react';
+import type { ElementType, MouseEvent } from 'react';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 interface SidebarMenuItemProps {
     icon: ElementType;
     label: string;
     isActive?: boolean;
-    onClick: () => void;
+    onClick: (event: MouseEvent) => void;
+    onContextMenu?: (event: MouseEvent) => void;
     badge?: string | number;
     collapsed?: boolean;
 }
@@ -16,6 +17,7 @@ export default function SidebarMenuItem({
     label,
     isActive = false,
     onClick,
+    onContextMenu,
     badge,
     collapsed = false
 }: SidebarMenuItemProps) {
@@ -32,7 +34,8 @@ export default function SidebarMenuItem({
     return (
         <Box
             as="button"
-            onClick={onClick}
+            onClick={(event) => onClick(event)}
+            onContextMenu={onContextMenu}
             w="100%"
             py={2}
             pl={2}

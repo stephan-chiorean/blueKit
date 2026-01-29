@@ -44,6 +44,7 @@ interface ProjectSidebarProps {
   onBack: () => void;
   onProjectSelect?: (project: Project) => void;
   onViewChange: (view: ViewType) => void;
+  onOpenViewInNewTab?: (view: ViewType) => void;
   projectPath: string;
   onFileSelect: (node: FileTreeNode) => void;
   selectedFileId?: string;
@@ -70,6 +71,7 @@ export default function ProjectSidebar({
   onBack,
   onProjectSelect,
   onViewChange,
+  onOpenViewInNewTab,
   projectPath,
   onFileSelect,
   selectedFileId,
@@ -318,6 +320,7 @@ export default function ProjectSidebar({
         <SidebarContent
           activeView={activeView}
           onViewChange={handleViewChange}
+          onOpenViewInNewTab={onOpenViewInNewTab}
           projectPath={projectPath}
           onFileSelect={onFileSelect}
           selectedFileId={selectedFileId}

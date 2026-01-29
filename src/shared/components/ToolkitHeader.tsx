@@ -1,6 +1,7 @@
 import { Box, HStack, Icon, Button, Text } from '@chakra-ui/react';
 import { LuPlus } from 'react-icons/lu';
 import { IconType } from 'react-icons';
+import { ReactNode } from 'react';
 
 /**
  * Props for ToolkitHeader component
@@ -23,9 +24,11 @@ export interface ToolkitHeaderProps {
         /** Variant style: 'glass', 'solid', or 'icon' (new default mirroring NoteView) */
         variant?: 'glass' | 'solid' | 'icon';
     };
+    /** Optional left-side actions (custom buttons/elements) */
+    leftActions?: ReactNode;
 }
 
-export function ToolkitHeader({ title, parentName, action }: ToolkitHeaderProps) {
+export function ToolkitHeader({ title, parentName, action, leftActions }: ToolkitHeaderProps) {
     const ActionIcon = action?.icon || LuPlus;
 
     return (
@@ -38,8 +41,14 @@ export function ToolkitHeader({ title, parentName, action }: ToolkitHeaderProps)
             py={2}
         >
             <HStack justify="space-between" align="center" gap={4}>
-                {/* Left: Placeholder to balance layout */}
-                <Box w={action ? "auto" : 0} minW={action ? "40px" : 0} />
+                {/* Left: Custom actions or placeholder to balance layout */}
+                {leftActions ? (
+                    <HStack gap={2} minW="40px">
+                        {leftActions}
+                    </HStack>
+                ) : (
+                    <Box w={action ? "auto" : 0} minW={action ? "40px" : 0} />
+                )}
 
                 {/* Center: Breadcrumbs */}
                 <HStack
