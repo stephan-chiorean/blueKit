@@ -331,7 +331,7 @@ function WalkthroughsSection({
         {/* Scrollable Content Area */}
         <Box flex={1} overflowY="auto" p={6}>
           {/* Folders Section */}
-          <Box position="relative">
+          <Box position="relative" mb={8}>
             <Flex align="center" justify="space-between" gap={2} mb={4}>
               <Flex align="center" gap={2}>
                 <Heading size="md">Groups</Heading>

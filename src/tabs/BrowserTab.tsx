@@ -7,6 +7,7 @@ export interface Tab {
   id: string;
   label: string;
   icon?: React.ElementType;
+  iconColor?: string;
   closable?: boolean;
 }
 
@@ -92,7 +93,7 @@ export default function BrowserTab({
           <Icon
             as={tab.icon}
             boxSize={TAB_SPECS.iconSize}
-            color={isSelected ? colors.iconSelected : colors.iconUnselected}
+            color={tab.iconColor ? tab.iconColor : (isSelected ? colors.iconSelected : colors.iconUnselected)}
             flexShrink={0}
           />
         )}

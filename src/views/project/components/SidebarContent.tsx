@@ -45,7 +45,7 @@ export type ViewType =
     | 'file'; // When a file is selected in the tree
 
 interface SidebarContentProps {
-    activeView: ViewType;
+    activeView: ViewType | undefined;
     onViewChange: (view: ViewType) => void;
     onOpenViewInNewTab?: (view: ViewType) => void;
     collapsed?: boolean;
@@ -97,8 +97,11 @@ export default function SidebarContent({
 
     const handleViewClick = useCallback((view: ViewType, event?: ReactMouseEvent) => {
         if (event && (event.metaKey || event.ctrlKey)) {
-            onOpenViewInNewTab?.(view);
-            return;
+            // Cmd+Click = Open in new tab (if handler provided)
+            if (onOpenViewInNewTab) {
+                onOpenViewInNewTab(view);
+                return;
+            }
         }
         onViewChange(view);
     }, [onOpenViewInNewTab, onViewChange]);

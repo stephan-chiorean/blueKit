@@ -1,12 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import TabContent from './TabContent';
 import { TabProvider, useTabContext } from './TabContext';
 
 function TabPersistence() {
   const { tabs, activeTabId, saveTabs, loadTabs } = useTabContext();
 
+  const loadedRef = useRef(false);
+
   useEffect(() => {
-    loadTabs();
+    if (!loadedRef.current) {
+      loadTabs();
+      loadedRef.current = true;
+    }
   }, [loadTabs]);
 
   useEffect(() => {

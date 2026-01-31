@@ -4,6 +4,8 @@ import SidebarContent, { ViewType } from './components/SidebarContent';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { useSupabaseAuth } from '@/shared/contexts/SupabaseAuthContext';
 import { Project, FileTreeNode } from '@/ipc';
+import { useState } from 'react';
+import KeyboardShortcutsModal from '@/shared/components/KeyboardShortcutsModal';
 
 
 
@@ -40,7 +42,7 @@ const TooltipContent = ({ children, colorMode }: { children: React.ReactNode, co
 interface ProjectSidebarProps {
   project: Project;
   allProjects: Project[];
-  activeView: ViewType;
+  activeView: ViewType | undefined;
   onBack: () => void;
   onProjectSelect?: (project: Project) => void;
   onViewChange: (view: ViewType) => void;
@@ -88,6 +90,7 @@ export default function ProjectSidebar({
 }: ProjectSidebarProps) {
   const { colorMode, toggleColorMode } = useColorMode();
   const { user } = useSupabaseAuth();
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Handle opening project in external editor
 
@@ -439,6 +442,7 @@ export default function ProjectSidebar({
                       bg: colorMode === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.1)',
                       color: "text.primary"
                     }}
+                    onClick={() => setShowShortcuts(true)}
                   >
                     <Icon boxSize={4}>
                       <LuSettings />
@@ -451,6 +455,7 @@ export default function ProjectSidebar({
           </HStack>
         </Box>
       )}
+      <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </Flex>
   );
 }

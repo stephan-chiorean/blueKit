@@ -20,6 +20,7 @@ import { SupabaseAuthProvider } from '@/shared/contexts/SupabaseAuthContext';
 import DraggableNotepad from '@/features/workstation/components/DraggableNotepad';
 import { useNotepad } from '@/shared/contexts/NotepadContext';
 import GradientBackground from '@/shared/components/GradientBackground';
+import GlobalQuickTaskPopover from '@/features/tasks/components/GlobalQuickTaskPopover';
 
 function AppContent() {
   const { isOpen: isNotepadOpen, toggleNotepad } = useNotepad();
@@ -90,6 +91,8 @@ function AppContent() {
                     isOpen={isNotepadOpen}
                     onClose={toggleNotepad}
                   />
+
+                  <GlobalQuickTaskPopover />
                 </Box>
               </SelectionProvider>
             </ProjectArtifactsProvider>

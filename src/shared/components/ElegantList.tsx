@@ -9,7 +9,7 @@ import {
     Menu,
 } from "@chakra-ui/react";
 import { MdFolder, MdMoreVert } from "react-icons/md";
-import { LuFileText, LuBookOpen } from "react-icons/lu";
+import { LuFileText, LuBookOpen, LuPackage } from "react-icons/lu";
 import { ArtifactFile, ArtifactFolder } from "@/ipc";
 import { ReactNode } from "react";
 import { useColorMode } from "@/shared/contexts/ColorModeContext";
@@ -45,8 +45,8 @@ export function ElegantList({
     const selectedBg = colorMode === "light" ? "blue.50" : "blue.900/20";
     const borderColor = colorMode === "light" ? "border.subtle" : "whiteAlpha.100";
     const folderIconColor = colorMode === "light" ? "blue.500" : "blue.400";
-    const fileIconColor = colorMode === "light" ? "orange.500" : "orange.400";
-    const walkthroughIconColor = colorMode === "light" ? "purple.500" : "purple.400";
+    const fileIconColor = colorMode === "light" ? "blue.500" : "blue.400";
+    const walkthroughIconColor = colorMode === "light" ? "orange.500" : "orange.400";
 
     if (items.length === 0) {
         return null;
@@ -95,7 +95,7 @@ export function ElegantList({
                             ItemIcon = LuBookOpen;
                             itemIconColor = walkthroughIconColor;
                         } else {
-                            ItemIcon = LuFileText;
+                            ItemIcon = LuPackage;
                             itemIconColor = fileIconColor;
                         }
                     }

@@ -397,7 +397,7 @@ function KitsSection({
         <Box flex={1} overflowY="auto" p={6}>
           {/* Folders Section - only show if folders exist */}
         {folders.length > 0 && (
-          <Box position="relative">
+          <Box position="relative" mb={8}>
             <Flex align="center" gap={2} mb={4}>
               <Heading size="md">Groups</Heading>
               <Text fontSize="sm" color="text.muted">

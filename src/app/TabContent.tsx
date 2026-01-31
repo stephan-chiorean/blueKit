@@ -7,7 +7,7 @@ import { invokeGetProjectRegistry, Project } from '@/ipc';
 import { useTabContext } from './TabContext';
 
 export default function TabContent() {
-  const { tabs, activeTabId, openInNewTab, openInCurrentTab, selectTab, closeTab } = useTabContext();
+  const { tabs, activeTabId, openInNewTab, openInCurrentTab, closeTab, switchContext } = useTabContext();
   const activeTab = useMemo(() => tabs.find(tab => tab.id === activeTabId), [tabs, activeTabId]);
 
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -17,16 +17,18 @@ export default function TabContent() {
   // Cache project registry to avoid refetching on every tab switch
   const [projectsCache, setProjectsCache] = useState<Project[]>([]);
 
-  const openHomeTab = useCallback(() => {
-    const homeTab = tabs.find(tab => tab.type === 'home');
-    if (homeTab) {
-      selectTab(homeTab.id);
-      return;
-    }
-    openInNewTab({ type: 'home', view: 'projects' }, { title: 'Home', pinned: true, closable: false });
-  }, [openInNewTab, selectTab, tabs]);
+  const openLibraryTab = useCallback(() => {
+    // Switch to library context - loads tabs from disk and restores last active tab
+    switchContext('library');
+  }, [switchContext]);
 
   const handleProjectSelectNewTab = useCallback((project: Project) => {
+    console.log('[TabContent] handleProjectSelectNewTab called', {
+      projectId: project.id,
+      projectName: project.name,
+      isVault: project.isVault,
+      passedView: project.isVault ? 'projects' : 'file',
+    });
     openInNewTab(
       {
         type: 'project',
@@ -38,6 +40,12 @@ export default function TabContent() {
   }, [openInNewTab]);
 
   const handleProjectSelectCurrentTab = useCallback((project: Project) => {
+    console.log('[TabContent] handleProjectSelectCurrentTab called', {
+      projectId: project.id,
+      projectName: project.name,
+      isVault: project.isVault,
+      passedView: project.isVault ? 'projects' : 'file',
+    });
     openInCurrentTab(
       {
         type: 'project',
@@ -52,7 +60,7 @@ export default function TabContent() {
     let isActive = true;
 
     const loadProject = async () => {
-      if (!activeTab || activeTab.type === 'home' || activeTab.type === 'editor-plans') {
+      if (!activeTab || activeTab.type === 'library' || activeTab.type === 'editor-plans') {
         setActiveProject(null);
         setProjectError(null);
         setProjectLoading(false);
@@ -110,6 +118,7 @@ export default function TabContent() {
   }, [activeTab, projectsCache]);
 
   if (!activeTab) {
+    // This should never happen since we always create a new tab when closing the last one
     return null;
   }
 
@@ -123,7 +132,7 @@ export default function TabContent() {
     );
   }
 
-  if (activeTab.type === 'home') {
+  if (activeTab.type === 'library') {
     return (
       <HomeView onProjectSelect={handleProjectSelectNewTab} />
     );
@@ -145,8 +154,8 @@ export default function TabContent() {
             {projectError ?? 'Unable to load project.'}
           </Text>
           <HStack>
-            <Button size="sm" variant="ghost" onClick={openHomeTab}>
-              Go to Home
+            <Button size="sm" variant="ghost" onClick={openLibraryTab}>
+              Go to Library
             </Button>
             <Button size="sm" variant="outline" onClick={() => closeTab(activeTab.id)}>
               Close Tab
@@ -161,7 +170,7 @@ export default function TabContent() {
     <Box h="100%">
       <ProjectView
         project={activeProject}
-        onBack={openHomeTab}
+        onBack={openLibraryTab}
         onProjectSelect={handleProjectSelectCurrentTab}
         isVault={!!activeProject.isVault}
       />

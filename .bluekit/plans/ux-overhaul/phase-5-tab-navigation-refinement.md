@@ -1,4 +1,6 @@
-# Phase 4: Tab Navigation Refinement
+# Phase 5: Tab Navigation Refinement
+
+> **Prerequisites**: This phase builds on **Phase 4: Context-Isolated Tabs**. Each project and home/library now have their own isolated tab sets. Tab operations work within the current context.
 
 ## ⚠️ CRITICAL: Tab Navigation Behavior
 
@@ -13,6 +15,8 @@
 
 ## 🎯 Updated Approach: Spotlight Popover Scope Selection
 
+> **Context-Aware**: With Phase 4's context-isolated tabs, this popover now allows users to choose which context (Home or specific Project) to create a tab in, then switches to that context.
+
 **New Tab Flow** (replaces direct tab creation):
 1. User clicks "+" button or presses Cmd+T
 2. **Spotlight popover opens** (following `.bluekit/kits/spotlight-popover-flow.md` pattern):
@@ -21,14 +25,17 @@
    - Floating popover appears below the button
 3. **Stage 1: Scope Selection**
    - User chooses between "Library" or a specific Project (dropdown/list)
+   - **Selecting a scope switches to that context** (Phase 4 architecture)
 4. **Stage 2: Context Actions**
    - Based on selected scope, shows relevant action buttons:
      - Library: Search library, Browse projects
      - Project: New note, Find file, Browse resources
-5. **Tab creation** happens after action button is clicked
+5. **Tab creation** happens after action button is clicked **within the selected context**
 
 **Benefits**:
 - User explicitly chooses context before tab creation (no ambiguity)
+- **Works seamlessly with context-isolated tabs** (Phase 4)
+- Switching contexts feels intentional and clear
 - Reduces accidental empty tabs
 - Follows existing project selector pattern (familiar UX)
 - Premium visual polish with spotlight effect
@@ -129,6 +136,7 @@ onAddTab={() => console.log('Add tab clicked - not implemented yet')}
 ```tsx
 const handleNewTab = () => {
   // Opens NewTabScopePopover for user to select scope (Library or Project)
+  // Popover will use switchContext() from Phase 4 to switch contexts
   setShowNewTabPopover(true);
 };
 ```
@@ -183,6 +191,9 @@ interface NewTabScopePopoverProps {
 type TabScope =
   | { type: 'library' }
   | { type: 'project', projectId: string, projectPath: string, projectName: string };
+
+// Uses switchContext() from TabContext (Phase 4)
+const { switchContext, createTab } = useTabContext();
 ```
 
 **Layout**:
@@ -237,9 +248,13 @@ const libraryActions = [
     label: 'Search library',
     shortcut: '⌘ K',
     onClick: () => {
-      createTabAndNavigate({ type: 'library' });
+      // Switch to home context (Phase 4)
+      switchContext('home');
+      // Create tab in home context
+      createTab({ type: 'home', view: 'projects' });
       // Future: Open search modal
       showToast('Search coming soon');
+      onClose();
     },
   },
   {
@@ -247,8 +262,10 @@ const libraryActions = [
     label: 'Browse projects',
     shortcut: '⌘ P',
     onClick: () => {
-      createTabAndNavigate({ type: 'library' });
-      // Opens library with projects view
+      // Switch to home context and create tab
+      switchContext('home');
+      createTab({ type: 'home', view: 'projects' });
+      onClose();
     },
   },
 ];
@@ -262,8 +279,12 @@ const projectActions = [
     label: 'New note',
     shortcut: '⌘ N',
     onClick: () => {
-      createTabAndNavigate({ type: 'project', projectId, projectPath });
+      // Switch to project context (Phase 4)
+      switchContext(`project:${projectId}`);
+      // Create tab in that project's context
+      createTab({ type: 'project', projectId, view: 'file' });
       // Triggers new file creation in selected project
+      onClose();
     },
   },
   {
@@ -271,8 +292,10 @@ const projectActions = [
     label: 'Find file',
     shortcut: '⌘ O',
     onClick: () => {
-      createTabAndNavigate({ type: 'project', projectId, projectPath });
+      switchContext(`project:${projectId}`);
+      createTab({ type: 'project', projectId, view: 'file' });
       showToast('File search coming soon');
+      onClose();
     },
   },
   {
@@ -280,7 +303,9 @@ const projectActions = [
     label: 'Browse resources',
     shortcut: '',
     onClick: () => {
-      createTabAndNavigate({ type: 'project', projectId, projectPath, view: 'kits' });
+      switchContext(`project:${projectId}`);
+      createTab({ type: 'project', projectId, view: 'kits' });
+      onClose();
     },
   },
 ];
@@ -1031,11 +1056,11 @@ useEffect(() => {
 
 ## Next Steps
 
-After Phase 4:
-- **Phase 5**: Implement file search (Cmd+O)
-- **Phase 6**: Implement project picker (Cmd+P)
-- **Phase 7**: Add "Open in New Tab" context menu
-- **Phase 8**: Tab groups and split views (future)
+After Phase 5:
+- **Phase 6**: Implement file search (Cmd+O)
+- **Phase 7**: Implement project picker (Cmd+P)
+- **Phase 8**: Add "Open in New Tab" context menu
+- **Phase 9**: Tab groups and split views (future)
 
 ---
 

@@ -324,7 +324,16 @@ export default function ProjectsTabContent({
                 cursor="pointer"
                 _hover={{ borderColor: "primary.400" }}
                 transition="all 0.2s"
-                onClick={() => onProjectSelect(project)}
+                onClick={() => {
+                  console.log('[ProjectsTabContent] Project card clicked', {
+                    projectId: project.id,
+                    projectName: project.name,
+                    isVault: project.isVault,
+                    onProjectSelectDefined: typeof onProjectSelect,
+                  });
+                  onProjectSelect(project);
+                  console.log('[ProjectsTabContent] onProjectSelect called, returned');
+                }}
                 position="relative"
                 overflow="hidden"
                 borderRadius="lg"

@@ -39,6 +39,13 @@ export default function BrowserTabs({
 }: BrowserTabsProps) {
   const colors = getTabColors(colorMode);
 
+  console.log('[BrowserTabs] Render:', {
+    tabsCount: tabs.length,
+    selectedId,
+    hasChildren: !!children,
+    sidebarCollapsed: isSidebarCollapsed
+  });
+
   // Determine if a divider should be shown before a tab
   // Dividers only appear between two unselected tabs
   const shouldShowDivider = (index: number): boolean => {

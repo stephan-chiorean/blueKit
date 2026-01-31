@@ -5,7 +5,7 @@ import {
   VStack,
   Splitter,
 } from '@chakra-ui/react';
-import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo, LuLibrary, LuFolder } from 'react-icons/lu';
+import { LuFile, LuBookOpen, LuBot, LuPalette, LuMap, LuListTodo, LuLibrary, LuFolder, LuPackage } from 'react-icons/lu';
 import { BsStack } from 'react-icons/bs';
 import { toaster } from '@/shared/components/ui/toaster';
 import { listen } from '@tauri-apps/api/event';
@@ -24,10 +24,10 @@ import ResourceViewPage from '@/pages/ResourceViewPage';
 import NoteViewPage from '@/pages/NoteViewPage';
 import ProjectSidebar from './ProjectSidebar';
 import { ViewType } from './components/SidebarContent';
-import EmptyProjectState from '@/shared/components/EmptyProjectState';
 import ProjectsTabContent from '@/features/projects/components/ProjectsTabContent';
 import WorkflowsTabContent from '@/features/workflows/components/WorkflowsTabContent';
 import { BrowserTabs } from '@/tabs';
+import EmptyTabState from '@/shared/components/EmptyTabState';
 import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjectArtifacts, invokeStopWatcher, invokeReadFile, invokeWriteFile, invokeGetProjectRegistry, invokeGetBlueprintTaskFile, invokeDbGetProjects, invokeGetProjectPlans, ArtifactFile, Project, TimeoutError, FileTreeNode } from '@/ipc';
 import { deleteResources } from '@/ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '@/ipc/walkthroughs';
@@ -58,9 +58,12 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
 
 
+
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const { tabs, activeTabId, selectTab, closeTab, openInNewTab, openInCurrentTab, updateTabResource } = useTabContext();
   const activeTab = useMemo(() => tabs.find(tab => tab.id === activeTabId), [tabs, activeTabId]);
+
+  console.log('[ProjectView] Render:', { activeTabId, activeTab, tabsCount: tabs.length });
 
   const getTabIconComponent = useCallback((iconId?: string) => {
     switch (iconId) {
@@ -84,7 +87,6 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       case 'blueprint':
         return BsStack;
       case 'library':
-      case 'home':
         return LuLibrary;
       case 'folder':
       case 'project':
@@ -97,12 +99,13 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     }
   }, []);
 
-  const getViewForTabType = useCallback((tabType?: string): ViewType => {
+  const getViewForTabType = useCallback((tabType?: string): ViewType | undefined => {
     switch (tabType) {
-      case 'home':
-        return 'projects';
+      case 'library':
+        return undefined; // Default to Empty State for library too
       case 'project':
-        return isVault ? 'projects' : 'file';
+        // Return undefined to trigger EmptyTabState for new project tabs
+        return undefined;
       case 'kit':
         return 'kits';
       case 'walkthrough':
@@ -122,11 +125,12 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       case 'file':
         return 'file';
       default:
-        return isVault ? 'projects' : 'file';
+        // Always default to undefined (Empty State) unless a specific view is matched
+        return undefined;
     }
   }, [isVault]);
 
-  const activeView: ViewType = activeTab?.resource.view ?? getViewForTabType(activeTab?.type);
+  const activeView: ViewType | undefined = activeTab?.resource.view ?? getViewForTabType(activeTab?.type);
 
   const getTabLabel = useCallback((tab: { title?: string; resource?: { path?: string }; type?: string }) => {
     if (tab.title) return tab.title;
@@ -137,20 +141,35 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   }, []);
 
   const browserTabs = useMemo(() => {
-    return tabs.map(tab => ({
-      id: tab.id,
-      label: getTabLabel(tab),
-      icon: getTabIconComponent(tab.icon || tab.type),
-      closable: tab.closable,
-    }));
+    return tabs.map(tab => {
+      let label = getTabLabel(tab);
+      // Suppress icon for "New Tab" explicitly
+      let icon = (tab.title === 'New Tab') ? undefined : getTabIconComponent(tab.icon || tab.type);
+      let iconColor: string | undefined = undefined;
+
+      // Override based on view
+      if (tab.resource?.view === 'kits') {
+        label = 'Kits';
+        icon = LuPackage;
+        iconColor = 'blue.400';
+      } else if (tab.resource?.view === 'walkthroughs') {
+        label = 'Walkthroughs';
+        icon = LuBookOpen;
+        iconColor = 'orange.400';
+      }
+
+      return {
+        id: tab.id,
+        label,
+        icon,
+        iconColor,
+        closable: tab.closable,
+      };
+    });
   }, [getTabIconComponent, getTabLabel, tabs]);
 
-  useEffect(() => {
-    if (!activeTabId || !activeTab) return;
-    if (activeTab.resource.view) return;
-    const defaultView = getViewForTabType(activeTab.type);
-    updateTabResource(activeTabId, { view: defaultView });
-  }, [activeTab, activeTabId, getViewForTabType, updateTabResource]);
+  // Removed useEffect that forced default view
+  // We want to allow "Empty State" tabs which have no view defined
 
   // Sidebar drag UX constants - tuned to industry standards (VS Code, Obsidian, Notion)
   const SIDEBAR_STORAGE_KEY = 'bluekit-sidebar-width';
@@ -323,6 +342,53 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     onNewFolder: (folderPath: string) => void;
   } | null>(null);
 
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+T: New Tab
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault();
+        openInNewTab(
+          {
+            type: 'project',
+            projectId: project.id,
+            path: project.path,
+            view: 'file',
+          },
+          { title: "New Tab" }
+        );
+      }
+
+      // Cmd+W: Close Tab
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+        e.preventDefault();
+        if (activeTabId) {
+          closeTab(activeTabId);
+        }
+      }
+
+      // Cmd+1-9: Switch Tabs
+      if ((e.metaKey || e.ctrlKey) && !isNaN(parseInt(e.key)) && parseInt(e.key) >= 1 && parseInt(e.key) <= 9) {
+        e.preventDefault();
+        const index = parseInt(e.key) - 1;
+        if (browserTabs[index]) {
+          selectTab(browserTabs[index].id);
+        }
+      }
+
+      // Cmd+N: New Note (only if actively viewing a project tab)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        if (notebookHandlers && project.path) {
+          e.preventDefault();
+          notebookHandlers.onNewFile(project.path);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTabId, closeTab, selectTab, browserTabs, notebookHandlers, project.path]);
+
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
   const [artifactsLoading, setArtifactsLoading] = useState(true);
@@ -362,7 +428,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     };
 
     const loadResourceFromTab = async () => {
-      if (!activeTab || activeTab.type === 'project' || activeTab.type === 'home') {
+      if (!activeTab || activeTab.type === 'project' || activeTab.type === 'library') {
         resetResourceState();
         return;
       }
@@ -885,7 +951,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   const handleViewKit = useCallback((artifact: ArtifactFile) => {
     const resourceType = (artifact.frontMatter?.type as ResourceType) || 'kit';
     const label = artifact.frontMatter?.alias || artifact.name;
-    openInNewTab(
+    openInCurrentTab(
       {
         type: resourceType,
         path: artifact.path,
@@ -894,11 +960,11 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       },
       { title: label }
     );
-  }, [getViewForTabType, openInNewTab, project.id]);
+  }, [getViewForTabType, openInCurrentTab, project.id]);
 
   const handleViewDiagram = useCallback((diagram: ArtifactFile) => {
     const label = diagram.frontMatter?.alias || diagram.name;
-    openInNewTab(
+    openInCurrentTab(
       {
         type: 'diagram',
         path: diagram.path,
@@ -907,11 +973,11 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       },
       { title: label }
     );
-  }, [getViewForTabType, openInNewTab, project.id]);
+  }, [getViewForTabType, openInCurrentTab, project.id]);
 
   const handleViewTask = useCallback((blueprintPath: string, taskFile: string, taskDescription: string) => {
     const taskPath = `${blueprintPath}/${taskFile}`;
-    openInNewTab(
+    openInCurrentTab(
       {
         type: 'task',
         path: taskPath,
@@ -922,10 +988,10 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       },
       { title: taskDescription || taskFile.replace('.md', '') }
     );
-  }, [getViewForTabType, openInNewTab, project.id]);
+  }, [getViewForTabType, openInCurrentTab, project.id]);
 
   const handleViewPlan = useCallback((plan: Plan) => {
-    openInNewTab(
+    openInCurrentTab(
       {
         type: 'plan',
         path: plan.folderPath,
@@ -935,7 +1001,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       },
       { title: plan.name }
     );
-  }, [getViewForTabType, openInNewTab, project.id]);
+  }, [getViewForTabType, openInCurrentTab, project.id]);
 
   const handleViewWalkthrough = useCallback(async (walkthrough: ArtifactFile) => {
     try {
@@ -944,7 +1010,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         walkthrough.path
       );
       const title = walkthroughData.name || walkthrough.frontMatter?.alias || walkthrough.name;
-      openInNewTab(
+      openInCurrentTab(
         {
           type: 'walkthrough',
           path: walkthrough.path,
@@ -977,33 +1043,69 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     setNotebookFile(null);
   }, []);
 
+  // Helper to get display name and icon for a view
+  const getViewDisplayInfo = useCallback((view: ViewType): { title: string; icon: string } => {
+    const viewMap: Record<ViewType, { title: string; icon: string }> = {
+      projects: { title: 'Projects', icon: 'folder' },
+      workflows: { title: 'Workflows', icon: 'workflow' },
+      tasks: { title: 'Tasks', icon: 'list' },
+      plans: { title: 'Plans', icon: 'map' },
+      kits: { title: 'Kits', icon: 'package' },
+      walkthroughs: { title: 'Walkthroughs', icon: 'book-open' },
+      diagrams: { title: 'Diagrams', icon: 'palette' },
+      git: { title: 'Git', icon: 'git-branch' },
+      bookmarks: { title: 'Bookmarks', icon: 'bookmark' },
+      scrapbook: { title: 'Scrapbook', icon: 'notebook' },
+      blueprints: { title: 'Blueprints', icon: 'stack' },
+      agents: { title: 'Agents', icon: 'bot' },
+      file: { title: project.name, icon: 'project' },
+    };
+    return viewMap[view] || { title: project.name, icon: 'project' };
+  }, [project.name]);
+
   const handleViewChange = useCallback((view: ViewType) => {
     if (!activeTabId) return;
-    if (activeTab?.type && activeTab.type !== 'project' && activeTab.type !== 'home') {
+
+    const { title, icon } = getViewDisplayInfo(view);
+
+    if (activeTab?.type && activeTab.type !== 'project' && activeTab.type !== 'library') {
       openInCurrentTab(
         {
           type: 'project',
           projectId: project.id,
           view,
         },
-        { title: project.name }
+        { title, icon }
       );
       return;
     }
-    updateTabResource(activeTabId, { view });
+    updateTabResource(activeTabId, { view }, { title, icon });
     handleClearResourceView();
-  }, [activeTab?.type, activeTabId, handleClearResourceView, openInCurrentTab, project.id, project.name, updateTabResource]);
+  }, [activeTab?.type, activeTabId, getViewDisplayInfo, handleClearResourceView, openInCurrentTab, project.id, updateTabResource]);
 
   const handleOpenViewInNewTab = useCallback((view: ViewType) => {
+    const { title, icon } = getViewDisplayInfo(view);
     openInNewTab(
       {
         type: 'project',
         projectId: project.id,
         view,
       },
-      { title: project.name }
+      { title, icon }
     );
-  }, [openInNewTab, project.id, project.name]);
+  }, [getViewDisplayInfo, openInNewTab, project.id]);
+
+  const handleNewTab = useCallback(() => {
+    openInNewTab(
+      {
+        type: 'project',
+        projectId: project.id,
+        path: project.path,
+        view: 'file',
+      },
+      { title: "New Tab", forceNew: true }
+    );
+  }, [openInNewTab, project.id, project.path, project.name]);
 
   // Finalize title edit: clear debounce timer, save content, and clear state
   // Note: File rename already happens in real-time via debounced handler
@@ -1047,7 +1149,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       // Get display label
       const label = node.frontMatter?.alias || node.name;
       const resourceType: ResourceType = isDiagram ? 'diagram' : 'file';
-      openInNewTab(
+      openInCurrentTab(
         {
           type: resourceType,
           path: node.path,
@@ -1193,7 +1295,8 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     // Fallback for file view if notebookFile is missing (should ideally show empty state, but for now we follow pattern)
     if (activeView === 'file') {
       return (
-        <EmptyProjectState
+        <EmptyTabState
+          context="project"
           onCreateNote={() => {
             if (notebookHandlers) {
               notebookHandlers.onNewFile(project.path);
@@ -1204,6 +1307,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 type: 'error'
               });
             }
+          }}
+          onCloseTab={() => {
+            if (activeTabId) closeTab(activeTabId);
           }}
         />
       );
@@ -1225,7 +1331,14 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               projects={allProjects}
               projectsLoading={false}
               error={null}
-              onProjectSelect={(p) => onProjectSelect?.(p)}
+              onProjectSelect={(p) => {
+                console.log('[ProjectView] onProjectSelect wrapper called', {
+                  project: p.name,
+                  onProjectSelectDefined: typeof onProjectSelect,
+                });
+                onProjectSelect?.(p);
+                console.log('[ProjectView] onProjectSelect?.() completed');
+              }}
               onProjectsChanged={() => {
                 invokeGetProjectRegistry().then(setAllProjects);
               }}
@@ -1347,9 +1460,37 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
           />
         );
       default:
+        // No view defined -> Empty State
+        if (!activeView) {
+          return (
+            <EmptyTabState
+              context={isVault ? 'library' : 'project'}
+              onCreateNote={() => {
+                if (notebookHandlers) {
+                  notebookHandlers.onNewFile(project.path);
+                } else {
+                  toaster.create({
+                    title: 'Unable to create note',
+                    description: 'File tree is not ready yet',
+                    type: 'error'
+                  });
+                }
+              }}
+              onCloseTab={() => {
+                if (activeTabId) closeTab(activeTabId);
+              }}
+            />
+          );
+        }
         return null;
     }
   };
+
+  const content = renderContent();
+  console.log('[ProjectView] Render Content Decision:', {
+    activeView,
+    contentType: content ? (content as any).type?.name || 'Component' : 'null'
+  });
 
   return (
     <SelectionProvider>
@@ -1418,7 +1559,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 pointerEvents: splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1 ? 'none' : 'auto',
               }}
             >
-                <ProjectSidebar
+              <ProjectSidebar
                 project={project}
                 allProjects={allProjects}
                 activeView={activeView}
@@ -1545,18 +1686,19 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                   selectedId={activeTabId || browserTabs[0]?.id || ''}
                   onSelect={selectTab}
                   onClose={closeTab}
-                  onAddTab={() => console.log('Add tab clicked - not implemented yet')}
+                  onAddTab={handleNewTab}
                   colorMode={colorMode}
                   onToggleSidebar={toggleSidebar}
                   isSidebarCollapsed={splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1}
                 >
-                  {renderContent()}
+                  {content}
                 </BrowserTabs>
               </Box>
             </Splitter.Panel>
           </Splitter.Root>
         </Box>
       </VStack>
-    </SelectionProvider >
+
+    </SelectionProvider>
   );
 }

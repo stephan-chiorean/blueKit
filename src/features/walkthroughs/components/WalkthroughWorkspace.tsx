@@ -46,29 +46,45 @@ export default function WalkthroughWorkspace({
     }, []);
 
     // Load walkthrough details and content
-    const loadWalkthrough = useCallback(async () => {
+    const loadWalkthrough = useCallback(async (isSilent = false) => {
         try {
-            setLoading(true);
+            if (!isSilent) setLoading(true);
             const walkthroughDetails = await invokeGetWalkthroughDetails(walkthroughId);
-            setDetails(walkthroughDetails);
+
+            // Only update details if they changed to prevent re-renders
+            setDetails(prev => {
+                if (JSON.stringify(prev) === JSON.stringify(walkthroughDetails)) return prev;
+                return walkthroughDetails;
+            });
 
             // Load markdown content
             const fileContent = await invokeReadFile(walkthroughDetails.filePath);
-            setContent(fileContent);
+            setContent(prev => prev !== fileContent ? fileContent : prev);
         } catch (error) {
             console.error('Failed to load walkthrough:', error);
-            toaster.create({
-                type: 'error',
-                title: 'Failed to load walkthrough',
-                description: String(error),
-            });
+            if (!isSilent) {
+                toaster.create({
+                    type: 'error',
+                    title: 'Failed to load walkthrough',
+                    description: String(error),
+                });
+            }
         } finally {
-            setLoading(false);
+            if (!isSilent) setLoading(false);
         }
     }, [walkthroughId]);
 
+    // Initial load and polling for updates
     useEffect(() => {
-        loadWalkthrough();
+        loadWalkthrough(); // Initial load (shows spinner)
+
+        // Poll for updates every 2 seconds
+        // This allows the user to edit the file externally and see updates here
+        const intervalId = setInterval(() => {
+            loadWalkthrough(true); // Silent load (no spinner)
+        }, 2000);
+
+        return () => clearInterval(intervalId);
     }, [loadWalkthrough]);
 
     // Takeaway handlers
@@ -160,7 +176,7 @@ export default function WalkthroughWorkspace({
                     <Box h="100%" display="flex" alignItems="center" justifyContent="center">
                         Loading...
                     </Box>
-                ) : (
+                ) : details ? (
                     <WalkthroughDocViewPage
                         details={details}
                         content={content}
@@ -169,7 +185,7 @@ export default function WalkthroughWorkspace({
                         onTogglePanel={togglePanel}
                         onContentChange={(newContent) => setContent(newContent)}
                     />
-                )}
+                ) : null}
             </Box>
 
             {/* Sidebar Panel - No extra blur since we're inside BrowserTabs content */}
