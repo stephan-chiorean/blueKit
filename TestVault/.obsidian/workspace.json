@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "BlueKit is cool.md",
+                "file": "Welcome.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "BlueKit is cool"
+              "title": "Welcome"
             }
           }
         ],
@@ -214,12 +214,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "195069c98660f028",
+  "active": "b8ff0868b6a7b87d",
   "lastOpenFiles": [
+    "BlueKit is cool.md",
     "math",
     "Science",
     "Untitled",
-    "Welcome.md",
-    "BlueKit is cool.md"
+    "Welcome.md"
   ]
 }

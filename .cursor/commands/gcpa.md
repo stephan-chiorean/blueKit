@@ -1,0 +1,1 @@
+commit and push a detailed commit message of all changes, including unstaged changes

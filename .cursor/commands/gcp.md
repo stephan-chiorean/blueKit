@@ -1,0 +1,1 @@
+commit and push a detailed commit message of only the staged changes
