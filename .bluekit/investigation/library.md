@@ -1,1 +1,4 @@
 need to think about concurrent operatsince file writes might not be atomic... postgres backed database with metadata linking to .... S3 or EFS?
+
+
+this is really cool. I saw a pretty girl today

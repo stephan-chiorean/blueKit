@@ -3,6 +3,8 @@
  * Colors matched exactly with ProjectSidebar.tsx and ProjectDetailPage.tsx
  */
 
+import { HEADER_HEIGHT, HEADER_SECTION_HEIGHT } from '@/shared/constants/layout';
+
 export const getTabColors = (colorMode: 'light' | 'dark') => ({
   // Tab bar background - matches sidebar exactly
   tabBarBg: colorMode === 'light'
@@ -17,10 +19,10 @@ export const getTabColors = (colorMode: 'light' | 'dark') => ({
   // Unselected tab - transparent (blends with tab bar)
   unselectedBg: 'transparent',
 
-  // Hover state - subtle hint toward selected
+  // Hover state - matches ProjectSidebar project selector background
   hoverBg: colorMode === 'light'
-    ? 'rgba(255, 255, 255, 0.2)'
-    : 'rgba(255, 255, 255, 0.05)',
+    ? 'rgba(0, 0, 0, 0.04)' // blackAlpha.50
+    : 'rgba(255, 255, 255, 0.06)', // whiteAlpha.100
 
   // Text colors
   selectedText: colorMode === 'light' ? 'gray.900' : 'gray.100',
@@ -48,8 +50,10 @@ export const getTabColors = (colorMode: 'light' | 'dark') => ({
 
 // Visual specifications
 export const TAB_SPECS = {
-  // Tab bar
-  barHeight: '40px',
+  // Tab section - outer container height (provides spacing from top)
+  sectionHeight: HEADER_SECTION_HEIGHT,
+  // Tab bar - actual tab height (centered within section)
+  barHeight: HEADER_HEIGHT,
   barPaddingX: 2, // Chakra spacing units
 
   // Individual tab - consistent sizing
@@ -74,13 +78,13 @@ export const TAB_SPECS = {
   closeSize: '14px',
 
   // Divider
-  dividerHeight: '16px',
+  dividerHeight: '24px',
   dividerWidth: '1px',
 
   // Animation
   hoverTransition: '150ms ease',
 
   // Typography
-  fontSize: 'xs', // 13px
+  fontSize: 'sm', // 14px
   fontWeight: 500,
 };

@@ -6,6 +6,7 @@ import { useSupabaseAuth } from '@/shared/contexts/SupabaseAuthContext';
 import { Project, FileTreeNode } from '@/ipc';
 import { useState } from 'react';
 import KeyboardShortcutsModal from '@/shared/components/KeyboardShortcutsModal';
+import { HEADER_SECTION_HEIGHT } from '@/shared/constants/layout';
 
 
 
@@ -123,9 +124,9 @@ export default function ProjectSidebar({
 
   return (
     <Flex direction="column" h="100%">
-      {/* Back button and project selector - Aligned with StandardPageLayout header */}
+      {/* Back button and project selector - Must match BrowserTabs section height */}
       <Box
-        h="40px"
+        h={HEADER_SECTION_HEIGHT}
         px={3}
         display="flex"
         alignItems="center"

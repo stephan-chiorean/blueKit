@@ -60,7 +60,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
 
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
-  const { tabs, activeTabId, selectTab, closeTab, openInNewTab, openInCurrentTab, updateTabResource } = useTabContext();
+  const { tabs, activeTabId, selectTab, closeTab, reorderTabs, openInNewTab, openInCurrentTab, updateTabResource } = useTabContext();
   const activeTab = useMemo(() => tabs.find(tab => tab.id === activeTabId), [tabs, activeTabId]);
 
   console.log('[ProjectView] Render:', { activeTabId, activeTab, tabsCount: tabs.length });
@@ -133,27 +133,39 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   const activeView: ViewType | undefined = activeTab?.resource.view ?? getViewForTabType(activeTab?.type);
 
   const getTabLabel = useCallback((tab: { title?: string; resource?: { path?: string }; type?: string }) => {
-    if (tab.title) return tab.title;
-    if (tab.resource?.path) {
-      return path.basename(tab.resource.path).replace(/\.(md|mmd|mermaid)$/i, '');
+    let label = '';
+    if (tab.title) {
+      label = tab.title;
+    } else if (tab.resource?.path) {
+      label = path.basename(tab.resource.path);
+    } else {
+      label = tab.type ?? 'Tab';
     }
-    return tab.type ?? 'Tab';
+    // Always strip markdown extensions from the label
+    return label.replace(/\.(md|mmd|mermaid)$/i, '');
   }, []);
 
   const browserTabs = useMemo(() => {
     return tabs.map(tab => {
       let label = getTabLabel(tab);
-      // Suppress icon for "New Tab" explicitly
-      let icon = (tab.title === 'New Tab') ? undefined : getTabIconComponent(tab.icon || tab.type);
+      // Suppress icon for "New Tab" and regular .md files (file/scrapbook types)
+      const shouldSuppressIcon = tab.title === 'New Tab' || tab.type === 'file' || tab.type === 'scrapbook';
+      let icon = shouldSuppressIcon ? undefined : getTabIconComponent(tab.icon || tab.type);
       let iconColor: string | undefined = undefined;
 
       // Override based on view
       if (tab.resource?.view === 'kits') {
-        label = 'Kits';
+        // Show generic "Kits" only if no specific path (viewing list)
+        if (!tab.resource?.path) {
+          label = 'Kits';
+        }
         icon = LuPackage;
         iconColor = 'blue.400';
       } else if (tab.resource?.view === 'walkthroughs') {
-        label = 'Walkthroughs';
+        // Show generic "Walkthroughs" only if no specific path (viewing list)
+        if (!tab.resource?.path) {
+          label = 'Walkthroughs';
+        }
         icon = LuBookOpen;
         iconColor = 'orange.400';
       }
@@ -1687,6 +1699,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                   onSelect={selectTab}
                   onClose={closeTab}
                   onAddTab={handleNewTab}
+                  onReorder={reorderTabs}
                   colorMode={colorMode}
                   onToggleSidebar={toggleSidebar}
                   isSidebarCollapsed={splitSizes[0] <= COLLAPSED_SIDEBAR_PERCENT + 0.1}

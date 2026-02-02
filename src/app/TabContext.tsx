@@ -72,6 +72,7 @@ export interface TabContextValue {
   ) => string;
   closeTab: (tabId: string) => void;
   selectTab: (tabId: string) => void;
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
   switchContext: (
     contextKey: string
   ) => Promise<{ contextKey: string; tabs: TabState[] }>;
@@ -739,6 +740,26 @@ export function TabProvider({ children }: { children: ReactNode }) {
     [activeContext, setActiveTab, tabsByContext]
   );
 
+  const reorderTabs = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setTabsByContext((prev) => {
+        const currentTabs = [...(prev[activeContext] || [])];
+
+        // Remove the tab from its current position
+        const [movedTab] = currentTabs.splice(fromIndex, 1);
+
+        // Insert it at the new position
+        currentTabs.splice(toIndex, 0, movedTab);
+
+        return {
+          ...prev,
+          [activeContext]: currentTabs,
+        };
+      });
+    },
+    [activeContext]
+  );
+
   const closeTab = useCallback(
     (tabId: string) => {
       setTabsByContext((prev) => {
@@ -1039,6 +1060,7 @@ export function TabProvider({ children }: { children: ReactNode }) {
     createTab,
     closeTab,
     selectTab,
+    reorderTabs,
     switchContext,
     updateTabResource,
     updateTabMeta,
