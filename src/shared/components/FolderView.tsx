@@ -16,8 +16,8 @@ import { ElegantList } from "./ElegantList";
 interface FolderViewProps {
   folder: ArtifactFolder | null;
   artifacts: ArtifactFile[];
-  isSelected: (path: string) => boolean;
-  onArtifactToggle: (artifact: ArtifactFile) => void;
+  selectedIds: Set<string>;
+  onSelectionChange: (ids: Set<string>) => void;
   onViewArtifact: (artifact: ArtifactFile) => void;
   onContextMenu?: (e: React.MouseEvent, artifact: ArtifactFile) => void;
   onBack: () => void;
@@ -30,8 +30,8 @@ interface FolderViewProps {
 export default function FolderView({
   folder,
   artifacts,
-  isSelected,
-  onArtifactToggle,
+  selectedIds,
+  onSelectionChange,
   onViewArtifact,
   onContextMenu,
   onBack,
@@ -119,7 +119,10 @@ export default function FolderView({
             // We'll let ElegantList handle icon logic.
             onItemClick={(item) => onViewArtifact(item as ArtifactFile)}
             onItemContextMenu={(e, item) => onContextMenu?.(e, item as ArtifactFile)}
-            selectedIds={new Set(artifacts.filter(a => isSelected(a.path)).map(a => a.path))}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectionChange={onSelectionChange}
+            getItemId={(item) => (item as ArtifactFile).path}
             renderActions={(item) => (
               <Menu.Item value="open" onClick={() => onViewArtifact(item as ArtifactFile)}>
                 <Text>Open</Text>

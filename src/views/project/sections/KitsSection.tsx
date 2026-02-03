@@ -11,19 +11,16 @@ import {
   Badge,
   Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus } from 'react-icons/lu';
-import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '@/ipc';
+import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX } from 'react-icons/lu';
+import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
-import { useSelection } from '@/shared/contexts/SelectionContext';
 import FolderView from '@/shared/components/FolderView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
 import DeleteFolderDialog from '@/shared/components/DeleteFolderDialog';
-import { KitContextMenu } from '@/features/kits/components/KitContextMenu';
-import { ElegantList } from '@/shared/components/ElegantList';
-import { ResourceSelectionBar } from '@/shared/components/ResourceSelectionBar';
 import { FilterPanel } from '@/shared/components/FilterPanel';
 import { getRootArtifacts } from '@/shared/utils/buildFolderTree';
 import { toaster } from '@/shared/components/ui/toaster';
+import { ElegantList } from '@/shared/components/ElegantList';
 
 interface KitsSectionProps {
   kits: ArtifactFile[];
@@ -33,10 +30,6 @@ interface KitsSectionProps {
   projectPath: string;
   projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
-  onReload?: () => void;
-  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
-  onConfirmMove?: (oldPath: string, newPath: string) => void;
-  movingArtifacts?: Set<string>;
 }
 
 function KitsSection({
@@ -47,63 +40,70 @@ function KitsSection({
   projectPath,
   projectId,
   onViewKit,
-  onReload,
-  onOptimisticMove,
-  onConfirmMove,
-  movingArtifacts = new Set(),
 }: KitsSectionProps) {
-  const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection, addItem } = useSelection();
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isKitsFilterOpen, setIsKitsFilterOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Local selection state
+  const [selectedKitIds, setSelectedKitIds] = useState<Set<string>>(new Set());
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
+  const [isFoldersLoading, setIsFoldersLoading] = useState(true);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    isOpen: boolean;
-    x: number;
-    y: number;
-    kit: ArtifactFile | null;
-  }>({ isOpen: false, x: 0, y: 0, kit: null });
 
-  const isSelected = (kitId: string) => isSelectedInContext(kitId);
 
-  const handleKitToggle = (kit: ArtifactFile) => {
-    toggleItem({
-      id: kit.path,
-      name: kit.frontMatter?.alias || kit.name,
-      type: 'Kit',
-      path: kit.path,
-      projectId,
-      projectPath,
-    });
+
+  const handleSelectionChange = (newSelectedIds: Set<string>) => {
+    setSelectedKitIds(newSelectedIds);
   };
 
-  // Get root-level kits (not in folders) - unfiltered
-  const rootKitsUnfiltered = useMemo(() => {
-    return getRootArtifacts(kits, folders, 'kits', projectPath);
-  }, [kits, folders, projectPath]);
+  const clearSelection = () => setSelectedKitIds(new Set());
 
-  // Get all unique tags from root-level kits only
+  // Clear selection on mount/unmount or projectId change
+  useEffect(() => {
+    clearSelection();
+  }, [projectId]);
+
+  // Actions
+  const handleDelete = () => {
+    console.log('Delete selected kits:', Array.from(selectedKitIds));
+    clearSelection();
+  };
+
+  const handlePublish = () => {
+    console.log('Publish selected kits:', Array.from(selectedKitIds));
+    clearSelection();
+  };
+
+  const handleAddToProject = () => {
+    console.log('Add selected kits to project:', Array.from(selectedKitIds));
+    clearSelection();
+  };
+
+  // Get all unique tags
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
-    rootKitsUnfiltered.forEach(kit => {
+    kits.forEach(kit => {
       kit.frontMatter?.tags?.forEach(tag => tagSet.add(tag));
     });
     return Array.from(tagSet).sort();
-  }, [rootKitsUnfiltered]);
+  }, [kits]);
 
-  // Filter only root-level kits based on name and selected tags
-  const filteredRootKits = useMemo(() => {
-    return rootKitsUnfiltered.filter(kit => {
+  // Filter kits based on name and selected tags
+  const filteredKits = useMemo(() => {
+    return kits.filter(kit => {
+      // Basic text search on name or alias
       const displayName = kit.frontMatter?.alias || kit.name;
       const matchesName = !nameFilter ||
         displayName.toLowerCase().includes(nameFilter.toLowerCase()) ||
         kit.name.toLowerCase().includes(nameFilter.toLowerCase());
 
+      // Filter by selected tags (AND logic - must have at least one of selected tags? OR logic usually better for tags)
+      // Implementing OR logic: if any selected tag matches any of kit's tags
       const matchesTags = selectedTags.length === 0 ||
         selectedTags.some(selectedTag =>
           kit.frontMatter?.tags?.some(tag =>
@@ -113,7 +113,7 @@ function KitsSection({
 
       return matchesName && matchesTags;
     });
-  }, [rootKitsUnfiltered, nameFilter, selectedTags]);
+  }, [kits, nameFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => {
@@ -129,10 +129,13 @@ function KitsSection({
   useEffect(() => {
     const loadFolders = async () => {
       try {
+        setIsFoldersLoading(true);
         const loadedFolders = await invokeGetArtifactFolders(projectPath, 'kits');
         setFolders(loadedFolders);
       } catch (err) {
-        console.error('Failed to load folders:', err);
+        console.error('[KitsFolders] ❌ Failed to load folders:', err);
+      } finally {
+        setIsFoldersLoading(false);
       }
     };
 
@@ -140,39 +143,17 @@ function KitsSection({
     loadFolders();
 
     return () => { };
-  }, [projectPath, kits]); // Reload when kits change (from file watcher)
+  }, [projectPath, kits]); // Reload when kits change
 
-  const handleViewKit = (kit: ArtifactFile) => {
-    onViewKit(kit);
+  // Get artifacts for a specific folder
+  const getFolderArtifacts = (folderPath: string): ArtifactFile[] => {
+    return kits.filter(k => k.path.startsWith(folderPath + '/'));
   };
 
-  const handleContextMenu = (e: React.MouseEvent, kit: ArtifactFile) => {
-    e.preventDefault();
-
-    // Boundary detection to prevent off-screen menu
-    const menuWidth = 250;
-    const menuHeight = 200;
-    let x = e.clientX;
-    let y = e.clientY;
-
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 10;
-    }
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 10;
-    }
-
-    setContextMenu({ isOpen: true, x, y, kit });
-  };
-
-  const closeContextMenu = () => {
-    setContextMenu({ isOpen: false, x: 0, y: 0, kit: null });
-  };
-
-  // Handle create folder
   const handleCreateFolder = async (name: string, config: Partial<FolderConfig>) => {
+    console.log('Creating folder:', name, config);
     const fullConfig: FolderConfig = {
-      id: `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      id: `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`, // Generate ID
       name: config.name || name,
       description: config.description,
       tags: config.tags || [],
@@ -182,6 +163,7 @@ function KitsSection({
 
     try {
       await invokeCreateArtifactFolder(projectPath, 'kits', null, name, fullConfig);
+      // Reload folders
       const newFolders = await invokeGetArtifactFolders(projectPath, 'kits');
       setFolders(newFolders);
     } catch (err) {
@@ -190,38 +172,10 @@ function KitsSection({
     }
   };
 
-
-  // Handle rename folder (receives new name from popover)
-  const handleRenameFolder = async (folder: ArtifactFolder, newName: string) => {
-    if (!newName) return;
-
-    try {
-      await invokeRenameArtifactFolder(folder.path, newName);
-      toaster.create({
-        type: 'success',
-        title: 'Group renamed',
-        description: `Renamed to ${newName}`,
-      });
-      // Reload folders to reflect the change
-      const newFolders = await invokeGetArtifactFolders(projectPath, 'kits');
-      setFolders(newFolders);
-    } catch (error) {
-      console.error('Failed to rename folder:', error);
-      toaster.create({
-        type: 'error',
-        title: 'Failed to rename group',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        closable: true,
-      });
-    }
-  };
-
-  // Handle delete folder
   const handleDeleteFolder = (folder: ArtifactFolder) => {
     setDeletingFolder(folder);
   };
 
-  // Confirm delete folder
   const handleConfirmDeleteFolder = async () => {
     if (!deletingFolder) return;
 
@@ -243,27 +197,27 @@ function KitsSection({
     }
   };
 
-  // Get artifacts for a specific folder
-  const getFolderArtifacts = (folderPath: string): ArtifactFile[] => {
-    return kits.filter(kit => kit.path.startsWith(folderPath + '/'));
+  // Ref for filter button
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Get root-level kits
+  const rootKits = useMemo(() => {
+    return getRootArtifacts(filteredKits, folders, 'kits', projectPath);
+  }, [filteredKits, folders, projectPath]);
+
+  // Handle context menu
+  const handleContextMenu = (e: React.MouseEvent, _kit: ArtifactFile) => {
+    e.preventDefault();
+    // Context menu logic if needed, or pass prop to ElegantList to handle it
   };
-
-  // Ref for filter button (used by FilterPanel for click-outside detection)
-  const kitsFilterButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Use filtered root kits (filter only applies to root-level kits)
-  const rootKits = filteredRootKits;
 
   if (kitsLoading) {
     return (
-      <Box
-        position="relative"
-        width="100%"
-        maxW="100%"
-        h="100%"
-      >
-        <VStack align="stretch" gap={6} width="100%">
-          <ToolkitHeader title="Kits" />
+      <Box position="relative" h="100%">
+        <VStack align="stretch" gap={6}>
+          <Flex align="center" justify="space-between" mb={6} py={2}>
+            <Heading size="2xl">Kits</Heading>
+          </Flex>
           <Box p={4}><Text>Loading...</Text></Box>
         </VStack>
       </Box>
@@ -272,12 +226,7 @@ function KitsSection({
 
   if (error) {
     return (
-      <Box
-        textAlign="center"
-        py={12}
-        color="red.500"
-        h="100%"
-      >
+      <Box textAlign="center" py={12} color="red.500" h="100%">
         Error: {error}
       </Box>
     );
@@ -285,12 +234,7 @@ function KitsSection({
 
   if (projectsCount === 0) {
     return (
-      <Box
-        textAlign="center"
-        py={12}
-        color="text.secondary"
-        h="100%"
-      >
+      <Box textAlign="center" py={12} color="text.secondary" h="100%">
         No projects linked. Projects are managed via CLI and will appear here automatically.
       </Box>
     );
@@ -298,194 +242,202 @@ function KitsSection({
 
   if (kits.length === 0) {
     return (
-      <Box
-        textAlign="center"
-        py={12}
-        color="text.secondary"
-        h="100%"
-      >
+      <Box textAlign="center" py={12} color="text.secondary" h="100%">
         No kits found in any linked project's .bluekit directory.
       </Box>
     );
   }
 
   // If viewing a folder, show the FolderView component
-  // Note: FolderView functionality is kept, but internal display is handled by FolderView component.
   if (viewingFolder) {
     return (
       <FolderView
         folder={viewingFolder}
         artifacts={getFolderArtifacts(viewingFolder.path)}
-        isSelected={(path) => isSelected(path)}
-        onArtifactToggle={handleKitToggle}
-        onViewArtifact={handleViewKit}
-        onContextMenu={handleContextMenu}
+        selectedIds={selectedKitIds}
+        onSelectionChange={handleSelectionChange}
+        onViewArtifact={onViewKit}
         onBack={() => setViewingFolder(null)}
       />
     );
   }
 
+  const projectName = projectPath.split('/').pop() || 'Project';
+
   return (
-    <Flex
-      direction="column"
-      h="100%"
-      overflow="hidden"
-      position="relative"
-    >
-      <VStack align="stretch" gap={0} h="100%">
+    <Flex direction="column" h="100%" overflow="hidden">
+      <VStack align="stretch" gap={0} flex={1} overflow="hidden">
         {/* Toolkit Header */}
         <ToolkitHeader
           title="Kits"
-          leftActions={
-            <HStack gap={1}>
-              {/* Filter Button */}
-              <Box position="relative">
-                <Button
-                  ref={kitsFilterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  px={2}
-                  onClick={() => setIsKitsFilterOpen(!isKitsFilterOpen)}
-                  bg="transparent"
-                  _hover={{
-                    bg: 'bg.subtle',
-                  }}
-                  title="Filter kits"
-                >
-                  <Icon boxSize={4}>
-                    <LuFilter />
-                  </Icon>
-                </Button>
-                <FilterPanel
-                  isOpen={isKitsFilterOpen}
-                  onClose={() => setIsKitsFilterOpen(false)}
-                  nameFilter={nameFilter}
-                  onNameFilterChange={setNameFilter}
-                  allTags={allTags}
-                  selectedTags={selectedTags}
-                  onToggleTag={toggleTag}
-                  filterButtonRef={kitsFilterButtonRef}
-                />
-              </Box>
-              {/* New Group Button */}
-              <CreateFolderPopover
-                isOpen={isCreateFolderOpen}
-                onOpenChange={setIsCreateFolderOpen}
-                onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    px={2}
-                    bg="transparent"
-                    _hover={{
-                      bg: 'bg.subtle',
-                    }}
-                    title="New group"
-                  >
-                    <Icon boxSize={4}>
-                      <LuFolderPlus />
-                    </Icon>
-                  </Button>
-                }
-              />
-            </HStack>
-          }
+          parentName={projectName}
         />
 
         {/* Scrollable Content Area */}
         <Box flex={1} overflowY="auto" p={6}>
-          {/* Folders Section - only show if folders exist */}
-        {folders.length > 0 && (
+          {/* Folders Section */}
           <Box position="relative" mb={8}>
+            <Flex align="center" justify="space-between" gap={2} mb={4}>
+              <Flex align="center" gap={2}>
+                <Heading size="md">Groups</Heading>
+                <Text fontSize="sm" color="text.muted">
+                  {folders.length}
+                </Text>
+                {/* Filter Button */}
+                <Box position="relative" overflow="visible">
+                  <Button
+                    ref={filterButtonRef}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    borderWidth="1px"
+                    borderRadius="lg"
+                    css={{
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                      transition: 'none',
+                      _dark: {
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                      },
+                    }}
+                  >
+                    <HStack gap={2}>
+                      <Icon>
+                        <LuFilter />
+                      </Icon>
+                      <Text>Filter</Text>
+                      {(nameFilter || selectedTags.length > 0) && (
+                        <Badge size="sm" colorPalette="primary" variant="solid">
+                          {[nameFilter && 1, selectedTags.length]
+                            .filter(Boolean)
+                            .reduce((a, b) => (a || 0) + (b || 0), 0)}
+                        </Badge>
+                      )}
+                    </HStack>
+                  </Button>
+                  <FilterPanel
+                    isOpen={isFilterOpen}
+                    onClose={() => setIsFilterOpen(false)}
+                    nameFilter={nameFilter}
+                    onNameFilterChange={setNameFilter}
+                    allTags={allTags}
+                    selectedTags={selectedTags}
+                    onToggleTag={toggleTag}
+                    filterButtonRef={filterButtonRef}
+                  />
+                </Box>
+                {/* New Folder Button using CreateFolderPopover */}
+                <CreateFolderPopover
+                  isOpen={isCreateFolderOpen}
+                  onOpenChange={setIsCreateFolderOpen}
+                  onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
+                  trigger={
+                    <Button
+                      size="sm"
+                      colorPalette="blue"
+                      variant="subtle"
+                    >
+                      <HStack gap={2}>
+                        <Icon>
+                          <LuFolderPlus />
+                        </Icon>
+                        <Text>New Group</Text>
+                      </HStack>
+                    </Button>
+                  }
+                />
+              </Flex>
+            </Flex>
+
+            {folders.length === 0 && !isFoldersLoading ? (
+              <Box
+                p={6}
+                bg="bg.subtle"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                textAlign="center"
+              >
+                <Text color="text.muted" fontSize="sm">
+                  No groups yet. Create one to organize your kits.
+                </Text>
+              </Box>
+            ) : (
+              <ElegantList
+                items={folders}
+                type="folder"
+                onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                renderActions={(item) => {
+                  const folder = item as ArtifactFolder;
+                  return (
+                    <>
+                      <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Open</Text>
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item
+                        value="delete-folder"
+                        color="fg.error"
+                        onClick={() => handleDeleteFolder(folder)}
+                      >
+                        <HStack gap={2}>
+                          <Icon as={LuFolderPlus} /> <Text>Delete</Text>
+                        </HStack>
+                      </Menu.Item>
+                    </>
+                  );
+                }}
+              />
+            )}
+          </Box>
+
+          {/* Kits Section */}
+          <Box mb={8} position="relative">
             <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Groups</Heading>
+              <Heading size="md">Kits</Heading>
               <Text fontSize="sm" color="text.muted">
-                {folders.length}
+                {rootKits.length}
               </Text>
             </Flex>
 
-            <ElegantList
-              items={folders}
-              type="folder"
-              onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
-              renderActions={(item) => {
-                const folder = item as ArtifactFolder;
-                return (
-                  <>
-                    <Menu.Item value="open-folder" onClick={() => setViewingFolder(folder)}>
-                      <HStack gap={2}>
-                        <Icon as={LuFolderPlus} /> <Text>Open</Text>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item
-                      value="delete-folder"
-                      color="fg.error"
-                      onClick={() => handleDeleteFolder(folder)}
-                    >
-                      <HStack gap={2}>
-                        <Icon as={LuFolderPlus} /> <Text>Delete</Text>
-                      </HStack>
-                    </Menu.Item>
-                  </>
-                );
-              }}
-            />
+            {rootKits.length === 0 ? (
+              <Box
+                p={6}
+                bg="bg.subtle"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                textAlign="center"
+              >
+                <Text color="text.muted" fontSize="sm">
+                  {(nameFilter || selectedTags.length > 0)
+                    ? 'No kits match the current filters'
+                    : 'No kits at root level. All kits are organized in folders.'}
+                </Text>
+              </Box>
+            ) : (
+              // Replaced with ElegantList with selection props
+              <ElegantList
+                items={rootKits}
+                type="kit"
+                selectable={true}
+                selectedIds={selectedKitIds}
+                onSelectionChange={handleSelectionChange}
+                getItemId={(item) => (item as ArtifactFile).path}
+                onItemClick={(kit) => onViewKit(kit as ArtifactFile)}
+                onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
+              />
+            )}
           </Box>
-        )}
-
-        {/* Kits Section */}
-        <Box mb={8} position="relative" width="100%" maxW="100%">
-          <Flex align="center" gap={2} mb={4}>
-            <Heading size="md">Kits</Heading>
-            <Text fontSize="sm" color="text.muted">
-              {rootKits.length}
-            </Text>
-          </Flex>
-
-          {rootKits.length === 0 && !kitsLoading && (nameFilter || selectedTags.length > 0) ? (
-            <Box
-              p={6}
-              bg="bg.subtle"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              textAlign="center"
-            >
-              <Text color="text.muted" fontSize="sm">
-                No kits match the current filters
-              </Text>
-            </Box>
-          ) : rootKits.length > 0 ? (
-            <ElegantList
-              items={rootKits}
-              type="kit"
-              onItemClick={(kit) => handleViewKit(kit as ArtifactFile)}
-              onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
-              renderActions={(item) => (
-                <Menu.Item value="open-kit" onClick={() => handleViewKit(item as ArtifactFile)}>
-                  <HStack gap={2}>
-                    <Text>Open</Text>
-                  </HStack>
-                </Menu.Item>
-              )}
-            />
-          ) : null}
-        </Box>
         </Box>
       </VStack>
 
-      <ResourceSelectionBar
-        isOpen={selectedItems.length > 0}
-        selectedItems={selectedItems}
-        onClearSelection={clearSelection}
-        onMoveToFolder={(folderPath) => {
-          // TODO: Implement move to folder
-          console.log('Move to folder:', folderPath, selectedItems);
-          clearSelection();
-        }}
-        folders={folders}
-      />
 
       <DeleteFolderDialog
         isOpen={!!deletingFolder}
@@ -494,15 +446,69 @@ function KitsSection({
         onConfirm={handleConfirmDeleteFolder}
       />
 
-      <KitContextMenu
-        isOpen={contextMenu.isOpen}
-        x={contextMenu.x}
-        y={contextMenu.y}
-        kit={contextMenu.kit}
-        onClose={closeContextMenu}
-      />
-
-
+      {/* Inline Selection Footer */}
+      <Box
+        position="sticky"
+        bottom={0}
+        width="100%"
+        display="grid"
+        css={{
+          gridTemplateRows: selectedKitIds.size > 0 ? "1fr" : "0fr",
+          transition: "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <Box overflow="hidden" minHeight={0}>
+          <Box
+            borderTopWidth="1px"
+            borderColor="border.subtle"
+            py={4}
+            px={6}
+            css={{
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              _dark: {
+                background: 'rgba(20, 20, 20, 0.85)',
+              }
+            }}
+          >
+            <HStack justify="space-between">
+              <HStack gap={3}>
+                <Badge colorPalette="blue" size="lg" variant="solid">
+                  {selectedKitIds.size}
+                </Badge>
+                <Text fontWeight="medium" fontSize="sm">kit{selectedKitIds.size > 1 ? 's' : ''} selected</Text>
+              </HStack>
+              <HStack gap={2}>
+                <Button size="sm" variant="ghost" colorPalette="blue" onClick={handleAddToProject}>
+                  <HStack gap={1}>
+                    <LuPlus />
+                    <Text>Add to Project</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="green" onClick={handlePublish}>
+                  <HStack gap={1}>
+                    <LuShare />
+                    <Text>Publish to Library</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="red" onClick={handleDelete}>
+                  <HStack gap={1}>
+                    <LuTrash2 />
+                    <Text>Delete</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="gray" onClick={clearSelection}>
+                  <HStack gap={1}>
+                    <LuX />
+                    <Text>Clear</Text>
+                  </HStack>
+                </Button>
+              </HStack>
+            </HStack>
+          </Box>
+        </Box>
+      </Box>
     </Flex>
   );
 }
@@ -516,7 +522,7 @@ export default memo(KitsSection, (prevProps, nextProps) => {
     prevProps.error === nextProps.error &&
     prevProps.projectsCount === nextProps.projectsCount &&
     prevProps.projectPath === nextProps.projectPath &&
-    prevProps.onViewKit === nextProps.onViewKit &&
-    prevProps.onReload === nextProps.onReload
+    prevProps.projectId === nextProps.projectId &&
+    prevProps.onViewKit === nextProps.onViewKit
   );
 });

@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, VStack, HStack, Text, Button, Icon, Badge, Flex, Portal, IconButton } from '@chakra-ui/react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { LuArrowLeft, LuArrowRight, LuFileText, LuPanelRightOpen, LuPanelRightClose } from 'react-icons/lu';
 import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
 import { listen } from '@tauri-apps/api/event';
@@ -15,9 +14,6 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { toaster } from '@/shared/components/ui/toaster';
 import { invokeReadFile } from '@/ipc';
 import path from 'path';
-
-const MotionBox = motion.create(Box);
-const MotionFlex = motion.create(Flex);
 
 type ViewMode = 'preview' | 'source' | 'edit';
 
@@ -225,17 +221,13 @@ export default function PlanDocViewPage({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [setIsSearchOpen, viewMode, canNavigatePrev, canNavigateNext, handleNavigatePrev, handleNavigateNext]);
 
-
-
     if (!currentDoc) {
         return (
-            <MotionFlex
+            <Flex
                 h="100%"
                 w="100%"
                 align="center"
                 justify="center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
                 style={{
                     background: 'transparent',
                 }}
@@ -251,7 +243,7 @@ export default function PlanDocViewPage({
                         Add markdown files to the plan folder to get started
                     </Text>
                 </VStack>
-            </MotionFlex>
+            </Flex>
         );
     }
 
@@ -337,25 +329,18 @@ export default function PlanDocViewPage({
                     {/* Right: View mode icons */}
                     <HStack gap={1}>
                         {/* Save status indicator */}
-                        <AnimatePresence>
-                            {viewMode === 'edit' && (
-                                <MotionBox
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    mr={2}
+                        {viewMode === 'edit' && (
+                            <Box mr={2}>
+                                <Badge
+                                    size="sm"
+                                    variant="subtle"
+                                    colorPalette={saveStatus === 'saved' ? 'green' : saveStatus === 'saving' ? 'yellow' : 'gray'}
+                                    css={{ borderRadius: '6px' }}
                                 >
-                                    <Badge
-                                        size="sm"
-                                        variant="subtle"
-                                        colorPalette={saveStatus === 'saved' ? 'green' : saveStatus === 'saving' ? 'yellow' : 'gray'}
-                                        css={{ borderRadius: '6px' }}
-                                    >
-                                        {saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'saving' ? 'Saving...' : 'Unsaved'}
-                                    </Badge>
-                                </MotionBox>
-                            )}
-                        </AnimatePresence>
+                                    {saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'saving' ? 'Saving...' : 'Unsaved'}
+                                </Badge>
+                            </Box>
+                        )}
 
                         {/* Preview icon */}
                         <Button
@@ -412,8 +397,6 @@ export default function PlanDocViewPage({
                         </Button>
                     </HStack>
 
-
-
                     <IconButton
                         variant="ghost"
                         size="sm"
@@ -434,72 +417,47 @@ export default function PlanDocViewPage({
                 </Flex>
             </Box>
 
-            {/* Content area */}
+            {/* Content area - No animations */}
             <Box flex={1} overflow={viewMode === 'edit' ? 'hidden' : 'auto'} position="relative">
-                <AnimatePresence mode="wait">
-                    {loading ? (
-                        <MotionBox
-                            key="loading"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            h="100%"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                        >
-                            <VStack gap={3}>
-                                <MotionBox
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                >
-                                    <Icon boxSize={8} color="primary.500">
-                                        <LuFileText />
-                                    </Icon>
-                                </MotionBox>
-                                <Text color="text.secondary" fontSize="sm">
-                                    Loading document...
-                                </Text>
-                            </VStack>
-                        </MotionBox>
-                    ) : viewMode === 'edit' ? (
-                        <MotionBox
-                            key="edit"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            h="100%"
-                        >
-                            <MarkdownEditor
-                                ref={editorRef}
-                                content={content}
-                                onChange={handleContentChange}
-                                onSave={handleSave}
-                                colorMode={colorMode}
-                                readOnly={false}
-                                showLineNumbers={true}
-                                placeholder="Start writing..."
-                            />
-                        </MotionBox>
-                    ) : (
-                        <MotionBox
-                            key={`content-${currentDoc.id}`}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.25 }}
-                            p={6}
-                            h="100%"
-                        >
-                            <ResourceMarkdownContent
-                                resource={resource}
-                                content={content}
-                                viewMode={viewMode}
-                                onResolveInternalPath={resolveInternalPath}
-                            />
-                        </MotionBox>
-                    )}
-                </AnimatePresence>
+                {loading ? (
+                    <Box
+                        h="100%"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                    >
+                        <VStack gap={3}>
+                            <Icon boxSize={8} color="primary.500">
+                                <LuFileText />
+                            </Icon>
+                            <Text color="text.secondary" fontSize="sm">
+                                Loading document...
+                            </Text>
+                        </VStack>
+                    </Box>
+                ) : viewMode === 'edit' ? (
+                    <Box h="100%">
+                        <MarkdownEditor
+                            ref={editorRef}
+                            content={content}
+                            onChange={handleContentChange}
+                            onSave={handleSave}
+                            colorMode={colorMode}
+                            readOnly={false}
+                            showLineNumbers={true}
+                            placeholder="Start writing..."
+                        />
+                    </Box>
+                ) : (
+                    <Box p={6} h="100%">
+                        <ResourceMarkdownContent
+                            resource={resource}
+                            content={content}
+                            viewMode={viewMode}
+                            onResolveInternalPath={resolveInternalPath}
+                        />
+                    </Box>
+                )}
             </Box>
 
             {/* Search Component */}

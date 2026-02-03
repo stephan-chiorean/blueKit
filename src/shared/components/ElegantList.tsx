@@ -7,9 +7,10 @@ import {
     Badge,
     IconButton,
     Menu,
+    Checkbox,
 } from "@chakra-ui/react";
 import { MdFolder, MdMoreVert } from "react-icons/md";
-import { LuFileText, LuBookOpen, LuPackage } from "react-icons/lu";
+import { LuBookOpen, LuPackage } from "react-icons/lu";
 import { ArtifactFile, ArtifactFolder } from "@/ipc";
 import { ReactNode } from "react";
 import { useColorMode } from "@/shared/contexts/ColorModeContext";
@@ -24,8 +25,11 @@ interface ElegantListProps {
     renderActions?: (item: ElegantListItem) => ReactNode;
 
     // Selection state
+    selectable?: boolean;
     selectedIds?: Set<string>;
     onToggleSelection?: (item: ElegantListItem) => void;
+    onSelectionChange?: (ids: Set<string>) => void;
+    getItemId?: (item: ElegantListItem) => string;
     type?: 'kit' | 'folder' | 'walkthrough';
 }
 
@@ -35,9 +39,12 @@ export function ElegantList({
     onItemContextMenu,
     getIcon,
     renderActions,
+    selectable,
     selectedIds,
     onToggleSelection,
-    type,
+    onSelectionChange,
+    getItemId,
+    // type prop is available in interface but not used in logic yet
 }: ElegantListProps) {
     const { colorMode } = useColorMode();
 
@@ -47,6 +54,43 @@ export function ElegantList({
     const folderIconColor = colorMode === "light" ? "blue.500" : "blue.400";
     const fileIconColor = colorMode === "light" ? "blue.500" : "blue.400";
     const walkthroughIconColor = colorMode === "light" ? "orange.500" : "orange.400";
+
+    const getItemPath = (item: ElegantListItem) => getItemId ? getItemId(item) : ('path' in item ? item.path : (item as any).id);
+
+    // Calculate selection state for header
+    const selectableItems = items.filter(item => !(!('frontMatter' in item))); // Filter out folders
+    const allSelected = selectableItems.length > 0 && selectableItems.every(item => selectedIds?.has(getItemPath(item)));
+    const someSelected = selectableItems.some(item => selectedIds?.has(getItemPath(item)));
+    const isIndeterminate = someSelected && !allSelected;
+
+    const handleSelectAll = () => {
+        if (!onSelectionChange) return;
+
+        if (allSelected) {
+            // Clear all
+            onSelectionChange(new Set());
+        } else {
+            // Select all
+            const newSet = new Set(selectedIds);
+            selectableItems.forEach(item => newSet.add(getItemPath(item)));
+            onSelectionChange(newSet);
+        }
+    };
+
+    const handleItemToggle = (item: ElegantListItem) => {
+        if (onSelectionChange && selectedIds) {
+            const path = getItemPath(item);
+            const newSet = new Set(selectedIds);
+            if (newSet.has(path)) {
+                newSet.delete(path);
+            } else {
+                newSet.add(path);
+            }
+            onSelectionChange(newSet);
+        } else {
+            onToggleSelection?.(item);
+        }
+    };
 
     if (items.length === 0) {
         return null;
@@ -74,19 +118,36 @@ export function ElegantList({
                     Updated
                 </Box>
                 <Box width="40px"></Box>
+                {/* Header Checkbox */}
+                {selectable && (
+                    <Box width="32px" display="flex" alignItems="center" justifyContent="center">
+                        <Checkbox.Root
+                            checked={allSelected ? true : (isIndeterminate ? "indeterminate" : false)}
+                            onCheckedChange={handleSelectAll}
+                            size="sm"
+                        >
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control>
+                                <Checkbox.Indicator />
+                            </Checkbox.Control>
+                        </Checkbox.Root>
+                    </Box>
+                )}
             </Flex>
 
             {/* List Items */}
             <Box>
                 {items.map((item) => {
                     // Use path as key
-                    const path = 'path' in item ? item.path : (item as any).id;
+                    const path = getItemId ? getItemId(item) : ('path' in item ? item.path : (item as any).id);
                     const isSelected = selectedIds?.has(path);
 
                     // Determine type for icon/styling
                     const isItemFolder = !('frontMatter' in item);
+                    // Items are selectable if the list is selectable AND it's not a folder
+                    const canSelect = selectable && !isItemFolder;
 
-                    let ItemIcon = MdFolder;
+                    let ItemIcon: React.ElementType = MdFolder;
                     let itemIconColor = folderIconColor;
 
                     if (!isItemFolder) {
@@ -122,7 +183,7 @@ export function ElegantList({
                         const folder = item as ArtifactFolder;
                         updatedAt = (folder as any).updatedAt || (folder as any).config?.updatedAt;
                     } else {
-                        const file = item as ArtifactFile;
+                        const file = item as any; // Cast to any to access potentially missing 'stats'
                         updatedAt = file.stats?.mtimeMs;
                     }
 
@@ -150,11 +211,14 @@ export function ElegantList({
                             _hover={{
                                 bg: isSelected ? selectedBg : hoverBg,
                             }}
-                            onClick={(e) => {
+                            onClick={() => {
+                                // If clicking the row toggles selection (optional UX choice), or just opens the item
+                                // Usually clicking the row opens the item. Clicking checkbox toggles selection.
                                 onItemClick(item);
                             }}
                             onContextMenu={(e) => onItemContextMenu?.(e, item)}
                         >
+
                             {/* Name Column */}
                             <Flex flex="1" align="center" gap={3} minW={0} pr={4}>
                                 <Icon as={ItemIcon} boxSize={5} color={itemIconColor} flexShrink={0} />
@@ -165,8 +229,8 @@ export function ElegantList({
                                         color="fg"
                                         truncate
                                     >
-                                        {isItemFolder 
-                                            ? item.name 
+                                        {isItemFolder
+                                            ? item.name
                                             : ((item as ArtifactFile).frontMatter?.alias || item.name)}
                                     </Text>
                                     {description && (
@@ -200,7 +264,19 @@ export function ElegantList({
 
                             {/* Actions Column */}
                             <Box width="40px" onClick={(e) => e.stopPropagation()}>
-                                {renderActions ? (
+                                {/* Only show menu if we have actions AND (it's not a selectable item OR we want menu + selection which we usually don't per plan) 
+                                    Plan says: "Replace 3-dot menu with checkbox selection" for kits.
+                                    "Keep ElegantList for groups: Keep 3-dot menu (no checkbox)"
+                                    
+                                    So if canSelect is true, we replaced menu with checkbox (checkbox is on left, actions on right is empty?).
+                                    Actually, usually actions are on the right. If I replace menu with checkbox, the right slot is empty?
+                                    Wait, the plan says "Replace 3-dot menu with checkbox selection".
+                                    It likely meant the primary interaction for "doing things" to the item becomes selection + footer actions, rather than per-item menu.
+                                    
+                                    So for canSelect items -> No Menu.
+                                    For !canSelect items (folders) -> Show Menu.
+                                */}
+                                {renderActions && (!selectable || isItemFolder) ? (
                                     <Menu.Root positioning={{ placement: "bottom-end" }}>
                                         <Menu.Trigger asChild>
                                             <IconButton
@@ -221,6 +297,24 @@ export function ElegantList({
                                     </Menu.Root>
                                 ) : null}
                             </Box>
+
+                            {/* Checkbox Column - Moved to Right */}
+                            {selectable && (
+                                <Box width="32px" onClick={(e) => e.stopPropagation()} display="flex" alignItems="center" justifyContent="center">
+                                    {canSelect && (
+                                        <Checkbox.Root
+                                            checked={isSelected}
+                                            onCheckedChange={() => handleItemToggle(item)}
+                                            size="sm"
+                                        >
+                                            <Checkbox.HiddenInput />
+                                            <Checkbox.Control>
+                                                <Checkbox.Indicator />
+                                            </Checkbox.Control>
+                                        </Checkbox.Root>
+                                    )}
+                                </Box>
+                            )}
                         </Flex>
                     );
                 })}
@@ -228,3 +322,4 @@ export function ElegantList({
         </Box>
     );
 }
+

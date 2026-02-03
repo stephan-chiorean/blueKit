@@ -11,17 +11,15 @@ import {
   Badge,
   Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus, LuPlus } from 'react-icons/lu';
-import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder, invokeRenameArtifactFolder } from '@/ipc';
+import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX } from 'react-icons/lu';
+import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
-import { useSelection } from '@/shared/contexts/SelectionContext';
 import FolderView from '@/shared/components/FolderView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
 import DeleteFolderDialog from '@/shared/components/DeleteFolderDialog';
 import { FilterPanel } from '@/shared/components/FilterPanel';
 import { getRootArtifacts } from '@/shared/utils/buildFolderTree';
 import { toaster } from '@/shared/components/ui/toaster';
-import { ResourceSelectionBar } from '@/shared/components/ResourceSelectionBar';
 import CreateWalkthroughDialog from '@/features/walkthroughs/components/CreateWalkthroughDialog';
 import { ElegantList } from '@/shared/components/ElegantList';
 
@@ -33,10 +31,6 @@ interface WalkthroughsSectionProps {
   projectPath: string;
   projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
-  onReload?: () => void;
-  onOptimisticMove?: (artifactPath: string, targetFolderPath: string) => (() => void);
-  onConfirmMove?: (oldPath: string, newPath: string) => void;
-  movingArtifacts?: Set<string>;
   onViewWalkthrough?: (walkthroughId: string) => void;
 }
 
@@ -48,16 +42,14 @@ function WalkthroughsSection({
   projectPath,
   projectId,
   onViewKit,
-  onReload,
-  onOptimisticMove,
-  onConfirmMove,
-  movingArtifacts = new Set(),
   onViewWalkthrough,
 }: WalkthroughsSectionProps) {
-  const { isSelected: isSelectedInContext, toggleItem, selectedItems, clearSelection } = useSelection();
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Local selection state
+  const [selectedWalkthroughIds, setSelectedWalkthroughIds] = useState<Set<string>>(new Set());
 
   // Folder-related state
   const [folders, setFolders] = useState<ArtifactFolder[]>([]);
@@ -67,18 +59,35 @@ function WalkthroughsSection({
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
   const [isCreateWalkthroughOpen, setIsCreateWalkthroughOpen] = useState(false);
 
-  const isSelected = (walkthroughId: string) => isSelectedInContext(walkthroughId);
 
-  const handleWalkthroughToggle = (walkthrough: ArtifactFile) => {
-    toggleItem({
-      id: walkthrough.path,
-      name: walkthrough.frontMatter?.alias || walkthrough.name,
-      type: 'Walkthrough',
-      path: walkthrough.path,
-      projectId,
-      projectPath,
-    });
+
+  const handleSelectionChange = (newSelectedIds: Set<string>) => {
+    setSelectedWalkthroughIds(newSelectedIds);
   };
+
+  const clearSelection = () => setSelectedWalkthroughIds(new Set());
+
+  // Clear selection on mount/unmount or projectId change
+  useEffect(() => {
+    clearSelection();
+  }, [projectId]);
+
+  // Actions
+  const handleDelete = () => {
+    console.log('Delete selected walkthroughs:', Array.from(selectedWalkthroughIds));
+    clearSelection();
+  };
+
+  const handlePublish = () => {
+    console.log('Publish selected walkthroughs:', Array.from(selectedWalkthroughIds));
+    clearSelection();
+  };
+
+  const handleAddToProject = () => {
+    console.log('Add selected walkthroughs to project:', Array.from(selectedWalkthroughIds));
+    clearSelection();
+  };
+
 
   // Filter kits to only show those with type: walkthrough in front matter
   const walkthroughs = useMemo(() =>
@@ -178,31 +187,6 @@ function WalkthroughsSection({
     }
   };
 
-  // Handle rename folder (receives new name from popover)
-  const handleRenameFolder = async (folder: ArtifactFolder, newName: string) => {
-    if (!newName) return;
-
-    try {
-      await invokeRenameArtifactFolder(folder.path, newName);
-      toaster.create({
-        type: 'success',
-        title: 'Group renamed',
-        description: `Renamed to ${newName}`,
-      });
-      // Reload folders to reflect the change
-      const newFolders = await invokeGetArtifactFolders(projectPath, 'walkthroughs');
-      setFolders(newFolders);
-    } catch (error) {
-      console.error('Failed to rename folder:', error);
-      toaster.create({
-        type: 'error',
-        title: 'Failed to rename group',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        closable: true,
-      });
-    }
-  };
-
   // Handle delete folder
   const handleDeleteFolder = (folder: ArtifactFolder) => {
     setDeletingFolder(folder);
@@ -299,8 +283,8 @@ function WalkthroughsSection({
       <FolderView
         folder={viewingFolder}
         artifacts={getFolderArtifacts(viewingFolder.path)}
-        isSelected={(path) => isSelected(path)}
-        onArtifactToggle={handleWalkthroughToggle}
+        selectedIds={selectedWalkthroughIds}
+        onSelectionChange={handleSelectionChange}
         onViewArtifact={handleViewWalkthrough}
         onBack={() => setViewingFolder(null)}
       />
@@ -315,7 +299,7 @@ function WalkthroughsSection({
       h="100%"
       overflow="hidden"
     >
-      <VStack align="stretch" gap={0} h="100%">
+      <VStack align="stretch" gap={0} flex={1} overflow="hidden">
         {/* Toolkit Header */}
         <ToolkitHeader
           title="Walkthroughs"
@@ -480,6 +464,10 @@ function WalkthroughsSection({
               <ElegantList
                 items={rootWalkthroughs}
                 type="walkthrough"
+                selectable={true}
+                selectedIds={selectedWalkthroughIds}
+                onSelectionChange={handleSelectionChange}
+                getItemId={(item) => (item as ArtifactFile).path}
                 onItemClick={(kit) => handleViewWalkthrough(kit as ArtifactFile)}
                 renderActions={(item) => (
                   <Menu.Item value="open-walkthrough" onClick={() => handleViewWalkthrough(item as ArtifactFile)}>
@@ -494,18 +482,6 @@ function WalkthroughsSection({
         </Box>
       </VStack>
 
-      <ResourceSelectionBar
-        isOpen={selectedItems.length > 0}
-        selectedItems={selectedItems}
-        onClearSelection={clearSelection}
-        onMoveToFolder={(folderPath) => {
-          // TODO: Implement move to folder
-          console.log('Move to folder:', folderPath, selectedItems);
-          clearSelection();
-        }}
-        folders={folders}
-      />
-
       <DeleteFolderDialog
         isOpen={!!deletingFolder}
         onClose={() => setDeletingFolder(null)}
@@ -519,13 +495,76 @@ function WalkthroughsSection({
           isOpen={isCreateWalkthroughOpen}
           onClose={() => setIsCreateWalkthroughOpen(false)}
           onWalkthroughCreated={() => {
-            onReload?.();
+            // No reload needed as file watcher handles it
           }}
           projectId={projectId}
           projectPath={projectPath}
         />
       )}
 
+      {/* Inline Selection Footer */}
+      <Box
+        position="sticky"
+        bottom={0}
+        width="100%"
+        display="grid"
+        css={{
+          gridTemplateRows: selectedWalkthroughIds.size > 0 ? "1fr" : "0fr",
+          transition: "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <Box overflow="hidden" minHeight={0}>
+          <Box
+            borderTopWidth="1px"
+            borderColor="border.subtle"
+            py={4}
+            px={6}
+            css={{
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              _dark: {
+                background: 'rgba(20, 20, 20, 0.85)',
+              }
+            }}
+          >
+            <HStack justify="space-between">
+              <HStack gap={3}>
+                <Badge colorPalette="blue" size="lg" variant="solid">
+                  {selectedWalkthroughIds.size}
+                </Badge>
+                <Text fontWeight="medium" fontSize="sm">walkthrough{selectedWalkthroughIds.size > 1 ? 's' : ''} selected</Text>
+              </HStack>
+              <HStack gap={2}>
+                <Button size="sm" variant="ghost" colorPalette="blue" onClick={handleAddToProject}>
+                  <HStack gap={1}>
+                    <LuPlus />
+                    <Text>Add to Project</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="orange" onClick={handlePublish}>
+                  <HStack gap={1}>
+                    <LuShare />
+                    <Text>Publish to Library</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="red" onClick={handleDelete}>
+                  <HStack gap={1}>
+                    <LuTrash2 />
+                    <Text>Delete</Text>
+                  </HStack>
+                </Button>
+                <Button size="sm" variant="ghost" colorPalette="gray" onClick={clearSelection}>
+                  <HStack gap={1}>
+                    <LuX />
+                    <Text>Clear</Text>
+                  </HStack>
+                </Button>
+              </HStack>
+            </HStack>
+          </Box>
+        </Box>
+      </Box>
 
     </Flex>
   );
@@ -542,7 +581,6 @@ export default memo(WalkthroughsSection, (prevProps, nextProps) => {
     prevProps.projectPath === nextProps.projectPath &&
     prevProps.projectId === nextProps.projectId &&
     prevProps.onViewKit === nextProps.onViewKit &&
-    prevProps.onReload === nextProps.onReload &&
     prevProps.onViewWalkthrough === nextProps.onViewWalkthrough
   );
 });
