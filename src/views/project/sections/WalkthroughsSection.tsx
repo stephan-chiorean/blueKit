@@ -79,6 +79,7 @@ function WalkthroughsSection({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
 
   const handleSelectionChange = (newSelectedIds: Set<string>) => {
@@ -179,6 +180,9 @@ function WalkthroughsSection({
   };
 
   const handleViewWalkthrough = (walkthrough: ArtifactFile) => {
+    // Don't open if we just finished dragging
+    if (justFinishedDragging) return;
+
     if (onViewWalkthrough) {
       onViewWalkthrough(walkthrough.path);
     } else {
@@ -328,10 +332,19 @@ function WalkthroughsSection({
     };
 
     const handleMouseUp = async () => {
+      const wasDragging = hasDragThresholdMet;
+
       if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
         await performMove(dragState.draggedWalkthrough, dragState.dropTargetFolderId);
       }
+
       clearDragState();
+
+      // Prevent click event from firing after drag
+      if (wasDragging) {
+        setJustFinishedDragging(true);
+        setTimeout(() => setJustFinishedDragging(false), 100);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {

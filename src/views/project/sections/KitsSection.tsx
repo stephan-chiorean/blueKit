@@ -109,6 +109,7 @@ function KitsSection({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
   const handleDelete = async () => {
     const selectedKits = kits.filter(k => selectedKitIds.has(k.path));
@@ -324,6 +325,12 @@ function KitsSection({
     // Context menu logic if needed, or pass prop to ElegantList to handle it
   };
 
+  // Wrapper for onViewKit that prevents opening after drag
+  const handleViewKit = (kit: ArtifactFile) => {
+    if (justFinishedDragging) return;
+    onViewKit(kit);
+  };
+
   // Drag handlers
   const handleDragStart = useCallback((kit: ArtifactFile, e: React.MouseEvent) => {
     e.preventDefault(); // Prevent text selection
@@ -415,10 +422,19 @@ function KitsSection({
     };
 
     const handleMouseUp = async () => {
+      const wasDragging = hasDragThresholdMet;
+
       if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
         await performMove(dragState.draggedKit, dragState.dropTargetFolderId);
       }
+
       clearDragState();
+
+      // Prevent click event from firing after drag
+      if (wasDragging) {
+        setJustFinishedDragging(true);
+        setTimeout(() => setJustFinishedDragging(false), 100);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -686,7 +702,7 @@ function KitsSection({
                 selectedIds={selectedKitIds}
                 onSelectionChange={handleSelectionChange}
                 getItemId={(item) => (item as ArtifactFile).path}
-                onItemClick={(kit) => onViewKit(kit as ArtifactFile)}
+                onItemClick={(kit) => handleViewKit(kit as ArtifactFile)}
                 onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
                 onItemMouseDown={(kit, e) => {
                   handleDragStart(kit as ArtifactFile, e as any);
