@@ -1389,6 +1389,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
             onOptimisticMove={handleOptimisticMove}
             onConfirmMove={handleConfirmMove}
             movingArtifacts={movingArtifacts}
+            projects={allProjects}
           />
         );
       case 'walkthroughs':
@@ -1402,6 +1403,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
             projectId={project.id}
             onViewKit={handleViewWalkthrough}
             onReload={loadProjectArtifacts}
+            projects={allProjects}
             onOptimisticMove={handleOptimisticMove}
             onConfirmMove={handleConfirmMove}
             movingArtifacts={movingArtifacts}

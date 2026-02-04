@@ -1,21 +1,33 @@
 # Phase 6.2: Tasks Section Refinement
 
 ## Overview
-Refactor TasksSection to follow the KitsSection pattern with improved UX for task management. This includes moving to modals for task creation/editing, implementing a dedicated selection footer, and reorganizing the UI for better usability.
+Refactor TasksSection to follow the **WalkthroughsSection pattern** with improved UX for task management. This includes:
+- **Using ElegantList component exclusively** (removing card/table view modes)
+- Moving to modals for task creation/editing
+- Implementing a dedicated selection footer
+- Reorganizing the UI to match WalkthroughsSection layout exactly
+- Adding drag-and-drop between sections
+
+## Key Architectural Change
+**Remove card/table view modes entirely and use only ElegantList component** (like WalkthroughsSection). This provides a consistent, elegant UI across all sections.
 
 ## Goals
-1. Align TasksSection UI with KitsSection patterns
-2. Replace popovers with modals for task creation/editing
-3. Implement dedicated selection footer for tasks
-4. Move status field to top-level visibility
-5. Improve quick add UX with right-aligned placement
+1. **Align TasksSection UI with WalkthroughsSection pattern** (not KitsSection)
+2. **Use only ElegantList component** - remove LiquidViewModeSwitcher
+3. Replace popovers with modals for task creation/editing
+4. Implement dedicated selection footer for tasks
+5. Move status field to top-level visibility
+6. Filter button inline with section heading (not in ToolkitHeader)
+7. Add drag-and-drop between In Progress and Backlog sections
 
-## Current State
-- Uses QuickTaskPopover for task creation (left-aligned)
-- Edit via EditTaskDialog
-- Status field hidden behind "more options"
-- Generic TasksActionBar for selections
-- Filter panel on left side
+## Current State (What We're Removing/Changing)
+- Uses QuickTaskPopover for task creation (left-aligned) → **Replace with CreateTaskDialog**
+- Edit via EditTaskDialog → **Keep but move Status to top**
+- Status field hidden behind "more options" → **Move to top level**
+- Generic TasksActionBar for selections → **Replace with TasksSelectionFooter**
+- Card/table view mode switching with LiquidViewModeSwitcher → **Remove entirely, use only ElegantList**
+- Manually rendered task cards and table rows → **Replace with ElegantList component**
+- Filter button in ToolkitHeader → **Move inline with section heading**
 
 ## Proposed Changes
 
@@ -40,12 +52,11 @@ Refactor TasksSection to follow the KitsSection pattern with improved UX for tas
 - Shows selected count and item types
 
 ### 3. Layout Structure
-**Follow KitsSection pattern:**
+**Follow WalkthroughsSection pattern:**
 ```
 ┌─────────────────────────────────────┐
 │ ToolkitHeader                       │
 │  - Title: "Tasks"                   │
-│  - Left: Filter Button (glass)      │
 │  - Right: Add Task Button (icon)    │
 └─────────────────────────────────────┘
 │                                     │
@@ -53,16 +64,14 @@ Refactor TasksSection to follow the KitsSection pattern with improved UX for tas
 │                                     │
 │  ┌────────────────────────────────┐ │
 │  │ In Progress Section            │ │
-│  │  - Heading + Count             │ │
-│  │  - ElegantList (if table view) │ │
-│  │  - Card Grid (if card view)    │ │
+│  │  - Heading + Count + Filter    │ │
+│  │  - ElegantList Component       │ │
 │  └────────────────────────────────┘ │
 │                                     │
 │  ┌────────────────────────────────┐ │
 │  │ Backlog Section                │ │
 │  │  - Heading + Count             │ │
-│  │  - ElegantList (if table view) │ │
-│  │  - Card Grid (if card view)    │ │
+│  │  - ElegantList Component       │ │
 │  └────────────────────────────────┘ │
 │                                     │
 └─────────────────────────────────────┘
@@ -72,21 +81,22 @@ Refactor TasksSection to follow the KitsSection pattern with improved UX for tas
 └─────────────────────────────────────┘
 ```
 
+**Key Changes:**
+- Remove card/table view modes entirely
+- Use only ElegantList component (like WalkthroughsSection)
+- No view mode switcher
+- Filter button inline with "In Progress" section heading (like WalkthroughsSection lines 325-372)
+
 ### 4. Filter Panel Position
-- Filter button on left side of ToolkitHeader (glass styling)
+- Filter button inline with "In Progress" section heading (glass styling)
 - Panel opens below button (absolute positioning)
-- Same pattern as WalkthroughsSection
+- Exact same pattern as WalkthroughsSection (lines 325-372)
 
-### 5. View Mode Integration
-- Keep card/table view switcher
-- Position on right side of section headers
-- Use LiquidViewModeSwitcher component
-
-### 6. Drag-and-Drop Between Sections
+### 5. Drag-and-Drop Between Sections
 **Enable dragging tasks between in-progress and backlog:**
 - Inspired by NotebookTree.tsx drag-and-drop implementation
-- Drag source: Any task card or table row
-- Drop targets: In-progress section header/area, Backlog section header/area
+- Drag source: Any task item in ElegantList
+- Drop targets: In-progress section container, Backlog section container
 - Actions:
   - Drag from backlog → drop on in-progress = Update status to `in_progress`
   - Drag from in-progress → drop on backlog = Update status to `backlog`
@@ -184,15 +194,28 @@ useEffect(() => {
 
 **Visual Feedback Implementation:**
 ```tsx
-// Task card/row with drag handlers
-<Card.Root
-  opacity={isBeingDragged ? 0.5 : 1}
-  cursor={dragState ? 'grabbing' : 'grab'}
-  onMouseDown={(e) => handleDragStart(task, { x: e.clientX, y: e.clientY })}
-  transition="opacity 0.15s"
->
-  {/* Task content */}
-</Card.Root>
+// ElegantList item with drag handlers (pass through props)
+<ElegantList
+  items={inProgressTasks}
+  type="task"
+  selectable={true}
+  selectedIds={selectedTaskIds}
+  onSelectionChange={handleSelectionChange}
+  getItemId={(item) => (item as Task).id}
+  onItemClick={(task) => handleViewTask(task as Task)}
+  // Drag handlers passed to each item
+  onItemMouseDown={(task, e) => handleDragStart(task as Task, e)}
+  getItemStyle={(task) => ({
+    opacity: dragState?.draggedTask.id === (task as Task).id ? 0.5 : 1,
+    cursor: dragState ? 'grabbing' : 'grab',
+    transition: 'opacity 0.15s'
+  })}
+  renderActions={(item) => (
+    <Menu.Item value="edit" onClick={() => handleEditTask(item as Task)}>
+      <Text>Edit</Text>
+    </Menu.Item>
+  )}
+/>
 
 // Drop zone styling
 <Box
@@ -272,7 +295,7 @@ useEffect(() => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
   ```
-- Add `handleDragStart` callback on task cards/rows (mousedown event)
+- Add `handleDragStart` callback on ElegantList items (via onItemMouseDown prop)
 - Add document-level mousemove handler to track cursor and update drop target
 - Add document-level mouseup handler to perform status update on drop
 - Add keyboard handler (Escape to cancel drag)
@@ -365,12 +388,12 @@ TasksSection
 - [ ] Create task via modal
 - [ ] Edit task via modal
 - [ ] Status field visible at top level
-- [ ] Filter panel opens/closes correctly
+- [ ] Filter panel opens/closes correctly (inline with In Progress heading)
 - [ ] Selection footer appears with selections
 - [ ] Delete multiple tasks
 - [ ] Clear multiple tasks
 - [ ] Complete multiple tasks
-- [ ] View mode switching (card/table)
+- [ ] ElegantList displays tasks correctly
 - [ ] Responsive layout
 - [ ] Glass styling on filter button
 - [ ] Right-aligned Add Task button
@@ -383,7 +406,7 @@ TasksSection
 - [ ] Escape key cancels drag
 - [ ] Dragged task shows reduced opacity
 - [ ] Tasks refresh after successful drag-drop
-- [ ] Drag works in both card and table view modes
+- [ ] Click task in ElegantList to view/edit
 
 ## Files to Modify
 1. `src/views/project/sections/TasksSection.tsx` - Main refactor
@@ -398,31 +421,34 @@ TasksSection
 - Document-level event listeners (mousemove, mouseup, keydown)
 
 ## Success Criteria
-1. Tasks section follows KitsSection UI pattern
+1. Tasks section follows WalkthroughsSection UI pattern
 2. Task creation/editing uses modals (not popovers)
 3. Status field always visible (top-level)
 4. Dedicated selection footer with task-specific actions
-5. Right-aligned Add Task button
-6. Glass filter button on left
-7. Consistent spacing and visual hierarchy
-8. Drag-and-drop between sections works smoothly
-9. Drop zones provide clear visual feedback
-10. Task status updates correctly on drag-drop
-11. Drag threshold prevents accidental drags
-12. Drag works in both card and table view modes
+5. Right-aligned Add Task button in ToolkitHeader
+6. Glass filter button inline with "In Progress" section heading
+7. **Uses only ElegantList component (no card/table view modes)**
+8. Consistent spacing and visual hierarchy matching WalkthroughsSection
+9. Drag-and-drop between sections works smoothly
+10. Drop zones provide clear visual feedback
+11. Task status updates correctly on drag-drop
+12. Drag threshold prevents accidental drags
+13. ElegantList items support drag handlers via props
 
 ## Notes
 - Keep existing in-progress/backlog separation
 - Maintain existing filter functionality
-- Preserve view mode switching (card/table)
+- **Remove card/table view modes - use only ElegantList (like WalkthroughsSection)**
 - Remove QuickTaskPopover dependency
 - Remove generic TasksActionBar
+- Remove LiquidViewModeSwitcher (no longer needed)
 - Drag-and-drop implementation follows NotebookTree.tsx patterns
 - Drag threshold (5px) prevents accidental drags on click
 - Drop zones use data attributes for clean element detection
 - Drag tooltip uses React Portal to overlay document body
 - Status updates via IPC maintain data integrity
-- Both card and table view modes support drag-and-drop
+- ElegantList component handles all task rendering
+- Filter button inline with "In Progress" section heading (matches WalkthroughsSection pattern)
 
 ## Drag-and-Drop UX Flow
 1. User mousedown on task card/row

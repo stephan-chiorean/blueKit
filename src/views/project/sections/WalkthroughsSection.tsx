@@ -12,7 +12,7 @@ import {
   Menu,
 } from '@chakra-ui/react';
 import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX } from 'react-icons/lu';
-import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
+import { ArtifactFile, ArtifactFolder, FolderConfig, Project, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import FolderView from '@/shared/components/FolderView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
@@ -32,6 +32,8 @@ interface WalkthroughsSectionProps {
   projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
   onViewWalkthrough?: (walkthroughId: string) => void;
+  projects?: Project[];
+  onReload?: () => void;
 }
 
 function WalkthroughsSection({
@@ -43,6 +45,8 @@ function WalkthroughsSection({
   projectId,
   onViewKit,
   onViewWalkthrough,
+  projects = [],
+  onReload,
 }: WalkthroughsSectionProps) {
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -287,6 +291,8 @@ function WalkthroughsSection({
         onSelectionChange={handleSelectionChange}
         onViewArtifact={handleViewWalkthrough}
         onBack={() => setViewingFolder(null)}
+        projects={projects}
+        onArtifactsChanged={onReload}
       />
     );
   }

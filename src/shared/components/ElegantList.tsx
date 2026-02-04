@@ -12,10 +12,12 @@ import {
 import { MdFolder, MdMoreVert } from "react-icons/md";
 import { LuBookOpen, LuPackage } from "react-icons/lu";
 import { ArtifactFile, ArtifactFolder } from "@/ipc";
+import { Task } from "@/types/task";
 import { ReactNode } from "react";
 import { useColorMode } from "@/shared/contexts/ColorModeContext";
+import { getPriorityIcon, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from "@/shared/utils/taskUtils";
 
-export type ElegantListItem = ArtifactFile | ArtifactFolder;
+export type ElegantListItem = ArtifactFile | ArtifactFolder | Task;
 
 interface ElegantListProps {
     items: ElegantListItem[];
@@ -30,7 +32,11 @@ interface ElegantListProps {
     onToggleSelection?: (item: ElegantListItem) => void;
     onSelectionChange?: (ids: Set<string>) => void;
     getItemId?: (item: ElegantListItem) => string;
-    type?: 'kit' | 'folder' | 'walkthrough';
+    type?: 'kit' | 'folder' | 'walkthrough' | 'task';
+
+    // Drag-and-drop support
+    onItemMouseDown?: (item: ElegantListItem, e: React.MouseEvent) => void;
+    getItemStyle?: (item: ElegantListItem) => React.CSSProperties;
 }
 
 export function ElegantList({
@@ -44,7 +50,9 @@ export function ElegantList({
     onToggleSelection,
     onSelectionChange,
     getItemId,
-    // type prop is available in interface but not used in logic yet
+    type,
+    onItemMouseDown,
+    getItemStyle,
 }: ElegantListProps) {
     const { colorMode } = useColorMode();
 
@@ -57,11 +65,14 @@ export function ElegantList({
 
     const getItemPath = (item: ElegantListItem) => getItemId ? getItemId(item) : ('path' in item ? item.path : (item as any).id);
 
+    // Helper to determine item type
+    const isFolder = (item: ElegantListItem): item is ArtifactFolder => !('frontMatter' in item) && !('priority' in item);
+    const isTask = (item: ElegantListItem): item is Task => 'priority' in item && 'status' in item;
+    const isArtifact = (item: ElegantListItem): item is ArtifactFile => 'frontMatter' in item;
+
     // Calculate selection state for header
-    const selectableItems = items.filter(item => !(!('frontMatter' in item))); // Filter out folders
+    const selectableItems = items.filter(item => !isFolder(item)); // Filter out folders
     const allSelected = selectableItems.length > 0 && selectableItems.every(item => selectedIds?.has(getItemPath(item)));
-    const someSelected = selectableItems.some(item => selectedIds?.has(getItemPath(item)));
-    const isIndeterminate = someSelected && !allSelected;
 
     const handleSelectAll = () => {
         if (!onSelectionChange) return;
@@ -122,13 +133,18 @@ export function ElegantList({
                 {selectable && (
                     <Box width="32px" display="flex" alignItems="center" justifyContent="center">
                         <Checkbox.Root
-                            checked={allSelected ? true : (isIndeterminate ? "indeterminate" : false)}
+                            checked={allSelected}
                             onCheckedChange={handleSelectAll}
                             size="sm"
                         >
                             <Checkbox.HiddenInput />
-                            <Checkbox.Control>
-                                <Checkbox.Indicator />
+                            <Checkbox.Control
+                                _checked={{
+                                    bg: "primary.500",
+                                    borderColor: "primary.500",
+                                }}
+                            >
+                                {/* No Checkbox.Indicator - solid fill only */}
                             </Checkbox.Control>
                         </Checkbox.Root>
                     </Box>
@@ -143,14 +159,23 @@ export function ElegantList({
                     const isSelected = selectedIds?.has(path);
 
                     // Determine type for icon/styling
-                    const isItemFolder = !('frontMatter' in item);
+                    const isItemFolder = isFolder(item);
+                    const isItemTask = isTask(item);
                     // Items are selectable if the list is selectable AND it's not a folder
                     const canSelect = selectable && !isItemFolder;
 
                     let ItemIcon: React.ElementType = MdFolder;
                     let itemIconColor = folderIconColor;
 
-                    if (!isItemFolder) {
+                    if (isItemTask) {
+                        // For tasks, use priority icon
+                        const task = item as Task;
+                        const priorityIcon = getPriorityIcon(task.priority);
+                        if (priorityIcon) {
+                            ItemIcon = priorityIcon.icon;
+                            itemIconColor = priorityIcon.color;
+                        }
+                    } else if (!isItemFolder) {
                         const file = item as ArtifactFile;
                         if (file.frontMatter?.type === 'walkthrough') {
                             ItemIcon = LuBookOpen;
@@ -168,7 +193,10 @@ export function ElegantList({
                     // Safely access properties based on type
                     let tags: string[] = [];
 
-                    if (isItemFolder) {
+                    if (isItemTask) {
+                        const task = item as Task;
+                        tags = task.tags || [];
+                    } else if (isItemFolder) {
                         const folder = item as ArtifactFolder;
                         if ('config' in folder && (folder as any).config?.tags) {
                             tags = (folder as any).config.tags || [];
@@ -179,7 +207,10 @@ export function ElegantList({
                     }
 
                     let updatedAt: string | number | undefined;
-                    if (isItemFolder) {
+                    if (isItemTask) {
+                        const task = item as Task;
+                        updatedAt = task.updatedAt;
+                    } else if (isItemFolder) {
                         const folder = item as ArtifactFolder;
                         updatedAt = (folder as any).updatedAt || (folder as any).config?.updatedAt;
                     } else {
@@ -194,9 +225,14 @@ export function ElegantList({
                         } catch (e) { }
                     }
 
-                    const description = isItemFolder
-                        ? ((item as any).description || (item as any).config?.description || '')
-                        : (item as ArtifactFile).frontMatter?.description;
+                    const description = isItemTask
+                        ? (item as Task).description
+                        : isItemFolder
+                            ? ((item as any).description || (item as any).config?.description || '')
+                            : (item as ArtifactFile).frontMatter?.description;
+
+                    // Get custom item style for drag-and-drop
+                    const customStyle = getItemStyle ? getItemStyle(item) : {};
 
                     return (
                         <Flex
@@ -217,22 +253,54 @@ export function ElegantList({
                                 onItemClick(item);
                             }}
                             onContextMenu={(e) => onItemContextMenu?.(e, item)}
+                            onMouseDown={(e) => onItemMouseDown?.(item, e)}
+                            style={customStyle}
                         >
 
                             {/* Name Column */}
                             <Flex flex="1" align="center" gap={3} minW={0} pr={4}>
                                 <Icon as={ItemIcon} boxSize={5} color={itemIconColor} flexShrink={0} />
                                 <Box minW={0} overflow="hidden">
-                                    <Text
-                                        fontWeight="medium"
-                                        fontSize="sm"
-                                        color="fg"
-                                        truncate
-                                    >
-                                        {isItemFolder
-                                            ? item.name
-                                            : ((item as ArtifactFile).frontMatter?.alias || item.name)}
-                                    </Text>
+                                    <HStack gap={2} align="center">
+                                        <Text
+                                            fontWeight="medium"
+                                            fontSize="sm"
+                                            color="fg"
+                                            truncate
+                                        >
+                                            {isItemTask
+                                                ? (item as Task).title
+                                                : isItemFolder
+                                                    ? item.name
+                                                    : ((item as ArtifactFile).frontMatter?.alias || item.name)}
+                                        </Text>
+                                        {/* Task-specific badges */}
+                                        {isItemTask && (() => {
+                                            const task = item as Task;
+                                            const complexityLabel = task.complexity ?
+                                                (task.complexity === 'easy' ? 'Easy' : task.complexity === 'hard' ? 'Hard' : 'Deep Dive') : null;
+                                            const typeLabel = task.type ? getTypeLabel(task.type) : null;
+                                            const typeIconData = task.type ? getTypeIcon(task.type) : null;
+
+                                            return (
+                                                <HStack gap={1} flexShrink={0}>
+                                                    {complexityLabel && (
+                                                        <Badge size="sm" variant="outline" colorPalette="gray">
+                                                            {complexityLabel}
+                                                        </Badge>
+                                                    )}
+                                                    {typeLabel && typeIconData && (
+                                                        <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
+                                                            <HStack gap={1}>
+                                                                <Icon as={typeIconData.icon} color={typeIconData.color} boxSize={3} />
+                                                                <Text>{typeLabel}</Text>
+                                                            </HStack>
+                                                        </Badge>
+                                                    )}
+                                                </HStack>
+                                            );
+                                        })()}
+                                    </HStack>
                                     {description && (
                                         <Text fontSize="xs" color="text.muted" truncate>
                                             {description}
@@ -245,7 +313,12 @@ export function ElegantList({
                             <Box width="200px" display={{ base: "none", md: "block" }}>
                                 <HStack gap={1} flexWrap="nowrap" overflow="hidden">
                                     {tags?.slice(0, 3).map((tag) => (
-                                        <Badge key={tag} size="sm" variant="subtle" colorPalette="gray">
+                                        <Badge
+                                            key={tag}
+                                            size="sm"
+                                            variant="subtle"
+                                            colorPalette={isItemTask ? getPriorityColorPalette((item as Task).priority) : "gray"}
+                                        >
                                             {tag}
                                         </Badge>
                                     ))}
@@ -308,8 +381,13 @@ export function ElegantList({
                                             size="sm"
                                         >
                                             <Checkbox.HiddenInput />
-                                            <Checkbox.Control>
-                                                <Checkbox.Indicator />
+                                            <Checkbox.Control
+                                                _checked={{
+                                                    bg: "primary.500",
+                                                    borderColor: "primary.500",
+                                                }}
+                                            >
+                                                {/* No Checkbox.Indicator - solid fill only */}
                                             </Checkbox.Control>
                                         </Checkbox.Root>
                                     )}

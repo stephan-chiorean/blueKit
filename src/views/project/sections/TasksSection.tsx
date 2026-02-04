@@ -1,38 +1,28 @@
 import { useMemo, useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
-  Heading,
-  SimpleGrid,
   Flex,
   Text,
   HStack,
-  Tag,
   VStack,
   Badge,
-  Checkbox,
   Button,
   Icon,
   Spinner,
-  Table,
-  Input,
-  InputGroup,
-  Field,
-  IconButton,
+  Heading,
+  Menu,
 } from '@chakra-ui/react';
-import { LuPlus, LuFolder, LuLayoutGrid, LuTable, LuFilter, LuX } from 'react-icons/lu';
-import { LiquidViewModeSwitcher } from '@/features/kits/components/LiquidViewModeSwitcher';
+import { LuPlus, LuFilter } from 'react-icons/lu';
 import { Task, TaskPriority, TaskType } from '@/types/task';
-import { Project, invokeDbGetTasks, invokeDbGetProjectTasks } from '@/ipc';
-import TasksActionBar from '@/features/tasks/components/TasksActionBar';
+import { Project, invokeDbGetTasks, invokeDbGetProjectTasks, invokeDbUpdateTask } from '@/ipc';
+import TasksSelectionFooter from '@/features/tasks/components/TasksSelectionFooter';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import EditTaskDialog from '@/features/tasks/components/EditTaskDialog';
-import { useQuickTaskPopover } from '@/shared/contexts/QuickTaskPopoverContext';
+import CreateTaskDialog from '@/features/tasks/components/CreateTaskDialog';
+import DragTooltip from '@/features/tasks/components/DragTooltip';
 import { toaster } from '@/shared/components/ui/toaster';
-import { getPriorityLabel, getPriorityIcon, getPriorityHoverColors, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from '@/shared/utils/taskUtils';
-import { useColorMode } from '@/shared/contexts/ColorModeContext';
+import { FilterPanel } from '@/shared/components/FilterPanel';
+import { ElegantList } from '@/shared/components/ElegantList';
 
 interface TasksSectionProps {
   context: 'workspace' | Project;  // workspace view or specific project
@@ -44,13 +34,23 @@ export interface TasksSectionRef {
 }
 
 type SortOption = 'priority' | 'time';
-type ViewMode = 'card' | 'table';
+
+// Drag state for task movement between sections
+interface DragState {
+  draggedTask: Task;
+  sourceSection: 'in_progress' | 'backlog';
+  dropTargetSection: 'in_progress' | 'backlog' | null;
+  isValidDrop: boolean;
+  startPosition: { x: number; y: number };
+}
+
+// Constants for drag behavior
+const DRAG_THRESHOLD = 5; // pixels before drag activates
 
 const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   context,
   projects,
 }, ref) => {
-  const { colorMode } = useColorMode();
   // Local state for tasks (loaded from database)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,21 +61,23 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   // Dialog state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { openPopover } = useQuickTaskPopover();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Drag state
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
 
   // Sort state
   const [sortBy] = useState<SortOption>('time');
-
-  // View mode state
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
 
   // Filter state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [titleFilter, setTitleFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
-  const [selectedComplexities, setSelectedComplexities] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<TaskType[]>([]);
+  const [selectedComplexities] = useState<string[]>([]);
+  const [selectedTypes] = useState<TaskType[]>([]);
 
   // Load tasks from database
   const loadTasks = async () => {
@@ -98,8 +100,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     }
   };
 
-  // Ref for filter panel to detect outside clicks
-  const filterPanelRef = useRef<HTMLDivElement>(null);
+  // Ref for filter button
   const filterButtonRef = useRef<HTMLButtonElement>(null);
 
   // Load tasks on mount and when context changes
@@ -107,52 +108,69 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     loadTasks();
   }, [context]);
 
-  // Close filter panel when clicking outside
+  // Document-level drag event handlers
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isFilterOpen &&
-        filterPanelRef.current &&
-        filterButtonRef.current &&
-        !filterPanelRef.current.contains(event.target as Node) &&
-        !filterButtonRef.current.contains(event.target as Node)
-      ) {
-        setIsFilterOpen(false);
+    if (!dragState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+
+      if (!hasDragThresholdMet) {
+        const dx = Math.abs(e.clientX - dragState.startPosition.x);
+        const dy = Math.abs(e.clientY - dragState.startPosition.y);
+
+        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          setHasDragThresholdMet(true);
+        }
+        return;
+      }
+
+      const target = findDropTargetAtPosition(e.clientX, e.clientY);
+      const isValid = isValidDrop(dragState.sourceSection, target);
+
+      setDragState(prev => prev ? {
+        ...prev,
+        dropTargetSection: target,
+        isValidDrop: isValid
+      } : null);
+    };
+
+    const handleMouseUp = async () => {
+      if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetSection) {
+        await performStatusUpdate(dragState.draggedTask, dragState.dropTargetSection);
+      }
+      clearDragState();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        clearDragState();
       }
     };
 
-    if (isFilterOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isFilterOpen]);
+  }, [dragState, hasDragThresholdMet]);
 
   // Get selected tasks
   const selectedTasks = useMemo(() => {
     return tasks.filter(task => selectedTaskIds.has(task.id));
   }, [tasks, selectedTaskIds]);
 
-  const isSelected = (id: string) => {
-    return selectedTaskIds.has(id);
-  };
-
-  const handleTaskToggle = (task: Task) => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(task.id)) {
-        next.delete(task.id);
-      } else {
-        next.add(task.id);
-      }
-      return next;
-    });
-  };
 
   const clearSelection = () => {
     setSelectedTaskIds(new Set());
+  };
+
+  const handleSelectionChange = (newSelectedIds: Set<string>) => {
+    setSelectedTaskIds(newSelectedIds);
   };
 
   const handleViewTask = (task: Task) => {
@@ -161,26 +179,84 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   };
 
   const handleAddTask = () => {
-    openPopover({
-      defaultView: 'create',
-      defaultProjectId: context !== 'workspace' ? (context as Project).id : undefined,
-      onTaskCreated: handleTaskCreated,
-    });
+    setIsCreateDialogOpen(true);
   };
 
   useImperativeHandle(ref, () => ({
     openCreateDialog: () => {
-      openPopover({
-        defaultView: 'create',
-        defaultProjectId: context !== 'workspace' ? (context as Project).id : undefined,
-        onTaskCreated: handleTaskCreated,
-      });
+      setIsCreateDialogOpen(true);
     },
   }));
 
-  const handleTaskCreated = () => {
-    // Reload tasks from database
-    loadTasks();
+  // Drag handlers
+  const handleDragStart = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    setDragState({
+      draggedTask: task,
+      sourceSection: task.status === 'in_progress' ? 'in_progress' : 'backlog',
+      dropTargetSection: null,
+      isValidDrop: false,
+      startPosition: { x: e.clientX, y: e.clientY },
+    });
+    setHasDragThresholdMet(false);
+  };
+
+  const clearDragState = () => {
+    setDragState(null);
+    setHasDragThresholdMet(false);
+    setMousePosition({ x: 0, y: 0 });
+  };
+
+  const findDropTargetAtPosition = (x: number, y: number): 'in_progress' | 'backlog' | null => {
+    const elements = document.elementsFromPoint(x, y);
+
+    for (const el of elements) {
+      const dropZone = (el as HTMLElement).closest('[data-drop-zone]');
+      if (dropZone) {
+        const zone = dropZone.getAttribute('data-drop-zone');
+        if (zone === 'in_progress' || zone === 'backlog') {
+          return zone;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const isValidDrop = (sourceSection: string, targetSection: string | null): boolean => {
+    if (!targetSection) return false;
+    return sourceSection !== targetSection;
+  };
+
+  const performStatusUpdate = async (task: Task, newStatus: 'in_progress' | 'backlog') => {
+    try {
+      await invokeDbUpdateTask(
+        task.id,
+        task.title,
+        task.description,
+        task.priority,
+        task.tags,
+        task.projectIds,
+        newStatus,
+        task.complexity,
+        task.type
+      );
+
+      toaster.create({
+        type: 'success',
+        title: 'Task moved',
+        description: `Moved to ${newStatus === 'in_progress' ? 'In Progress' : 'Backlog'}`,
+      });
+
+      await loadTasks();
+    } catch (error) {
+      toaster.create({
+        type: 'error',
+        title: 'Failed to move task',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   };
 
   // Get priority order for sorting (lower number = higher priority)
@@ -201,23 +277,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     }
   };
 
-  // Get complexity label
-  const getComplexityLabel = (complexity?: string) => {
-    if (!complexity) return null;
-    switch (complexity) {
-      case 'easy':
-        return 'Easy';
-      case 'hard':
-        return 'Hard';
-      case 'deep dive':
-        return 'Deep Dive';
-      default:
-        return complexity;
-    }
-  };
 
-
-  // Get all unique tags, priorities, and complexities from tasks
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
     tasks.forEach(task => {
@@ -225,10 +285,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     });
     return Array.from(tagSet).sort();
   }, [tasks]);
-
-  const allPriorities: TaskPriority[] = ['pinned', 'high', 'standard', 'long term', 'nit'];
-  const allComplexities = ['easy', 'hard', 'deep dive'];
-  const allTypes: TaskType[] = ['bug', 'investigation', 'feature', 'cleanup', 'optimization', 'chore'];
 
   // Sort tasks based on selected sort option, filtering out completed tasks
   const sortedTasks = useMemo(() => {
@@ -338,26 +394,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     });
   };
 
-  const toggleComplexity = (complexity: string) => {
-    setSelectedComplexities(prev => {
-      if (prev.includes(complexity)) {
-        return prev.filter(c => c !== complexity);
-      } else {
-        return [...prev, complexity];
-      }
-    });
-  };
-
-  const toggleType = (type: TaskType) => {
-    setSelectedTypes(prev => {
-      if (prev.includes(type)) {
-        return prev.filter(t => t !== type);
-      } else {
-        return [...prev, type];
-      }
-    });
-  };
-
   if (loading) {
     return (
       <Box
@@ -404,139 +440,14 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     );
   }
 
-  // Helper function to format date
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '—';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
 
-  // Helper function to render task card (used in both In Progress and Backlog sections)
-  const renderTaskCard = (task: Task) => {
-    const taskSelected = isSelected(task.id);
-    const complexityLabel = getComplexityLabel(task.complexity);
-    const typeLabel = getTypeLabel(task.type);
-    const typeIcon = task.type ? getTypeIcon(task.type) : null;
-    const priorityIcon = getPriorityIcon(task.priority);
-    const hoverColors = getPriorityHoverColors(task.priority);
-
-    return (
-      <Card.Root
-        key={task.id}
-        variant="subtle"
-        borderRadius="16px"
-        borderWidth={taskSelected ? "2px" : "1px"}
-        position="relative"
-        cursor="pointer"
-        onClick={() => handleViewTask(task)}
-        transition="all 0.2s ease-in-out"
-        css={{
-          background: 'rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(30px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-          borderColor: taskSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-          _dark: {
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderColor: taskSelected ? 'var(--chakra-colors-primary-500)' : 'rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-          },
-          _hover: {
-            transform: 'scale(1.02)',
-            borderColor: hoverColors.borderColor,
-          },
-        }}
-      >
-        <CardHeader>
-          <VStack align="stretch" gap={3}>
-            <Flex justify="space-between" align="start" gap={3}>
-              <HStack gap={2} flex="1" align="center">
-                <Heading size="md">{task.title}</Heading>
-                {priorityIcon && (
-                  <Icon color={priorityIcon.color} boxSize={5}>
-                    <priorityIcon.icon />
-                  </Icon>
-                )}
-              </HStack>
-              <Checkbox.Root
-                checked={taskSelected}
-                colorPalette="blue"
-                onCheckedChange={() => {
-                  handleTaskToggle(task);
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                cursor="pointer"
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control cursor="pointer">
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-              </Checkbox.Root>
-            </Flex>
-
-            <HStack gap={2} flexWrap="wrap">
-              {/* Show complexity if available */}
-              {complexityLabel && (
-                <Badge size="sm" variant="outline" colorPalette="gray">
-                  {complexityLabel}
-                </Badge>
-              )}
-              {/* Show type if available */}
-              {typeLabel && typeIcon && (
-                <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
-                  <HStack gap={1}>
-                    <Icon color={typeIcon.color} boxSize={3}>
-                      <typeIcon.icon />
-                    </Icon>
-                    <Text>{typeLabel}</Text>
-                  </HStack>
-                </Badge>
-              )}
-            </HStack>
-
-            {/* Project badges - gray/muted */}
-            {task.projectIds.length > 0 && (
-              <HStack gap={1} flexWrap="wrap">
-                {task.projectIds.map(projectId => {
-                  const project = projects.find(p => p.id === projectId);
-                  return project ? (
-                    <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
-                      <HStack gap={1}>
-                        <LuFolder size={10} />
-                        <Text>{project.name}</Text>
-                      </HStack>
-                    </Badge>
-                  ) : null;
-                })}
-              </HStack>
-            )}
-          </VStack>
-        </CardHeader>
-
-        <CardBody display="flex" flexDirection="column" gap={3}>
-          {/* Tags - colored to match priority icon */}
-          {task.tags && task.tags.length > 0 && (
-            <HStack gap={1} flexWrap="wrap">
-              {task.tags.map((tag) => (
-                <Tag.Root
-                  key={tag}
-                  size="sm"
-                  variant="subtle"
-                  colorPalette={getPriorityColorPalette(task.priority)}
-                >
-                  <Tag.Label>{tag}</Tag.Label>
-                </Tag.Root>
-              ))}
-            </HStack>
-          )}
-        </CardBody>
-      </Card.Root>
-    );
-  };
 
   const parentName = context === 'workspace' ? 'Workspace' : context.name;
+
+  const hasActiveFilters = titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0;
+  const filterCount = [titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length, selectedTypes.length]
+    .filter(Boolean)
+    .reduce((a, b) => (a || 0) + (b || 0), 0);
 
   return (
     <Flex
@@ -545,6 +456,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
       overflow="hidden"
       position="relative"
     >
+      {/* Dialogs */}
       <EditTaskDialog
         task={selectedTask}
         isOpen={isDialogOpen}
@@ -555,12 +467,23 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
         onTaskUpdated={loadTasks}
       />
 
-      <TasksActionBar
-        selectedTasks={selectedTasks}
-        hasSelection={selectedTaskIds.size > 0}
-        clearSelection={clearSelection}
-        onTasksUpdated={loadTasks}
+      <CreateTaskDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onTaskCreated={loadTasks}
+        defaultProjectId={context !== 'workspace' ? (context as Project).id : undefined}
+        projects={projects}
       />
+
+      {/* Drag Tooltip */}
+      {dragState && hasDragThresholdMet && (
+        <DragTooltip
+          task={dragState.draggedTask}
+          targetSection={dragState.dropTargetSection}
+          position={mousePosition}
+          isValidDrop={dragState.isValidDrop}
+        />
+      )}
 
       {/* Toolkit Header */}
       <ToolkitHeader
@@ -574,215 +497,98 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
         }}
       />
 
+
       {/* Scrollable Content */}
       <Box flex={1} overflowY="auto" p={6}>
         {/* In Progress Section */}
-        <Box mb={8} position="relative">
-          <Flex align="center" justify="space-between" gap={2} mb={4}>
-            <Flex align="center" gap={2}>
-              <Heading size="md">In Progress</Heading>
-              <Text fontSize="sm" color="text.muted">
-                {inProgressTasks.length}
-              </Text>
-              {/* Filter Button - with liquid glass styling */}
-              <Box position="relative" overflow="visible">
-                <Button
-                  ref={filterButtonRef}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  borderRadius="lg"
-                  borderWidth="1px"
-                  css={{
-                    background: 'rgba(255, 255, 255, 0.25)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                    borderColor: 'rgba(0, 0, 0, 0.08)',
-                    boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                    _dark: {
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                    },
-                    _hover: {
-                      background: 'rgba(255, 255, 255, 0.35)',
-                      _dark: {
-                        background: 'rgba(0, 0, 0, 0.3)',
-                      },
-                    },
-                  }}
-                >
-                  <HStack gap={2}>
-                    <Icon>
-                      <LuFilter />
-                    </Icon>
-                    <Text>Filter</Text>
-                    {(titleFilter || selectedTags.length > 0 || selectedPriorities.length > 0 || selectedComplexities.length > 0 || selectedTypes.length > 0) && (
-                      <Badge size="sm" colorPalette="primary" variant="solid">
-                        {[titleFilter && 1, selectedTags.length, selectedPriorities.length, selectedComplexities.length, selectedTypes.length]
-                          .filter(Boolean)
-                          .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
-                {/* Filter Overlay */}
-                {isFilterOpen && (
-                  <Box
-                    ref={filterPanelRef}
-                    position="absolute"
-                    top="100%"
-                    left={0}
-                    zIndex={10}
-                    w="400px"
-                    mt={2}
-                    borderWidth="1px"
-                    borderColor="border.subtle"
-                    borderRadius="md"
-                    p={4}
-                    bg="bg.surface"
-                    boxShadow="lg"
-                  >
-                    <VStack align="stretch" gap={4}>
-                      <Field.Root>
-                        <Field.Label>Title</Field.Label>
-                        <InputGroup
-                          endElement={titleFilter ? (
-                            <IconButton
-                              size="xs"
-                              variant="ghost"
-                              aria-label="Clear title filter"
-                              onClick={() => setTitleFilter('')}
-                            >
-                              <Icon>
-                                <LuX />
-                              </Icon>
-                            </IconButton>
-                          ) : undefined}
-                        >
-                          <Input
-                            placeholder="Search by title or description..."
-                            value={titleFilter}
-                            onChange={(e) => setTitleFilter(e.target.value)}
-                          />
-                        </InputGroup>
-                      </Field.Root>
-
-                      {allTags.length > 0 && (
-                        <Field.Root>
-                          <Field.Label>Tags</Field.Label>
-                          <HStack gap={1} flexWrap="wrap" mt={2}>
-                            {allTags.map((tag) => {
-                              const isSelected = selectedTags.includes(tag);
-                              return (
-                                <Tag.Root
-                                  key={tag}
-                                  size="sm"
-                                  variant={isSelected ? 'solid' : 'subtle'}
-                                  colorPalette={isSelected ? 'primary' : undefined}
-                                  cursor="pointer"
-                                  onClick={() => toggleTag(tag)}
-                                  opacity={isSelected ? 1 : 0.6}
-                                  _hover={{ opacity: 1 }}
-                                >
-                                  <Tag.Label>{tag}</Tag.Label>
-                                </Tag.Root>
-                              );
-                            })}
-                          </HStack>
-                        </Field.Root>
-                      )}
-
-                      <Field.Root>
-                        <Field.Label>Priority</Field.Label>
-                        <HStack gap={1} flexWrap="wrap" mt={2}>
-                          {allPriorities.map((priority) => {
-                            const isSelected = selectedPriorities.includes(priority);
-                            const priorityIcon = getPriorityIcon(priority);
-                            return (
-                              <Tag.Root
-                                key={priority}
-                                size="sm"
-                                variant={isSelected ? 'solid' : 'subtle'}
-                                colorPalette={isSelected ? getPriorityColorPalette(priority) : undefined}
-                                cursor="pointer"
-                                onClick={() => togglePriority(priority)}
-                                opacity={isSelected ? 1 : 0.6}
-                                _hover={{ opacity: 1 }}
-                              >
-                                <HStack gap={1}>
-                                  {priorityIcon && (
-                                    <Icon color={priorityIcon.color} boxSize={3}>
-                                      <priorityIcon.icon />
-                                    </Icon>
-                                  )}
-                                  <Tag.Label>{getPriorityLabel(priority)}</Tag.Label>
-                                </HStack>
-                              </Tag.Root>
-                            );
-                          })}
-                        </HStack>
-                      </Field.Root>
-
-                      <Field.Root>
-                        <Field.Label>Complexity</Field.Label>
-                        <HStack gap={1} flexWrap="wrap" mt={2}>
-                          {allComplexities.map((complexity) => {
-                            const isSelected = selectedComplexities.includes(complexity);
-                            return (
-                              <Tag.Root
-                                key={complexity}
-                                size="sm"
-                                variant={isSelected ? 'solid' : 'subtle'}
-                                colorPalette={isSelected ? 'primary' : undefined}
-                                cursor="pointer"
-                                onClick={() => toggleComplexity(complexity)}
-                                opacity={isSelected ? 1 : 0.6}
-                                _hover={{ opacity: 1 }}
-                              >
-                                <Tag.Label>{getComplexityLabel(complexity)}</Tag.Label>
-                              </Tag.Root>
-                            );
-                          })}
-                        </HStack>
-                      </Field.Root>
-
-                      <Field.Root>
-                        <Field.Label>Type</Field.Label>
-                        <HStack gap={1} flexWrap="wrap" mt={2}>
-                          {allTypes.map((type) => {
-                            const isSelected = selectedTypes.includes(type);
-                            return (
-                              <Tag.Root
-                                key={type}
-                                size="sm"
-                                variant={isSelected ? 'solid' : 'subtle'}
-                                colorPalette={isSelected ? 'primary' : undefined}
-                                cursor="pointer"
-                                onClick={() => toggleType(type)}
-                                opacity={isSelected ? 1 : 0.6}
-                                _hover={{ opacity: 1 }}
-                              >
-                                <Tag.Label>{getTypeLabel(type)}</Tag.Label>
-                              </Tag.Root>
-                            );
-                          })}
-                        </HStack>
-                      </Field.Root>
-                    </VStack>
-                  </Box>
-                )}
-              </Box>
-            </Flex>
-            {/* View Mode Switcher */}
-            <LiquidViewModeSwitcher
-              value={viewMode}
-              onChange={(mode) => setViewMode(mode as ViewMode)}
-              modes={[
-                { id: 'card', label: 'Cards', icon: LuLayoutGrid },
-                { id: 'table', label: 'Table', icon: LuTable },
-              ]}
-            />
+        <Box
+          mb={8}
+          position="relative"
+          data-drop-zone="in_progress"
+          borderWidth={
+            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
+              ? "2px"
+              : "0"
+          }
+          borderStyle="dashed"
+          borderColor={
+            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.400" : "red.400")
+              : "transparent"
+          }
+          bg={
+            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.50" : "red.50")
+              : "transparent"
+          }
+          transition="all 0.15s"
+          _dark={{
+            bg: dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.900/20" : "red.900/20")
+              : "transparent"
+          }}
+          p={dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet ? 4 : 0}
+        >
+          <Flex align="center" gap={2} mb={4}>
+            <Heading size="md">In Progress</Heading>
+            <Text fontSize="sm" color="text.muted">
+              {inProgressTasks.length}
+            </Text>
+            {/* Filter Button */}
+            <Box position="relative" overflow="visible">
+              <Button
+                ref={filterButtonRef}
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                borderWidth="1px"
+                borderRadius="lg"
+                css={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
+                  transition: 'none',
+                  _dark: {
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+                  },
+                }}
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFilter />
+                  </Icon>
+                  <Text>Filter</Text>
+                  {hasActiveFilters && (
+                    <Badge size="sm" colorPalette="primary" variant="solid">
+                      {filterCount}
+                    </Badge>
+                  )}
+                </HStack>
+              </Button>
+              <FilterPanel
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                nameFilter={titleFilter}
+                onNameFilterChange={setTitleFilter}
+                allTags={allTags}
+                selectedTags={selectedTags}
+                onToggleTag={toggleTag}
+                filterButtonRef={filterButtonRef}
+                statusOptions={[
+                  { value: 'pinned', label: 'Pinned', colorPalette: 'blue' },
+                  { value: 'high', label: 'High', colorPalette: 'red' },
+                  { value: 'standard', label: 'Standard', colorPalette: 'orange' },
+                  { value: 'long term', label: 'Long Term', colorPalette: 'purple' },
+                  { value: 'nit', label: 'Nit', colorPalette: 'yellow' },
+                ]}
+                selectedStatuses={selectedPriorities}
+                onToggleStatus={(priority) => togglePriority(priority as TaskPriority)}
+              />
+            </Box>
           </Flex>
 
           {inProgressTasks.length === 0 ? (
@@ -803,139 +609,60 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                 }
               </Text>
             </Box>
-          ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {inProgressTasks.map(renderTaskCard)}
-            </SimpleGrid>
           ) : (
-            <Table.Root size="sm" variant="outline">
-              <Table.Header>
-                <Table.Row bg="bg.subtle">
-                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                  <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
-                  <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
-                  <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
-                  <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
-                  <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
-                  <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {inProgressTasks.map((task) => {
-                  const taskSelected = isSelected(task.id);
-                  const complexityLabel = getComplexityLabel(task.complexity);
-                  const typeLabel = getTypeLabel(task.type);
-                  const typeIcon = task.type ? getTypeIcon(task.type) : null;
-                  const priorityIcon = getPriorityIcon(task.priority);
-                  const hoverColors = getPriorityHoverColors(task.priority);
-                  return (
-                    <Table.Row
-                      key={task.id}
-                      cursor="pointer"
-                      onClick={() => handleViewTask(task)}
-                      bg="bg.surface"
-                      _hover={{ borderColor: hoverColors.borderColor }}
-                      data-selected={taskSelected ? "" : undefined}
-                    >
-                      <Table.Cell>
-                        <Checkbox.Root
-                          size="sm"
-                          checked={taskSelected}
-                          colorPalette="blue"
-                          onCheckedChange={() => {
-                            handleTaskToggle(task);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          cursor="pointer"
-                        >
-                          <Checkbox.HiddenInput />
-                          <Checkbox.Control cursor="pointer">
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Root>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack gap={2}>
-                          <Text fontWeight="medium">{task.title}</Text>
-                          {priorityIcon && (
-                            <Icon color={priorityIcon.color}>
-                              <priorityIcon.icon />
-                            </Icon>
-                          )}
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {complexityLabel ? (
-                          <Badge size="sm" variant="outline" colorPalette="gray">
-                            {complexityLabel}
-                          </Badge>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {typeLabel && typeIcon ? (
-                          <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
-                            <HStack gap={1}>
-                              <Icon color={typeIcon.color} boxSize={3}>
-                                <typeIcon.icon />
-                              </Icon>
-                              <Text>{typeLabel}</Text>
-                            </HStack>
-                          </Badge>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {task.projectIds.length > 0 ? (
-                          <HStack gap={1} flexWrap="wrap">
-                            {task.projectIds.map(projectId => {
-                              const project = projects.find(p => p.id === projectId);
-                              return project ? (
-                                <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
-                                  <HStack gap={1}>
-                                    <LuFolder size={10} />
-                                    <Text>{project.name}</Text>
-                                  </HStack>
-                                </Badge>
-                              ) : null;
-                            })}
-                          </HStack>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {task.tags && task.tags.length > 0 ? (
-                          <HStack gap={1} flexWrap="wrap">
-                            {task.tags.map((tag) => (
-                              <Tag.Root key={tag} size="sm" variant="subtle">
-                                <Tag.Label>{tag}</Tag.Label>
-                              </Tag.Root>
-                            ))}
-                          </HStack>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="text.secondary">
-                          {formatDate(task.updatedAt)}
-                        </Text>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
+            <ElegantList
+              items={inProgressTasks}
+              type="task"
+              selectable={true}
+              selectedIds={selectedTaskIds}
+              onSelectionChange={handleSelectionChange}
+              getItemId={(item) => (item as Task).id}
+              onItemClick={(task) => handleViewTask(task as Task)}
+              onItemMouseDown={(task, e) => {
+                e.stopPropagation();
+                handleDragStart(task as Task, e as any);
+              }}
+              getItemStyle={(task) => ({
+                opacity: dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet ? 0.5 : 1,
+                cursor: dragState ? 'grabbing' : 'grab',
+                transition: 'opacity 0.15s'
+              })}
+              renderActions={(item) => (
+                <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
+                  <Text>Edit</Text>
+                </Menu.Item>
+              )}
+            />
           )}
         </Box>
 
         {/* Backlog Section */}
-        <Box>
+        <Box
+          data-drop-zone="backlog"
+          borderWidth={
+            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
+              ? "2px"
+              : "0"
+          }
+          borderStyle="dashed"
+          borderColor={
+            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.400" : "red.400")
+              : "transparent"
+          }
+          bg={
+            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.50" : "red.50")
+              : "transparent"
+          }
+          transition="all 0.15s"
+          _dark={{
+            bg: dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
+              ? (dragState.isValidDrop ? "blue.900/20" : "red.900/20")
+              : "transparent"
+          }}
+          p={dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet ? 4 : 0}
+        >
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">Backlog</Heading>
             <Text fontSize="sm" color="text.muted">
@@ -959,137 +686,41 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                 }
               </Text>
             </Box>
-          ) : viewMode === 'card' ? (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {backlogTasks.map(renderTaskCard)}
-            </SimpleGrid>
           ) : (
-            <Table.Root size="sm" variant="outline">
-              <Table.Header>
-                <Table.Row bg="bg.subtle">
-                  <Table.ColumnHeader w="6"></Table.ColumnHeader>
-                  <Table.ColumnHeader w="25%">Title</Table.ColumnHeader>
-                  <Table.ColumnHeader w="12%">Complexity</Table.ColumnHeader>
-                  <Table.ColumnHeader w="12%">Type</Table.ColumnHeader>
-                  <Table.ColumnHeader w="18%">Projects</Table.ColumnHeader>
-                  <Table.ColumnHeader w="18%">Tags</Table.ColumnHeader>
-                  <Table.ColumnHeader w="15%">Updated</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {backlogTasks.map((task) => {
-                  const taskSelected = isSelected(task.id);
-                  const complexityLabel = getComplexityLabel(task.complexity);
-                  const typeLabel = getTypeLabel(task.type);
-                  const typeIcon = task.type ? getTypeIcon(task.type) : null;
-                  const priorityIcon = getPriorityIcon(task.priority);
-                  const hoverColors = getPriorityHoverColors(task.priority);
-                  return (
-                    <Table.Row
-                      key={task.id}
-                      cursor="pointer"
-                      onClick={() => handleViewTask(task)}
-                      bg="bg.surface"
-                      _hover={{ borderColor: hoverColors.borderColor }}
-                      data-selected={taskSelected ? "" : undefined}
-                    >
-                      <Table.Cell>
-                        <Checkbox.Root
-                          size="sm"
-                          checked={taskSelected}
-                          colorPalette="blue"
-                          onCheckedChange={() => {
-                            handleTaskToggle(task);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          cursor="pointer"
-                        >
-                          <Checkbox.HiddenInput />
-                          <Checkbox.Control cursor="pointer">
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Root>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack gap={2}>
-                          <Text fontWeight="medium">{task.title}</Text>
-                          {priorityIcon && (
-                            <Icon color={priorityIcon.color}>
-                              <priorityIcon.icon />
-                            </Icon>
-                          )}
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {complexityLabel ? (
-                          <Badge size="sm" variant="outline" colorPalette="gray">
-                            {complexityLabel}
-                          </Badge>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {typeLabel && typeIcon ? (
-                          <Badge size="sm" variant="outline" colorPalette={getTypeColorPalette(task.type!)}>
-                            <HStack gap={1}>
-                              <Icon color={typeIcon.color} boxSize={3}>
-                                <typeIcon.icon />
-                              </Icon>
-                              <Text>{typeLabel}</Text>
-                            </HStack>
-                          </Badge>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {task.projectIds.length > 0 ? (
-                          <HStack gap={1} flexWrap="wrap">
-                            {task.projectIds.map(projectId => {
-                              const project = projects.find(p => p.id === projectId);
-                              return project ? (
-                                <Badge key={projectId} size="xs" variant="outline" colorPalette="gray">
-                                  <HStack gap={1}>
-                                    <LuFolder size={10} />
-                                    <Text>{project.name}</Text>
-                                  </HStack>
-                                </Badge>
-                              ) : null;
-                            })}
-                          </HStack>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {task.tags && task.tags.length > 0 ? (
-                          <HStack gap={1} flexWrap="wrap">
-                            {task.tags.map((tag) => (
-                              <Tag.Root key={tag} size="sm" variant="subtle">
-                                <Tag.Label>{tag}</Tag.Label>
-                              </Tag.Root>
-                            ))}
-                          </HStack>
-                        ) : (
-                          <Text fontSize="sm" color="text.tertiary">—</Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="text.secondary">
-                          {formatDate(task.updatedAt)}
-                        </Text>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
+            <ElegantList
+              items={backlogTasks}
+              type="task"
+              selectable={true}
+              selectedIds={selectedTaskIds}
+              onSelectionChange={handleSelectionChange}
+              getItemId={(item) => (item as Task).id}
+              onItemClick={(task) => handleViewTask(task as Task)}
+              onItemMouseDown={(task, e) => {
+                e.stopPropagation();
+                handleDragStart(task as Task, e as any);
+              }}
+              getItemStyle={(task) => ({
+                opacity: dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet ? 0.5 : 1,
+                cursor: dragState ? 'grabbing' : 'grab',
+                transition: 'opacity 0.15s'
+              })}
+              renderActions={(item) => (
+                <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
+                  <Text>Edit</Text>
+                </Menu.Item>
+              )}
+            />
           )}
         </Box>
       </Box>
+
+      {/* Selection Footer */}
+      <TasksSelectionFooter
+        isOpen={selectedTaskIds.size > 0}
+        selectedTasks={selectedTasks}
+        onClearSelection={clearSelection}
+        onTasksUpdated={loadTasks}
+      />
     </Flex>
   );
 });

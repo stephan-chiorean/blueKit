@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   Portal,
@@ -9,6 +9,7 @@ import {
   Textarea,
   VStack,
   HStack,
+  Field,
   Icon,
   SegmentGroup,
   TagsInput,
@@ -32,22 +33,29 @@ import {
   LuChevronUp,
   LuListTodo,
 } from 'react-icons/lu';
-import { Task, TaskPriority, TaskStatus, TaskComplexity, TaskType } from '@/types/task';
-import { Project, invokeDbUpdateTask, invokeGetProjectRegistry } from '@/ipc';
+import { TaskPriority, TaskStatus, TaskComplexity, TaskType } from '@/types/task';
+import { Project, invokeDbCreateTask } from '@/ipc';
 import { toaster } from '@/shared/components/ui/toaster';
 import ProjectMultiSelect from './ProjectMultiSelect';
 
 const MotionBox = motion.create(Box);
 const MotionVStack = motion.create(VStack);
 
-interface EditTaskDialogProps {
-  task: Task | null;
+interface CreateTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onTaskUpdated?: () => void;
+  onTaskCreated?: () => void;
+  defaultProjectId?: string;
+  projects: Project[];
 }
 
-export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }: EditTaskDialogProps) {
+export default function CreateTaskDialog({
+  isOpen,
+  onClose,
+  onTaskCreated,
+  defaultProjectId,
+  projects
+}: CreateTaskDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TaskStatus>('backlog');
@@ -58,43 +66,12 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
   const [complexity, setComplexity] = useState<TaskComplexity | ''>('');
   const [type, setType] = useState<TaskType | ''>('');
   const [tags, setTags] = useState<string[]>([]);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
+    defaultProjectId ? [defaultProjectId] : []
+  );
   const [loading, setLoading] = useState(false);
 
-  // Load projects on mount
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        const registryProjects = await invokeGetProjectRegistry();
-        setProjects(registryProjects);
-      } catch (error) {
-        console.error('Failed to load projects in EditTaskDialog:', error);
-      }
-    };
-    loadProjects();
-  }, []);
-
-  // Initialize form when task changes
-  useEffect(() => {
-    if (task) {
-      setTitle(task.title);
-      setDescription(task.description || '');
-      setStatus(task.status);
-      setPriority(task.priority);
-      setComplexity(task.complexity || '');
-      setType(task.type || '');
-      setTags(task.tags);
-      setSelectedProjectIds(task.projectIds || []);
-      // Auto-expand if task has advanced fields set
-      const hasAdvancedFields = !!(task.complexity || task.type || task.tags.length > 0 || (task.projectIds && task.projectIds.length > 0));
-      setShowMoreDetails(hasAdvancedFields);
-    }
-  }, [task]);
-
-  if (!task) return null;
-
-  const handleSave = async () => {
+  const handleCreate = async () => {
     if (!title.trim()) {
       toaster.create({
         type: 'error',
@@ -107,8 +84,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
 
     setLoading(true);
     try {
-      await invokeDbUpdateTask(
-        task.id,
+      await invokeDbCreateTask(
         title.trim(),
         description.trim() || undefined,
         priority,
@@ -121,20 +97,31 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
 
       toaster.create({
         type: 'success',
-        title: 'Task updated',
-        description: `Updated task: ${title}`,
+        title: 'Task created',
+        description: `Created task: ${title}`,
       });
 
-      if (onTaskUpdated) {
-        onTaskUpdated();
+      // Reset form
+      setTitle('');
+      setDescription('');
+      setStatus('backlog');
+      setPriority('standard');
+      setComplexity('');
+      setType('');
+      setTags([]);
+      setSelectedProjectIds(defaultProjectId ? [defaultProjectId] : []);
+      setShowMoreDetails(false);
+
+      if (onTaskCreated) {
+        onTaskCreated();
       }
 
       onClose();
     } catch (error) {
-      console.error('Failed to update task:', error);
+      console.error('Failed to create task:', error);
       toaster.create({
         type: 'error',
-        title: 'Failed to update task',
+        title: 'Failed to create task',
         description: String(error),
         closable: true,
       });
@@ -143,8 +130,24 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
     }
   };
 
+  const handleClose = () => {
+    if (!loading) {
+      // Reset form on close
+      setTitle('');
+      setDescription('');
+      setStatus('backlog');
+      setPriority('standard');
+      setComplexity('');
+      setType('');
+      setTags([]);
+      setSelectedProjectIds(defaultProjectId ? [defaultProjectId] : []);
+      setShowMoreDetails(false);
+      onClose();
+    }
+  };
+
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && onClose()}>
+    <Dialog.Root open={isOpen} onOpenChange={(e) => !e.open && handleClose()}>
       <Portal>
         <Dialog.Backdrop
           asChild
@@ -205,10 +208,10 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                   </MotionBox>
                   <VStack align="start" gap={0}>
                     <Dialog.Title fontSize="xl" fontWeight="bold">
-                      Edit Task
+                      Create Task
                     </Dialog.Title>
                     <Text fontSize="sm" color="text.secondary">
-                      Update task details
+                      Add a new task to your workflow
                     </Text>
                   </VStack>
                 </HStack>
@@ -242,9 +245,10 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                       <Input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Task title..."
+                        placeholder="e.g., Fix authentication bug"
                         size="lg"
                         disabled={loading}
+                        autoFocus
                         css={{
                           borderRadius: '12px',
                           fontSize: '16px',
@@ -303,7 +307,6 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                           items={[
                             { value: 'backlog', label: 'Backlog' },
                             { value: 'in_progress', label: 'In Progress' },
-                            { value: 'completed', label: 'Completed' },
                             { value: 'blocked', label: 'Blocked' },
                           ]}
                         />
@@ -558,7 +561,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                 <HStack gap={3} justify="flex-end" w="100%">
                   <Button
                     variant="ghost"
-                    onClick={onClose}
+                    onClick={handleClose}
                     disabled={loading}
                     size="lg"
                   >
@@ -566,9 +569,9 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                   </Button>
                   <Button
                     colorPalette="primary"
-                    onClick={handleSave}
+                    onClick={handleCreate}
                     loading={loading}
-                    loadingText="Saving..."
+                    loadingText="Creating..."
                     disabled={!title.trim()}
                     size="lg"
                     css={{
@@ -581,7 +584,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                       },
                     }}
                   >
-                    Save Changes
+                    Create Task
                   </Button>
                 </HStack>
               </Dialog.Footer>

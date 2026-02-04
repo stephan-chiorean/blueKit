@@ -11,8 +11,20 @@ import {
   Badge,
   Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX } from 'react-icons/lu';
-import { ArtifactFile, ArtifactFolder, FolderConfig, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
+import { LuFilter, LuFolderPlus } from 'react-icons/lu';
+import {
+  ArtifactFile,
+  ArtifactFolder,
+  FolderConfig,
+  Project,
+  invokeGetArtifactFolders,
+  invokeCreateArtifactFolder,
+  invokeDeleteArtifactFolder,
+  deleteResources,
+  invokeCopyKitToProject,
+  invokeCopyWalkthroughToProject,
+  invokeCopyDiagramToProject,
+} from '@/ipc';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import FolderView from '@/shared/components/FolderView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
@@ -21,6 +33,8 @@ import { FilterPanel } from '@/shared/components/FilterPanel';
 import { getRootArtifacts } from '@/shared/utils/buildFolderTree';
 import { toaster } from '@/shared/components/ui/toaster';
 import { ElegantList } from '@/shared/components/ElegantList';
+import KitsSelectionFooter from './components/KitsSelectionFooter';
+import AddToProjectDialog from './components/AddToProjectDialog';
 
 interface KitsSectionProps {
   kits: ArtifactFile[];
@@ -30,6 +44,11 @@ interface KitsSectionProps {
   projectPath: string;
   projectId?: string;
   onViewKit: (kit: ArtifactFile) => void;
+  projects?: Project[];
+  onReload?: () => void;
+  onOptimisticMove?: (artifactId: string, folderId: string | null) => void;
+  onConfirmMove?: (artifactId: string, folderId: string | null) => void;
+  movingArtifacts?: Set<string>;
 }
 
 function KitsSection({
@@ -40,6 +59,8 @@ function KitsSection({
   projectPath,
   projectId,
   onViewKit,
+  projects = [],
+  onReload,
 }: KitsSectionProps) {
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -69,9 +90,39 @@ function KitsSection({
   }, [projectId]);
 
   // Actions
-  const handleDelete = () => {
-    console.log('Delete selected kits:', Array.from(selectedKitIds));
-    clearSelection();
+  const [isKitsLoading, setIsKitsLoading] = useState(false);
+  const [isAddToProjectOpen, setIsAddToProjectOpen] = useState(false);
+
+  const handleDelete = async () => {
+    const selectedKits = kits.filter(k => selectedKitIds.has(k.path));
+    if (selectedKits.length === 0) return;
+
+    const confirmMessage = `Delete ${selectedKits.length} kit${selectedKits.length !== 1 ? 's' : ''}? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsKitsLoading(true);
+    try {
+      const filePaths = selectedKits.map(k => k.path);
+      await deleteResources(filePaths);
+
+      toaster.create({
+        type: 'success',
+        title: 'Kits deleted',
+        description: `Deleted ${selectedKits.length} kit${selectedKits.length !== 1 ? 's' : ''}`,
+      });
+
+      clearSelection();
+      onReload?.();
+    } catch (error) {
+      console.error('Failed to delete kits:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete kits',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsKitsLoading(false);
+    }
   };
 
   const handlePublish = () => {
@@ -79,9 +130,54 @@ function KitsSection({
     clearSelection();
   };
 
-  const handleAddToProject = () => {
-    console.log('Add selected kits to project:', Array.from(selectedKitIds));
-    clearSelection();
+  const handleAddToProjects = async (selectedProjects: Project[]) => {
+    const selectedKits = kits.filter(k => selectedKitIds.has(k.path));
+    if (selectedKits.length === 0 || selectedProjects.length === 0) return;
+
+    setIsKitsLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const project of selectedProjects) {
+        for (const kit of selectedKits) {
+          try {
+            const artifactType = kit.frontMatter?.type || 'kit';
+
+            if (artifactType === 'walkthrough') {
+              await invokeCopyWalkthroughToProject(kit.path, project.path);
+            } else if (artifactType === 'diagram') {
+              await invokeCopyDiagramToProject(kit.path, project.path);
+            } else {
+              await invokeCopyKitToProject(kit.path, project.path);
+            }
+
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to copy ${kit.name} to ${project.name}:`, err);
+            errorCount++;
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        toaster.create({
+          type: 'success',
+          title: 'Add complete',
+          description: `Added ${successCount} kit${successCount !== 1 ? 's' : ''} to ${selectedProjects.length} project${selectedProjects.length !== 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        });
+      } else if (errorCount > 0) {
+        toaster.create({
+          type: 'error',
+          title: 'Add failed',
+          description: `Failed to add ${errorCount} kit${errorCount !== 1 ? 's' : ''}`,
+        });
+      }
+
+      clearSelection();
+    } finally {
+      setIsKitsLoading(false);
+    }
   };
 
   // Get all unique tags
@@ -258,6 +354,8 @@ function KitsSection({
         onSelectionChange={handleSelectionChange}
         onViewArtifact={onViewKit}
         onBack={() => setViewingFolder(null)}
+        projects={projects}
+        onArtifactsChanged={onReload}
       />
     );
   }
@@ -446,69 +544,23 @@ function KitsSection({
         onConfirm={handleConfirmDeleteFolder}
       />
 
-      {/* Inline Selection Footer */}
-      <Box
-        position="sticky"
-        bottom={0}
-        width="100%"
-        display="grid"
-        css={{
-          gridTemplateRows: selectedKitIds.size > 0 ? "1fr" : "0fr",
-          transition: "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        <Box overflow="hidden" minHeight={0}>
-          <Box
-            borderTopWidth="1px"
-            borderColor="border.subtle"
-            py={4}
-            px={6}
-            css={{
-              background: 'rgba(255, 255, 255, 0.85)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-              _dark: {
-                background: 'rgba(20, 20, 20, 0.85)',
-              }
-            }}
-          >
-            <HStack justify="space-between">
-              <HStack gap={3}>
-                <Badge colorPalette="blue" size="lg" variant="solid">
-                  {selectedKitIds.size}
-                </Badge>
-                <Text fontWeight="medium" fontSize="sm">kit{selectedKitIds.size > 1 ? 's' : ''} selected</Text>
-              </HStack>
-              <HStack gap={2}>
-                <Button size="sm" variant="ghost" colorPalette="blue" onClick={handleAddToProject}>
-                  <HStack gap={1}>
-                    <LuPlus />
-                    <Text>Add to Project</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="green" onClick={handlePublish}>
-                  <HStack gap={1}>
-                    <LuShare />
-                    <Text>Publish to Library</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="red" onClick={handleDelete}>
-                  <HStack gap={1}>
-                    <LuTrash2 />
-                    <Text>Delete</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="gray" onClick={clearSelection}>
-                  <HStack gap={1}>
-                    <LuX />
-                    <Text>Clear</Text>
-                  </HStack>
-                </Button>
-              </HStack>
-            </HStack>
-          </Box>
-        </Box>
-      </Box>
+      <KitsSelectionFooter
+        selectedCount={selectedKitIds.size}
+        isOpen={selectedKitIds.size > 0}
+        onClearSelection={clearSelection}
+        onDelete={handleDelete}
+        onPublish={handlePublish}
+        onAddToProject={() => setIsAddToProjectOpen(true)}
+        loading={isKitsLoading}
+      />
+
+      <AddToProjectDialog
+        isOpen={isAddToProjectOpen}
+        onClose={() => setIsAddToProjectOpen(false)}
+        projects={projects}
+        onConfirm={handleAddToProjects}
+        loading={isKitsLoading}
+      />
     </Flex>
   );
 }
