@@ -11,7 +11,8 @@ import {
   Badge,
   Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX } from 'react-icons/lu';
+import { createPortal } from 'react-dom';
+import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX, LuBookOpen, LuArrowRight } from 'react-icons/lu';
 import { ArtifactFile, ArtifactFolder, FolderConfig, Project, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
 import { invokeMoveArtifactToFolder } from '@/ipc/folders';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
@@ -441,6 +442,13 @@ function WalkthroughsSection({
 
   const projectName = projectPath.split('/').pop() || 'Project';
 
+  // Get drop target folder name for tooltip
+  const getDropTargetName = (): string | undefined => {
+    if (!dragState || dragState.dropTargetFolderId === undefined) return undefined;
+    const targetFolder = folders.find(f => (f.config?.id || f.path) === dragState.dropTargetFolderId);
+    return targetFolder?.name;
+  };
+
   return (
     <Flex
       direction="column"
@@ -688,6 +696,16 @@ function WalkthroughsSection({
         />
       )}
 
+      {/* Drag Tooltip */}
+      {dragState && hasDragThresholdMet && (
+        <DragTooltip
+          walkthrough={dragState.draggedWalkthrough}
+          targetFolderName={getDropTargetName()}
+          position={mousePosition}
+          isValidDrop={dragState.isValidDrop}
+        />
+      )}
+
       {/* Inline Selection Footer */}
       <Box
         position="sticky"
@@ -753,6 +771,70 @@ function WalkthroughsSection({
       </Box>
 
     </Flex>
+  );
+}
+
+// Drag tooltip component
+interface DragTooltipProps {
+  walkthrough: ArtifactFile;
+  targetFolderName: string | undefined;
+  position: { x: number; y: number };
+  isValidDrop: boolean;
+}
+
+function DragTooltip({ walkthrough, targetFolderName, position, isValidDrop }: DragTooltipProps) {
+  // Determine action text
+  let actionText: string;
+  let actionColor: string;
+
+  if (targetFolderName === undefined) {
+    actionText = 'Release to cancel';
+    actionColor = 'gray.500';
+  } else if (!isValidDrop) {
+    actionText = 'Cannot move here';
+    actionColor = 'red.400';
+  } else {
+    actionText = `Move to ${targetFolderName}`;
+    actionColor = 'blue.500';
+  }
+
+  const displayName = walkthrough.frontMatter?.alias || walkthrough.name.replace(/\.(md|markdown)$/, '');
+
+  return createPortal(
+    <Box
+      position="fixed"
+      left={`${position.x + 16}px`}
+      top={`${position.y + 8}px`}
+      pointerEvents="none"
+      zIndex={9999}
+      bg="bg.panel"
+      borderRadius="md"
+      boxShadow="lg"
+      px={3}
+      py={2}
+      border="2px solid"
+      borderColor={isValidDrop ? 'blue.400' : 'red.400'}
+      minW="180px"
+      maxW="280px"
+    >
+      <HStack gap={2}>
+        <Icon as={LuBookOpen} color="orange.400" boxSize={4} />
+        <Text fontSize="sm" fontWeight="medium" truncate>
+          {displayName}
+        </Text>
+      </HStack>
+      <HStack gap={1} mt={1.5}>
+        <Icon
+          as={isValidDrop ? LuArrowRight : LuX}
+          boxSize={3}
+          color={actionColor}
+        />
+        <Text fontSize="xs" color={actionColor}>
+          {actionText}
+        </Text>
+      </HStack>
+    </Box>,
+    document.body
   );
 }
 

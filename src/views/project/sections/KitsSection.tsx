@@ -11,7 +11,8 @@ import {
   Badge,
   Menu,
 } from '@chakra-ui/react';
-import { LuFilter, LuFolderPlus } from 'react-icons/lu';
+import { createPortal } from 'react-dom';
+import { LuFilter, LuFolderPlus, LuPackage, LuArrowRight, LuX } from 'react-icons/lu';
 import {
   ArtifactFile,
   ArtifactFolder,
@@ -508,6 +509,13 @@ function KitsSection({
 
   const projectName = projectPath.split('/').pop() || 'Project';
 
+  // Get drop target folder name for tooltip
+  const getDropTargetName = (): string | undefined => {
+    if (!dragState || dragState.dropTargetFolderId === undefined) return undefined;
+    const targetFolder = folders.find(f => (f.config?.id || f.path) === dragState.dropTargetFolderId);
+    return targetFolder?.name;
+  };
+
   return (
     <Flex direction="column" h="100%" overflow="hidden">
       <VStack align="stretch" gap={0} flex={1} overflow="hidden">
@@ -720,6 +728,15 @@ function KitsSection({
         </Box>
       </VStack>
 
+      {/* Drag Tooltip */}
+      {dragState && hasDragThresholdMet && (
+        <DragTooltip
+          kit={dragState.draggedKit}
+          targetFolderName={getDropTargetName()}
+          position={mousePosition}
+          isValidDrop={dragState.isValidDrop}
+        />
+      )}
 
       <DeleteFolderDialog
         isOpen={!!deletingFolder}
@@ -746,6 +763,70 @@ function KitsSection({
         loading={isKitsLoading}
       />
     </Flex>
+  );
+}
+
+// Drag tooltip component
+interface DragTooltipProps {
+  kit: ArtifactFile;
+  targetFolderName: string | undefined;
+  position: { x: number; y: number };
+  isValidDrop: boolean;
+}
+
+function DragTooltip({ kit, targetFolderName, position, isValidDrop }: DragTooltipProps) {
+  // Determine action text
+  let actionText: string;
+  let actionColor: string;
+
+  if (targetFolderName === undefined) {
+    actionText = 'Release to cancel';
+    actionColor = 'gray.500';
+  } else if (!isValidDrop) {
+    actionText = 'Cannot move here';
+    actionColor = 'red.400';
+  } else {
+    actionText = `Move to ${targetFolderName}`;
+    actionColor = 'blue.500';
+  }
+
+  const displayName = kit.frontMatter?.alias || kit.name.replace(/\.(md|markdown)$/, '');
+
+  return createPortal(
+    <Box
+      position="fixed"
+      left={`${position.x + 16}px`}
+      top={`${position.y + 8}px`}
+      pointerEvents="none"
+      zIndex={9999}
+      bg="bg.panel"
+      borderRadius="md"
+      boxShadow="lg"
+      px={3}
+      py={2}
+      border="2px solid"
+      borderColor={isValidDrop ? 'blue.400' : 'red.400'}
+      minW="180px"
+      maxW="280px"
+    >
+      <HStack gap={2}>
+        <Icon as={LuPackage} color="blue.400" boxSize={4} />
+        <Text fontSize="sm" fontWeight="medium" truncate>
+          {displayName}
+        </Text>
+      </HStack>
+      <HStack gap={1} mt={1.5}>
+        <Icon
+          as={isValidDrop ? LuArrowRight : LuX}
+          boxSize={3}
+          color={actionColor}
+        />
+        <Text fontSize="xs" color={actionColor}>
+          {actionText}
+        </Text>
+      </HStack>
+    </Box>,
+    document.body
   );
 }
 
