@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, memo } from 'react';
+import { useState, useMemo, useEffect, useRef, memo, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -25,6 +25,7 @@ import {
   invokeCopyWalkthroughToProject,
   invokeCopyDiagramToProject,
 } from '@/ipc';
+import { invokeMoveArtifactToFolder } from '@/ipc/folders';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import FolderView from '@/shared/components/FolderView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
@@ -35,6 +36,17 @@ import { toaster } from '@/shared/components/ui/toaster';
 import { ElegantList } from '@/shared/components/ElegantList';
 import KitsSelectionFooter from './components/KitsSelectionFooter';
 import AddToProjectDialog from './components/AddToProjectDialog';
+
+// Drag state for kit/folder movement
+interface DragState {
+  draggedKit: ArtifactFile;
+  dropTargetFolderId: string | null | undefined; // null = root, undefined = invalid area
+  isValidDrop: boolean;
+  startPosition: { x: number; y: number };
+}
+
+// Constants for drag behavior
+const DRAG_THRESHOLD = 5; // pixels before drag activates
 
 interface KitsSectionProps {
   kits: ArtifactFile[];
@@ -92,6 +104,11 @@ function KitsSection({
   // Actions
   const [isKitsLoading, setIsKitsLoading] = useState(false);
   const [isAddToProjectOpen, setIsAddToProjectOpen] = useState(false);
+
+  // Drag state
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
 
   const handleDelete = async () => {
     const selectedKits = kits.filter(k => selectedKitIds.has(k.path));
@@ -307,6 +324,120 @@ function KitsSection({
     // Context menu logic if needed, or pass prop to ElegantList to handle it
   };
 
+  // Drag handlers
+  const handleDragStart = useCallback((kit: ArtifactFile, e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent text selection
+    e.stopPropagation();
+
+    setDragState({
+      draggedKit: kit,
+      dropTargetFolderId: undefined,
+      isValidDrop: false,
+      startPosition: { x: e.clientX, y: e.clientY },
+    });
+    setMousePosition({ x: e.clientX, y: e.clientY });
+    setHasDragThresholdMet(false);
+  }, []);
+
+  const clearDragState = useCallback(() => {
+    setDragState(null);
+    setHasDragThresholdMet(false);
+  }, []);
+
+  // Find drop target at cursor position
+  const findDropTargetAtPosition = useCallback((x: number, y: number): string | null | undefined => {
+    const elements = document.elementsFromPoint(x, y);
+
+    for (const el of elements) {
+      const droppableEl = (el as HTMLElement).closest('[data-droppable-folder-id]');
+      if (droppableEl) {
+        const folderId = droppableEl.getAttribute('data-droppable-folder-id');
+        return folderId; // folder ID
+      }
+    }
+
+    return undefined; // Not a valid drop area
+  }, []);
+
+  // Perform move operation
+  const performMove = useCallback(async (kit: ArtifactFile, targetFolderId: string | null | undefined) => {
+    if (targetFolderId === undefined) return;
+
+    try {
+      const targetFolder = folders.find(f => f.config.id === targetFolderId);
+      if (!targetFolder) return;
+
+      await invokeMoveArtifactToFolder(kit.path, targetFolder.path);
+
+      toaster.create({
+        type: 'success',
+        title: 'Kit moved',
+        description: `Moved "${kit.frontMatter?.alias || kit.name}" to ${targetFolder.name}`,
+      });
+
+      onReload?.();
+    } catch (error) {
+      console.error('Failed to move kit:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Move failed',
+        description: error instanceof Error ? error.message : 'An error occurred',
+      });
+    }
+  }, [folders, onReload]);
+
+  // Document-level mouse event handlers for drag
+  useEffect(() => {
+    if (!dragState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+
+      // Check drag threshold
+      if (!hasDragThresholdMet) {
+        const dx = Math.abs(e.clientX - dragState.startPosition.x);
+        const dy = Math.abs(e.clientY - dragState.startPosition.y);
+        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          setHasDragThresholdMet(true);
+        }
+        return;
+      }
+
+      // Find drop target at cursor position
+      const dropTarget = findDropTargetAtPosition(e.clientX, e.clientY);
+      const isValid = dropTarget !== undefined;
+
+      setDragState(prev => prev ? {
+        ...prev,
+        dropTargetFolderId: dropTarget,
+        isValidDrop: isValid
+      } : null);
+    };
+
+    const handleMouseUp = async () => {
+      if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
+        await performMove(dragState.draggedKit, dragState.dropTargetFolderId);
+      }
+      clearDragState();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        clearDragState();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dragState, hasDragThresholdMet, clearDragState, performMove, findDropTargetAtPosition]);
+
   if (kitsLoading) {
     return (
       <Box position="relative" h="100%">
@@ -371,7 +502,12 @@ function KitsSection({
         />
 
         {/* Scrollable Content Area */}
-        <Box flex={1} overflowY="auto" p={6}>
+        <Box
+          flex={1}
+          overflowY="auto"
+          p={6}
+          userSelect={dragState && hasDragThresholdMet ? 'none' : 'auto'}
+        >
           {/* Folders Section */}
           <Box position="relative" mb={8}>
             <Flex align="center" justify="space-between" gap={2} mb={4}>
@@ -469,6 +605,28 @@ function KitsSection({
                 items={folders}
                 type="folder"
                 onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                getItemProps={(item) => {
+                  const folder = item as ArtifactFolder;
+                  return {
+                    'data-droppable-folder-id': folder.config.id,
+                  };
+                }}
+                getItemStyle={(item) => {
+                  const folder = item as ArtifactFolder;
+                  const isDraggedOver = dragState?.dropTargetFolderId === folder.config.id && hasDragThresholdMet;
+
+                  if (!isDraggedOver) return {};
+
+                  return {
+                    borderWidth: '2px',
+                    borderStyle: 'dashed',
+                    borderColor: '#3182ce', // blue.400
+                    backgroundColor: 'var(--chakra-colors-blue-50)',
+                    _dark: {
+                      backgroundColor: 'var(--chakra-colors-blue-900)',
+                    }
+                  };
+                }}
                 renderActions={(item) => {
                   const folder = item as ArtifactFolder;
                   return (
@@ -529,6 +687,16 @@ function KitsSection({
                 getItemId={(item) => (item as ArtifactFile).path}
                 onItemClick={(kit) => onViewKit(kit as ArtifactFile)}
                 onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
+                onItemMouseDown={(kit, e) => {
+                  handleDragStart(kit as ArtifactFile, e as any);
+                }}
+                getItemStyle={(kit) => {
+                  const isDragged = dragState?.draggedKit.path === (kit as ArtifactFile).path && hasDragThresholdMet;
+                  return {
+                    opacity: isDragged ? 0.4 : 1,
+                    cursor: dragState ? 'grabbing' : 'grab',
+                  };
+                }}
               />
             )}
           </Box>
