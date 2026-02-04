@@ -35,11 +35,13 @@ export interface TasksSectionRef {
 
 type SortOption = 'priority' | 'time';
 
-// Drag state for task movement between sections
+// Drag state for task reordering
 interface DragState {
   draggedTask: Task;
   sourceSection: 'in_progress' | 'backlog';
+  sourceIndex: number;
   dropTargetSection: 'in_progress' | 'backlog' | null;
+  dropTargetIndex: number | null;
   isValidDrop: boolean;
   startPosition: { x: number; y: number };
 }
@@ -67,6 +69,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
   // Sort state
   const [sortBy] = useState<SortOption>('time');
@@ -126,20 +129,44 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
       }
 
       const target = findDropTargetAtPosition(e.clientX, e.clientY);
-      const isValid = isValidDrop(dragState.sourceSection, target);
+      const isValid = isValidDrop(
+        dragState.sourceSection,
+        dragState.sourceIndex,
+        target.section,
+        target.index
+      );
 
       setDragState(prev => prev ? {
         ...prev,
-        dropTargetSection: target,
+        dropTargetSection: target.section,
+        dropTargetIndex: target.index,
         isValidDrop: isValid
       } : null);
     };
 
     const handleMouseUp = async () => {
-      if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetSection) {
-        await performStatusUpdate(dragState.draggedTask, dragState.dropTargetSection);
+      const wasDragging = hasDragThresholdMet;
+
+      if (
+        hasDragThresholdMet &&
+        dragState.isValidDrop &&
+        dragState.dropTargetSection &&
+        dragState.dropTargetIndex !== null
+      ) {
+        await performTaskReorder(
+          dragState.draggedTask,
+          dragState.dropTargetSection,
+          dragState.dropTargetIndex
+        );
       }
+
       clearDragState();
+
+      // Prevent click event from firing after drag
+      if (wasDragging) {
+        setJustFinishedDragging(true);
+        setTimeout(() => setJustFinishedDragging(false), 100);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -174,6 +201,9 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   };
 
   const handleViewTask = (task: Task) => {
+    // Don't open modal if we just finished dragging
+    if (justFinishedDragging) return;
+
     setSelectedTask(task);
     setIsDialogOpen(true);
   };
@@ -189,13 +219,17 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   }));
 
   // Drag handlers
-  const handleDragStart = (task: Task, e: React.MouseEvent) => {
+  const handleDragStart = (task: Task, index: number, e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent text selection
     e.stopPropagation();
 
+    const sourceSection = task.status === 'in_progress' ? 'in_progress' : 'backlog';
     setDragState({
       draggedTask: task,
-      sourceSection: task.status === 'in_progress' ? 'in_progress' : 'backlog',
+      sourceSection,
+      sourceIndex: index,
       dropTargetSection: null,
+      dropTargetIndex: null,
       isValidDrop: false,
       startPosition: { x: e.clientX, y: e.clientY },
     });
@@ -208,52 +242,130 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     setMousePosition({ x: 0, y: 0 });
   };
 
-  const findDropTargetAtPosition = (x: number, y: number): 'in_progress' | 'backlog' | null => {
+  const findDropTargetAtPosition = (x: number, y: number): { section: 'in_progress' | 'backlog' | null; index: number | null } => {
     const elements = document.elementsFromPoint(x, y);
 
+    // First, find which section we're in
+    let section: 'in_progress' | 'backlog' | null = null;
     for (const el of elements) {
       const dropZone = (el as HTMLElement).closest('[data-drop-zone]');
       if (dropZone) {
         const zone = dropZone.getAttribute('data-drop-zone');
         if (zone === 'in_progress' || zone === 'backlog') {
-          return zone;
+          section = zone;
+          break;
         }
       }
     }
 
-    return null;
+    if (!section) {
+      return { section: null, index: null };
+    }
+
+    // Find which task we're hovering over
+    for (const el of elements) {
+      const taskElement = (el as HTMLElement).closest('[data-task-index]');
+      if (taskElement) {
+        const taskIndex = parseInt(taskElement.getAttribute('data-task-index') || '-1', 10);
+        if (taskIndex >= 0) {
+          const rect = taskElement.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+
+          // If mouse is in the top half, insert before this task
+          // If in the bottom half, insert after this task
+          const insertIndex = y < midpoint ? taskIndex : taskIndex + 1;
+          return { section, index: insertIndex };
+        }
+      }
+    }
+
+    // If no task found, drop at the end
+    const tasks = section === 'in_progress' ? inProgressTasks : backlogTasks;
+    return { section, index: tasks.length };
   };
 
-  const isValidDrop = (sourceSection: string, targetSection: string | null): boolean => {
-    if (!targetSection) return false;
-    return sourceSection !== targetSection;
+  const isValidDrop = (
+    sourceSection: string,
+    sourceIndex: number,
+    targetSection: string | null,
+    targetIndex: number | null
+  ): boolean => {
+    if (!targetSection || targetIndex === null) return false;
+
+    // Can drop in different section
+    if (sourceSection !== targetSection) return true;
+
+    // Can drop in same section if index is different and not adjacent
+    // (dropping right before or after itself doesn't make sense)
+    return targetIndex !== sourceIndex && targetIndex !== sourceIndex + 1;
   };
 
-  const performStatusUpdate = async (task: Task, newStatus: 'in_progress' | 'backlog') => {
+  const performTaskReorder = async (
+    draggedTask: Task,
+    targetSection: 'in_progress' | 'backlog',
+    targetIndex: number
+  ) => {
     try {
-      await invokeDbUpdateTask(
-        task.id,
-        task.title,
-        task.description,
-        task.priority,
-        task.tags,
-        task.projectIds,
-        newStatus,
-        task.complexity,
-        task.type
-      );
+      // Get the tasks in the target section
+      const targetTasks = targetSection === 'in_progress' ? [...inProgressTasks] : [...backlogTasks];
+
+      // Remove the dragged task if it's in the same section
+      const sourceSection = draggedTask.status === 'in_progress' ? 'in_progress' : 'backlog';
+      if (sourceSection === targetSection) {
+        const sourceIndex = targetTasks.findIndex(t => t.id === draggedTask.id);
+        if (sourceIndex >= 0) {
+          targetTasks.splice(sourceIndex, 1);
+          // Adjust target index if we removed an item before it
+          if (sourceIndex < targetIndex) {
+            targetIndex--;
+          }
+        }
+      }
+
+      // Update status if moving between sections
+      const newStatus = targetSection === 'in_progress' ? 'in_progress' :
+        (draggedTask.status === 'completed' ? 'completed' : 'backlog');
+
+      // Insert at the target index
+      targetTasks.splice(targetIndex, 0, draggedTask);
+
+      // Update tasks in reverse order (last to first) with small delays
+      // This ensures the first task gets the most recent timestamp
+      // Since we sort by updatedAt descending (newest first), this maintains the visual order
+      for (let i = targetTasks.length - 1; i >= 0; i--) {
+        const task = targetTasks[i];
+
+        await invokeDbUpdateTask(
+          task.id,
+          task.title,
+          task.description,
+          task.priority,
+          task.tags,
+          task.projectIds,
+          task.id === draggedTask.id ? newStatus : task.status,
+          task.complexity,
+          task.type
+        );
+
+        // Small delay to ensure different timestamps (only between updates)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
 
       toaster.create({
         type: 'success',
-        title: 'Task moved',
-        description: `Moved to ${newStatus === 'in_progress' ? 'In Progress' : 'Backlog'}`,
+        title: 'Task reordered',
+        description: sourceSection !== targetSection
+          ? `Moved to ${targetSection === 'in_progress' ? 'In Progress' : 'Backlog'}`
+          : 'Task order updated',
       });
 
       await loadTasks();
     } catch (error) {
       toaster.create({
         type: 'error',
-        title: 'Failed to move task',
+        title: 'Failed to reorder task',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -499,35 +611,17 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
 
 
       {/* Scrollable Content */}
-      <Box flex={1} overflowY="auto" p={6}>
+      <Box
+        flex={1}
+        overflowY="auto"
+        p={6}
+        userSelect={dragState && hasDragThresholdMet ? 'none' : 'auto'}
+      >
         {/* In Progress Section */}
         <Box
           mb={8}
           position="relative"
           data-drop-zone="in_progress"
-          borderWidth={
-            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
-              ? "2px"
-              : "0"
-          }
-          borderStyle="dashed"
-          borderColor={
-            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.400" : "red.400")
-              : "transparent"
-          }
-          bg={
-            dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.50" : "red.50")
-              : "transparent"
-          }
-          transition="all 0.15s"
-          _dark={{
-            bg: dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.900/20" : "red.900/20")
-              : "transparent"
-          }}
-          p={dragState?.dropTargetSection === 'in_progress' && hasDragThresholdMet ? 4 : 0}
         >
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">In Progress</Heading>
@@ -610,58 +704,59 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
               </Text>
             </Box>
           ) : (
-            <ElegantList
-              items={inProgressTasks}
-              type="task"
-              selectable={true}
-              selectedIds={selectedTaskIds}
-              onSelectionChange={handleSelectionChange}
-              getItemId={(item) => (item as Task).id}
-              onItemClick={(task) => handleViewTask(task as Task)}
-              onItemMouseDown={(task, e) => {
-                e.stopPropagation();
-                handleDragStart(task as Task, e as any);
-              }}
-              getItemStyle={(task) => ({
-                opacity: dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet ? 0.5 : 1,
-                cursor: dragState ? 'grabbing' : 'grab',
-                transition: 'opacity 0.15s'
-              })}
-              renderActions={(item) => (
-                <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
-                  <Text>Edit</Text>
-                </Menu.Item>
-              )}
-            />
+            <>
+              <ElegantList
+                items={inProgressTasks}
+                type="task"
+                selectable={true}
+                selectedIds={selectedTaskIds}
+                onSelectionChange={handleSelectionChange}
+                getItemId={(item) => (item as Task).id}
+                onItemClick={(task) => handleViewTask(task as Task)}
+                onItemMouseDown={(task, e, index) => {
+                  e.stopPropagation();
+                  handleDragStart(task as Task, index, e as any);
+                }}
+                getItemStyle={(task, index) => {
+                  const isDragged = dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet;
+                  const isDropTarget =
+                    dragState &&
+                    hasDragThresholdMet &&
+                    dragState.dropTargetSection === 'in_progress' &&
+                    dragState.dropTargetIndex === index;
+
+                  return {
+                    opacity: isDragged ? 0.4 : 1,
+                    cursor: dragState ? 'grabbing' : 'grab',
+                    borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
+                  };
+                }}
+                getItemProps={(task, index) => ({
+                  'data-task-index': index,
+                })}
+                renderActions={(item) => (
+                  <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
+                    <Text>Edit</Text>
+                  </Menu.Item>
+                )}
+              />
+              {/* Drop indicator at the end of list */}
+              {dragState &&
+                hasDragThresholdMet &&
+                dragState.dropTargetSection === 'in_progress' &&
+                dragState.dropTargetIndex === inProgressTasks.length && (
+                  <Box
+                    h="2px"
+                    bg={dragState.isValidDrop ? 'blue.400' : 'red.400'}
+                  />
+                )}
+            </>
           )}
         </Box>
 
         {/* Backlog Section */}
         <Box
           data-drop-zone="backlog"
-          borderWidth={
-            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
-              ? "2px"
-              : "0"
-          }
-          borderStyle="dashed"
-          borderColor={
-            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.400" : "red.400")
-              : "transparent"
-          }
-          bg={
-            dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.50" : "red.50")
-              : "transparent"
-          }
-          transition="all 0.15s"
-          _dark={{
-            bg: dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet
-              ? (dragState.isValidDrop ? "blue.900/20" : "red.900/20")
-              : "transparent"
-          }}
-          p={dragState?.dropTargetSection === 'backlog' && hasDragThresholdMet ? 4 : 0}
         >
           <Flex align="center" gap={2} mb={4}>
             <Heading size="md">Backlog</Heading>
@@ -687,29 +782,53 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
               </Text>
             </Box>
           ) : (
-            <ElegantList
-              items={backlogTasks}
-              type="task"
-              selectable={true}
-              selectedIds={selectedTaskIds}
-              onSelectionChange={handleSelectionChange}
-              getItemId={(item) => (item as Task).id}
-              onItemClick={(task) => handleViewTask(task as Task)}
-              onItemMouseDown={(task, e) => {
-                e.stopPropagation();
-                handleDragStart(task as Task, e as any);
-              }}
-              getItemStyle={(task) => ({
-                opacity: dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet ? 0.5 : 1,
-                cursor: dragState ? 'grabbing' : 'grab',
-                transition: 'opacity 0.15s'
-              })}
-              renderActions={(item) => (
-                <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
-                  <Text>Edit</Text>
-                </Menu.Item>
-              )}
-            />
+            <>
+              <ElegantList
+                items={backlogTasks}
+                type="task"
+                selectable={true}
+                selectedIds={selectedTaskIds}
+                onSelectionChange={handleSelectionChange}
+                getItemId={(item) => (item as Task).id}
+                onItemClick={(task) => handleViewTask(task as Task)}
+                onItemMouseDown={(task, e, index) => {
+                  e.stopPropagation();
+                  handleDragStart(task as Task, index, e as any);
+                }}
+                getItemStyle={(task, index) => {
+                  const isDragged = dragState?.draggedTask.id === (task as Task).id && hasDragThresholdMet;
+                  const isDropTarget =
+                    dragState &&
+                    hasDragThresholdMet &&
+                    dragState.dropTargetSection === 'backlog' &&
+                    dragState.dropTargetIndex === index;
+
+                  return {
+                    opacity: isDragged ? 0.4 : 1,
+                    cursor: dragState ? 'grabbing' : 'grab',
+                    borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
+                  };
+                }}
+                getItemProps={(task, index) => ({
+                  'data-task-index': index,
+                })}
+                renderActions={(item) => (
+                  <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
+                    <Text>Edit</Text>
+                  </Menu.Item>
+                )}
+              />
+              {/* Drop indicator at the end of list */}
+              {dragState &&
+                hasDragThresholdMet &&
+                dragState.dropTargetSection === 'backlog' &&
+                dragState.dropTargetIndex === backlogTasks.length && (
+                  <Box
+                    h="2px"
+                    bg={dragState.isValidDrop ? 'blue.400' : 'red.400'}
+                  />
+                )}
+            </>
           )}
         </Box>
       </Box>

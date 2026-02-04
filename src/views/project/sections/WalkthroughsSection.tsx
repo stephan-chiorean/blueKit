@@ -291,7 +291,6 @@ function WalkthroughsSection({
         onSelectionChange={handleSelectionChange}
         onViewArtifact={handleViewWalkthrough}
         onBack={() => setViewingFolder(null)}
-        projects={projects}
         onArtifactsChanged={onReload}
       />
     );

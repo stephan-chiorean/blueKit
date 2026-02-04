@@ -20,7 +20,7 @@ import {
   LuX,
 } from 'react-icons/lu';
 import { GrNavigate } from 'react-icons/gr';
-import { Plan } from '@/types/plan';
+import { Plan, PlanDetails } from '@/types/plan';
 import CreatePlanDialog from '@/features/plans/components/CreatePlanDialog';
 import { ViewModeSwitcher, STANDARD_VIEW_MODES } from '@/shared/components/ViewModeSwitcher';
 import { PlanResourceCard } from '@/shared/components/PlanResourceCard';
@@ -29,9 +29,9 @@ import { StandardPageLayout } from '@/shared/components/layouts/StandardPageLayo
 import { FilterPanel } from '@/shared/components/FilterPanel';
 
 interface PlansSectionProps {
-  plans: Plan[];
+  plans: PlanDetails[];
   plansLoading: boolean;
-  onViewPlan: (plan: Plan) => void;
+  onViewPlan: (plan: PlanDetails) => void;
   projectId: string;
   projectPath: string;
   onPlansChanged: () => void;
@@ -263,7 +263,7 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
 
     // Default to card view
     return (
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} overflow="visible">
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={6} overflow="visible">
         {filteredPlans.map((plan, index) => (
           <PlanResourceCard
             key={plan.id}
@@ -382,7 +382,7 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
               </Box>
             ) : (
               <Box py={4}>
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} gap={6}>
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <PlanCardSkeleton key={i} />
                   ))}

@@ -1,4 +1,4 @@
-import { HStack, Icon, Text } from '@chakra-ui/react';
+import { HStack, Icon, Text, Button } from '@chakra-ui/react';
 import { useMemo, useState } from 'react';
 import {
   LuPackage,
@@ -7,9 +7,10 @@ import {
   LuNetwork,
   LuTrash2,
   LuX,
+  LuFolder,
 } from 'react-icons/lu';
 import { SelectionBar, SelectionBarAction } from './SelectionBar';
-import { ProjectSelectorPopover } from './ProjectSelectorPopover';
+import AddToProjectPopover from './AddToProjectPopover';
 import {
   ArtifactFile,
   Project,
@@ -44,7 +45,6 @@ interface FolderViewSelectionBarProps {
   onClearSelection: () => void;
   onDeleteComplete?: () => void;
   onAddComplete?: () => void;
-  projects: Project[];
   position?: 'fixed' | 'absolute';
 }
 
@@ -58,7 +58,6 @@ export function FolderViewSelectionBar({
   onClearSelection,
   onDeleteComplete,
   onAddComplete,
-  projects,
   position = 'absolute',
 }: FolderViewSelectionBarProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -240,12 +239,29 @@ export function FolderViewSelectionBar({
       type: 'popover',
       popover: {
         trigger: (
-          <ProjectSelectorPopover
-            projects={projects}
-            mode="add"
+          <AddToProjectPopover
+            trigger={
+              <Button
+                variant="subtle"
+                colorPalette="blue"
+                size="sm"
+                disabled={isLoading}
+              >
+                <HStack gap={2}>
+                  <Icon>
+                    <LuFolder />
+                  </Icon>
+                  Add to Project
+                </HStack>
+              </Button>
+            }
             onConfirm={handleAddToProjects}
-            loading={isLoading}
-            disabled={isLoading}
+            itemCount={selectedArtifacts.length}
+            sourceFiles={selectedArtifacts.map(a => ({
+              path: a.path,
+              name: a.name,
+              type: (a.frontMatter?.type || 'kit') as any
+            }))}
           />
         ),
       },

@@ -354,7 +354,6 @@ function KitsSection({
         onSelectionChange={handleSelectionChange}
         onViewArtifact={onViewKit}
         onBack={() => setViewingFolder(null)}
-        projects={projects}
         onArtifactsChanged={onReload}
       />
     );

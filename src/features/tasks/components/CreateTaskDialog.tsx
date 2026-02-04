@@ -298,19 +298,21 @@ export default function CreateTaskDialog({
                       <Text fontSize="sm" fontWeight="medium" color="text.primary">
                         Status
                       </Text>
-                      <SegmentGroup.Root
-                        value={status}
-                        onValueChange={(e) => setStatus(e.value as TaskStatus)}
-                      >
-                        <SegmentGroup.Indicator />
-                        <SegmentGroup.Items
-                          items={[
-                            { value: 'backlog', label: 'Backlog' },
-                            { value: 'in_progress', label: 'In Progress' },
-                            { value: 'blocked', label: 'Blocked' },
-                          ]}
-                        />
-                      </SegmentGroup.Root>
+                      <Box w="fit-content">
+                        <SegmentGroup.Root
+                          value={status}
+                          onValueChange={(e) => setStatus(e.value as TaskStatus)}
+                        >
+                          <SegmentGroup.Indicator />
+                          <SegmentGroup.Items
+                            items={[
+                              { value: 'backlog', label: 'Backlog' },
+                              { value: 'in_progress', label: 'In Progress' },
+                              { value: 'blocked', label: 'Blocked' },
+                            ]}
+                          />
+                        </SegmentGroup.Root>
+                      </Box>
                     </VStack>
                   </MotionBox>
 

@@ -35,8 +35,9 @@ interface ElegantListProps {
     type?: 'kit' | 'folder' | 'walkthrough' | 'task';
 
     // Drag-and-drop support
-    onItemMouseDown?: (item: ElegantListItem, e: React.MouseEvent) => void;
-    getItemStyle?: (item: ElegantListItem) => React.CSSProperties;
+    onItemMouseDown?: (item: ElegantListItem, e: React.MouseEvent, index: number) => void;
+    getItemStyle?: (item: ElegantListItem, index: number) => React.CSSProperties;
+    getItemProps?: (item: ElegantListItem, index: number) => Record<string, any>;
 }
 
 export function ElegantList({
@@ -53,6 +54,7 @@ export function ElegantList({
     type,
     onItemMouseDown,
     getItemStyle,
+    getItemProps,
 }: ElegantListProps) {
     const { colorMode } = useColorMode();
 
@@ -153,7 +155,7 @@ export function ElegantList({
 
             {/* List Items */}
             <Box>
-                {items.map((item) => {
+                {items.map((item, index) => {
                     // Use path as key
                     const path = getItemId ? getItemId(item) : ('path' in item ? item.path : (item as any).id);
                     const isSelected = selectedIds?.has(path);
@@ -231,8 +233,9 @@ export function ElegantList({
                             ? ((item as any).description || (item as any).config?.description || '')
                             : (item as ArtifactFile).frontMatter?.description;
 
-                    // Get custom item style for drag-and-drop
-                    const customStyle = getItemStyle ? getItemStyle(item) : {};
+                    // Get custom item style and props for drag-and-drop
+                    const customStyle = getItemStyle ? getItemStyle(item, index) : {};
+                    const customProps = getItemProps ? getItemProps(item, index) : {};
 
                     return (
                         <Flex
@@ -253,8 +256,9 @@ export function ElegantList({
                                 onItemClick(item);
                             }}
                             onContextMenu={(e) => onItemContextMenu?.(e, item)}
-                            onMouseDown={(e) => onItemMouseDown?.(item, e)}
+                            onMouseDown={(e) => onItemMouseDown?.(item, e, index)}
                             style={customStyle}
+                            {...customProps}
                         >
 
                             {/* Name Column */}

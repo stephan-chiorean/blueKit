@@ -23,7 +23,6 @@ interface FolderViewProps {
   onViewArtifact: (artifact: ArtifactFile) => void;
   onContextMenu?: (e: React.MouseEvent, artifact: ArtifactFile) => void;
   onBack: () => void;
-  projects: Project[];
   onArtifactsChanged?: () => void;
 }
 
@@ -39,7 +38,6 @@ export default function FolderView({
   onViewArtifact,
   onContextMenu,
   onBack,
-  projects,
   onArtifactsChanged,
 }: FolderViewProps) {
   const { colorMode } = useColorMode();
@@ -163,7 +161,6 @@ export default function FolderView({
         onClearSelection={handleClearSelection}
         onDeleteComplete={handleOperationComplete}
         onAddComplete={handleOperationComplete}
-        projects={projects}
         position="absolute"
       />
     </Box>

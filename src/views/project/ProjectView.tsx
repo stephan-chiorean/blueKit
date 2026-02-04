@@ -32,7 +32,8 @@ import { invokeGetProjectArtifacts, invokeGetChangedArtifacts, invokeWatchProjec
 import { deleteResources } from '@/ipc/artifacts';
 import { invokeGetOrCreateWalkthroughByPath } from '@/ipc/walkthroughs';
 import { ResourceFile, ResourceType } from '@/types/resource';
-import { Plan } from '@/types/plan';
+import { Plan, PlanDetails } from '@/types/plan';
+import { invokeGetPlanDetails } from '@/ipc/plans';
 import { useFeatureFlags } from '@/shared/contexts/FeatureFlagsContext';
 import { useProjectArtifacts } from '@/shared/contexts/ProjectArtifactsContext';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
@@ -414,7 +415,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   const [dbProject, setDbProject] = useState<Project | null>(null);
 
   // Plans state
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<PlanDetails[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
 
   // Use transition for non-urgent updates (file watching updates)
@@ -614,12 +615,27 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
   }, [project.path]);
 
   // Load plans for this project - wrapped in useCallback for stable reference
+  // Load plans for this project - wrapped in useCallback for stable reference
   const loadPlans = useCallback(async () => {
     try {
       setPlansLoading(true);
+      // First get the list of plans
       const projectPlans = await invokeGetProjectPlans(project.id);
+
+      // Then fetch full details for each plan to get milestones
+      const plansWithDetails = await Promise.all(
+        projectPlans.map(async (plan) => {
+          try {
+            return await invokeGetPlanDetails(plan.id);
+          } catch (e) {
+            console.warn(`Failed to load details for plan ${plan.id}`, e);
+            return plan as unknown as PlanDetails; // Fallback to basic plan if details fail
+          }
+        })
+      );
+
       flushSync(() => {
-        setPlans(projectPlans);
+        setPlans(plansWithDetails);
       });
     } catch (err) {
       console.error('Failed to load plans:', err);
