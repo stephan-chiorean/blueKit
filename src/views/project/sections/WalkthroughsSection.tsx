@@ -277,7 +277,7 @@ function WalkthroughsSection({
     if (targetFolderId === undefined) return;
 
     try {
-      const targetFolder = folders.find(f => f.config.id === targetFolderId);
+      const targetFolder = folders.find(f => (f.config?.id || f.path) === targetFolderId);
       if (!targetFolder) return;
 
       await invokeMoveArtifactToFolder(walkthrough.path, targetFolder.path);
@@ -554,12 +554,13 @@ function WalkthroughsSection({
                 getItemProps={(item) => {
                   const folder = item as ArtifactFolder;
                   return {
-                    'data-droppable-folder-id': folder.config.id,
+                    'data-droppable-folder-id': folder.config?.id || folder.path,
                   };
                 }}
                 getItemStyle={(item) => {
                   const folder = item as ArtifactFolder;
-                  const isDraggedOver = dragState?.dropTargetFolderId === folder.config.id && hasDragThresholdMet;
+                  const folderId = folder.config?.id || folder.path;
+                  const isDraggedOver = dragState?.dropTargetFolderId === folderId && hasDragThresholdMet;
 
                   if (!isDraggedOver) return {};
 
