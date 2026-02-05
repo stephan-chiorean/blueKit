@@ -13,7 +13,7 @@ import { MdFolder, MdMoreVert } from "react-icons/md";
 import { LuBookOpen, LuPackage } from "react-icons/lu";
 import { ArtifactFile, ArtifactFolder } from "@/ipc";
 import { Task } from "@/types/task";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useColorMode } from "@/shared/contexts/ColorModeContext";
 import { getPriorityIcon, getPriorityColorPalette, getTypeIcon, getTypeColorPalette, getTypeLabel } from "@/shared/utils/taskUtils";
 
@@ -40,6 +40,7 @@ interface ElegantListProps {
     onItemMouseDown?: (item: ElegantListItem, e: React.MouseEvent, index: number) => void;
     getItemStyle?: (item: ElegantListItem, index: number) => React.CSSProperties;
     getItemProps?: (item: ElegantListItem, index: number) => Record<string, any>;
+    isDragging?: boolean; // Disable hover effects during drag operations
 }
 
 export function ElegantList({
@@ -59,8 +60,25 @@ export function ElegantList({
     onItemMouseDown,
     getItemStyle,
     getItemProps,
+    isDragging = false,
 }: ElegantListProps) {
     const { colorMode } = useColorMode();
+    
+    // Track hovered item explicitly to avoid stuck hover states during drag
+    const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
+    // Debug logging for drag state changes
+    useEffect(() => {
+        console.log(`[ElegantList] type=${type} isDragging changed to: ${isDragging}`);
+    }, [isDragging, type]);
+    
+    // Clear hover state when drag starts or ends to prevent stuck states
+    useEffect(() => {
+        if (isDragging) {
+            console.log(`[ElegantList] type=${type} clearing hover state due to drag`);
+            setHoveredItemId(null);
+        }
+    }, [isDragging, type]);
 
     const hoverBg = colorMode === "light" ? "blackAlpha.50" : "whiteAlpha.100";
     const selectedBg = colorMode === "light" ? "blue.50" : "blue.900/20";
@@ -139,11 +157,11 @@ export function ElegantList({
                 </Box>
                 {/* Header Checkbox */}
                 {selectable && (
-                    <Box width="32px" display="flex" alignItems="center" justifyContent="center">
+                    <Box width="48px" display="flex" alignItems="center" justifyContent="center">
                         <Checkbox.Root
                             checked={allSelected}
                             onCheckedChange={handleSelectAll}
-                            size="sm"
+                            size="md"
                         >
                             <Checkbox.HiddenInput />
                             <Checkbox.Control
@@ -243,6 +261,10 @@ export function ElegantList({
                     const customStyle = getItemStyle ? getItemStyle(item, index) : {};
                     const customProps = getItemProps ? getItemProps(item, index) : {};
 
+                    // Determine background: selected takes priority, then hover (if not dragging)
+                    const isHovered = hoveredItemId === path && !isDragging;
+                    const rowBg = isSelected ? selectedBg : (isHovered ? hoverBg : "transparent");
+
                     return (
                         <Flex
                             key={path}
@@ -252,9 +274,14 @@ export function ElegantList({
                             cursor="pointer"
                             borderBottomWidth="1px"
                             borderColor={borderColor}
-                            bg={isSelected ? selectedBg : "transparent"}
-                            _hover={{
-                                bg: isSelected ? selectedBg : hoverBg,
+                            bg={rowBg}
+                            onMouseEnter={() => {
+                                if (!isDragging) {
+                                    setHoveredItemId(path);
+                                }
+                            }}
+                            onMouseLeave={() => {
+                                setHoveredItemId(null);
                             }}
                             onClick={() => {
                                 // If clicking the row toggles selection (optional UX choice), or just opens the item
@@ -377,12 +404,12 @@ export function ElegantList({
 
                             {/* Checkbox Column - Moved to Right */}
                             {selectable && (
-                                <Box width="32px" onClick={(e) => e.stopPropagation()} display="flex" alignItems="center" justifyContent="center">
+                                <Box width="48px" onClick={(e) => e.stopPropagation()} display="flex" alignItems="center" justifyContent="center">
                                     {canSelect && (
                                         <Checkbox.Root
                                             checked={isSelected}
                                             onCheckedChange={() => handleItemToggle(item)}
-                                            size="sm"
+                                            size="md"
                                         >
                                             <Checkbox.HiddenInput />
                                             <Checkbox.Control

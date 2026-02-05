@@ -770,6 +770,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                 selectable={false}
                 getItemId={(item) => (item as Task).id}
                 onItemClick={(task) => handleViewTask(task as Task)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 onItemMouseDown={(task, e, index) => {
                   e.stopPropagation();
                   handleDragStart(task as Task, index, e as any);
@@ -784,7 +785,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
 
                   return {
                     opacity: isDragged ? 0.4 : 1,
-                    cursor: dragState ? 'grabbing' : 'grab',
+                    cursor: 'pointer',
                     borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
                   };
                 }}
@@ -893,6 +894,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                 selectable={false}
                 getItemId={(item) => (item as Task).id}
                 onItemClick={(task) => handleViewTask(task as Task)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 onItemMouseDown={(task, e, index) => {
                   e.stopPropagation();
                   handleDragStart(task as Task, index, e as any);
@@ -907,7 +909,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
 
                   return {
                     opacity: isDragged ? 0.4 : 1,
-                    cursor: dragState ? 'grabbing' : 'grab',
+                    cursor: 'pointer',
                     borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
                   };
                 }}

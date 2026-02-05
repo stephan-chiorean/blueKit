@@ -12,7 +12,7 @@ import {
   Menu,
 } from '@chakra-ui/react';
 import { createPortal } from 'react-dom';
-import { LuFilter, LuFolderPlus, LuPackage, LuArrowRight, LuX } from 'react-icons/lu';
+import { LuFilter, LuFolderPlus, LuPackage, LuArrowRight, LuX, LuTrash2, LuShare, LuPlus } from 'react-icons/lu';
 import {
   ArtifactFile,
   ArtifactFolder,
@@ -28,15 +28,16 @@ import {
 } from '@/ipc';
 import { invokeMoveArtifactToFolder } from '@/ipc/folders';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
-import FolderView from '@/shared/components/FolderView';
+import GroupView from '@/shared/components/GroupView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
 import DeleteFolderDialog from '@/shared/components/DeleteFolderDialog';
 import { FilterPanel } from '@/shared/components/FilterPanel';
 import { getRootArtifacts } from '@/shared/utils/buildFolderTree';
 import { toaster } from '@/shared/components/ui/toaster';
 import { ElegantList } from '@/shared/components/ElegantList';
-import KitsSelectionFooter from './components/KitsSelectionFooter';
+import ResourceSelectionFooter from './components/ResourceSelectionFooter';
 import AddToProjectDialog from './components/AddToProjectDialog';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 // Drag state for kit/folder movement
 interface DragState {
@@ -89,6 +90,8 @@ function KitsSection({
   const [viewingFolder, setViewingFolder] = useState<ArtifactFolder | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ArtifactFolder | null>(null);
 
+  // Color mode for drag styling
+  const { colorMode } = useColorMode();
 
 
   const handleSelectionChange = (newSelectedIds: Set<string>) => {
@@ -337,6 +340,8 @@ function KitsSection({
     e.preventDefault(); // Prevent text selection
     e.stopPropagation();
 
+    console.log('[Drag] Start - mousedown on kit:', kit.name);
+
     setDragState({
       draggedKit: kit,
       dropTargetFolderId: undefined,
@@ -348,6 +353,7 @@ function KitsSection({
   }, []);
 
   const clearDragState = useCallback(() => {
+    console.log('[Drag] Clear - resetting drag state');
     setDragState(null);
     setHasDragThresholdMet(false);
   }, []);
@@ -406,6 +412,7 @@ function KitsSection({
         const dx = Math.abs(e.clientX - dragState.startPosition.x);
         const dy = Math.abs(e.clientY - dragState.startPosition.y);
         if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          console.log('[Drag] Threshold met - drag is now active, pointerEvents should be none');
           setHasDragThresholdMet(true);
         }
         return;
@@ -424,6 +431,7 @@ function KitsSection({
 
     const handleMouseUp = async () => {
       const wasDragging = hasDragThresholdMet;
+      console.log('[Drag] MouseUp - wasDragging:', wasDragging, 'isValidDrop:', dragState.isValidDrop);
 
       if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
         await performMove(dragState.draggedKit, dragState.dropTargetFolderId);
@@ -492,10 +500,10 @@ function KitsSection({
     );
   }
 
-  // If viewing a folder, show the FolderView component
+  // If viewing a folder, show the GroupView component
   if (viewingFolder) {
     return (
-      <FolderView
+      <GroupView
         folder={viewingFolder}
         artifacts={getFolderArtifacts(viewingFolder.path)}
         selectedIds={selectedKitIds}
@@ -503,6 +511,7 @@ function KitsSection({
         onViewArtifact={onViewKit}
         onBack={() => setViewingFolder(null)}
         onArtifactsChanged={onReload}
+        projects={projects}
       />
     );
   }
@@ -629,6 +638,7 @@ function KitsSection({
                 items={folders}
                 type="folder"
                 onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 getItemProps={(item) => {
                   const folder = item as ArtifactFolder;
                   return {
@@ -640,17 +650,15 @@ function KitsSection({
                   const folderId = folder.config?.id || folder.path;
                   const isDraggedOver = dragState?.dropTargetFolderId === folderId && hasDragThresholdMet;
 
-                  if (!isDraggedOver) return {};
+                  // Don't set pointerEvents on folder rows - they need to be detectable for drop targeting
+                  // The hover highlight is controlled via backgroundColor, not CSS :hover
+                  if (isDraggedOver) {
+                    return {
+                      backgroundColor: colorMode === 'light' ? 'var(--chakra-colors-blue-50)' : 'rgba(30, 58, 138, 0.3)',
+                    };
+                  }
 
-                  return {
-                    borderWidth: '2px',
-                    borderStyle: 'dashed',
-                    borderColor: '#3182ce', // blue.400
-                    backgroundColor: 'var(--chakra-colors-blue-50)',
-                    _dark: {
-                      backgroundColor: 'var(--chakra-colors-blue-900)',
-                    }
-                  };
+                  return {};
                 }}
                 renderActions={(item) => {
                   const folder = item as ArtifactFolder;
@@ -712,6 +720,7 @@ function KitsSection({
                 getItemId={(item) => (item as ArtifactFile).path}
                 onItemClick={(kit) => handleViewKit(kit as ArtifactFile)}
                 onItemContextMenu={(e, kit) => handleContextMenu(e, kit as ArtifactFile)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 onItemMouseDown={(kit, e) => {
                   handleDragStart(kit as ArtifactFile, e as any);
                 }}
@@ -719,7 +728,7 @@ function KitsSection({
                   const isDragged = dragState?.draggedKit.path === (kit as ArtifactFile).path && hasDragThresholdMet;
                   return {
                     opacity: isDragged ? 0.4 : 1,
-                    cursor: dragState ? 'grabbing' : 'grab',
+                    cursor: 'pointer',
                   };
                 }}
               />
@@ -745,13 +754,31 @@ function KitsSection({
         onConfirm={handleConfirmDeleteFolder}
       />
 
-      <KitsSelectionFooter
+      <ResourceSelectionFooter
         selectedCount={selectedKitIds.size}
         isOpen={selectedKitIds.size > 0}
         onClearSelection={clearSelection}
-        onDelete={handleDelete}
-        onPublish={handlePublish}
-        onAddToProject={() => setIsAddToProjectOpen(true)}
+        resourceType="kit"
+        actions={[
+          {
+            label: 'Add to Project',
+            icon: LuPlus,
+            colorPalette: 'blue',
+            onClick: () => setIsAddToProjectOpen(true),
+          },
+          {
+            label: 'Publish to Library',
+            icon: LuShare,
+            colorPalette: 'orange',
+            onClick: handlePublish,
+          },
+          {
+            label: 'Delete',
+            icon: LuTrash2,
+            colorPalette: 'red',
+            onClick: handleDelete,
+          },
+        ]}
         loading={isKitsLoading}
       />
 

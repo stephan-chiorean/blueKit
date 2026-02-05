@@ -1,25 +1,33 @@
 import { Box, HStack, Text, Button, Icon, Badge } from '@chakra-ui/react';
-import { LuTrash2, LuX, LuShare, LuFolderPlus } from 'react-icons/lu';
+import { LuX } from 'react-icons/lu';
+import { IconType } from 'react-icons';
 
-interface KitsSelectionFooterProps {
+export interface ActionButton {
+    label: string;
+    icon: IconType;
+    colorPalette: string;
+    onClick: () => void;
+}
+
+interface ResourceSelectionFooterProps {
     selectedCount: number;
     isOpen: boolean;
     onClearSelection: () => void;
-    onDelete: () => void;
-    onPublish: () => void;
-    onAddToProject: () => void;
+    resourceType: 'kit' | 'plan' | 'walkthrough';
+    actions: ActionButton[];
     loading?: boolean;
 }
 
-export default function KitsSelectionFooter({
+export default function ResourceSelectionFooter({
     selectedCount,
     isOpen,
     onClearSelection,
-    onDelete,
-    onPublish,
-    onAddToProject,
+    resourceType,
+    actions,
     loading
-}: KitsSelectionFooterProps) {
+}: ResourceSelectionFooterProps) {
+    const pluralizedResourceType = selectedCount !== 1 ? `${resourceType}s` : resourceType;
+
     return (
         <Box
             position="sticky"
@@ -53,52 +61,27 @@ export default function KitsSelectionFooter({
                                 {selectedCount}
                             </Badge>
                             <Text fontWeight="medium" fontSize="sm">
-                                kit{selectedCount !== 1 ? 's' : ''} selected
+                                {pluralizedResourceType} selected
                             </Text>
                         </HStack>
                         <HStack gap={2}>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="blue"
-                                onClick={onAddToProject}
-                                disabled={loading}
-                            >
-                                <HStack gap={1}>
-                                    <Icon>
-                                        <LuFolderPlus />
-                                    </Icon>
-                                    <Text>Add to Project</Text>
-                                </HStack>
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="green"
-                                onClick={onPublish}
-                                disabled={loading}
-                            >
-                                <HStack gap={1}>
-                                    <Icon>
-                                        <LuShare />
-                                    </Icon>
-                                    <Text>Publish</Text>
-                                </HStack>
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="red"
-                                onClick={onDelete}
-                                disabled={loading}
-                            >
-                                <HStack gap={1}>
-                                    <Icon>
-                                        <LuTrash2 />
-                                    </Icon>
-                                    <Text>Delete</Text>
-                                </HStack>
-                            </Button>
+                            {actions.map((action, index) => (
+                                <Button
+                                    key={index}
+                                    size="sm"
+                                    variant="ghost"
+                                    colorPalette={action.colorPalette}
+                                    onClick={action.onClick}
+                                    disabled={loading}
+                                >
+                                    <HStack gap={1}>
+                                        <Icon>
+                                            <action.icon />
+                                        </Icon>
+                                        <Text>{action.label}</Text>
+                                    </HStack>
+                                </Button>
+                            ))}
                             <Button
                                 size="sm"
                                 variant="ghost"

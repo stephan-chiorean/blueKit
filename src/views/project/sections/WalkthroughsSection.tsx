@@ -13,10 +13,11 @@ import {
 } from '@chakra-ui/react';
 import { createPortal } from 'react-dom';
 import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX, LuBookOpen, LuArrowRight } from 'react-icons/lu';
+import ResourceSelectionFooter from './components/ResourceSelectionFooter';
 import { ArtifactFile, ArtifactFolder, FolderConfig, Project, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
 import { invokeMoveArtifactToFolder } from '@/ipc/folders';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
-import FolderView from '@/shared/components/FolderView';
+import GroupView from '@/shared/components/GroupView';
 import { CreateFolderPopover } from '@/shared/components/CreateFolderPopover';
 import DeleteFolderDialog from '@/shared/components/DeleteFolderDialog';
 import { FilterPanel } from '@/shared/components/FilterPanel';
@@ -24,6 +25,7 @@ import { getRootArtifacts } from '@/shared/utils/buildFolderTree';
 import { toaster } from '@/shared/components/ui/toaster';
 import CreateWalkthroughDialog from '@/features/walkthroughs/components/CreateWalkthroughDialog';
 import { ElegantList } from '@/shared/components/ElegantList';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 // Drag state for walkthrough/folder movement
 interface DragState {
@@ -82,6 +84,8 @@ function WalkthroughsSection({
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
+  // Color mode for drag styling
+  const { colorMode } = useColorMode();
 
   const handleSelectionChange = (newSelectedIds: Set<string>) => {
     setSelectedWalkthroughIds(newSelectedIds);
@@ -425,10 +429,10 @@ function WalkthroughsSection({
     );
   }
 
-  // If viewing a folder, show the FolderView component
+  // If viewing a folder, show the GroupView component
   if (viewingFolder) {
     return (
-      <FolderView
+      <GroupView
         folder={viewingFolder}
         artifacts={getFolderArtifacts(viewingFolder.path)}
         selectedIds={selectedWalkthroughIds}
@@ -436,6 +440,7 @@ function WalkthroughsSection({
         onViewArtifact={handleViewWalkthrough}
         onBack={() => setViewingFolder(null)}
         onArtifactsChanged={onReload}
+        projects={projects}
       />
     );
   }
@@ -572,6 +577,7 @@ function WalkthroughsSection({
                 items={folders}
                 type="folder"
                 onItemClick={(folder) => setViewingFolder(folder as ArtifactFolder)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 getItemProps={(item) => {
                   const folder = item as ArtifactFolder;
                   return {
@@ -586,13 +592,7 @@ function WalkthroughsSection({
                   if (!isDraggedOver) return {};
 
                   return {
-                    borderWidth: '2px',
-                    borderStyle: 'dashed',
-                    borderColor: '#3182ce', // blue.400
-                    backgroundColor: 'var(--chakra-colors-blue-50)',
-                    _dark: {
-                      backgroundColor: 'var(--chakra-colors-blue-900)',
-                    }
+                    backgroundColor: colorMode === 'light' ? 'var(--chakra-colors-blue-50)' : 'rgba(30, 58, 138, 0.3)', // blue.950 with opacity
                   };
                 }}
                 renderActions={(item) => {
@@ -653,6 +653,7 @@ function WalkthroughsSection({
                 onSelectionChange={handleSelectionChange}
                 getItemId={(item) => (item as ArtifactFile).path}
                 onItemClick={(kit) => handleViewWalkthrough(kit as ArtifactFile)}
+                isDragging={dragState !== null && hasDragThresholdMet}
                 onItemMouseDown={(walkthrough, e) => {
                   handleDragStart(walkthrough as ArtifactFile, e as any);
                 }}
@@ -660,7 +661,7 @@ function WalkthroughsSection({
                   const isDragged = dragState?.draggedWalkthrough.path === (walkthrough as ArtifactFile).path && hasDragThresholdMet;
                   return {
                     opacity: isDragged ? 0.4 : 1,
-                    cursor: dragState ? 'grabbing' : 'grab',
+                    cursor: 'pointer',
                   };
                 }}
                 renderActions={(item) => (
@@ -706,69 +707,33 @@ function WalkthroughsSection({
         />
       )}
 
-      {/* Inline Selection Footer */}
-      <Box
-        position="sticky"
-        bottom={0}
-        width="100%"
-        display="grid"
-        css={{
-          gridTemplateRows: selectedWalkthroughIds.size > 0 ? "1fr" : "0fr",
-          transition: "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        <Box overflow="hidden" minHeight={0}>
-          <Box
-            borderTopWidth="1px"
-            borderColor="border.subtle"
-            py={4}
-            px={6}
-            css={{
-              background: 'rgba(255, 255, 255, 0.85)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-              _dark: {
-                background: 'rgba(20, 20, 20, 0.85)',
-              }
-            }}
-          >
-            <HStack justify="space-between">
-              <HStack gap={3}>
-                <Badge colorPalette="blue" size="lg" variant="solid">
-                  {selectedWalkthroughIds.size}
-                </Badge>
-                <Text fontWeight="medium" fontSize="sm">walkthrough{selectedWalkthroughIds.size > 1 ? 's' : ''} selected</Text>
-              </HStack>
-              <HStack gap={2}>
-                <Button size="sm" variant="ghost" colorPalette="blue" onClick={handleAddToProject}>
-                  <HStack gap={1}>
-                    <LuPlus />
-                    <Text>Add to Project</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="orange" onClick={handlePublish}>
-                  <HStack gap={1}>
-                    <LuShare />
-                    <Text>Publish to Library</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="red" onClick={handleDelete}>
-                  <HStack gap={1}>
-                    <LuTrash2 />
-                    <Text>Delete</Text>
-                  </HStack>
-                </Button>
-                <Button size="sm" variant="ghost" colorPalette="gray" onClick={clearSelection}>
-                  <HStack gap={1}>
-                    <LuX />
-                    <Text>Clear</Text>
-                  </HStack>
-                </Button>
-              </HStack>
-            </HStack>
-          </Box>
-        </Box>
-      </Box>
+      {/* Selection Footer */}
+      <ResourceSelectionFooter
+        selectedCount={selectedWalkthroughIds.size}
+        isOpen={selectedWalkthroughIds.size > 0}
+        onClearSelection={clearSelection}
+        resourceType="walkthrough"
+        actions={[
+          {
+            label: 'Add to Project',
+            icon: LuPlus,
+            colorPalette: 'blue',
+            onClick: handleAddToProject,
+          },
+          {
+            label: 'Publish to Library',
+            icon: LuShare,
+            colorPalette: 'orange',
+            onClick: handlePublish,
+          },
+          {
+            label: 'Delete',
+            icon: LuTrash2,
+            colorPalette: 'red',
+            onClick: handleDelete,
+          },
+        ]}
+      />
 
     </Flex>
   );
