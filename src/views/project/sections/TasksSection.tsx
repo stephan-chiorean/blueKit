@@ -10,12 +10,14 @@ import {
   Icon,
   Spinner,
   Heading,
-  Menu,
+  IconButton,
+  Tooltip,
+  Portal,
 } from '@chakra-ui/react';
-import { LuPlus, LuFilter } from 'react-icons/lu';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LuPlus, LuFilter, LuCircleCheck, LuTrash2, LuPartyPopper } from 'react-icons/lu';
 import { Task, TaskPriority, TaskType } from '@/types/task';
-import { Project, invokeDbGetTasks, invokeDbGetProjectTasks, invokeDbUpdateTask } from '@/ipc';
-import TasksSelectionFooter from '@/features/tasks/components/TasksSelectionFooter';
+import { Project, invokeDbGetTasks, invokeDbGetProjectTasks, invokeDbUpdateTask, invokeDbDeleteTask } from '@/ipc';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import EditTaskDialog from '@/features/tasks/components/EditTaskDialog';
 import CreateTaskDialog from '@/features/tasks/components/CreateTaskDialog';
@@ -23,6 +25,8 @@ import DragTooltip from '@/features/tasks/components/DragTooltip';
 import { toaster } from '@/shared/components/ui/toaster';
 import { FilterPanel } from '@/shared/components/FilterPanel';
 import { ElegantList } from '@/shared/components/ElegantList';
+
+const MotionBox = motion.create(Box);
 
 interface TasksSectionProps {
   context: 'workspace' | Project;  // workspace view or specific project
@@ -57,9 +61,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Local state for selected tasks
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-
   // Dialog state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -70,6 +71,9 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
+
+  // Confetti state
+  const [showConfetti, setShowConfetti] = useState(false);
 
   // Sort state
   const [sortBy] = useState<SortOption>('time');
@@ -186,26 +190,60 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
     };
   }, [dragState, hasDragThresholdMet]);
 
-  // Get selected tasks
-  const selectedTasks = useMemo(() => {
-    return tasks.filter(task => selectedTaskIds.has(task.id));
-  }, [tasks, selectedTaskIds]);
-
-
-  const clearSelection = () => {
-    setSelectedTaskIds(new Set());
-  };
-
-  const handleSelectionChange = (newSelectedIds: Set<string>) => {
-    setSelectedTaskIds(newSelectedIds);
-  };
-
   const handleViewTask = (task: Task) => {
     // Don't open modal if we just finished dragging
     if (justFinishedDragging) return;
 
     setSelectedTask(task);
     setIsDialogOpen(true);
+  };
+
+  const handleCompleteTask = async (task: Task) => {
+    if (task.status === 'completed') return;
+
+    try {
+      await invokeDbUpdateTask(
+        task.id, task.title, task.description, task.priority,
+        task.tags, task.projectIds, 'completed', task.complexity, task.type
+      );
+
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+
+      toaster.create({
+        type: 'success',
+        title: 'Task completed',
+        description: `Marked "${task.title}" as completed`,
+      });
+
+      await loadTasks();
+    } catch (error) {
+      toaster.create({
+        type: 'error',
+        title: 'Failed to complete task',
+        description: error instanceof Error ? error.message : String(error),
+        closable: true,
+      });
+    }
+  };
+
+  const handleDeleteTask = async (task: Task) => {
+    try {
+      await invokeDbDeleteTask(task.id);
+      toaster.create({
+        type: 'success',
+        title: 'Task deleted',
+        description: `Deleted "${task.title}"`,
+      });
+      await loadTasks();
+    } catch (error) {
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete task',
+        description: error instanceof Error ? error.message : String(error),
+        closable: true,
+      });
+    }
   };
 
   const handleAddTask = () => {
@@ -597,6 +635,27 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
         />
       )}
 
+      {/* Confetti Animation */}
+      <AnimatePresence>
+        {showConfetti && (
+          <MotionBox
+            position="fixed"
+            top="50%"
+            left="50%"
+            transform="translate(-50%, -50%)"
+            zIndex={1000}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.4, type: 'spring' }}
+          >
+            <Icon boxSize={24} color="green.500">
+              <LuPartyPopper />
+            </Icon>
+          </MotionBox>
+        )}
+      </AnimatePresence>
+
       {/* Toolkit Header */}
       <ToolkitHeader
         title="Tasks"
@@ -708,9 +767,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
               <ElegantList
                 items={inProgressTasks}
                 type="task"
-                selectable={true}
-                selectedIds={selectedTaskIds}
-                onSelectionChange={handleSelectionChange}
+                selectable={false}
                 getItemId={(item) => (item as Task).id}
                 onItemClick={(task) => handleViewTask(task as Task)}
                 onItemMouseDown={(task, e, index) => {
@@ -731,14 +788,61 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                     borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
                   };
                 }}
-                getItemProps={(task, index) => ({
+                getItemProps={(_task, index) => ({
                   'data-task-index': index,
                 })}
-                renderActions={(item) => (
-                  <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
-                    <Text>Edit</Text>
-                  </Menu.Item>
-                )}
+                actionsWidth="100px"
+                renderInlineActions={(item) => {
+                  const task = item as Task;
+                  return (
+                    <HStack gap={1} justify="flex-end">
+                      {task.status !== 'completed' && (
+                        <Tooltip.Root positioning={{ placement: "top" }}>
+                          <Tooltip.Trigger asChild>
+                            <IconButton
+                              size="xs"
+                              variant="ghost"
+                              colorPalette="green"
+                              aria-label="Complete Task"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCompleteTask(task);
+                              }}
+                            >
+                              <LuCircleCheck />
+                            </IconButton>
+                          </Tooltip.Trigger>
+                          <Portal>
+                            <Tooltip.Positioner>
+                              <Tooltip.Content>Complete Task</Tooltip.Content>
+                            </Tooltip.Positioner>
+                          </Portal>
+                        </Tooltip.Root>
+                      )}
+                      <Tooltip.Root positioning={{ placement: "top" }}>
+                        <Tooltip.Trigger asChild>
+                          <IconButton
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="red"
+                            aria-label="Delete Task"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTask(task);
+                            }}
+                          >
+                            <LuTrash2 />
+                          </IconButton>
+                        </Tooltip.Trigger>
+                        <Portal>
+                          <Tooltip.Positioner>
+                            <Tooltip.Content>Delete Task</Tooltip.Content>
+                          </Tooltip.Positioner>
+                        </Portal>
+                      </Tooltip.Root>
+                    </HStack>
+                  );
+                }}
               />
               {/* Drop indicator at the end of list */}
               {dragState &&
@@ -786,9 +890,7 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
               <ElegantList
                 items={backlogTasks}
                 type="task"
-                selectable={true}
-                selectedIds={selectedTaskIds}
-                onSelectionChange={handleSelectionChange}
+                selectable={false}
                 getItemId={(item) => (item as Task).id}
                 onItemClick={(task) => handleViewTask(task as Task)}
                 onItemMouseDown={(task, e, index) => {
@@ -809,14 +911,61 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
                     borderTop: isDropTarget ? `2px solid ${dragState.isValidDrop ? '#3182ce' : '#e53e3e'}` : undefined,
                   };
                 }}
-                getItemProps={(task, index) => ({
+                getItemProps={(_task, index) => ({
                   'data-task-index': index,
                 })}
-                renderActions={(item) => (
-                  <Menu.Item value="edit" onClick={() => handleViewTask(item as Task)}>
-                    <Text>Edit</Text>
-                  </Menu.Item>
-                )}
+                actionsWidth="100px"
+                renderInlineActions={(item) => {
+                  const task = item as Task;
+                  return (
+                    <HStack gap={1} justify="flex-end">
+                      {task.status !== 'completed' && (
+                        <Tooltip.Root positioning={{ placement: "top" }}>
+                          <Tooltip.Trigger asChild>
+                            <IconButton
+                              size="xs"
+                              variant="ghost"
+                              colorPalette="green"
+                              aria-label="Complete Task"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCompleteTask(task);
+                              }}
+                            >
+                              <LuCircleCheck />
+                            </IconButton>
+                          </Tooltip.Trigger>
+                          <Portal>
+                            <Tooltip.Positioner>
+                              <Tooltip.Content>Complete Task</Tooltip.Content>
+                            </Tooltip.Positioner>
+                          </Portal>
+                        </Tooltip.Root>
+                      )}
+                      <Tooltip.Root positioning={{ placement: "top" }}>
+                        <Tooltip.Trigger asChild>
+                          <IconButton
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="red"
+                            aria-label="Delete Task"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTask(task);
+                            }}
+                          >
+                            <LuTrash2 />
+                          </IconButton>
+                        </Tooltip.Trigger>
+                        <Portal>
+                          <Tooltip.Positioner>
+                            <Tooltip.Content>Delete Task</Tooltip.Content>
+                          </Tooltip.Positioner>
+                        </Portal>
+                      </Tooltip.Root>
+                    </HStack>
+                  );
+                }}
               />
               {/* Drop indicator at the end of list */}
               {dragState &&
@@ -832,14 +981,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
           )}
         </Box>
       </Box>
-
-      {/* Selection Footer */}
-      <TasksSelectionFooter
-        isOpen={selectedTaskIds.size > 0}
-        selectedTasks={selectedTasks}
-        onClearSelection={clearSelection}
-        onTasksUpdated={loadTasks}
-      />
     </Flex>
   );
 });

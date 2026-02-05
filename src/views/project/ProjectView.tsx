@@ -393,7 +393,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         if (notebookHandlers && project.path) {
           e.preventDefault();
-          notebookHandlers.onNewFile(project.path);
+          notebookHandlers.onNewFile(path.join(project.path, '.bluekit'));
         }
       }
     };
@@ -1327,7 +1327,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
           context="project"
           onCreateNote={() => {
             if (notebookHandlers) {
-              notebookHandlers.onNewFile(project.path);
+              notebookHandlers.onNewFile(path.join(project.path, '.bluekit'));
             } else {
               toaster.create({
                 title: 'Unable to create note',
@@ -1497,7 +1497,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               context={isVault ? 'library' : 'project'}
               onCreateNote={() => {
                 if (notebookHandlers) {
-                  notebookHandlers.onNewFile(project.path);
+                  notebookHandlers.onNewFile(path.join(project.path, '.bluekit'));
                 } else {
                   toaster.create({
                     title: 'Unable to create note',

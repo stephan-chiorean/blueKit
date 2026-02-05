@@ -25,6 +25,8 @@ interface ElegantListProps {
     onItemContextMenu?: (e: React.MouseEvent, item: ElegantListItem) => void;
     getIcon?: (item: ElegantListItem) => React.ElementType;
     renderActions?: (item: ElegantListItem) => ReactNode;
+    renderInlineActions?: (item: ElegantListItem) => ReactNode; // New: render buttons directly on row
+    actionsWidth?: string | number;
 
     // Selection state
     selectable?: boolean;
@@ -46,6 +48,8 @@ export function ElegantList({
     onItemContextMenu,
     getIcon,
     renderActions,
+    renderInlineActions,
+    actionsWidth,
     selectable,
     selectedIds,
     onToggleSelection,
@@ -130,7 +134,9 @@ export function ElegantList({
                 <Box width="100px" display={{ base: "none", sm: "block" }}>
                     Updated
                 </Box>
-                <Box width="40px"></Box>
+                <Box width={actionsWidth || (renderInlineActions ? "auto" : "40px")}>
+                    {renderInlineActions && "Actions"}
+                </Box>
                 {/* Header Checkbox */}
                 {selectable && (
                     <Box width="32px" display="flex" alignItems="center" justifyContent="center">
@@ -340,20 +346,14 @@ export function ElegantList({
                             </Box>
 
                             {/* Actions Column */}
-                            <Box width="40px" onClick={(e) => e.stopPropagation()}>
-                                {/* Only show menu if we have actions AND (it's not a selectable item OR we want menu + selection which we usually don't per plan) 
-                                    Plan says: "Replace 3-dot menu with checkbox selection" for kits.
-                                    "Keep ElegantList for groups: Keep 3-dot menu (no checkbox)"
-                                    
-                                    So if canSelect is true, we replaced menu with checkbox (checkbox is on left, actions on right is empty?).
-                                    Actually, usually actions are on the right. If I replace menu with checkbox, the right slot is empty?
-                                    Wait, the plan says "Replace 3-dot menu with checkbox selection".
-                                    It likely meant the primary interaction for "doing things" to the item becomes selection + footer actions, rather than per-item menu.
-                                    
-                                    So for canSelect items -> No Menu.
-                                    For !canSelect items (folders) -> Show Menu.
-                                */}
-                                {renderActions && (!selectable || isItemFolder) ? (
+                            <Box width={actionsWidth || (renderInlineActions ? "auto" : "40px")} onClick={(e) => e.stopPropagation()}>
+                                {/* Inline actions (buttons shown directly on row) */}
+                                {renderInlineActions ? (
+                                    <HStack gap={2}>
+                                        {renderInlineActions(item)}
+                                    </HStack>
+                                ) : renderActions && (!selectable || isItemFolder) ? (
+                                    /* Menu actions (3-dot dropdown) */
                                     <Menu.Root positioning={{ placement: "bottom-end" }}>
                                         <Menu.Trigger asChild>
                                             <IconButton
