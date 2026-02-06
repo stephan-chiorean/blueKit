@@ -15,10 +15,9 @@ import {
     Center,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { listen } from '@tauri-apps/api/event';
 import { LuCopy, LuCheck, LuTrash2, LuCircleCheck, LuPartyPopper, LuChevronDown, LuFileText, LuNotebook, LuTarget } from 'react-icons/lu';
 import { ResourceFile } from '@/types/resource';
-import { invokeWatchPlanFolder, invokeStopWatcher, invokeUpdatePlan, invokeGetPlanDocuments, invokeReorderPlanDocuments } from '@/ipc';
+import { invokeUpdatePlan, invokeReorderPlanDocuments } from '@/ipc';
 import { PlanDetails, PlanDocument } from '@/types/plan';
 import { toaster } from '@/shared/components/ui/toaster';
 import MilestoneTimeline from './MilestoneTimeline';
@@ -68,63 +67,6 @@ export default function PlanOverviewPanel({
         }
     }, [notesKey]);
 
-    // Incremental update for plan documents
-    const updatePlanDocumentsIncremental = useCallback(async (_changedPaths: string[]) => {
-        if (!planId || !planDetails) return;
-
-        try {
-            await invokeGetPlanDocuments(planId);
-            // This will trigger a re-render from parent
-            onUpdate();
-        } catch (error) {
-            console.error('Error updating plan documents incrementally:', error);
-            onUpdate();
-        }
-    }, [planId, planDetails, onUpdate]);
-
-    // Set up file watcher for plan folder
-    useEffect(() => {
-        if (!planId || !planDetails) return;
-
-        let isMounted = true;
-        let unlistenFn: (() => void) | null = null;
-
-        const setupWatcher = async () => {
-            try {
-                await invokeWatchPlanFolder(planId, planDetails.folderPath);
-                const eventName = `plan-documents-changed-${planId}`;
-
-                const unlisten = await listen<string[]>(eventName, (event) => {
-                    if (isMounted) {
-                        const changedPaths = event.payload;
-                        if (changedPaths.length > 0) {
-                            updatePlanDocumentsIncremental(changedPaths);
-                        } else {
-                            onUpdate();
-                        }
-                    }
-                });
-
-                unlistenFn = unlisten;
-            } catch (error) {
-                console.error(`Failed to set up file watcher for plan ${planId}:`, error);
-            }
-        };
-
-        setupWatcher();
-
-        return () => {
-            isMounted = false;
-            if (unlistenFn) {
-                unlistenFn();
-            }
-
-            const eventName = `plan-documents-changed-${planId}`;
-            invokeStopWatcher(eventName).catch(err => {
-                console.warn('Failed to stop plan folder watcher:', err);
-            });
-        };
-    }, [planId, planDetails?.folderPath, updatePlanDocumentsIncremental, onUpdate]);
 
     // Auto-save notes to localStorage
     const autoSaveNotes = useCallback(() => {

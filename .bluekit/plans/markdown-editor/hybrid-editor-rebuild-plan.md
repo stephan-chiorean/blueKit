@@ -1,6 +1,6 @@
 # Hybrid Glassmorphic Markdown Editor - Implementation Plan
 
-> **Status:** Planning Complete - Ready for Implementation
+> **Status:** Planning Complete - Ready for Implementati
 >
 > **See:** [README.md](./README.md) for high-level overview and phase links
 
@@ -21,6 +21,7 @@ This plan outlines the complete rebuild of BlueKit's markdown editing system usi
 ### Existing Components
 
 1. **MarkdownEditor.tsx** (CodeMirror-based)
+
    - Location: `src/shared/components/editor/MarkdownEditor.tsx`
    - Full-featured code editor with syntax highlighting
    - ~400 lines of complex state management
@@ -28,6 +29,7 @@ This plan outlines the complete rebuild of BlueKit's markdown editing system usi
    - Used in: NoteViewPage, EditableMarkdownViewer
 
 2. **EditableMarkdownViewer.tsx**
+
    - Location: `src/features/workstation/components/EditableMarkdownViewer.tsx`
    - Three-mode viewer: preview/source/edit
    - ~1000 lines including links, backlinks, metadata display
@@ -77,18 +79,21 @@ HybridMarkdownEditor (new root component)
 ### New Components to Build
 
 1. **HybridMarkdownEditor** - Main entry point
+
    - Props: `value: string`, `onChange: (value: string) => void`, `resource: ResourceFile`
    - Manages block state and parsing
    - Handles save coordination
    - Preserves all current integration points
 
 2. **MarkdownBlock** - Smart block component
+
    - State: `isEditing: boolean`
    - Detects click → switches to edit mode
    - Blur/Enter → switches back to preview
    - Typography matching between modes (line-height: 1.75)
 
 3. **BlockParser** - Utility module
+
    - Splits markdown by `\n\n` into blocks
    - Identifies block types (h1, h2, p, code, list)
    - Reconstructs markdown from block array
@@ -104,6 +109,9 @@ HybridMarkdownEditor (new root component)
 
 **Goal:** Create the hybrid editor as a standalone component without touching existing code.
 
+**Training Ground Strategy:**
+The `src/pages/HybridEditorDemo.tsx` page will serve as the exclusive training ground for this phase. All styling, interaction polish, and feature development must be perfected here first. We will port over styling from the main app to this page to ensure we are testing against a realistic environment before validating the implementation.
+
 1. Create new directory: `src/shared/components/hybridEditor/`
 2. Implement core components:
    ```
@@ -114,7 +122,7 @@ HybridMarkdownEditor (new root component)
    ├── GlassCodeBlock.tsx
    └── index.ts
    ```
-3. Build demo page: `src/pages/HybridEditorDemo.tsx`
+3. Build demo page: `src/pages/HybridEditorDemo.tsx` (The "Training Ground")
 4. Test in isolation with sample markdown files
 5. Verify:
    - Block splitting/reconstruction accuracy
@@ -123,6 +131,7 @@ HybridMarkdownEditor (new root component)
    - Glassmorphic styling works in light/dark mode
 
 **Acceptance Criteria:**
+
 - [ ] Click paragraph → textarea appears
 - [ ] Click away → markdown renders
 - [ ] Code blocks have frosted glass effect
@@ -149,6 +158,7 @@ HybridMarkdownEditor (new root component)
 4. Verify no regressions in existing features
 
 **Acceptance Criteria:**
+
 - [ ] Auto-save triggers on content change (1.5s delay)
 - [ ] Cmd+S saves immediately
 - [ ] Cmd+F opens search
@@ -174,6 +184,7 @@ HybridMarkdownEditor (new root component)
 5. Gather feedback on UX differences
 
 **Acceptance Criteria:**
+
 - [ ] Both editors work without conflicts
 - [ ] Feature flag toggle is reliable
 - [ ] All features work in both modes
@@ -190,6 +201,7 @@ HybridMarkdownEditor (new root component)
 5. Update documentation in CLAUDE.md
 
 **Acceptance Criteria:**
+
 - [ ] All pages use HybridMarkdownEditor
 - [ ] No console errors or warnings
 - [ ] All tests pass
@@ -217,6 +229,7 @@ HybridMarkdownEditor (new root component)
 5. Update CHANGELOG.md
 
 **Acceptance Criteria:**
+
 - [ ] Bundle size reduced (estimated 50-100KB savings)
 - [ ] No unused dependencies remain
 - [ ] Clean build with no warnings
@@ -227,11 +240,13 @@ HybridMarkdownEditor (new root component)
 If critical issues arise, we can roll back in two ways:
 
 ### Quick Rollback (5 minutes)
+
 1. Toggle feature flag: `ENABLE_HYBRID_EDITOR = false`
 2. Revert to CodeMirror editor immediately
 3. File bug report for issues found
 
 ### Full Rollback (30 minutes)
+
 1. Revert Git commits from Phase 4 and 5
 2. Restore CodeMirror dependencies
 3. Rebuild and test
@@ -242,11 +257,13 @@ If critical issues arise, we can roll back in two ways:
 ### Technical Risks
 
 1. **Block Parsing Accuracy**
+
    - Risk: Complex markdown (nested lists, tables) may not split correctly
    - Mitigation: Extensive test suite with edge cases
    - Fallback: Add "raw edit" mode for complex documents
 
 2. **Performance with Large Files**
+
    - Risk: Many blocks (>100) may cause render lag
    - Mitigation: Virtual scrolling or lazy rendering
    - Fallback: Auto-switch to CodeMirror for files >10KB
@@ -259,6 +276,7 @@ If critical issues arise, we can roll back in two ways:
 ### UX Risks
 
 1. **User Confusion**
+
    - Risk: Block-based editing is unfamiliar
    - Mitigation: Add tooltips/onboarding hints
    - Fallback: Keep feature flag for opt-in
@@ -271,18 +289,21 @@ If critical issues arise, we can roll back in two ways:
 ## Success Metrics
 
 ### Performance
+
 - [ ] First render < 100ms for typical kit file
 - [ ] Edit mode transition < 50ms
 - [ ] Bundle size reduction > 50KB
 - [ ] Memory usage comparable or lower
 
 ### UX
+
 - [ ] Zero markdown syntax corruption bugs
 - [ ] Smooth animations (no layout shift)
 - [ ] Glassmorphic styling matches design system
 - [ ] All keyboard shortcuts work
 
 ### Compatibility
+
 - [ ] Works with all existing kits/walkthroughs
 - [ ] File watching triggers updates correctly
 - [ ] Auto-save preserves cursor position
@@ -291,15 +312,18 @@ If critical issues arise, we can roll back in two ways:
 ## Dependencies
 
 ### New NPM Packages
+
 - `react-textarea-autosize` - Auto-growing textareas for edit mode
 
 ### Existing Dependencies (to keep)
+
 - `react-markdown` - Preview rendering
 - `remark-gfm` - GitHub Flavored Markdown support
 - `@chakra-ui/react` - Component library
 - `shiki` - Code syntax highlighting
 
 ### Dependencies to Remove (Phase 6)
+
 - `@codemirror/*` - Full CodeMirror 6 suite
 
 ## Implementation Phases
@@ -307,31 +331,37 @@ If critical issues arise, we can roll back in two ways:
 This plan is organized into 7 phases, each documented in detail:
 
 1. **[Phase 1: Build in Parallel](./phase-1-build-in-parallel.md)** (3-5 days)
+
    - Build hybrid editor components in isolation
    - No changes to existing code
    - Test with demo page
 
 2. **[Phase 2: Integration Adapter](./phase-2-integration-adapter.md)** (2-3 days)
+
    - Wire up existing features (auto-save, file watching)
    - Create adapter component
    - Preserve all functionality
 
 3. **[Phase 3: Feature Flag](./phase-3-feature-flag.md)** (1 day)
+
    - Add toggle for A/B testing
    - Deploy both editors side-by-side
    - Enable safe rollback
 
 4. **[Phase 4: Migrate Pages](./phase-4-migrate-pages.md)** (1-2 days)
+
    - Replace editor in each page one-by-one
    - Behind feature flag for safety
    - Maintain feature parity
 
 5. **[Phase 5: Stabilize](./phase-5-stabilize.md)** (3-5 days)
+
    - Dogfood with flag ON
    - Fix bugs, optimize performance
    - Gather feedback
 
 6. **[Phase 6: Remove Old Code](./phase-6-remove-old-code.md)** (1 day)
+
    - Make hybrid editor default
    - Delete old components
    - Remove CodeMirror dependencies
@@ -343,16 +373,16 @@ This plan is organized into 7 phases, each documented in detail:
 
 ## Timeline Estimate
 
-| Phase | Duration | Dependencies |
-|-------|----------|--------------|
-| Phase 1: Build in Parallel | 3-5 days | None |
-| Phase 2: Integration Adapter | 2-3 days | Phase 1 complete |
-| Phase 3: Feature Flag | 1 day | Phase 2 complete |
-| Phase 4: Migrate Pages | 1-2 days | Phase 3 complete |
-| Phase 5: Stabilize | 3-5 days | Phase 4 complete |
-| Phase 6: Remove Old Code | 1 day | Phase 5 stable |
-| Phase 7: Cleanup & Polish | 0.5 days | Phase 6 complete |
-| **Total** | **11.5-16.5 days** | |
+| Phase                        | Duration           | Dependencies     |
+| ---------------------------- | ------------------ | ---------------- |
+| Phase 1: Build in Parallel   | 3-5 days           | None             |
+| Phase 2: Integration Adapter | 2-3 days           | Phase 1 complete |
+| Phase 3: Feature Flag        | 1 day              | Phase 2 complete |
+| Phase 4: Migrate Pages       | 1-2 days           | Phase 3 complete |
+| Phase 5: Stabilize           | 3-5 days           | Phase 4 complete |
+| Phase 6: Remove Old Code     | 1 day              | Phase 5 stable   |
+| Phase 7: Cleanup & Polish    | 0.5 days           | Phase 6 complete |
+| **Total**                    | **11.5-16.5 days** |                  |
 
 ## Key Decisions (Resolved)
 

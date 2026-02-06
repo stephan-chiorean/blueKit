@@ -881,6 +881,312 @@ const debouncedUpdate = useMemo(
 **Benefits**: Additional layer of protection against rapid events
 **Trade-off**: Additional delay
 
+## Extending the Pattern to Other Systems
+
+The incremental update architecture described above (for kits, walkthroughs, agents, etc.) is **not artifact-specific**. The same pattern applies to any file-based content system in BlueKit.
+
+### Unified Architecture Pattern
+
+**Core Principle**: The component that **owns the content's lifecycle** should **own the watcher's lifecycle**.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         Parent Container (Lifecycle Owner)              │
+│                                                          │
+│  useEffect(() => {                                       │
+│    // 1. Start watching                                 │
+│    await invokeWatchXFolder(id, folderPath);            │
+│                                                          │
+│    // 2. Listen for changes                             │
+│    const unlisten = await listen(eventName, handler);   │
+│                                                          │
+│    // 3. Cleanup on unmount                             │
+│    return () => {                                        │
+│      unlisten();                                         │
+│      invokeStopWatcher(eventName);                      │
+│    };                                                    │
+│  }, [id, folderPath]);                                  │
+│                                                          │
+│  ├─── Child Component A (listens to same events)        │
+│  └─── Child Component B (listens to same events)        │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Application: Plans System
+
+**Example Implementation** (`src/features/plans/components/PlanWorkspace.tsx`):
+
+```typescript
+// PlanWorkspace owns the plan view lifecycle
+export default function PlanWorkspace({ plan, onPlanDeleted, onBack }) {
+  // Load plan details
+  useEffect(() => {
+    loadPlanDetails(false);
+  }, [loadPlanDetails]);
+
+  // Set up file watcher for plan folder
+  useEffect(() => {
+    if (!planId || !planDetails?.folderPath) return;
+
+    let isMounted = true;
+    let unlistenFn: (() => void) | null = null;
+
+    const setupWatcher = async () => {
+      try {
+        // Start watching the plan folder
+        await invokeWatchPlanFolder(planId, planDetails.folderPath);
+        const eventName = `plan-documents-changed-${planId}`;
+
+        // Listen for file changes
+        const unlisten = await listen<string[]>(eventName, (event) => {
+          if (isMounted) {
+            const changedPaths = event.payload;
+            if (changedPaths.length > 0) {
+              // Reload plan details in background
+              handlePlanUpdate();
+            }
+          }
+        });
+
+        unlistenFn = unlisten;
+      } catch (error) {
+        console.error(`Failed to set up file watcher for plan ${planId}:`, error);
+      }
+    };
+
+    setupWatcher();
+
+    return () => {
+      isMounted = false;
+      if (unlistenFn) {
+        unlistenFn();
+      }
+
+      // Stop the watcher when component unmounts
+      const eventName = `plan-documents-changed-${planId}`;
+      invokeStopWatcher(eventName).catch(err => {
+        console.warn('Failed to stop plan folder watcher:', err);
+      });
+    };
+  }, [planId, planDetails?.folderPath, handlePlanUpdate]);
+
+  return (
+    <Flex>
+      <PlanDocViewPage /> {/* Child can also listen to events */}
+      <PlanOverviewPanel /> {/* Child can also listen to events */}
+    </Flex>
+  );
+}
+```
+
+**Children can listen independently:**
+
+```typescript
+// PlanDocViewPage.tsx
+useEffect(() => {
+  if (!planId || isEditMode) return;
+
+  const unlisten = await listen(`plan-documents-changed-${planId}`, (event) => {
+    // Reload current document if it changed
+    if (event.payload.includes(currentDocPath)) {
+      reloadDocument();
+    }
+  });
+
+  return () => unlisten();
+}, [planId, isEditMode, currentDocPath]);
+```
+
+### Common Anti-Pattern: Watcher in Conditional Child
+
+❌ **INCORRECT** - Watcher lifecycle tied to child visibility:
+
+```typescript
+// PlanOverviewPanel.tsx (conditionally rendered sidebar)
+export default function PlanOverviewPanel({ isPanelOpen, ... }) {
+  // ❌ BAD: Watcher stops when panel closes!
+  useEffect(() => {
+    await invokeWatchPlanFolder(...);
+    const unlisten = await listen(...);
+    return () => {
+      unlisten();
+      invokeStopWatcher(...); // Kills watcher when panel closes!
+    };
+  }, [planId]);
+
+  return <VStack>...</VStack>;
+}
+
+// PlanWorkspace.tsx
+{isPanelOpen && <PlanOverviewPanel />} // Panel unmounts when closed
+```
+
+**Problem**: When `isPanelOpen = false`, `PlanOverviewPanel` unmounts, triggering cleanup that stops the watcher. Other components (like `PlanDocViewPage`) listening to the same events stop receiving updates.
+
+✅ **CORRECT** - Watcher lifecycle matches content lifecycle:
+
+```typescript
+// PlanWorkspace.tsx (parent that owns the plan view)
+export default function PlanWorkspace() {
+  // ✅ GOOD: Watcher runs as long as plan is being viewed
+  useEffect(() => {
+    await invokeWatchPlanFolder(...);
+    const unlisten = await listen(...);
+    return () => {
+      unlisten();
+      invokeStopWatcher(...); // Only stops when leaving plan view
+    };
+  }, [planId]);
+
+  return (
+    <>
+      <PlanDocViewPage /> {/* Always rendered */}
+      {isPanelOpen && <PlanOverviewPanel />} {/* Conditionally rendered */}
+    </>
+  );
+}
+```
+
+### Extending to New Systems
+
+When adding file-watching to a new system (e.g., brainstorms, workflows, blueprints), follow this checklist:
+
+**1. Backend (Rust)**
+
+```rust
+// src-tauri/src/commands.rs
+#[tauri::command]
+pub async fn watch_x_folder(
+    app_handle: tauri::AppHandle,
+    x_id: String,
+    folder_path: String,
+) -> Result<(), String> {
+    let event_name = format!("x-changed-{}", x_id);
+    start_directory_watcher(app_handle, folder_path, event_name).await
+}
+```
+
+**2. IPC Wrapper (TypeScript)**
+
+```typescript
+// src/ipc/x.ts
+export async function invokeWatchXFolder(
+  xId: string,
+  folderPath: string
+): Promise<void> {
+  return await invokeWithTimeout<void>('watch_x_folder', {
+    xId,
+    folderPath,
+  });
+}
+```
+
+**3. Frontend Parent Component**
+
+```typescript
+// src/features/x/XWorkspace.tsx
+export default function XWorkspace({ x }) {
+  const xId = x.id;
+  const folderPath = x.folderPath;
+
+  // Watcher setup - runs as long as workspace is mounted
+  useEffect(() => {
+    if (!xId || !folderPath) return;
+
+    let isMounted = true;
+    let unlistenFn: (() => void) | null = null;
+
+    const setupWatcher = async () => {
+      try {
+        await invokeWatchXFolder(xId, folderPath);
+        const eventName = `x-changed-${xId}`;
+
+        const unlisten = await listen<string[]>(eventName, (event) => {
+          if (isMounted) {
+            handleXUpdate(event.payload);
+          }
+        });
+
+        unlistenFn = unlisten;
+      } catch (error) {
+        console.error('Failed to set up watcher:', error);
+      }
+    };
+
+    setupWatcher();
+
+    return () => {
+      isMounted = false;
+      if (unlistenFn) unlistenFn();
+      invokeStopWatcher(`x-changed-${xId}`).catch(console.warn);
+    };
+  }, [xId, folderPath]);
+
+  return <>{/* children */}</>;
+}
+```
+
+**4. Child Components (Optional)**
+
+Child components can independently listen to the same events:
+
+```typescript
+// src/features/x/XDetailView.tsx
+useEffect(() => {
+  if (!xId || isEditMode) return;
+
+  const unlisten = await listen(`x-changed-${xId}`, (event) => {
+    // React to changes specific to this view
+    if (event.payload.includes(currentItemPath)) {
+      reloadItem();
+    }
+  });
+
+  return () => unlisten();
+}, [xId, isEditMode, currentItemPath]);
+```
+
+### Decision Tree: Where to Place the Watcher
+
+```
+Is the component always rendered while content is visible?
+├─ YES → ✅ Safe to place watcher here
+│         Example: PlanWorkspace, ProjectDetailPage
+│
+└─ NO → ❌ Do NOT place watcher here
+          ├─ Is it conditionally rendered?
+          │  Example: PlanOverviewPanel (toggleable sidebar)
+          │  → Move watcher to parent
+          │
+          ├─ Is it inside a tab/modal?
+          │  Example: Tab content that switches
+          │  → Move watcher to tab container (if applicable)
+          │     or accept that watching only happens when tab is active
+          │
+          └─ Is it paginated/virtualized?
+             Example: List item in virtualized list
+             → Move watcher to list container
+```
+
+### Real-World Systems in BlueKit
+
+| System | Parent (Watcher Owner) | Children (Event Listeners) |
+|--------|------------------------|----------------------------|
+| **Kits/Walkthroughs** | `ProjectDetailPage` | `KitsTabContent`, `WalkthroughsTabContent` |
+| **Plans** | `PlanWorkspace` | `PlanDocViewPage`, `PlanOverviewPanel` |
+| **Blueprints** | `BlueprintDetailPage` (if exists) | Blueprint viewer components |
+| **Scrapbook** | `ScrapbookSection` | Scrapbook item viewers |
+
+### Key Takeaways
+
+1. **Watcher lifecycle = Content lifecycle**: Start watcher when entering view, stop when leaving
+2. **Parent owns, children listen**: Parent sets up watcher, children can independently listen
+3. **Avoid conditional watcher owners**: Never place watcher in components that unmount while content is still visible
+4. **Reuse the pattern**: Same architecture for artifacts, plans, blueprints, workflows, etc.
+5. **Multiple listeners OK**: Multiple components can listen to the same event independently
+
+This unified architecture ensures consistent real-time updates across all file-based systems in BlueKit.
+
 ## Summary
 
 The incremental update system is a sophisticated architecture that:

@@ -4,6 +4,7 @@ import WelcomeView from '@/views/home/WelcomeView';
 import TabManager from '@/app/TabManager';
 import PreviewWindowPage from '@/pages/PreviewWindowPage';
 import WorktreeWindowPage from '@/pages/WorktreeWindowPage';
+import HybridEditorDemo from '@/pages/HybridEditorDemo';
 import { SelectionProvider } from '@/shared/contexts/SelectionContext';
 import { ColorModeProvider } from '@/shared/contexts/ColorModeContext';
 import { FeatureFlagsProvider } from '@/shared/contexts/FeatureFlagsContext';
@@ -67,6 +68,15 @@ function AppContent() {
             </ResourceProvider>
           </LibraryCacheProvider>
         </FeatureFlagsProvider>
+      </ColorModeProvider>
+    );
+  }
+
+  // Hybrid Editor Demo Route
+  if (window.location.pathname === '/hybrid-demo') {
+    return (
+      <ColorModeProvider>
+        <HybridEditorDemo />
       </ColorModeProvider>
     );
   }

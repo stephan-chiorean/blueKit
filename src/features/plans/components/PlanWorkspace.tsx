@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
+import { listen } from '@tauri-apps/api/event';
 import { PlanDocument, PlanDetails } from '@/types/plan';
 import { ResourceFile } from '@/types/resource';
-import { invokeGetPlanDetails } from '@/ipc';
+import { invokeGetPlanDetails, invokeWatchPlanFolder } from '@/ipc';
+import { invokeStopWatcher } from '@/ipc/projects';
 import { toaster } from '@/shared/components/ui/toaster';
 
 import PlanOverviewPanel from './PlanOverviewPanel';
@@ -82,6 +84,52 @@ export default function PlanWorkspace({ plan, onPlanDeleted, onBack }: PlanWorks
     useEffect(() => {
         loadPlanDetails(false);
     }, [loadPlanDetails]);
+
+    // Set up file watcher for plan folder
+    useEffect(() => {
+        if (!planId || !planDetails?.folderPath) return;
+
+        let isMounted = true;
+        let unlistenFn: (() => void) | null = null;
+
+        const setupWatcher = async () => {
+            try {
+                // Start watching the plan folder
+                await invokeWatchPlanFolder(planId, planDetails.folderPath);
+                const eventName = `plan-documents-changed-${planId}`;
+
+                // Listen for file changes
+                const unlisten = await listen<string[]>(eventName, (event) => {
+                    if (isMounted) {
+                        const changedPaths = event.payload;
+                        if (changedPaths.length > 0) {
+                            // Reload plan details in background (updates document list)
+                            handlePlanUpdate();
+                        }
+                    }
+                });
+
+                unlistenFn = unlisten;
+            } catch (error) {
+                console.error(`Failed to set up file watcher for plan ${planId}:`, error);
+            }
+        };
+
+        setupWatcher();
+
+        return () => {
+            isMounted = false;
+            if (unlistenFn) {
+                unlistenFn();
+            }
+
+            // Stop the watcher when component unmounts
+            const eventName = `plan-documents-changed-${planId}`;
+            invokeStopWatcher(eventName).catch(err => {
+                console.warn('Failed to stop plan folder watcher:', err);
+            });
+        };
+    }, [planId, planDetails?.folderPath, handlePlanUpdate]);
 
     // Get documents (already sorted by backend)
     const sortedDocuments = useMemo(() => planDetails?.documents || [], [planDetails?.documents]);
