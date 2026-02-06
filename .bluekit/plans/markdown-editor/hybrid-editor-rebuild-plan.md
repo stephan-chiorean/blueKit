@@ -1,8 +1,20 @@
 # Hybrid Glassmorphic Markdown Editor - Implementation Plan
 
+> **Status:** Planning Complete - Ready for Implementation
+>
+> **See:** [README.md](./README.md) for high-level overview and phase links
+
 ## Executive Summary
 
-This plan outlines the complete rebuild of BlueKit's markdown editing system using a hybrid block-based approach inspired by the `hybrid-glassmorphic-markdown-editor` kit. The goal is to create a seamless editing experience where users can click individual content blocks to edit them inline, while maintaining full markdown syntax support and all existing features.
+This plan outlines the complete rebuild of BlueKit's markdown editing system using a hybrid block-based approach inspired by the `hybrid-glassmorphic-markdown-editor` kit. The goal is to create a seamless editing experience where users can click individual content blocks to edit them inline, while maintaining glassmorphic preview styling and all existing features.
+
+## Key Clarifications
+
+- **No mode separation**: Preview styling persists while editing (hybrid approach)
+- **Title separate from content**: No H1 syncing hacks, title handled via creation modal
+- **Zero backend changes**: Pure frontend implementation using existing IPC
+- **No complex additions**: No new backlinks logic, use existing features
+- **Glassmorphic preview**: Maintain frosted glass aesthetic throughout
 
 ## Current State Analysis
 
@@ -287,42 +299,72 @@ If critical issues arise, we can roll back in two ways:
 - `@chakra-ui/react` - Component library
 - `shiki` - Code syntax highlighting
 
-### Dependencies to Remove (Phase 5)
+### Dependencies to Remove (Phase 6)
 - `@codemirror/*` - Full CodeMirror 6 suite
+
+## Implementation Phases
+
+This plan is organized into 7 phases, each documented in detail:
+
+1. **[Phase 1: Build in Parallel](./phase-1-build-in-parallel.md)** (3-5 days)
+   - Build hybrid editor components in isolation
+   - No changes to existing code
+   - Test with demo page
+
+2. **[Phase 2: Integration Adapter](./phase-2-integration-adapter.md)** (2-3 days)
+   - Wire up existing features (auto-save, file watching)
+   - Create adapter component
+   - Preserve all functionality
+
+3. **[Phase 3: Feature Flag](./phase-3-feature-flag.md)** (1 day)
+   - Add toggle for A/B testing
+   - Deploy both editors side-by-side
+   - Enable safe rollback
+
+4. **[Phase 4: Migrate Pages](./phase-4-migrate-pages.md)** (1-2 days)
+   - Replace editor in each page one-by-one
+   - Behind feature flag for safety
+   - Maintain feature parity
+
+5. **[Phase 5: Stabilize](./phase-5-stabilize.md)** (3-5 days)
+   - Dogfood with flag ON
+   - Fix bugs, optimize performance
+   - Gather feedback
+
+6. **[Phase 6: Remove Old Code](./phase-6-remove-old-code.md)** (1 day)
+   - Make hybrid editor default
+   - Delete old components
+   - Remove CodeMirror dependencies
+
+7. **[Phase 7: Cleanup & Polish](./phase-7-cleanup.md)** (0.5 days)
+   - Remove demo code
+   - Final documentation
+   - Release notes
 
 ## Timeline Estimate
 
 | Phase | Duration | Dependencies |
 |-------|----------|--------------|
-| Phase 1: Build in Isolation | 2-3 days | None |
-| Phase 2: Integration Layer | 1-2 days | Phase 1 complete |
-| Phase 3: Parallel Deployment | 1 day | Phase 2 complete |
-| Phase 4: Migration | 1 day | Phase 3 validation |
-| Phase 5: Cleanup | 0.5 days | Phase 4 stable |
-| **Total** | **5.5-7.5 days** | |
+| Phase 1: Build in Parallel | 3-5 days | None |
+| Phase 2: Integration Adapter | 2-3 days | Phase 1 complete |
+| Phase 3: Feature Flag | 1 day | Phase 2 complete |
+| Phase 4: Migrate Pages | 1-2 days | Phase 3 complete |
+| Phase 5: Stabilize | 3-5 days | Phase 4 complete |
+| Phase 6: Remove Old Code | 1 day | Phase 5 stable |
+| Phase 7: Cleanup & Polish | 0.5 days | Phase 6 complete |
+| **Total** | **11.5-16.5 days** | |
 
-## Open Questions
+## Key Decisions (Resolved)
 
-1. **Block Splitting Algorithm**
-   - Should we split only on `\n\n` or be more intelligent about markdown structure?
-   - How to handle code blocks that contain `\n\n`?
-
-2. **Edit Mode Activation**
-   - Single click or double click to enter edit mode?
-   - Should Enter key also enter edit mode (accessibility)?
-
-3. **Toolbar/Actions**
-   - Do we need formatting toolbar (bold, italic, links)?
-   - Keep it minimal per kit philosophy?
-
-4. **Mobile Support**
-   - How does block-based editing work on touch devices?
-   - Needs separate design consideration?
+1. **Block Splitting Algorithm**: Split on `\n\n` with special handling for code blocks
+2. **Edit Mode Activation**: Single click to enter edit mode (faster UX)
+3. **Toolbar/Actions**: No toolbar, keep minimal (markdown syntax only)
+4. **Mobile Support**: Deferred to post-launch (desktop-first)
+5. **Title Handling**: Separate from content, no H1 syncing
 
 ## Next Steps
 
-1. Review this plan with team/stakeholders
-2. Answer open questions
-3. Create feature flag in codebase
-4. Begin Phase 1 implementation
-5. Schedule daily check-ins during development
+1. ✅ Review plan with stakeholders
+2. ✅ Answer open questions
+3. → Begin Phase 1: Build in Parallel
+4. → Create feature branch: `feature/hybrid-markdown-editor`

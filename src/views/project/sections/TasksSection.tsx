@@ -660,10 +660,59 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
       <ToolkitHeader
         title="Tasks"
         parentName={parentName}
+        leftActions={
+          <Box position="relative">
+            <Button
+              ref={filterButtonRef}
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              colorPalette="gray"
+              title="Filter"
+            >
+              <Icon boxSize={4}>
+                <LuFilter />
+              </Icon>
+              {hasActiveFilters && (
+                <Badge
+                  position="absolute"
+                  top="-2px"
+                  right="-2px"
+                  size="xs"
+                  colorPalette="primary"
+                  variant="solid"
+                  borderRadius="full"
+                  zIndex={1}
+                >
+                  {filterCount}
+                </Badge>
+              )}
+            </Button>
+            <FilterPanel
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              nameFilter={titleFilter}
+              onNameFilterChange={setTitleFilter}
+              allTags={allTags}
+              selectedTags={selectedTags}
+              onToggleTag={toggleTag}
+              filterButtonRef={filterButtonRef}
+              statusOptions={[
+                { value: 'pinned', label: 'Pinned', colorPalette: 'blue' },
+                { value: 'high', label: 'High', colorPalette: 'red' },
+                { value: 'standard', label: 'Standard', colorPalette: 'orange' },
+                { value: 'long term', label: 'Long Term', colorPalette: 'purple' },
+                { value: 'nit', label: 'Nit', colorPalette: 'yellow' },
+              ]}
+              selectedStatuses={selectedPriorities}
+              onToggleStatus={(priority) => togglePriority(priority as TaskPriority)}
+            />
+          </Box>
+        }
         action={{
           label: "Add Task",
           onClick: handleAddTask,
-          variant: "icon",
+          variant: "icon", // Explicitly matching the requested style "mirroring"
           icon: LuPlus,
         }}
       />
@@ -687,61 +736,6 @@ const TasksSection = forwardRef<TasksSectionRef, TasksSectionProps>(({
             <Text fontSize="sm" color="text.muted">
               {inProgressTasks.length}
             </Text>
-            {/* Filter Button */}
-            <Box position="relative" overflow="visible">
-              <Button
-                ref={filterButtonRef}
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                borderWidth="1px"
-                borderRadius="lg"
-                css={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  borderColor: 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                  transition: 'none',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                  },
-                }}
-              >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                  {hasActiveFilters && (
-                    <Badge size="sm" colorPalette="primary" variant="solid">
-                      {filterCount}
-                    </Badge>
-                  )}
-                </HStack>
-              </Button>
-              <FilterPanel
-                isOpen={isFilterOpen}
-                onClose={() => setIsFilterOpen(false)}
-                nameFilter={titleFilter}
-                onNameFilterChange={setTitleFilter}
-                allTags={allTags}
-                selectedTags={selectedTags}
-                onToggleTag={toggleTag}
-                filterButtonRef={filterButtonRef}
-                statusOptions={[
-                  { value: 'pinned', label: 'Pinned', colorPalette: 'blue' },
-                  { value: 'high', label: 'High', colorPalette: 'red' },
-                  { value: 'standard', label: 'Standard', colorPalette: 'orange' },
-                  { value: 'long term', label: 'Long Term', colorPalette: 'purple' },
-                  { value: 'nit', label: 'Nit', colorPalette: 'yellow' },
-                ]}
-                selectedStatuses={selectedPriorities}
-                onToggleStatus={(priority) => togglePriority(priority as TaskPriority)}
-              />
-            </Box>
           </Flex>
 
           {inProgressTasks.length === 0 ? (

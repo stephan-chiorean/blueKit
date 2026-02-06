@@ -529,6 +529,72 @@ function KitsSection({
         <ToolkitHeader
           title="Kits"
           parentName={projectName}
+          leftActions={
+            <HStack gap={1}>
+              <Box position="relative">
+                <Button
+                  ref={filterButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  colorPalette="gray"
+                  title="Filter"
+                >
+                  <Icon boxSize={4}>
+                    <LuFilter />
+                  </Icon>
+                  {(nameFilter || selectedTags.length > 0) && (
+                    <Badge
+                      position="absolute"
+                      top="-2px"
+                      right="-2px"
+                      size="xs"
+                      colorPalette="primary"
+                      variant="solid"
+                      borderRadius="full"
+                      zIndex={1}
+                    >
+                      {(nameFilter ? 1 : 0) + selectedTags.length}
+                    </Badge>
+                  )}
+                </Button>
+                <FilterPanel
+                  isOpen={isFilterOpen}
+                  onClose={() => setIsFilterOpen(false)}
+                  nameFilter={nameFilter}
+                  onNameFilterChange={setNameFilter}
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  onToggleTag={toggleTag}
+                  filterButtonRef={filterButtonRef}
+                />
+              </Box>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCreateFolderOpen(true)}
+                colorPalette="gray"
+                title="New Group"
+              >
+                <Icon boxSize={4}>
+                  <LuFolderPlus />
+                </Icon>
+              </Button>
+              {/* Controlled Popover rendering attached to header button logic via state */}
+              <CreateFolderPopover
+                isOpen={isCreateFolderOpen}
+                onOpenChange={setIsCreateFolderOpen}
+                onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
+                trigger={<Box />}
+              />
+            </HStack>
+          }
+          action={{
+            label: "New Kit",
+            onClick: () => setIsAddToProjectOpen(true),
+            variant: "icon",
+            icon: LuPlus,
+          }}
         />
 
         {/* Scrollable Content Area */}
@@ -546,74 +612,6 @@ function KitsSection({
                 <Text fontSize="sm" color="text.muted">
                   {folders.length}
                 </Text>
-                {/* Filter Button */}
-                <Box position="relative" overflow="visible">
-                  <Button
-                    ref={filterButtonRef}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    css={{
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                      borderColor: 'rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                      transition: 'none',
-                      _dark: {
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                      },
-                    }}
-                  >
-                    <HStack gap={2}>
-                      <Icon>
-                        <LuFilter />
-                      </Icon>
-                      <Text>Filter</Text>
-                      {(nameFilter || selectedTags.length > 0) && (
-                        <Badge size="sm" colorPalette="primary" variant="solid">
-                          {[nameFilter && 1, selectedTags.length]
-                            .filter(Boolean)
-                            .reduce((a, b) => (a || 0) + (b || 0), 0)}
-                        </Badge>
-                      )}
-                    </HStack>
-                  </Button>
-                  <FilterPanel
-                    isOpen={isFilterOpen}
-                    onClose={() => setIsFilterOpen(false)}
-                    nameFilter={nameFilter}
-                    onNameFilterChange={setNameFilter}
-                    allTags={allTags}
-                    selectedTags={selectedTags}
-                    onToggleTag={toggleTag}
-                    filterButtonRef={filterButtonRef}
-                  />
-                </Box>
-                {/* New Folder Button using CreateFolderPopover */}
-                <CreateFolderPopover
-                  isOpen={isCreateFolderOpen}
-                  onOpenChange={setIsCreateFolderOpen}
-                  onConfirm={(name, description, tags) => handleCreateFolder(name, { description, tags })}
-                  trigger={
-                    <Button
-                      size="sm"
-                      colorPalette="blue"
-                      variant="subtle"
-                    >
-                      <HStack gap={2}>
-                        <Icon>
-                          <LuFolderPlus />
-                        </Icon>
-                        <Text>New Group</Text>
-                      </HStack>
-                    </Button>
-                  }
-                />
               </Flex>
             </Flex>
 

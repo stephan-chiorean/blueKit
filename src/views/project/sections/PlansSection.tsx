@@ -21,8 +21,8 @@ import { PlanDetails } from '@/types/plan';
 import CreatePlanDialog from '@/features/plans/components/CreatePlanDialog';
 import { ElegantPlanList } from '@/shared/components/ElegantPlanList';
 import { TableSkeleton } from '@/shared/components/Skeletons';
-import { StandardPageLayout } from '@/shared/components/layouts/StandardPageLayout';
 import { FilterPanel } from '@/shared/components/FilterPanel';
+import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 
 interface PlansSectionProps {
   plans: PlanDetails[];
@@ -136,55 +136,42 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
           projectPath={projectPath}
         />
 
-        <StandardPageLayout
+        <ToolkitHeader
           title="Plans"
           parentName={projectName}
-          headerAction={{
-            label: "Create Plan",
-            onClick: handleOpenCreateDialog,
-            variant: "icon",
-            icon: LuPlus,
-          }}
-          filterControl={
+          leftActions={
             <Box position="relative">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                borderWidth="1px"
-                borderRadius="lg"
-                css={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                  borderColor: 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 2px 8px 0 rgba(0, 0, 0, 0.04)',
-                  transition: 'none',
-                  _dark: {
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderColor: 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                  },
-                }}
+                colorPalette="gray"
+                title="Filter"
               >
-                <HStack gap={2}>
-                  <Icon>
-                    <LuFilter />
-                  </Icon>
-                  <Text>Filter</Text>
-                  {(nameFilter || selectedStatuses.length > 0) && (
-                    <Badge size="sm" colorPalette="primary" variant="solid">
-                      {(nameFilter ? 1 : 0) + selectedStatuses.length}
-                    </Badge>
-                  )}
-                </HStack>
+                <Icon boxSize={4}>
+                  <LuFilter />
+                </Icon>
+                {(nameFilter || selectedStatuses.length > 0) && (
+                  <Badge
+                    position="absolute"
+                    top="-2px"
+                    right="-2px"
+                    size="xs"
+                    colorPalette="primary"
+                    variant="solid"
+                    borderRadius="full"
+                    zIndex={1}
+                  >
+                    {(nameFilter ? 1 : 0) + selectedStatuses.length}
+                  </Badge>
+                )}
               </Button>
               <FilterPanel
                 isOpen={isFilterOpen}
                 onClose={() => setIsFilterOpen(false)}
                 nameFilter={nameFilter}
                 onNameFilterChange={setNameFilter}
-                allTags={[]} // Plans don't have tags yet
+                allTags={[]}
                 selectedTags={[]}
                 onToggleTag={() => { }}
                 statusOptions={statusOptions}
@@ -199,16 +186,25 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
               />
             </Box>
           }
-          itemCount={filteredPlans.length}
-          itemLabel="plans"
-          isLoading={plansLoading}
-          loadingSkeleton={
+          action={{
+            label: "Create Plan",
+            onClick: handleOpenCreateDialog,
+            variant: "icon",
+            icon: LuPlus,
+          }}
+        />
+
+        <Box
+          flex={1}
+          overflowY="auto"
+          p={6}
+          w="100%"
+        >
+          {plansLoading ? (
             <Box py={4}>
               <TableSkeleton />
             </Box>
-          }
-          isEmpty={plans.length === 0}
-          emptyState={
+          ) : plans.length === 0 ? (
             <VStack py={12} gap={3}>
               <Text color="text.secondary" fontSize="lg">
                 No plans yet
@@ -223,80 +219,82 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
                 </HStack>
               </Button>
             </VStack>
-          }
-        >
-          {/* Active Plans Section */}
-          <Box mb={8}>
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Active</Heading>
-              <Text fontSize="sm" color="text.muted">
-                {activePlans.length}
-              </Text>
-            </Flex>
+          ) : (
+            <>
+              {/* Active Plans Section */}
+              <Box mb={8}>
+                <Flex align="center" gap={2} mb={4}>
+                  <Heading size="md">Active</Heading>
+                  <Text fontSize="sm" color="text.muted">
+                    {activePlans.length}
+                  </Text>
+                </Flex>
 
-            {activePlans.length === 0 ? (
-              <Box
-                p={6}
-                bg="bg.subtle"
-                borderRadius="md"
-                borderWidth="1px"
-                borderColor="border.subtle"
-                textAlign="center"
-              >
-                <Text color="text.muted" fontSize="sm">
-                  {(nameFilter || selectedStatuses.length > 0)
-                    ? 'No active plans match the current filters'
-                    : 'No active plans'
-                  }
-                </Text>
+                {activePlans.length === 0 ? (
+                  <Box
+                    p={6}
+                    bg="bg.subtle"
+                    borderRadius="md"
+                    borderWidth="1px"
+                    borderColor="border.subtle"
+                    textAlign="center"
+                  >
+                    <Text color="text.muted" fontSize="sm">
+                      {(nameFilter || selectedStatuses.length > 0)
+                        ? 'No active plans match the current filters'
+                        : 'No active plans'
+                      }
+                    </Text>
+                  </Box>
+                ) : (
+                  <ElegantPlanList
+                    plans={activePlans}
+                    selectable={true}
+                    selectedIds={selectedPlanIds}
+                    onSelectionChange={setSelectedPlanIds}
+                    onPlanClick={onViewPlan}
+                  />
+                )}
               </Box>
-            ) : (
-              <ElegantPlanList
-                plans={activePlans}
-                selectable={true}
-                selectedIds={selectedPlanIds}
-                onSelectionChange={setSelectedPlanIds}
-                onPlanClick={onViewPlan}
-              />
-            )}
-          </Box>
 
-          {/* Completed Plans Section */}
-          <Box>
-            <Flex align="center" gap={2} mb={4}>
-              <Heading size="md">Completed</Heading>
-              <Text fontSize="sm" color="text.muted">
-                {completedPlans.length}
-              </Text>
-            </Flex>
+              {/* Completed Plans Section */}
+              <Box>
+                <Flex align="center" gap={2} mb={4}>
+                  <Heading size="md">Completed</Heading>
+                  <Text fontSize="sm" color="text.muted">
+                    {completedPlans.length}
+                  </Text>
+                </Flex>
 
-            {completedPlans.length === 0 ? (
-              <Box
-                p={6}
-                bg="bg.subtle"
-                borderRadius="md"
-                borderWidth="1px"
-                borderColor="border.subtle"
-                textAlign="center"
-              >
-                <Text color="text.muted" fontSize="sm">
-                  {(nameFilter || selectedStatuses.length > 0)
-                    ? 'No completed plans match the current filters'
-                    : 'No completed plans'
-                  }
-                </Text>
+                {completedPlans.length === 0 ? (
+                  <Box
+                    p={6}
+                    bg="bg.subtle"
+                    borderRadius="md"
+                    borderWidth="1px"
+                    borderColor="border.subtle"
+                    textAlign="center"
+                  >
+                    <Text color="text.muted" fontSize="sm">
+                      {(nameFilter || selectedStatuses.length > 0)
+                        ? 'No completed plans match the current filters'
+                        : 'No completed plans'
+                      }
+                    </Text>
+                  </Box>
+                ) : (
+                  <ElegantPlanList
+                    plans={completedPlans}
+                    selectable={true}
+                    selectedIds={selectedPlanIds}
+                    onSelectionChange={setSelectedPlanIds}
+                    onPlanClick={onViewPlan}
+                  />
+                )}
               </Box>
-            ) : (
-              <ElegantPlanList
-                plans={completedPlans}
-                selectable={true}
-                selectedIds={selectedPlanIds}
-                onSelectionChange={setSelectedPlanIds}
-                onPlanClick={onViewPlan}
-              />
-            )}
-          </Box>
-        </StandardPageLayout>
+            </>
+          )}
+        </Box>
       </Box>
 
       {/* Selection Footer */}
