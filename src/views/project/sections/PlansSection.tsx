@@ -127,7 +127,7 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
       overflow="hidden"
       bg="transparent"
     >
-      <Box flex="1" overflow="hidden">
+      <VStack align="stretch" gap={0} flex={1} overflow="hidden">
         <CreatePlanDialog
           isOpen={isCreateDialogOpen}
           onClose={() => setIsCreateDialogOpen(false)}
@@ -295,7 +295,7 @@ const PlansSection = forwardRef<PlansSectionRef, PlansSectionProps>(({
             </>
           )}
         </Box>
-      </Box>
+      </VStack>
 
       {/* Selection Footer */}
       <ResourceSelectionFooter
