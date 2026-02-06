@@ -14,7 +14,20 @@ import {
 import { createPortal } from 'react-dom';
 import { LuFilter, LuFolderPlus, LuPlus, LuTrash2, LuShare, LuX, LuBookOpen, LuArrowRight } from 'react-icons/lu';
 import ResourceSelectionFooter from './components/ResourceSelectionFooter';
-import { ArtifactFile, ArtifactFolder, FolderConfig, Project, invokeGetArtifactFolders, invokeCreateArtifactFolder, invokeDeleteArtifactFolder } from '@/ipc';
+import AddToProjectDialog from './components/AddToProjectDialog';
+import {
+  ArtifactFile,
+  ArtifactFolder,
+  FolderConfig,
+  Project,
+  invokeGetArtifactFolders,
+  invokeCreateArtifactFolder,
+  invokeDeleteArtifactFolder,
+  deleteResources,
+  invokeCopyKitToProject,
+  invokeCopyWalkthroughToProject,
+  invokeCopyDiagramToProject,
+} from '@/ipc';
 import { invokeMoveArtifactToFolder } from '@/ipc/folders';
 import { ToolkitHeader } from '@/shared/components/ToolkitHeader';
 import GroupView from '@/shared/components/GroupView';
@@ -49,6 +62,9 @@ interface WalkthroughsSectionProps {
   onViewWalkthrough?: (walkthroughId: string) => void;
   projects?: Project[];
   onReload?: () => void;
+  onOptimisticMove?: (artifactId: string, folderId: string | null) => void;
+  onConfirmMove?: (oldPath: string, newPath: string) => void;
+  movingArtifacts?: Set<string>;
 }
 
 function WalkthroughsSection({
@@ -62,6 +78,7 @@ function WalkthroughsSection({
   onViewWalkthrough,
   projects = [],
   onReload,
+  onOptimisticMove,
 }: WalkthroughsSectionProps) {
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -99,19 +116,93 @@ function WalkthroughsSection({
   }, [projectId]);
 
   // Actions
-  const handleDelete = () => {
-    console.log('Delete selected walkthroughs:', Array.from(selectedWalkthroughIds));
-    clearSelection();
+  const [isWalkthroughsLoading, setIsWalkthroughsLoading] = useState(false);
+  const [isAddToProjectOpen, setIsAddToProjectOpen] = useState(false);
+
+  const handleDelete = async () => {
+    const selectedWalkthroughs = walkthroughs.filter(w => selectedWalkthroughIds.has(w.path));
+    if (selectedWalkthroughs.length === 0) return;
+
+    const confirmMessage = `Delete ${selectedWalkthroughs.length} walkthrough${selectedWalkthroughs.length !== 1 ? 's' : ''}? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsWalkthroughsLoading(true);
+    try {
+      const filePaths = selectedWalkthroughs.map(w => w.path);
+      await deleteResources(filePaths);
+
+      toaster.create({
+        type: 'success',
+        title: 'Walkthroughs deleted',
+        description: `Deleted ${selectedWalkthroughs.length} walkthrough${selectedWalkthroughs.length !== 1 ? 's' : ''}`,
+      });
+
+      clearSelection();
+      onReload?.();
+    } catch (error) {
+      console.error('Failed to delete walkthroughs:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete walkthroughs',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsWalkthroughsLoading(false);
+    }
   };
 
   const handlePublish = () => {
-    console.log('Publish selected walkthroughs:', Array.from(selectedWalkthroughIds));
     clearSelection();
   };
 
-  const handleAddToProject = () => {
-    console.log('Add selected walkthroughs to project:', Array.from(selectedWalkthroughIds));
-    clearSelection();
+  const handleAddToProjects = async (selectedProjects: Project[]) => {
+    const selectedWalkthroughs = walkthroughs.filter(w => selectedWalkthroughIds.has(w.path));
+    if (selectedWalkthroughs.length === 0 || selectedProjects.length === 0) return;
+
+    setIsWalkthroughsLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const project of selectedProjects) {
+        for (const walkthrough of selectedWalkthroughs) {
+          try {
+            const artifactType = walkthrough.frontMatter?.type || 'kit';
+
+            if (artifactType === 'walkthrough') {
+              await invokeCopyWalkthroughToProject(walkthrough.path, project.path);
+            } else if (artifactType === 'diagram') {
+              await invokeCopyDiagramToProject(walkthrough.path, project.path);
+            } else {
+              await invokeCopyKitToProject(walkthrough.path, project.path);
+            }
+
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to copy ${walkthrough.name} to ${project.name}:`, err);
+            errorCount++;
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        toaster.create({
+          type: 'success',
+          title: 'Add complete',
+          description: `Added ${successCount} walkthrough${successCount !== 1 ? 's' : ''} to ${selectedProjects.length} project${selectedProjects.length !== 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        });
+      } else if (errorCount > 0) {
+        toaster.create({
+          type: 'error',
+          title: 'Add failed',
+          description: `Failed to add ${errorCount} walkthrough${errorCount !== 1 ? 's' : ''}`,
+        });
+      }
+
+      clearSelection();
+    } finally {
+      setIsWalkthroughsLoading(false);
+    }
   };
 
 
@@ -289,6 +380,9 @@ function WalkthroughsSection({
       const targetFolder = folders.find(f => (f.config?.id || f.path) === targetFolderId);
       if (!targetFolder) return;
 
+      // Optimistic update
+      onOptimisticMove?.(walkthrough.path, targetFolder.path);
+
       await invokeMoveArtifactToFolder(walkthrough.path, targetFolder.path);
 
       toaster.create({
@@ -306,7 +400,7 @@ function WalkthroughsSection({
         description: error instanceof Error ? error.message : 'An error occurred',
       });
     }
-  }, [folders, onReload]);
+  }, [folders, onReload, onOptimisticMove]);
 
   // Document-level mouse event handlers for drag
   useEffect(() => {
@@ -424,7 +518,7 @@ function WalkthroughsSection({
         color="text.secondary"
         h="100%"
       >
-        No walkthroughs found in any linked project's .bluekit directory.
+        No walkthroughs found in this project's .bluekit directory.
       </Box>
     );
   }
@@ -718,7 +812,7 @@ function WalkthroughsSection({
             label: 'Add to Project',
             icon: LuPlus,
             colorPalette: 'blue',
-            onClick: handleAddToProject,
+            onClick: () => setIsAddToProjectOpen(true),
           },
           {
             label: 'Publish to Library',
@@ -733,6 +827,15 @@ function WalkthroughsSection({
             onClick: handleDelete,
           },
         ]}
+        loading={isWalkthroughsLoading}
+      />
+
+      <AddToProjectDialog
+        isOpen={isAddToProjectOpen}
+        onClose={() => setIsAddToProjectOpen(false)}
+        projects={projects}
+        onConfirm={handleAddToProjects}
+        loading={isWalkthroughsLoading}
       />
 
     </Flex>

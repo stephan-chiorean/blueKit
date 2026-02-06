@@ -11,6 +11,7 @@ import PlanDocViewPage from './PlanDocViewPage';
 interface PlanWorkspaceProps {
     plan: ResourceFile;
     onPlanDeleted?: () => void | Promise<void>;
+    onBack?: () => void;
 }
 
 // Sidebar constants
@@ -25,7 +26,7 @@ const SIDEBAR_WIDTH = 480; // Fixed width in pixels
  * - Glassmorphic fixed-width sidebar (toggleable)
  * - Main content area with subtle background
  */
-export default function PlanWorkspace({ plan, onPlanDeleted }: PlanWorkspaceProps) {
+export default function PlanWorkspace({ plan, onPlanDeleted, onBack }: PlanWorkspaceProps) {
 
     const [planDetails, setPlanDetails] = useState<PlanDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -122,6 +123,7 @@ export default function PlanWorkspace({ plan, onPlanDeleted }: PlanWorkspaceProp
                         isPanelOpen={isPanelOpen}
                         onTogglePanel={togglePanel}
                         onNavigate={handleDocNavigate}
+                        onBack={onBack}
                     />
                 )}
             </Box>

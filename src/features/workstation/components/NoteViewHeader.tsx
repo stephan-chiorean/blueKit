@@ -17,8 +17,6 @@ interface NoteViewHeaderProps {
   canNavigatePrev?: boolean;
   /** Whether navigation to next is available */
   canNavigateNext?: boolean;
-  /** Override title for editing mode (synced from editor H1) */
-  editingTitle?: string;
 }
 
 export function NoteViewHeader({
@@ -30,7 +28,6 @@ export function NoteViewHeader({
   onNavigateNext,
   canNavigatePrev = false,
   canNavigateNext = false,
-  editingTitle,
 }: NoteViewHeaderProps) {
   // Parse breadcrumbs relative to .bluekit
   const breadcrumbs = (() => {
@@ -52,11 +49,6 @@ export function NoteViewHeader({
 
     // Split by path separator and filter out empty parts
     const parts = pathWithoutExt.split(/[/\\]/).filter(part => part.length > 0);
-
-    // If editingTitle is provided, use it for the last segment (filename)
-    if (editingTitle && parts.length > 0) {
-      parts[parts.length - 1] = editingTitle;
-    }
 
     return parts.length > 0 ? parts : ['Untitled'];
   })();

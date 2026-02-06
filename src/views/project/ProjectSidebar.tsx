@@ -56,10 +56,6 @@ interface ProjectSidebarProps {
   onClearResourceView: () => void;
   /** Called when a new file is created (for opening in edit mode) */
   onNewFileCreated?: (node: FileTreeNode) => void;
-  /** Path of node in title-edit mode (visual highlight only) */
-  titleEditPath?: string | null;
-  /** External title to display for titleEditPath node (synced from editor) */
-  editingTitle?: string;
   isWorktreeView?: boolean;
   onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
   isVault?: boolean;
@@ -82,8 +78,6 @@ export default function ProjectSidebar({
   onTreeRefresh,
   onClearResourceView,
   onNewFileCreated,
-  titleEditPath,
-  editingTitle,
   isWorktreeView = false,
   onHandlersReady,
   isVault = false,
@@ -331,8 +325,6 @@ export default function ProjectSidebar({
           fileTreeVersion={fileTreeVersion}
           onTreeRefresh={onTreeRefresh}
           onNewFileCreated={onNewFileCreated}
-          titleEditPath={titleEditPath}
-          editingTitle={editingTitle}
           projectName={project.name}
           onHandlersReady={onHandlersReady}
           isVault={isVault}

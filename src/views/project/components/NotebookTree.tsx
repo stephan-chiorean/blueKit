@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { LuFile, LuChevronRight, LuArrowRight, LuX } from 'react-icons/lu';
-import { FaStar, FaBookmark } from 'react-icons/fa';
+import { FaBookmark } from 'react-icons/fa';
 import { AiOutlineFileText } from 'react-icons/ai';
 import { RxFileText } from 'react-icons/rx';
 import { invokeGetBlueKitFileTree, FileTreeNode } from '@/ipc/fileTree';
@@ -34,10 +34,6 @@ interface NotebookTreeProps {
     onTreeRefresh?: () => void;
     /** Called when a new file is created (for opening in edit mode) */
     onNewFileCreated?: (node: FileTreeNode) => void;
-    /** Path of node in title-edit mode (visual highlight only, no input capture) */
-    titleEditPath?: string | null;
-    /** External title to display for the titleEditPath node (synced from editor) */
-    editingTitle?: string;
     /** Called with handlers for creating files/folders (for toolbar) */
     onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
 }
@@ -191,8 +187,6 @@ export default function NotebookTree({
     version,
     onTreeRefresh,
     onNewFileCreated,
-    titleEditPath,
-    editingTitle,
     onHandlersReady
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
@@ -310,6 +304,9 @@ export default function NotebookTree({
         }
     };
 
+    // Track previous selectedFileId to detect actual selection changes
+    const prevSelectedFileIdRef = useRef<string | undefined>(undefined);
+
     // Find parent folder paths when a file is selected
     const parentFolderPaths = useMemo(() => {
         if (!selectedFileId || nodes.length === 0) {
@@ -320,35 +317,40 @@ export default function NotebookTree({
     }, [selectedFileId, nodes]);
 
     // Auto-expand parent folders when a file is selected
-    // We need to find folder IDs from paths to expand them
+    // Only runs when selectedFileId actually changes (not on tree refresh)
     useEffect(() => {
-        if (parentFolderPaths.size > 0 && nodes.length > 0) {
-            // Helper to find folder ID by path
-            const findFolderIdByPath = (nodes: FileTreeNode[], targetPath: string): string | null => {
-                for (const node of nodes) {
-                    if (node.path === targetPath && node.isFolder) {
-                        return node.id;
-                    }
-                    if (node.children) {
-                        const found = findFolderIdByPath(node.children, targetPath);
-                        if (found) return found;
-                    }
-                }
-                return null;
-            };
+        // Only expand if selectedFileId changed (not just tree refresh)
+        if (selectedFileId !== prevSelectedFileIdRef.current) {
+            prevSelectedFileIdRef.current = selectedFileId;
 
-            setExpandedFolders(prev => {
-                const next = new Set(prev);
-                parentFolderPaths.forEach(path => {
-                    const folderId = findFolderIdByPath(nodes, path);
-                    if (folderId) {
-                        next.add(folderId);
+            if (parentFolderPaths.size > 0 && nodes.length > 0) {
+                // Helper to find folder ID by path
+                const findFolderIdByPath = (nodes: FileTreeNode[], targetPath: string): string | null => {
+                    for (const node of nodes) {
+                        if (node.path === targetPath && node.isFolder) {
+                            return node.id;
+                        }
+                        if (node.children) {
+                            const found = findFolderIdByPath(node.children, targetPath);
+                            if (found) return found;
+                        }
                     }
+                    return null;
+                };
+
+                setExpandedFolders(prev => {
+                    const next = new Set(prev);
+                    parentFolderPaths.forEach(path => {
+                        const folderId = findFolderIdByPath(nodes, path);
+                        if (folderId) {
+                            next.add(folderId);
+                        }
+                    });
+                    return next;
                 });
-                return next;
-            });
+            }
         }
-    }, [parentFolderPaths, nodes]);
+    }, [selectedFileId, parentFolderPaths, nodes]);
 
     const handleToggleExpand = (folderId: string) => {
         setExpandedFolders(prev => {
@@ -588,7 +590,6 @@ export default function NotebookTree({
             const newNode = findNodeByPath(tree, filePath);
             if (newNode) {
                 // For files, don't enter inline edit in tree - editor will have focus
-                // Parent component manages titleEditPath for visual sync
                 // Just notify parent that a new file was created
                 if (onNewFileCreated) {
                     onNewFileCreated(newNode);
@@ -1007,8 +1008,6 @@ export default function NotebookTree({
                     onInlineEditChange={handleInlineEditChange}
                     onInlineEditComplete={handleInlineEditComplete}
                     onInlineEditCancel={handleInlineEditCancel}
-                    titleEditPath={titleEditPath}
-                    editingTitle={editingTitle}
                     onDragStart={handleDragStart}
                     draggedNodePath={dragState?.draggedNode.path}
                     dropTargetPath={hasDragThresholdMet ? dragState?.dropTargetPath : undefined}
@@ -1240,9 +1239,6 @@ interface CustomTreeProps {
     onInlineEditChange: (value: string) => void;
     onInlineEditComplete: () => void;
     onInlineEditCancel: () => void;
-    // Title edit props (for files - visual only, no input capture)
-    titleEditPath: string | null | undefined;
-    editingTitle: string | undefined;
     // Drag props
     onDragStart: (node: FileTreeNode, position: { x: number; y: number }) => void;
     draggedNodePath?: string;
@@ -1269,8 +1265,6 @@ function CustomTree({
     onInlineEditChange,
     onInlineEditComplete,
     onInlineEditCancel,
-    titleEditPath,
-    editingTitle,
     onDragStart,
     draggedNodePath,
     dropTargetPath,
@@ -1298,8 +1292,6 @@ function CustomTree({
                     onEditComplete={onInlineEditComplete}
                     onEditCancel={onInlineEditCancel}
                     inlineEditNodeId={inlineEditNodeId}
-                    titleEditPath={titleEditPath}
-                    editingTitle={editingTitle}
                     onDragStart={onDragStart}
                     isBeingDragged={draggedNodePath === node.path}
                     isDraggedOver={dropTargetPath === node.path}
@@ -1331,8 +1323,6 @@ function TreeNode({
     onEditComplete,
     onEditCancel,
     inlineEditNodeId,
-    titleEditPath,
-    editingTitle,
     onDragStart,
     isBeingDragged,
     isDraggedOver,
@@ -1359,9 +1349,6 @@ function TreeNode({
     onEditComplete: () => void,
     onEditCancel: () => void,
     inlineEditNodeId: string | null,
-    // Title edit props (for files - visual only sync)
-    titleEditPath: string | null | undefined,
-    editingTitle: string | undefined,
     // Drag props
     onDragStart: (node: FileTreeNode, position: { x: number; y: number }) => void,
     isBeingDragged: boolean,
@@ -1375,9 +1362,6 @@ function TreeNode({
     // Hover props
 
 }) {
-    // Check if this node is in title-edit mode (visual only, for files)
-    const isInTitleEditMode = !node.isFolder && titleEditPath === node.path;
-
     // Check if this file is bookmarked
     const isBookmarked = !node.isFolder && bookmarkedPaths.has(node.path);
 
@@ -1476,12 +1460,12 @@ function TreeNode({
                 onContextMenu={(e) => onContextMenu(e, node)}
                 bg={
                     isDraggedOver ? dragOverBg :
-                        (isSelected || isEditing || isInTitleEditMode ? selectedBg : 'transparent')
+                        (isSelected || isEditing ? selectedBg : 'transparent')
                 }
-                color={isSelected || isEditing || isInTitleEditMode ? selectedColor : 'inherit'}
+                color={isSelected || isEditing ? selectedColor : 'inherit'}
                 _hover={{
                     bg: isDraggedOver ? dragOverBg :
-                        (isSelected || isEditing || isInTitleEditMode ? selectedBg : hoverBg)
+                        (isSelected || isEditing ? selectedBg : hoverBg)
                 }}
                 borderRadius="sm"
                 gap={2}
@@ -1546,14 +1530,11 @@ function TreeNode({
                     />
                 ) : (
                     <Text fontSize="sm" truncate flex={1}>
-                        {isInTitleEditMode && editingTitle ? editingTitle : (node.isFolder ? node.name : getDisplayName(node.name))}
+                        {node.isFolder ? node.name : getDisplayName(node.name)}
                     </Text>
                 )}
                 {isBookmarked && (
                     <Icon as={FaBookmark} color="orange.400" boxSize={3} />
-                )}
-                {node.isEssential && (
-                    <Icon as={FaStar} color="blue.500" boxSize={3} />
                 )}
             </HStack>
 
@@ -1586,8 +1567,6 @@ function TreeNode({
                             onInlineEditChange={onEditChange}
                             onInlineEditComplete={onEditComplete}
                             onInlineEditCancel={onEditCancel}
-                            titleEditPath={titleEditPath}
-                            editingTitle={editingTitle}
                             onDragStart={onDragStart}
                             draggedNodePath={draggedNodePath}
                             dropTargetPath={dropTargetPath}

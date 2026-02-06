@@ -63,22 +63,16 @@ export function ElegantList({
     isDragging = false,
 }: ElegantListProps) {
     const { colorMode } = useColorMode();
-    
+
     // Track hovered item explicitly to avoid stuck hover states during drag
     const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
-    // Debug logging for drag state changes
-    useEffect(() => {
-        console.log(`[ElegantList] type=${type} isDragging changed to: ${isDragging}`);
-    }, [isDragging, type]);
-    
     // Clear hover state when drag starts or ends to prevent stuck states
     useEffect(() => {
         if (isDragging) {
-            console.log(`[ElegantList] type=${type} clearing hover state due to drag`);
             setHoveredItemId(null);
         }
-    }, [isDragging, type]);
+    }, [isDragging]);
 
     const hoverBg = colorMode === "light" ? "blackAlpha.50" : "whiteAlpha.100";
     const selectedBg = colorMode === "light" ? "blue.50" : "blue.900/20";

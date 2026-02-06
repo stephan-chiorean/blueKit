@@ -36,6 +36,8 @@ export interface MarkdownEditorProps {
   showLineNumbers?: boolean;
   /** Whether to select the H1 title on mount (for new file creation) */
   selectH1OnMount?: boolean;
+  /** Callback when user exits H1 line (Enter or blur) - passes the new title */
+  onH1Exit?: (newTitle: string) => void;
 }
 
 export interface MarkdownEditorRef {
@@ -74,6 +76,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       placeholder = 'Start writing...',
       showLineNumbers = false,
       selectH1OnMount = false,
+      onH1Exit,
     },
     ref
   ) {
@@ -81,6 +84,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
     const viewRef = useRef<EditorView | null>(null);
     const onChangeRef = useRef(onChange);
     const onSaveRef = useRef(onSave);
+    const onH1ExitRef = useRef(onH1Exit);
+    const wasOnH1Ref = useRef(false);
 
     // Keep refs updated
     useEffect(() => {
@@ -91,7 +96,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       onSaveRef.current = onSave;
     }, [onSave]);
 
-    // Memoize save keymap
+    useEffect(() => {
+      onH1ExitRef.current = onH1Exit;
+    }, [onH1Exit]);
+
+    // Memoize save keymap and H1 exit keymap
     const saveKeymap = useMemo(() => keymap.of([
       {
         key: 'Mod-s',
@@ -100,6 +109,26 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
             onSaveRef.current(view.state.doc.toString());
           }
           return true;
+        },
+      },
+    ]), []);
+
+    // Keymap for detecting Enter on H1 line
+    const h1ExitKeymap = useMemo(() => keymap.of([
+      {
+        key: 'Enter',
+        run: (view) => {
+          const line = view.state.doc.lineAt(view.state.selection.main.head);
+          if (line.number === 1 && line.text.startsWith('# ')) {
+            // Extract title from H1 line
+            const h1Match = line.text.match(/^#\s+(.+)$/);
+            if (h1Match && onH1ExitRef.current) {
+              onH1ExitRef.current(h1Match[1].trim());
+            }
+            // Allow Enter to proceed normally (move to next line)
+            return false;
+          }
+          return false;
         },
       },
     ]), []);
@@ -120,6 +149,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
         indentWithTab,
       ]),
       saveKeymap,
+      h1ExitKeymap,
 
       // Markdown language
       markdown({
@@ -130,13 +160,30 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       // Placeholder
       placeholderExt(placeholder),
 
-      // Update listener
+      // Update listener for content changes and H1 blur detection
       EditorView.updateListener.of((update) => {
         if (update.docChanged && onChangeRef.current) {
           onChangeRef.current(update.state.doc.toString());
         }
+
+        // Detect H1 line exit (blur from H1 line)
+        if (update.selectionSet) {
+          const currentLine = update.state.doc.lineAt(update.state.selection.main.head);
+          const isOnH1 = currentLine.number === 1;
+
+          if (wasOnH1Ref.current && !isOnH1) {
+            // User moved off H1 line - trigger H1 exit
+            const firstLine = update.state.doc.line(1);
+            const h1Match = firstLine.text.match(/^#\s+(.+)$/);
+            if (h1Match && onH1ExitRef.current) {
+              onH1ExitRef.current(h1Match[1].trim());
+            }
+          }
+
+          wasOnH1Ref.current = isOnH1;
+        }
       }),
-    ], [placeholder, saveKeymap]);
+    ], [placeholder, saveKeymap, h1ExitKeymap]);
 
     // Initialize editor
     useEffect(() => {
@@ -171,19 +218,56 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
 
       // Select H1 title on mount if requested (for new file creation flow)
       if (selectH1OnMount) {
-        // Small delay to ensure editor is fully rendered
-        setTimeout(() => {
+        // Retry mechanism using RAF to ensure better alignment with render cycles
+        let attempts = 0;
+        const maxAttempts = 30; // Approx 500ms at 60fps
+
+        const trySelectH1 = () => {
+          // Check if view is still valid (matches current ref)
+          if (!view || view !== viewRef.current) return;
+
           const content = view.state.doc.toString();
           const h1Match = content.match(/^#\s+(.+)$/m);
+
+          // Conditions to stop retrying:
+          // 1. Found key elements and have focus
+          // 2. Max attempts reached
+
           if (h1Match) {
             const titleStart = content.indexOf(h1Match[1]);
             const titleEnd = titleStart + h1Match[1].length;
+
+            // Dispatch selection
             view.dispatch({
               selection: { anchor: titleStart, head: titleEnd },
+              scrollIntoView: true,
             });
+
+            // Force focus
             view.focus();
+
+            // Critical: Check if we actually have focus. 
+            // If not, we keep trying. If yes, we do one more check in next frame to handle focus theft.
+            if (view.hasFocus) {
+              // We appear to have focus. One more check next frame to be sure.
+              requestAnimationFrame(() => {
+                if (view && view === viewRef.current && !view.hasFocus) {
+                  view.focus();
+                }
+              });
+              return; // Success path
+            }
           }
-        }, 50);
+
+          // If we are here, we either didn't find H1 or didn't have focus yet.
+          if (attempts < maxAttempts) {
+            attempts++;
+            requestAnimationFrame(trySelectH1);
+          }
+        };
+
+        // Start trying
+        requestAnimationFrame(trySelectH1);
       }
 
       return () => {

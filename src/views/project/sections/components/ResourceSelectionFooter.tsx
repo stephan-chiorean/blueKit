@@ -1,6 +1,7 @@
 import { Box, HStack, Text, Button, Icon, Badge } from '@chakra-ui/react';
 import { LuX } from 'react-icons/lu';
 import { IconType } from 'react-icons';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 
 export interface ActionButton {
     label: string;
@@ -26,6 +27,7 @@ export default function ResourceSelectionFooter({
     actions,
     loading
 }: ResourceSelectionFooterProps) {
+    const { colorMode } = useColorMode();
     const pluralizedResourceType = selectedCount !== 1 ? `${resourceType}s` : resourceType;
 
     return (
@@ -43,16 +45,13 @@ export default function ResourceSelectionFooter({
             <Box overflow="hidden" minHeight={0}>
                 <Box
                     borderTopWidth="1px"
-                    borderColor="border.subtle"
+                    borderColor={colorMode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'}
                     py={4}
                     px={6}
                     css={{
-                        background: 'rgba(255, 255, 255, 0.85)',
-                        backdropFilter: 'blur(20px) saturate(180%)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                        _dark: {
-                            background: 'rgba(20, 20, 20, 0.85)',
-                        }
+                        background: colorMode === 'light'
+                            ? '#EBEFF7'
+                            : 'rgba(255, 255, 255, 0.05)',
                     }}
                 >
                     <HStack justify="space-between">

@@ -132,7 +132,7 @@ export default function ResourceViewPage({
           overflow="hidden"
           bg="transparent"
         >
-          <PlanWorkspace plan={resource} onPlanDeleted={onPlanDeleted} />
+          <PlanWorkspace plan={resource} onPlanDeleted={onPlanDeleted} onBack={onBack} />
         </Box>
       </VStack>
     );

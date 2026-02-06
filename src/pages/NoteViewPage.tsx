@@ -9,8 +9,8 @@ import SearchInMarkdown from '@/features/workstation/components/SearchInMarkdown
 import { useWorkstation } from '@/app/WorkstationContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { toaster } from '@/shared/components/ui/toaster';
-import { invokeGetFolderMarkdownFiles } from '@/ipc/artifacts';
-import { invokeReadFile } from '@/ipc/files';
+import { invokeGetFolderMarkdownFiles, deleteResources } from '@/ipc/artifacts';
+import { invokeReadFile, invokeWriteFile } from '@/ipc/files';
 import path from 'path';
 
 interface NoteViewPageProps {
@@ -24,8 +24,8 @@ interface NoteViewPageProps {
   onNavigate?: (resource: ResourceFile, content: string) => void;
   /** Initial view mode (default: 'preview') */
   initialViewMode?: ViewMode;
-  /** Override title for editing mode (synced from editor H1) */
-  editingTitle?: string;
+  /** Callback when file is renamed (for updating tree/tabs) */
+  onFileRenamed?: (oldPath: string, newPath: string) => void;
 }
 
 type ViewMode = 'preview' | 'source' | 'edit';
@@ -37,13 +37,14 @@ export default function NoteViewPage({
   onContentChange,
   onNavigate,
   initialViewMode = 'preview',
-  editingTitle,
+  onFileRenamed,
 }: NoteViewPageProps) {
   const { colorMode } = useColorMode();
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [content, setContent] = useState(initialContent);
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const editorRef = useRef<MarkdownEditorRef>(null);
+  const isRenamingRef = useRef(false);
 
   // State for sibling navigation
   const [siblingFiles, setSiblingFiles] = useState<ResourceFile[]>([]);
@@ -196,6 +197,58 @@ export default function NoteViewPage({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [setIsSearchOpen]);
 
+  // Handle H1 exit - rename file when user presses Enter or blurs from H1 line
+  const handleH1Exit = useCallback(async (newTitle: string) => {
+    // Skip if already renaming (prevent race conditions)
+    if (isRenamingRef.current) return;
+
+    // Sanitize filename
+    const sanitizedTitle = newTitle.replace(/[/\\:*?"<>|]/g, '-').trim() || 'Untitled';
+
+    // If title is "Untitled", no need to rename
+    if (sanitizedTitle === 'Untitled') return;
+
+    const currentPath = resource.path;
+    const dirPath = path.dirname(currentPath);
+    const newPath = path.join(dirPath, `${sanitizedTitle}.md`);
+
+    // No change needed
+    if (newPath === currentPath) return;
+
+    isRenamingRef.current = true;
+
+    try {
+      // Get current content from editor
+      const currentContent = editorRef.current?.getContent() || content;
+
+      // Update H1 in content to match sanitized title
+      const updatedContent = currentContent.replace(/^#\s+.+$/m, `# ${sanitizedTitle}`);
+
+      // Write to new path
+      await invokeWriteFile(newPath, updatedContent);
+
+      // Delete old file
+      await deleteResources([currentPath]);
+
+      // Update local content state
+      setContent(updatedContent);
+
+      // Notify parent of rename (for tree/tab updates)
+      onFileRenamed?.(currentPath, newPath);
+
+      // Note: We stay in edit mode - no mode switching
+    } catch (error) {
+      console.error('Failed to rename file on H1 exit:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Rename failed',
+        description: error instanceof Error ? error.message : 'Could not rename file',
+      });
+    } finally {
+      isRenamingRef.current = false;
+    }
+  }, [resource.path, content, onFileRenamed]);
+
   return (
     <Box
       h="100%"
@@ -212,7 +265,6 @@ export default function NoteViewPage({
         onNavigateNext={handleNavigateNext}
         canNavigatePrev={canNavigatePrev}
         canNavigateNext={canNavigateNext}
-        editingTitle={editingTitle}
       />
 
       <Box flex={1} overflow={viewMode === 'edit' ? 'hidden' : 'auto'} p={6}>
@@ -227,6 +279,7 @@ export default function NoteViewPage({
             showLineNumbers={true}
             placeholder="Start writing..."
             selectH1OnMount={initialViewMode === 'edit'}
+            onH1Exit={handleH1Exit}
           />
         ) : (
           <ResourceMarkdownContent

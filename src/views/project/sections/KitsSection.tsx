@@ -61,7 +61,7 @@ interface KitsSectionProps {
   projects?: Project[];
   onReload?: () => void;
   onOptimisticMove?: (artifactId: string, folderId: string | null) => void;
-  onConfirmMove?: (artifactId: string, folderId: string | null) => void;
+  onConfirmMove?: (oldPath: string, newPath: string) => void; // Unused in this file but ensuring type safety
   movingArtifacts?: Set<string>;
 }
 
@@ -75,6 +75,7 @@ function KitsSection({
   onViewKit,
   projects = [],
   onReload,
+  onOptimisticMove,
 }: KitsSectionProps) {
   const [nameFilter, setNameFilter] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -148,7 +149,6 @@ function KitsSection({
   };
 
   const handlePublish = () => {
-    console.log('Publish selected kits:', Array.from(selectedKitIds));
     clearSelection();
   };
 
@@ -269,7 +269,6 @@ function KitsSection({
   };
 
   const handleCreateFolder = async (name: string, config: Partial<FolderConfig>) => {
-    console.log('Creating folder:', name, config);
     const fullConfig: FolderConfig = {
       id: `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`, // Generate ID
       name: config.name || name,
@@ -340,8 +339,6 @@ function KitsSection({
     e.preventDefault(); // Prevent text selection
     e.stopPropagation();
 
-    console.log('[Drag] Start - mousedown on kit:', kit.name);
-
     setDragState({
       draggedKit: kit,
       dropTargetFolderId: undefined,
@@ -353,7 +350,6 @@ function KitsSection({
   }, []);
 
   const clearDragState = useCallback(() => {
-    console.log('[Drag] Clear - resetting drag state');
     setDragState(null);
     setHasDragThresholdMet(false);
   }, []);
@@ -381,6 +377,9 @@ function KitsSection({
       const targetFolder = folders.find(f => (f.config?.id || f.path) === targetFolderId);
       if (!targetFolder) return;
 
+      // Optimistic update
+      onOptimisticMove?.(kit.path, targetFolder.path);
+
       await invokeMoveArtifactToFolder(kit.path, targetFolder.path);
 
       toaster.create({
@@ -398,7 +397,7 @@ function KitsSection({
         description: error instanceof Error ? error.message : 'An error occurred',
       });
     }
-  }, [folders, onReload]);
+  }, [folders, onReload, onOptimisticMove]);
 
   // Document-level mouse event handlers for drag
   useEffect(() => {
@@ -412,7 +411,6 @@ function KitsSection({
         const dx = Math.abs(e.clientX - dragState.startPosition.x);
         const dy = Math.abs(e.clientY - dragState.startPosition.y);
         if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
-          console.log('[Drag] Threshold met - drag is now active, pointerEvents should be none');
           setHasDragThresholdMet(true);
         }
         return;
@@ -431,7 +429,6 @@ function KitsSection({
 
     const handleMouseUp = async () => {
       const wasDragging = hasDragThresholdMet;
-      console.log('[Drag] MouseUp - wasDragging:', wasDragging, 'isValidDrop:', dragState.isValidDrop);
 
       if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
         await performMove(dragState.draggedKit, dragState.dropTargetFolderId);
@@ -495,7 +492,7 @@ function KitsSection({
   if (kits.length === 0) {
     return (
       <Box textAlign="center" py={12} color="text.secondary" h="100%">
-        No kits found in any linked project's .bluekit directory.
+        No kits found in this project's .bluekit directory.
       </Box>
     );
   }

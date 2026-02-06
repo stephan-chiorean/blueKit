@@ -53,12 +53,7 @@ export default function BrowserTabs({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const tabBarRef = useRef<HTMLDivElement>(null);
 
-  console.log('[BrowserTabs] Render:', {
-    tabsCount: tabs.length,
-    selectedId,
-    hasChildren: !!children,
-    sidebarCollapsed: isSidebarCollapsed
-  });
+
 
   // Handle drag start
   const handleDragStart = (tabId: string, tabIndex: number, e: React.MouseEvent) => {
@@ -117,8 +112,8 @@ export default function BrowserTabs({
 
       // Perform reorder if position changed
       if (dragState.dropTargetIndex !== null &&
-          dragState.dropTargetIndex !== dragState.draggedTabIndex &&
-          onReorder) {
+        dragState.dropTargetIndex !== dragState.draggedTabIndex &&
+        onReorder) {
         onReorder(dragState.draggedTabIndex, dragState.dropTargetIndex);
       }
 

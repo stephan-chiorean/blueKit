@@ -32,6 +32,8 @@ interface PlanDocViewPageProps {
     isPanelOpen?: boolean;
     /** Callback to toggle the overview panel */
     onTogglePanel?: () => void;
+    /** Callback to navigate back to plans list */
+    onBack?: () => void;
 }
 
 export default function PlanDocViewPage({
@@ -42,6 +44,7 @@ export default function PlanDocViewPage({
     onContentChange,
     isPanelOpen = true,
     onTogglePanel,
+    onBack,
 }: PlanDocViewPageProps) {
     const { colorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -267,38 +270,66 @@ export default function PlanDocViewPage({
                 py={2}
             >
                 <Flex justify="space-between" align="center" gap={4}>
-                    {/* Left: Navigation arrows */}
-                    <HStack gap={1}>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            px={2}
-                            bg="transparent"
-                            disabled={!canNavigatePrev}
-                            opacity={canNavigatePrev ? 1 : 0.5}
-                            cursor={canNavigatePrev ? 'pointer' : 'not-allowed'}
-                            onClick={handleNavigatePrev}
-                            _hover={{}}
-                        >
-                            <Icon boxSize={4}>
-                                <LuArrowLeft />
-                            </Icon>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            px={2}
-                            bg="transparent"
-                            disabled={!canNavigateNext}
-                            opacity={canNavigateNext ? 1 : 0.5}
-                            cursor={canNavigateNext ? 'pointer' : 'not-allowed'}
-                            onClick={handleNavigateNext}
-                            _hover={{}}
-                        >
-                            <Icon boxSize={4}>
-                                <LuArrowRight />
-                            </Icon>
-                        </Button>
+                    {/* Left: Back button + Document navigation arrows */}
+                    <HStack gap={2}>
+                        {/* Back to Plans button */}
+                        {onBack && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                px={2}
+                                bg="transparent"
+                                onClick={onBack}
+                                _hover={{
+                                    bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                                }}
+                                borderRightWidth="1px"
+                                borderColor="border.subtle"
+                                borderRadius="md"
+                                mr={1}
+                            >
+                                <HStack gap={1}>
+                                    <Icon boxSize={4}>
+                                        <LuArrowLeft />
+                                    </Icon>
+                                    <Text fontSize="sm" fontWeight="medium">Plans</Text>
+                                </HStack>
+                            </Button>
+                        )}
+
+                        {/* Document navigation arrows */}
+                        <HStack gap={1}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                px={2}
+                                bg="transparent"
+                                disabled={!canNavigatePrev}
+                                opacity={canNavigatePrev ? 1 : 0.5}
+                                cursor={canNavigatePrev ? 'pointer' : 'not-allowed'}
+                                onClick={handleNavigatePrev}
+                                _hover={{}}
+                            >
+                                <Icon boxSize={4}>
+                                    <LuArrowLeft />
+                                </Icon>
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                px={2}
+                                bg="transparent"
+                                disabled={!canNavigateNext}
+                                opacity={canNavigateNext ? 1 : 0.5}
+                                cursor={canNavigateNext ? 'pointer' : 'not-allowed'}
+                                onClick={handleNavigateNext}
+                                _hover={{}}
+                            >
+                                <Icon boxSize={4}>
+                                    <LuArrowRight />
+                                </Icon>
+                            </Button>
+                        </HStack>
                     </HStack>
 
                     {/* Center: Filename with (N/M) indicator */}

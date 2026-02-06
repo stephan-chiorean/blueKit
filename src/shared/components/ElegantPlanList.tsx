@@ -8,12 +8,10 @@ import {
   Badge,
   Checkbox,
 } from "@chakra-ui/react";
-import { LuCircle } from "react-icons/lu";
+import { LuCircle, LuMap } from "react-icons/lu";
 import { PlanDetails } from "@/types/plan";
 import { useColorMode } from "@/shared/contexts/ColorModeContext";
 import {
-  getPlanStatusIcon,
-  getPlanStatusColor,
   getProgressColor,
   getActiveMilestones,
 } from "@/shared/utils/planUtils";
@@ -143,8 +141,6 @@ export function ElegantPlanList({
           const isSelected = selectedIds?.has(plan.id);
 
           // Get plan-specific data
-          const StatusIcon = getPlanStatusIcon(plan.status);
-          const statusIconColor = getPlanStatusColor(plan.status);
           const progressColor = getProgressColor(plan.status, plan.progress);
 
           // Milestone data
@@ -187,7 +183,7 @@ export function ElegantPlanList({
             >
               {/* Name Column */}
               <Flex flex="1" align="center" gap={3} minW={0} pr={4}>
-                <Icon as={StatusIcon} boxSize={5} color={statusIconColor} flexShrink={0} />
+                <Icon as={LuMap} boxSize={5} color={plan.status === 'completed' ? 'green.500' : 'blue.500'} flexShrink={0} />
                 <VStack align="start" gap={1.5} minW={0} flex={1}>
                   <HStack gap={2} align="center" flexWrap="wrap">
                     <Text fontWeight="medium" fontSize="sm" color="fg" truncate>
@@ -199,7 +195,7 @@ export function ElegantPlanList({
                     </Badge>
                     {/* Task completion badge */}
                     {totalTasks > 0 && (
-                      <Badge size="sm" variant="outline" colorPalette="blue">
+                      <Badge size="sm" variant="outline" colorPalette={plan.status === 'completed' ? 'green' : 'blue'}>
                         {completedTasks}/{totalTasks} tasks
                       </Badge>
                     )}

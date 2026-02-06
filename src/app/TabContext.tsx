@@ -215,10 +215,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const currentTabs = tabsByContext[activeContext] || [];
     if (currentTabs.length === 0) {
-      console.warn(
-        "[TabContext] ⚠️ Empty context detected, creating default tab.",
-        { context: activeContext }
-      );
       let newTab: TabState;
 
       if (activeContext === "library") {
@@ -334,8 +330,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
   // Switch to a different context
   const loadContextTabs = useCallback(
     async (contextKey: string): Promise<TabState[]> => {
-      console.log("[TabContext] loadContextTabs called", { contextKey });
-
       let filePath: string | null = null;
       if (contextKey === "library") {
         filePath = await getGlobalTabsPath();
@@ -344,22 +338,11 @@ export function TabProvider({ children }: { children: ReactNode }) {
         filePath = await getProjectTabsPath(projectId);
       }
 
-      console.log("[TabContext] loadContextTabs: Reading from disk", {
-        contextKey,
-        filePath,
-      });
-
       if (!filePath) return [];
 
       try {
         const content = await invokeReadFile(filePath);
         const data = JSON.parse(content);
-
-        console.log("[TabContext] loadContextTabs: Parsed file", {
-          schemaVersion: data.schemaVersion,
-          availableContexts: Object.keys(data.contexts || {}),
-          activeContext: data.activeContext,
-        });
 
         if (data.schemaVersion === TAB_SCHEMA_VERSION) {
           const loadedContextData = data.contexts?.[contextKey];
@@ -371,16 +354,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
                 view: tab.view ?? {},
               })
             );
-
-            console.log("[TabContext] loadContextTabs: Loaded tabs from disk", {
-              contextKey,
-              activeTabId: loadedContextData.activeTabId,
-              tabs: loadedTabs.map((t: TabState) => ({
-                id: t.id,
-                title: t.title,
-                view: t.resource?.view,
-              })),
-            });
 
             setTabsByContext((prev) => ({
               ...prev,
@@ -401,10 +374,7 @@ export function TabProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
-        console.log(
-          "[TabContext] loadContextTabs: Failed to load (file may not exist)",
-          { contextKey, error }
-        );
+        // File may not exist yet
       }
       return [];
     },
@@ -432,8 +402,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
   // Helper to read tabs from disk (source of truth)
   const readTabsFromDisk = useCallback(
     async (contextKey: string): Promise<TabState[]> => {
-      console.log("[TabContext] readTabsFromDisk:", contextKey);
-
       let filePath: string | null = null;
       if (contextKey === "library") {
         filePath = await getGlobalTabsPath();
@@ -443,7 +411,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
       }
 
       if (!filePath) {
-        console.log("[TabContext] No file path for context:", contextKey);
         return [];
       }
 
@@ -452,26 +419,12 @@ export function TabProvider({ children }: { children: ReactNode }) {
         const data = JSON.parse(content);
         const tabs = data.contexts?.[contextKey]?.tabs || [];
 
-        console.log("[TabContext] Loaded tabs from disk:", {
-          contextKey,
-          tabCount: tabs.length,
-          tabs: tabs.map((t: TabState) => ({
-            id: t.id,
-            title: t.title,
-            view: t.resource?.view,
-          })),
-        });
-
         return tabs.map((tab: TabState) => ({
           ...tab,
           resource: tab.resource ?? {},
           view: tab.view ?? {},
         }));
       } catch (error) {
-        console.log(
-          "[TabContext] Failed to read tabs (file may not exist):",
-          { contextKey, error }
-        );
         return [];
       }
     },
@@ -480,36 +433,23 @@ export function TabProvider({ children }: { children: ReactNode }) {
 
   const switchContext = useCallback(
     async (contextKey: string) => {
-      console.log("[TabContext] Switching context:", {
-        from: activeContext,
-        to: contextKey,
-      });
-
       // Alias library -> project:<vaultId>
       let targetContext = contextKey;
       if (contextKey === "library") {
         const vaultId = await ensureVaultId();
         if (vaultId) {
           targetContext = `project:${vaultId}`;
-          console.log("[TabContext] Aliasing library ->", targetContext);
         }
       }
 
       // ALWAYS read from disk - disk is source of truth
-      console.log("[TabContext] switchContext: reading from disk", targetContext);
       let contextTabs = await readTabsFromDisk(targetContext);
-
-      console.log("[TabContext] switchContext: loaded tabs from disk", {
-        targetContext,
-        tabCount: contextTabs.length,
-      });
 
       if (contextTabs.length > 0) {
         // Tabs exist - restore them
         setTabsByContext((prev) => ({ ...prev, [targetContext]: contextTabs }));
       } else {
         // No tabs on disk - create default empty tab
-        console.log("[TabContext] No tabs on disk, creating default tab");
         const isLibrary = targetContext.startsWith("project:") && targetContext === `project:${await ensureVaultId()}`;
         const projectId = targetContext.replace("project:", "");
 
@@ -541,7 +481,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
           : contextTabs[0]?.id;
 
       if (tabToActivate) {
-        console.log("[TabContext] Restoring active tab:", tabToActivate);
         setActiveTab(tabToActivate, targetContext);
       }
 
@@ -561,17 +500,11 @@ export function TabProvider({ children }: { children: ReactNode }) {
     const globalPath = await getGlobalTabsPath();
     const vaultId = await ensureVaultId();
 
-    console.log("[TabContext] loadTabs starting", { globalPath, vaultId });
     if (!globalPath) return;
 
     try {
       const content = await invokeReadFile(globalPath);
       const data = JSON.parse(content);
-      console.log("[TabContext] Global tabs loaded:", {
-        schemaVersion: data.schemaVersion,
-        activeContext: data.activeContext,
-        contextKeys: Object.keys(data.contexts || {}),
-      });
 
       if (data.schemaVersion !== TAB_SCHEMA_VERSION) return;
 
@@ -581,10 +514,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
 
       // Prefer project-keyed tabs for vault
       if (vaultContextKey && data.contexts?.[vaultContextKey]) {
-        console.log(
-          "[TabContext] Loading vault tabs from project key:",
-          vaultContextKey
-        );
         libraryTabs = (data.contexts[vaultContextKey].tabs || []).map(
           (tab: TabState) => ({
             ...tab,
@@ -607,9 +536,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
       }
       // Fallback to 'library' key if exists and no project key found (migration case)
       else if (data.contexts?.library) {
-        console.log(
-          "[TabContext] Loading library tabs from library key (legacy)"
-        );
         libraryTabs = (data.contexts.library.tabs || []).map(
           (tab: TabState) => ({
             ...tab,
@@ -644,10 +570,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
         persistedActiveContext !== "library" &&
         data.contexts?.[persistedActiveContext]
       ) {
-        console.log(
-          "[TabContext] Loading active context from Global file:",
-          persistedActiveContext
-        );
         const contextData = data.contexts[persistedActiveContext];
         const contextTabs = (contextData.tabs || []).map((tab: TabState) => ({
           ...tab,
@@ -866,15 +788,6 @@ export function TabProvider({ children }: { children: ReactNode }) {
       const pinned = options?.pinned ?? false;
       const dirty = options?.dirty ?? false;
 
-      console.log(
-        "[TabContext] updateCurrentTabInContext: OVERWRITING current tab",
-        {
-          currentTabId: activeTabId,
-          newResource: resourceData,
-          newTitle: title,
-        }
-      );
-
       setTabsByContext((prev) => ({
         ...prev,
         [activeContext]: (prev[activeContext] || []).map((tab) => {
@@ -900,19 +813,10 @@ export function TabProvider({ children }: { children: ReactNode }) {
       const targetContext = getContextKey(resource);
       const forceNew = options?.forceNew ?? false;
 
-      console.log("[TabContext] openInNewTab called", {
-        resource,
-        options,
-        targetContext,
-        activeContext,
-        forceNew,
-      });
-
       let resolvedContext = targetContext;
       let contextTabs = tabsByContext[targetContext] || [];
 
       if (targetContext !== activeContext) {
-        console.log("[TabContext] Different context - switching first");
         const switchResult = await switchContext(targetContext);
         resolvedContext = switchResult.contextKey;
         contextTabs = switchResult.tabs;
@@ -927,16 +831,11 @@ export function TabProvider({ children }: { children: ReactNode }) {
           : null;
 
         if (existingTab) {
-          console.log(
-            "[TabContext] Tab already exists, activating it:",
-            existingTab.id
-          );
           setActiveTab(existingTab.id, resolvedContext);
           return;
         }
       }
 
-      console.log("[TabContext] Creating new tab");
       createTab(resource, options, resolvedContext);
     },
     [
@@ -951,32 +850,19 @@ export function TabProvider({ children }: { children: ReactNode }) {
 
   const openInCurrentTab = useCallback(
     async (resource: TabResourceInput, options?: TabCreateOptions) => {
-      console.log("[TabContext] openInCurrentTab called", {
-        resource,
-        options,
-        activeTabId,
-        activeContext,
-      });
-
       if (!activeTabId) {
-        console.log("[TabContext] No active tab, creating new tab");
         createTab(resource, options);
         return;
       }
 
       const targetContext = getContextKey(resource);
-      console.log("[TabContext] Target context:", targetContext, "Active:", activeContext);
 
       // If resource is from different context, switch context
       if (targetContext !== activeContext) {
         // Cross-context: Just switch - switchContext reads from disk
-        console.log("[TabContext] Cross-context navigation, switching to:", targetContext);
         await switchContext(targetContext);
       } else {
         // Same context - update current tab
-        console.log("[TabContext] SAME CONTEXT: updating current tab", {
-          currentTabId: activeTabId,
-        });
         updateCurrentTabInContext(resource, options);
       }
     },

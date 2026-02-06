@@ -56,10 +56,6 @@ interface SidebarContentProps {
     onTreeRefresh?: () => void;
     /** Called when a new file is created (for opening in edit mode) */
     onNewFileCreated?: (node: FileTreeNode) => void;
-    /** Path of node in title-edit mode (visual highlight only) */
-    titleEditPath?: string | null;
-    /** External title to display for titleEditPath node (synced from editor) */
-    editingTitle?: string;
     projectName?: string;
     onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
     isVault?: boolean;
@@ -76,8 +72,6 @@ export default function SidebarContent({
     fileTreeVersion,
     onTreeRefresh,
     onNewFileCreated,
-    titleEditPath,
-    editingTitle,
     projectName,
     onHandlersReady,
     isVault = false
@@ -526,8 +520,6 @@ export default function SidebarContent({
                             version={fileTreeVersion}
                             onTreeRefresh={onTreeRefresh}
                             onNewFileCreated={onNewFileCreated}
-                            titleEditPath={titleEditPath}
-                            editingTitle={editingTitle}
                             onHandlersReady={useCallback((handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => {
                                 setTreeHandlers(handlers);
                                 if (onHandlersReady) onHandlersReady(handlers);
