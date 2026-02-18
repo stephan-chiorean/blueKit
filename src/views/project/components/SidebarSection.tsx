@@ -109,6 +109,8 @@ export default function SidebarSection({
                         style={{ overflow: flex ? undefined : 'hidden' }}
                         flex={flex ? "1" : undefined}
                         minH={flex ? 0 : undefined}
+                        display={flex ? "flex" : undefined}
+                        flexDirection={flex ? "column" : undefined}
                     >
                         <ChildrenContainer
                             gap={flex ? 0 : 0}

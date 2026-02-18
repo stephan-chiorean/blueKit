@@ -1,5 +1,5 @@
-import { Box, Flex, VStack, HStack, Text, Icon, Select, Portal, createListCollection, Avatar, Tooltip, IconButton } from '@chakra-ui/react';
-import { LuFolder, LuArrowLeft, LuNetwork, LuLibrary, LuMoon, LuSun, LuSettings, LuUser, LuPanelLeft } from 'react-icons/lu';
+import { Box, Flex, VStack, HStack, Text, Icon, Portal, Avatar, Tooltip, IconButton } from '@chakra-ui/react';
+import { LuFolder, LuArrowLeft, LuNetwork, LuLibrary, LuMoon, LuSun, LuSettings, LuUser, LuPanelLeft, LuChevronDown } from 'react-icons/lu';
 import SidebarContent, { ViewType } from './components/SidebarContent';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { useSupabaseAuth } from '@/shared/contexts/SupabaseAuthContext';
@@ -7,6 +7,7 @@ import { Project, FileTreeNode } from '@/ipc';
 import { useState } from 'react';
 import KeyboardShortcutsModal from '@/shared/components/KeyboardShortcutsModal';
 import { HEADER_SECTION_HEIGHT } from '@/shared/constants/layout';
+import ProjectSwitcherModal from './components/ProjectSwitcherModal';
 
 
 
@@ -86,6 +87,7 @@ export default function ProjectSidebar({
   const { colorMode, toggleColorMode } = useColorMode();
   const { user } = useSupabaseAuth();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isProjectSwitcherOpen, setIsProjectSwitcherOpen] = useState(false);
 
   // Handle opening project in external editor
 
@@ -93,22 +95,6 @@ export default function ProjectSidebar({
   // User display name and avatar derivation
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
   const userAvatar = user?.user_metadata?.avatar_url;
-
-  // Create collection for Select component
-  const projectsCollection = createListCollection({
-    items: allProjects,
-    itemToString: (item) => item.name,
-    itemToValue: (item) => item.id,
-  });
-
-  // Handler for project selection from dropdown
-  const handleProjectChange = (details: { value: string[] }) => {
-    const selectedProjectId = details.value[0];
-    const selectedProject = allProjects.find(p => p.id === selectedProjectId);
-    if (selectedProject && onProjectSelect) {
-      onProjectSelect(selectedProject);
-    }
-  };
 
   const handleViewChange = (view: ViewType) => {
     onViewChange(view);
@@ -188,86 +174,46 @@ export default function ProjectSidebar({
                 _hover={{ color: colorMode === 'light' ? 'black' : 'white' }}
               />
             </Box>
-            <Select.Root
-              collection={projectsCollection}
-              value={[project.id]}
-              onValueChange={handleProjectChange}
-              size="sm"
+            <Box
+              as="button"
+              onClick={() => setIsProjectSwitcherOpen(true)}
+              cursor="pointer"
+              borderWidth="0"
+              borderRadius="md"
+              px={2}
+              h="28px"
+              minH="28px"
+              bg={colorMode === 'light' ? "blackAlpha.50" : "whiteAlpha.100"}
+              display="flex"
+              alignItems="center"
               flex="1"
-              width="auto"
+              _hover={{ bg: colorMode === 'light' ? "blackAlpha.100" : "whiteAlpha.200" }}
+              css={{
+                transition: 'all 0.2s',
+              }}
             >
-              <Select.HiddenSelect />
-              <Select.Control
-                cursor="pointer"
-                borderWidth="0"
-                borderRadius="md"
-                px={2}
-                h="28px"
-                minH="28px"
-                bg={colorMode === 'light' ? "blackAlpha.50" : "whiteAlpha.100"}
-                display="flex"
-                alignItems="center"
-                _hover={{ bg: colorMode === 'light' ? "blackAlpha.100" : "whiteAlpha.200" }}
-                css={{
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Select.Trigger
-                  flex="1"
-                  width="auto"
-                  bg="transparent"
-                  border="none"
-                  h="100%"
-                  py={0}
-                  _focus={{ boxShadow: "none", outline: "none" }}
-                  _hover={{ bg: "transparent" }}
-                  _active={{ bg: "transparent" }}
-                >
-                  <HStack gap={2} alignItems="center" h="100%" flex="1">
-                    <Icon boxSize={3.5} color="primary.500">
-                      <LuFolder />
-                    </Icon>
-                    <Select.ValueText placeholder="Select project" fontSize="xs" fontWeight="medium" />
-                  </HStack>
-                </Select.Trigger>
-                <Select.IndicatorGroup>
-                  <Select.Indicator ml={1} />
-                </Select.IndicatorGroup>
-              </Select.Control>
-              <Portal>
-                <Select.Positioner>
-                  <Select.Content
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    css={{
-                      background: 'rgba(255, 255, 255, 0.65)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                      borderColor: 'rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.1)',
-                      zIndex: 9999,
-                      _dark: {
-                        background: 'rgba(20, 20, 25, 0.8)',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
-                      },
-                    }}
-                  >
-                    {projectsCollection.items.map((proj) => (
-                      <Select.Item key={proj.id} item={proj}>
-                        <HStack gap={2}>
-                          <Icon color="primary.500">
-                            <LuFolder />
-                          </Icon>
-                          <Select.ItemText>{proj.name}</Select.ItemText>
-                        </HStack>
-                        <Select.ItemIndicator />
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Positioner>
-              </Portal>
-            </Select.Root>
+              <HStack gap={2} alignItems="center" h="100%" flex="1" overflow="hidden">
+                <Icon boxSize={3.5} color="primary.500" flexShrink={0}>
+                  <LuFolder />
+                </Icon>
+                <Text fontSize="xs" fontWeight="medium" truncate>
+                  {project.name}
+                </Text>
+              </HStack>
+              <Box flexShrink={0}>
+                <Icon color="text.muted" size="xs"><LuChevronDown /></Icon>
+              </Box>
+            </Box>
+            <ProjectSwitcherModal
+              isOpen={isProjectSwitcherOpen}
+              onClose={() => setIsProjectSwitcherOpen(false)}
+              projects={allProjects}
+              currentProject={project}
+              onProjectSelect={(p) => {
+                if (onProjectSelect) onProjectSelect(p);
+                // No need to set isOpen to false here as modal handles it or we do it transparently
+              }}
+            />
             {/* Panel toggle icon - collapses sidebar */}
             {onToggleSidebar && (
               <Tooltip.Root openDelay={150} closeDelay={100} positioning={{ placement: 'top', gutter: 8 }}>
@@ -307,10 +253,12 @@ export default function ProjectSidebar({
       </Box>
 
       {/* Sidebar Menu Content - with border separator */}
-      <Box
+      <Flex
+        direction="column"
         flex="1"
+        minH={0}
         overflowX="hidden"
-        overflowY="auto"
+        overflowY="hidden"
         pb={1}
         px={3}
         pt={2}
@@ -329,7 +277,7 @@ export default function ProjectSidebar({
           onHandlersReady={onHandlersReady}
           isVault={isVault}
         />
-      </Box>
+      </Flex>
 
       {/* Modern Footer: User Profile & Actions */}
       {!isWorktreeView && (
