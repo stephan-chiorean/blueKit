@@ -29,6 +29,8 @@ export interface ObsidianEditorProps {
   placeholder?: string;
   /** Rendered inside the scroll container, above editor content. */
   headerSlot?: ReactNode;
+  /** DOM id applied to the scrollable content container (for search-in-page). */
+  contentId?: string;
 }
 
 export interface ObsidianEditorRef {
@@ -51,6 +53,7 @@ const ObsidianEditor = forwardRef<ObsidianEditorRef, ObsidianEditorProps>(
       showModeToggle = true,
       placeholder,
       headerSlot,
+      contentId,
     },
     ref
   ) {
@@ -162,6 +165,7 @@ const ObsidianEditor = forwardRef<ObsidianEditorRef, ObsidianEditorProps>(
 
         {/* Editor Area — headerSlot scrolls together with content */}
         <Box
+          id={contentId}
           flex="1"
           overflow="auto"
           position="relative"

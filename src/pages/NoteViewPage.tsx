@@ -71,7 +71,7 @@ export default function NoteViewPage({
   // Reconstruct full markdown content
   const buildFullContent = useCallback((t: string, b: string) =>
     t ? `# ${t}\n\n${b}` : b,
-  []);
+    []);
 
   // State for sibling navigation
   const [siblingFiles, setSiblingFiles] = useState<ResourceFile[]>([]);
@@ -303,17 +303,18 @@ export default function NoteViewPage({
           colorMode={colorMode}
           placeholder="Start writing..."
           headerSlot={titleSlot}
+          contentId="markdown-content-container"
         />
       </Box>
 
       {/* Search */}
       <Portal>
-        {isSearchOpen && viewMode !== 'edit' && (
+        {isSearchOpen && (
           <SearchInMarkdown
             isOpen={isSearchOpen}
             onClose={() => setIsSearchOpen(false)}
-            containerId={viewMode === 'source' ? 'markdown-content-source' : 'markdown-content-preview'}
-            viewMode={viewMode as 'preview' | 'source'}
+            containerId="markdown-content-container"
+            viewMode={viewMode === 'edit' ? 'preview' : viewMode as 'preview' | 'source'}
           />
         )}
       </Portal>
