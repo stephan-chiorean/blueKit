@@ -31,7 +31,7 @@ export default function EmptyTabState({
         },
         {
             icon: LuSearch,
-            label: 'Go to file',
+            label: 'Go to Note',
             shortcut: '⌘ O',
             onClick: onSearchFiles || (() => {
                 toaster.create({

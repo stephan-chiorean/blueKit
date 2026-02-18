@@ -16,6 +16,7 @@ import BlueprintsSection from './sections/BlueprintsSection';
 import AgentsTabContent from '@/features/agents/components/AgentsTabContent';
 import ScrapbookTabContent from '@/features/scrapbook/components/ScrapbookTabContent';
 import NewNoteModal from './components/NewNoteModal';
+import NoteSearchModal from './components/NoteSearchModal';
 import DiagramsTabContent from '@/features/diagrams/components/DiagramsTabContent';
 import GitSection from './sections/GitSection';
 import BookmarksTabContent from '@/features/bookmarks/components/BookmarksTabContent';
@@ -405,6 +406,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
   // New Note Modal State
   const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState(false);
+  const [isNoteSearchOpen, setIsNoteSearchOpen] = useState(false);
   const [newNoteParentPath, setNewNoteParentPath] = useState<string | null>(null);
 
   const handleOpenNewNoteModal = useCallback((parentPath?: string) => {
@@ -478,6 +480,12 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
           e.preventDefault();
           handleOpenNewNoteModal(project.path);
         }
+      }
+
+      // Cmd+O: Go to Note (file search)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+        e.preventDefault();
+        setIsNoteSearchOpen(true);
       }
     };
 
@@ -1305,6 +1313,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               });
             }
           }}
+          onSearchFiles={() => setIsNoteSearchOpen(true)}
           onCloseTab={() => {
             if (activeTabId) closeTab(activeTabId);
           }}
@@ -1464,6 +1473,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               onCreateNote={() => {
                 handleOpenNewNoteModal(project.path);
               }}
+              onSearchFiles={() => setIsNoteSearchOpen(true)}
               onCloseTab={() => {
                 if (activeTabId) closeTab(activeTabId);
               }}
@@ -1689,6 +1699,13 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         onClose={() => setIsNewNoteModalOpen(false)}
         parentPath={newNoteParentPath || project.path}
         onNoteCreated={handleNoteCreated}
+      />
+
+      <NoteSearchModal
+        isOpen={isNoteSearchOpen}
+        onClose={() => setIsNoteSearchOpen(false)}
+        projectPath={project.path}
+        onNoteSelect={handleFileSelect}
       />
     </SelectionProvider>
   );
