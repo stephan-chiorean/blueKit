@@ -62,7 +62,7 @@ export default function NoteViewPage({
   const { colorMode } = useColorMode();
   const isLight = colorMode === 'light';
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
-  const [title, setTitle] = useState(() => extractTitle(initialContent));
+  const [title, setTitle] = useState(() => resource.name.replace(/\.md$/i, ''));
   const [body, setBody] = useState(() => extractBody(initialContent));
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const editorRef = useRef<ObsidianEditorRef>(null);
@@ -81,9 +81,6 @@ export default function NoteViewPage({
   const { save, saveNow } = useAutoSave(resource.path, {
     delay: 1500,
     enabled: editable && viewMode !== 'preview',
-    onSaveSuccess: () => {
-      toaster.create({ type: 'success', title: 'Saved', duration: 2000 });
-    },
     onSaveError: (error) => {
       toaster.create({ type: 'error', title: 'Save failed', description: error.message });
     },
@@ -98,11 +95,14 @@ export default function NoteViewPage({
     prevResourcePathRef.current = resource.path;
 
     if (isNewFile || viewMode !== 'edit') {
-      setTitle(extractTitle(initialContent));
+      // Use filename (without extension) as the title
+      // We keep extractBody to strip the H1 from content if present, preventing duplication
+      const fileName = resource.name.replace(/\.md$/i, '');
+      setTitle(fileName);
       setBody(extractBody(initialContent));
       if (isNewFile) setViewMode(initialViewMode);
     }
-  }, [initialContent, resource.path, viewMode, initialViewMode]);
+  }, [initialContent, resource.path, resource.name, viewMode, initialViewMode]);
 
   // Fetch sibling files in the same directory
   useEffect(() => {

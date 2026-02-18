@@ -15,6 +15,7 @@ import WalkthroughsSection from './sections/WalkthroughsSection';
 import BlueprintsSection from './sections/BlueprintsSection';
 import AgentsTabContent from '@/features/agents/components/AgentsTabContent';
 import ScrapbookTabContent from '@/features/scrapbook/components/ScrapbookTabContent';
+import NewNoteModal from './components/NewNoteModal';
 import DiagramsTabContent from '@/features/diagrams/components/DiagramsTabContent';
 import GitSection from './sections/GitSection';
 import BookmarksTabContent from '@/features/bookmarks/components/BookmarksTabContent';
@@ -348,6 +349,89 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
   const handleTreeRefresh = useCallback(() => setFileTreeVersion(v => v + 1), []);
 
+  const handleFileSelect = useCallback(async (node: FileTreeNode) => {
+    try {
+      const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
+
+      // Get display label
+      const label = node.frontMatter?.alias || node.name;
+      const resourceType: ResourceType = isDiagram ? 'diagram' : 'file';
+      openInCurrentTab(
+        {
+          type: resourceType,
+          path: node.path,
+          projectId: project.id,
+          view: getViewForTabType(resourceType),
+        },
+        { title: label }
+      );
+    } catch (e) {
+      console.error("Failed to open file", e);
+    }
+  }, [getViewForTabType, openInCurrentTab, project.id]);
+
+  // Handler for when a new file is created in NotebookTree
+  // Opens the file immediately in edit mode
+  const handleNewFileCreated = useCallback(async (node: FileTreeNode) => {
+    setIsNewFile(true);
+    setNewFileKey(k => k + 1); // Force NoteViewPage remount
+    await handleFileSelect(node);
+  }, [handleFileSelect]);
+
+  // Handler for when a file is renamed (from NoteViewPage)
+  const handleFileRenamed = useCallback((_oldPath: string, newPath: string) => {
+    // Update notebookFile state with new path
+    setNotebookFile(prev => prev ? {
+      ...prev,
+      resource: {
+        ...prev.resource,
+        name: path.basename(newPath),
+        path: newPath,
+      }
+    } : null);
+
+    // Update tab with new path and title
+    if (activeTabId) {
+      const newTitle = path.basename(newPath).replace(/\.(md|mmd|mermaid)$/i, '');
+      updateTabResource(activeTabId, { path: newPath }, { title: newTitle });
+    }
+
+    // Refresh tree to show renamed file
+    handleTreeRefresh();
+
+    // Clear new file flag
+    setIsNewFile(false);
+  }, [activeTabId, updateTabResource, handleTreeRefresh]);
+
+  // New Note Modal State
+  const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState(false);
+  const [newNoteParentPath, setNewNoteParentPath] = useState<string | null>(null);
+
+  const handleOpenNewNoteModal = useCallback((parentPath?: string) => {
+    // Default to project path if not provided
+    setNewNoteParentPath(parentPath || project.path);
+    setIsNewNoteModalOpen(true);
+  }, [project.path]);
+
+  const handleNoteCreated = useCallback((fullPath: string) => {
+    // Refresh tree
+    handleTreeRefresh();
+    // Open the new file
+    // We construct a mock node to pass to handleNewFileCreated
+    // It mostly needs the path and name
+    const name = path.basename(fullPath);
+    const mockNode: FileTreeNode = {
+      id: fullPath,
+      name,
+      path: fullPath,
+      isFolder: false,
+      children: [],
+      frontMatter: { type: 'file', alias: name },
+      isEssential: false
+    };
+    handleNewFileCreated(mockNode);
+  }, [handleTreeRefresh, handleNewFileCreated]);
+
   // Notebook handlers (new file/folder) - lifted from SidebarContent -> NotebookTree
   const [notebookHandlers, setNotebookHandlers] = useState<{
     onNewFile: (folderPath: string) => void;
@@ -390,16 +474,16 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
 
       // Cmd+N: New Note (only if actively viewing a project tab)
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
-        if (notebookHandlers && project.path) {
+        if (project.path) {
           e.preventDefault();
-          notebookHandlers.onNewFile(path.join(project.path, '.bluekit'));
+          handleOpenNewNoteModal(project.path);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, closeTab, selectTab, browserTabs, notebookHandlers, project.path]);
+  }, [activeTabId, closeTab, selectTab, browserTabs, notebookHandlers, project.path, handleOpenNewNoteModal]);
 
   // Separate artifacts and loading state for better performance
   const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
@@ -586,6 +670,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     };
     loadProjects();
   }, []);
+
+
+
 
   // Load database project for git metadata
   useEffect(() => {
@@ -1139,59 +1226,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     );
   }, [openInNewTab, project.id, project.path, project.name]);
 
-  const handleFileSelect = useCallback(async (node: FileTreeNode) => {
-    try {
-      const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
 
-      // Get display label
-      const label = node.frontMatter?.alias || node.name;
-      const resourceType: ResourceType = isDiagram ? 'diagram' : 'file';
-      openInCurrentTab(
-        {
-          type: resourceType,
-          path: node.path,
-          projectId: project.id,
-          view: getViewForTabType(resourceType),
-        },
-        { title: label }
-      );
-    } catch (e) {
-      console.error("Failed to open file", e);
-    }
-  }, [getViewForTabType, openInNewTab, project.id]);
 
-  // Handler for when a new file is created in NotebookTree
-  // Opens the file immediately in edit mode
-  const handleNewFileCreated = useCallback(async (node: FileTreeNode) => {
-    setIsNewFile(true);
-    setNewFileKey(k => k + 1); // Force NoteViewPage remount
-    await handleFileSelect(node);
-  }, [handleFileSelect]);
 
-  // Handler for when a file is renamed (from NoteViewPage)
-  const handleFileRenamed = useCallback((_oldPath: string, newPath: string) => {
-    // Update notebookFile state with new path
-    setNotebookFile(prev => prev ? {
-      ...prev,
-      resource: {
-        ...prev.resource,
-        name: path.basename(newPath),
-        path: newPath,
-      }
-    } : null);
-
-    // Update tab with new path and title
-    if (activeTabId) {
-      const newTitle = path.basename(newPath).replace(/\.(md|mmd|mermaid)$/i, '');
-      updateTabResource(activeTabId, { path: newPath }, { title: newTitle });
-    }
-
-    // Refresh tree to show renamed file
-    handleTreeRefresh();
-
-    // Clear new file flag
-    setIsNewFile(false);
-  }, [activeTabId, updateTabResource, handleTreeRefresh]);
 
   // Render content based on active view
   const renderContent = () => {
@@ -1425,15 +1462,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
             <EmptyTabState
               context={isVault ? 'library' : 'project'}
               onCreateNote={() => {
-                if (notebookHandlers) {
-                  notebookHandlers.onNewFile(path.join(project.path, '.bluekit'));
-                } else {
-                  toaster.create({
-                    title: 'Unable to create note',
-                    description: 'File tree is not ready yet',
-                    type: 'error'
-                  });
-                }
+                handleOpenNewNoteModal(project.path);
               }}
               onCloseTab={() => {
                 if (activeTabId) closeTab(activeTabId);
@@ -1534,6 +1563,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
                 onHandlersReady={setNotebookHandlers}
                 isVault={isVault}
                 onToggleSidebar={toggleSidebar}
+                onNewNote={handleOpenNewNoteModal}
               />
             </Splitter.Panel>
 
@@ -1654,6 +1684,12 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         </Box>
       </VStack>
 
+      <NewNoteModal
+        isOpen={isNewNoteModalOpen}
+        onClose={() => setIsNewNoteModalOpen(false)}
+        parentPath={newNoteParentPath || project.path}
+        onNoteCreated={handleNoteCreated}
+      />
     </SelectionProvider>
   );
 }

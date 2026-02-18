@@ -175,7 +175,16 @@ const ObsidianEditor = forwardRef<ObsidianEditorRef, ObsidianEditorProps>(
             // (title + content) moves as one document.
             '& .cm-editor': { height: 'auto', minHeight: '300px' },
             '& .cm-scroller': { overflow: 'hidden' },
-          } : undefined}
+            // Hide active line and cursor when not focused (for clean initial view)
+            '& .cm-editor:not(.cm-focused) .cm-activeLine': { backgroundColor: 'transparent !important' },
+            '& .cm-editor:not(.cm-focused) .cm-selectionBackground': { backgroundColor: 'transparent !important' },
+            '& .cm-editor:not(.cm-focused) .cm-cursor': { display: 'none !important' },
+          } : {
+            // Even without headerSlot, we might want these clean styles
+            '& .cm-editor:not(.cm-focused) .cm-activeLine': { backgroundColor: 'transparent !important' },
+            '& .cm-editor:not(.cm-focused) .cm-selectionBackground': { backgroundColor: 'transparent !important' },
+            '& .cm-editor:not(.cm-focused) .cm-cursor': { display: 'none !important' },
+          }}
         >
           {headerSlot}
 

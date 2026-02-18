@@ -1,4 +1,4 @@
-# BlueKit
+# bluekit-overview
 
 **BlueKit is a project-scoped knowledge notebook for code.**
 

@@ -35,6 +35,7 @@ interface FileContextMenuProps {
     onRename: (node: FileTreeNode) => void;
     onDelete: (node: FileTreeNode) => void;
     onAddToBookmarks: (node: FileTreeNode) => void;
+    onNewNote: (folderPath: string) => void;
 }
 
 /**
@@ -54,6 +55,7 @@ export function FileContextMenu({
     onRename,
     onDelete,
     onAddToBookmarks,
+    onNewNote,
 }: FileContextMenuProps) {
     // Calculate adjusted position to keep menu within viewport
     const adjustedPosition = useMemo(() => {
@@ -81,6 +83,13 @@ export function FileContextMenu({
     }, [x, y]);
 
     if (!isOpen || !node || node.isFolder) return null;
+
+    const handleNewNote = () => {
+        // Create in same folder as file
+        const parentPath = node.path.substring(0, node.path.lastIndexOf('/'));
+        onNewNote(parentPath);
+        onClose();
+    };
 
     const handleDuplicate = () => {
         onDuplicate(node);
@@ -181,6 +190,15 @@ export function FileContextMenu({
                         </Menu.Item>
 
                         <Menu.Separator />
+
+                        <Menu.Item value="new-note" onSelect={handleNewNote}>
+                            <HStack gap={2} width="100%">
+                                <Icon>
+                                    <LuFiles />
+                                </Icon>
+                                <Text fontSize="sm">New note</Text>
+                            </HStack>
+                        </Menu.Item>
 
                         <Menu.Item value="duplicate" onSelect={handleDuplicate}>
                             <HStack gap={2} width="100%">

@@ -81,3 +81,84 @@ After generation, verify:
 - Visual source components:
   - `src/features/tasks/components/CreateTaskDialog.tsx`
   - `src/features/walkthroughs/components/CreateWalkthroughDialog.tsx`
+
+## Elegant Content Patterns
+
+To achieve the premium "Project Switcher" aesthetic, use these patterns within the modal body:
+
+**1. Subtle Search Input**
+Instead of the default bordered input, use a flat, transparent-bg input that blends into the glass.
+
+```tsx
+<Box position="relative" px={6} pb={4}>
+  <Input
+    variant="subtle"
+    placeholder="Search..."
+    pl={10}
+    size="lg"
+    fontSize="sm"
+    css={{
+      borderRadius: '12px',
+      bg: 'rgba(0,0,0,0.03)',
+      _dark: { bg: 'rgba(255,255,255,0.05)' },
+      border: 'none',
+      _focus: {
+        bg: 'transparent',
+        boxShadow: 'none', // Critical for "clean" look
+        outline: 'none',
+      },
+    }}
+  />
+  <Icon position="absolute" left={9} top="50%" transform="translateY(-50%)" color="text.secondary">
+    <LuSearch />
+  </Icon>
+</Box>
+```
+
+**2. Faded Scroll Mask**
+For scrollable lists, use a CSS mask to fade out the bottom edge softly, rather than a hard cutoff.
+
+```tsx
+<VStack
+  overflowY="auto"
+  css={{
+    maskImage: 'linear-gradient(to bottom, black, black calc(100% - 16px), transparent)',
+    // Custom thin scrollbar
+    '&::-webkit-scrollbar': { width: '4px' },
+    '&::-webkit-scrollbar-thumb': {
+      background: 'rgba(0,0,0,0.1)',
+      borderRadius: 'full',
+    },
+  }}
+>
+  {/* List items */}
+</VStack>
+```
+
+**3. Interactive List Items**
+List items should be transparent by default and reveal their background + actions on hover.
+
+```tsx
+<HStack
+  p={3}
+  borderRadius="12px"
+  cursor="pointer"
+  position="relative" // For positioning hover actions
+  _hover={{
+    bg: 'rgba(0,0,0,0.03)',
+    _dark: { bg: 'rgba(255,255,255,0.03)' },
+    '& .action-buttons': { opacity: 1, pointerEvents: 'auto' } // Reveal actions
+  }}
+>
+  <Icon boxSize={4} color="text.secondary" as={LuFolder} />
+  <VStack gap={0} align="start">
+    <Text fontSize="sm" fontWeight="medium">Item Title</Text>
+    <Text fontSize="xs" color="text.muted">Item Subtitle</Text>
+  </VStack>
+
+  {/* Revealable Actions */}
+  <HStack className="action-buttons" opacity={0} transition="opacity 0.2s">
+    <IconButton size="xs" variant="ghost" icon={<LuEdit />} />
+  </HStack>
+</HStack>
+```

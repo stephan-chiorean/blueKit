@@ -36,6 +36,7 @@ interface NotebookTreeProps {
     onNewFileCreated?: (node: FileTreeNode) => void;
     /** Called with handlers for creating files/folders (for toolbar) */
     onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
+    onNewNote: (parentPath?: string) => void;
 }
 
 // Inline edit state for Obsidian-style creation
@@ -186,8 +187,8 @@ export default function NotebookTree({
     className,
     version,
     onTreeRefresh,
-    onNewFileCreated,
-    onHandlersReady
+    onHandlersReady,
+    onNewNote,
 }: NotebookTreeProps) {
     const [nodes, setNodes] = useState<FileTreeNode[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -566,44 +567,7 @@ export default function NotebookTree({
         setFileContextMenu({ isOpen: false, x: 0, y: 0, node: null });
     };
 
-    const handleNewFile = useCallback(async (folderPath: string) => {
-        try {
-            const tempName = 'Untitled.md';
-            // Use path separator that works cross-platform (backend handles normalization)
-            const separator = folderPath.includes('\\') ? '\\' : '/';
-            const filePath = `${folderPath}${separator}${tempName}`;
 
-            // Create file with placeholder content
-            await invokeWriteFile(filePath, '# Untitled\n\n');
-
-            // Expand the parent folder to show new file
-            const parentNode = findNodeByPath(nodes, folderPath);
-            if (parentNode) {
-                setExpandedFolders(prev => new Set([...prev, parentNode.id]));
-            }
-
-            // Refresh tree to show new file
-            const tree = await invokeGetBlueKitFileTree(projectPath);
-            setNodes(tree);
-
-            // Find the new node and enter inline edit mode
-            const newNode = findNodeByPath(tree, filePath);
-            if (newNode) {
-                // For files, don't enter inline edit in tree - editor will have focus
-                // Just notify parent that a new file was created
-                if (onNewFileCreated) {
-                    onNewFileCreated(newNode);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to create file:', error);
-            toaster.create({
-                type: 'error',
-                title: 'Failed to create file',
-                description: error instanceof Error ? error.message : 'Unknown error',
-            });
-        }
-    }, [nodes, projectPath, onNewFileCreated]);
 
     const handleNewFolder = useCallback(async (folderPath: string) => {
         try {
@@ -649,11 +613,11 @@ export default function NotebookTree({
     useEffect(() => {
         if (onHandlersReady) {
             onHandlersReady({
-                onNewFile: handleNewFile,
+                onNewFile: (path) => onNewNote(path),
                 onNewFolder: handleNewFolder
             });
         }
-    }, [onHandlersReady, handleNewFile, handleNewFolder]);
+    }, [onHandlersReady, onNewNote, handleNewFolder]);
 
     // Handler for inline edit value changes
     const handleInlineEditChange = (value: string) => {
@@ -1063,7 +1027,7 @@ export default function NotebookTree({
                 node={directoryContextMenu.node}
                 projectPath={projectPath}
                 onClose={closeDirectoryContextMenu}
-                onNewFile={handleNewFile}
+                onNewFile={onNewNote}
                 onNewFolder={handleNewFolder}
                 onCopyPath={handleCopyPath}
                 onCopyRelativePath={(nodePath: string) => {
@@ -1088,6 +1052,7 @@ export default function NotebookTree({
                 onRename={handleRename}
                 onDelete={handleDelete}
                 onAddToBookmarks={handleAddToBookmarks}
+                onNewNote={onNewNote}
             />
 
             {/* Rename Popover */}

@@ -59,6 +59,7 @@ interface SidebarContentProps {
     projectName?: string;
     onHandlersReady?: (handlers: { onNewFile: (folderPath: string) => void; onNewFolder: (folderPath: string) => void }) => void;
     isVault?: boolean;
+    onNewNote: (parentPath?: string) => void;
 }
 
 export default function SidebarContent({
@@ -74,7 +75,8 @@ export default function SidebarContent({
     onNewFileCreated,
     projectName,
     onHandlersReady,
-    isVault = false
+    isVault = false,
+    onNewNote
 }: SidebarContentProps) {
     const { flags } = useFeatureFlags();
     const { colorMode } = useColorMode();
@@ -524,6 +526,7 @@ export default function SidebarContent({
                                 setTreeHandlers(handlers);
                                 if (onHandlersReady) onHandlersReady(handlers);
                             }, [onHandlersReady])}
+                            onNewNote={onNewNote}
                         />
                     </Box>
                 </SidebarSection>

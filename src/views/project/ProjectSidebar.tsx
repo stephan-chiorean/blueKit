@@ -62,6 +62,7 @@ interface ProjectSidebarProps {
   isVault?: boolean;
   /** Toggle sidebar collapsed/expanded */
   onToggleSidebar?: () => void;
+  onNewNote: (parentPath?: string) => void;
 }
 
 export default function ProjectSidebar({
@@ -83,6 +84,7 @@ export default function ProjectSidebar({
   onHandlersReady,
   isVault = false,
   onToggleSidebar,
+  onNewNote,
 }: ProjectSidebarProps) {
   const { colorMode, toggleColorMode } = useColorMode();
   const { user } = useSupabaseAuth();
@@ -276,6 +278,7 @@ export default function ProjectSidebar({
           projectName={project.name}
           onHandlersReady={onHandlersReady}
           isVault={isVault}
+          onNewNote={onNewNote}
         />
       </Flex>
 
