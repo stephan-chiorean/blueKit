@@ -2676,6 +2676,7 @@ pub async fn rename_artifact_folder(
 /// New path of the moved artifact
 #[tauri::command]
 pub async fn move_artifact_to_folder(
+    db: State<'_, sea_orm::DatabaseConnection>,
     artifact_path: String,
     target_folder_path: String,
 ) -> Result<String, String> {
@@ -2704,7 +2705,27 @@ pub async fn move_artifact_to_folder(
     fs::rename(&source, &destination)
         .map_err(|e| format!("Failed to move file: {}", e))?;
 
-    Ok(destination.to_str().unwrap_or("").to_string())
+    let destination_str = destination.to_str().unwrap_or("").to_string();
+
+    let is_walkthrough_path = |path: &PathBuf| {
+        let normalized = path.to_string_lossy().replace('\\', "/");
+        normalized.contains("/.bluekit/walkthroughs/")
+    };
+
+    if is_walkthrough_path(&source) && is_walkthrough_path(&destination) {
+        if let Err(err) = crate::db::walkthrough_operations::update_walkthrough_file_path(
+            db.inner(),
+            &artifact_path,
+            &destination_str,
+        )
+        .await
+        {
+            let _ = fs::rename(&destination, &source);
+            return Err(format!("Failed to update walkthrough path: {}", err));
+        }
+    }
+
+    Ok(destination_str)
 }
 
 /// Moves a folder into another folder (creating nesting).
@@ -5781,4 +5802,3 @@ pub async fn stop_supabase_auth_server() -> Result<(), String> {
     }
     Ok(())
 }
-

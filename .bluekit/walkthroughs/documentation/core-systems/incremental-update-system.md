@@ -1187,6 +1187,311 @@ Is the component always rendered while content is visible?
 
 This unified architecture ensures consistent real-time updates across all file-based systems in BlueKit.
 
+## UI Component Patterns for Handling File Changes
+
+### Pattern 1: Parent-Owned State (Recommended for Lists/Collections)
+
+**Use Case**: When displaying a list of artifacts (kits, walkthroughs, plans, etc.) where the parent manages state.
+
+**Example**: `ProjectView` managing artifacts state
+
+```typescript
+// Parent component owns state and watcher
+export default function ProjectView({ project }) {
+  const [artifacts, setArtifacts] = useState<ArtifactFile[]>([]);
+  
+  // Set up watcher (once per project)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    
+    const setupWatcher = async () => {
+      await invokeWatchProjectArtifacts(project.path);
+      const eventName = `project-artifacts-changed-${sanitizePath(project.path)}`;
+      
+      unlisten = await listen<string[]>(eventName, (event) => {
+        updateArtifactsIncremental(event.payload);
+      });
+    };
+    
+    setupWatcher();
+    
+    return () => {
+      if (unlisten) unlisten();
+      invokeStopWatcher(eventName);
+    };
+  }, [project.path]);
+  
+  // Children consume artifacts from parent state
+  return <ArtifactList artifacts={artifacts} />;
+}
+```
+
+**Benefits**:
+- Single watcher for entire collection
+- Efficient batch updates
+- Children stay simple (just receive props)
+
+**Drawbacks**:
+- Parent needs to know about all child state needs
+
+### Pattern 2: Self-Contained Component (Recommended for Single File Views)
+
+**Use Case**: When a component displays/edits a single file and needs to stay in sync with external changes.
+
+**Example**: `NoteViewPage` watching its own file
+
+```typescript
+export default function NoteViewPage({ resource, content: initialContent }) {
+  const [content, setContent] = useState(initialContent);
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
+  
+  // Set up file watcher for this specific file
+  useEffect(() => {
+    // Don't watch while editing (to avoid conflicts with auto-save)
+    if (viewMode === 'edit') return;
+    
+    let unlisten: (() => void) | null = null;
+    let isMounted = true;
+    
+    const setupWatcher = async () => {
+      try {
+        // Use project-level watcher (already watching all .md files)
+        const projectPath = getProjectPathFromFilePath(resource.path);
+        const eventName = `project-artifacts-changed-${sanitizePath(projectPath)}`;
+        
+        // Listen for changes to ANY file in the project
+        unlisten = await listen<string[]>(eventName, async (event) => {
+          if (!isMounted) return;
+          
+          // Check if our specific file changed
+          if (event.payload.includes(resource.path)) {
+            try {
+              const newContent = await invokeReadFile(resource.path);
+              setContent(newContent);
+            } catch (err) {
+              console.error('Failed to reload file:', err);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Failed to set up file watcher:', error);
+      }
+    };
+    
+    setupWatcher();
+    
+    return () => {
+      isMounted = false;
+      if (unlisten) unlisten();
+    };
+  }, [resource.path, viewMode]);
+  
+  // Update content when props change (navigation)
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent, resource.path]);
+  
+  return <MarkdownViewer content={content} />;
+}
+```
+
+**Benefits**:
+- Component is self-contained and portable
+- Parent doesn't need to know about component's internal state
+- Works with existing project-level watcher (no additional backend watchers needed)
+
+**Drawbacks**:
+- Each component sets up its own listener (lightweight, just a callback)
+- Needs to filter events to find relevant file
+
+### Pattern 3: Hybrid (Complex Views)
+
+**Use Case**: Components that need both collection updates AND specific file updates.
+
+**Example**: File explorer with preview pane
+
+```typescript
+export default function FileExplorer({ project }) {
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
+  
+  // Watcher for file list (parent owns)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    
+    const setupWatcher = async () => {
+      await invokeWatchProjectArtifacts(project.path);
+      const eventName = `project-artifacts-changed-${sanitizePath(project.path)}`;
+      
+      unlisten = await listen<string[]>(eventName, async (event) => {
+        // Update file list
+        updateFilesIncremental(event.payload);
+        
+        // Also update selected file if it changed
+        if (selectedFile && event.payload.includes(selectedFile.path)) {
+          const newContent = await invokeReadFile(selectedFile.path);
+          setSelectedFile(prev => prev ? { ...prev, content: newContent } : null);
+        }
+      });
+    };
+    
+    setupWatcher();
+    
+    return () => {
+      if (unlisten) unlisten();
+      invokeStopWatcher(eventName);
+    };
+  }, [project.path, selectedFile]);
+  
+  return (
+    <>
+      <FileList files={files} onSelect={setSelectedFile} />
+      {selectedFile && <FilePreview content={selectedFile.content} />}
+    </>
+  );
+}
+```
+
+**Benefits**:
+- Single watcher handles multiple UI needs
+- Efficient for complex views
+
+**Drawbacks**:
+- More complex logic in parent
+- Tight coupling between list and detail views
+
+### Key Decisions: Which Pattern to Use?
+
+```
+Is the component displaying a single file/resource?
+├─ YES → Use Pattern 2 (Self-Contained Component)
+│         - Component sets up listener to project-level watcher
+│         - Filters events for its specific file
+│         - Reloads content when file changes
+│         Example: NoteViewPage, DiagramViewer
+│
+└─ NO → Is it managing a collection/list?
+    ├─ YES → Use Pattern 1 (Parent-Owned State)
+    │         - Parent sets up watcher for directory
+    │         - Parent updates collection state
+    │         - Children receive artifacts as props
+    │         Example: ProjectView, WalkthroughsSection
+    │
+    └─ Is it showing both list + detail?
+        └─ YES → Use Pattern 3 (Hybrid)
+                  - Parent sets up single watcher
+                  - Handles both collection AND detail updates
+                  Example: FileExplorer with preview
+
+```
+
+### Important: Edit Mode Considerations
+
+**Rule**: Never reload file content while user is editing to avoid data loss.
+
+```typescript
+useEffect(() => {
+  // ✅ CORRECT: Skip watching while in edit mode
+  if (viewMode === 'edit') return;
+  
+  const unlisten = await listen(eventName, (event) => {
+    if (event.payload.includes(filePath)) {
+      reloadContent();
+    }
+  });
+  
+  return () => unlisten();
+}, [viewMode, filePath]); // Watch viewMode dependency
+```
+
+**Why?**
+- User may have unsaved changes
+- External changes during editing create conflicts
+- Auto-save handles persisting user changes
+
+**Alternative**: Show a notification instead
+
+```typescript
+const [hasExternalChanges, setHasExternalChanges] = useState(false);
+
+useEffect(() => {
+  const unlisten = await listen(eventName, (event) => {
+    if (event.payload.includes(filePath)) {
+      if (viewMode === 'edit') {
+        // Show notification instead of reloading
+        setHasExternalChanges(true);
+      } else {
+        reloadContent();
+      }
+    }
+  });
+  
+  return () => unlisten();
+}, [viewMode, filePath]);
+
+// UI shows banner: "File changed externally. [Reload] [Dismiss]"
+```
+
+### Performance Considerations
+
+**Listener Cleanup**: Always unlisten when component unmounts
+
+```typescript
+// ✅ CORRECT
+useEffect(() => {
+  const unlisten = await listen(...);
+  return () => unlisten(); // Cleanup prevents memory leaks
+}, [deps]);
+
+// ❌ WRONG - memory leak
+useEffect(() => {
+  listen(...); // No cleanup!
+}, [deps]);
+```
+
+**Filtering Events**: Project-level watcher emits ALL file changes
+
+```typescript
+// ✅ EFFICIENT: Check specific file
+unlisten = await listen<string[]>(eventName, (event) => {
+  if (event.payload.includes(myFilePath)) {
+    reloadFile();
+  }
+});
+
+// ❌ INEFFICIENT: Reload on every change
+unlisten = await listen<string[]>(eventName, (event) => {
+  reloadFile(); // Reloads even when other files change!
+});
+```
+
+**Debouncing**: Already handled by backend (300ms window)
+
+- No need for additional frontend debouncing in most cases
+- Backend batches rapid changes automatically
+
+### Testing File Watching in Components
+
+**Manual Testing Steps**:
+
+1. Open component that displays a file
+2. Edit the file in external editor (VS Code, vim, etc.)
+3. Save external changes
+4. Verify UI updates within ~300ms (debounce window)
+5. Switch to edit mode in component
+6. Edit file externally again
+7. Verify UI does NOT update (or shows notification)
+8. Switch back to preview mode
+9. Verify UI now updates
+
+**Edge Cases to Test**:
+
+- Rapid external changes (multiple saves within 1 second)
+- File deleted while viewing
+- File moved while viewing
+- Very large files (>1MB)
+- Binary file changes (should be filtered out)
+
 ## Summary
 
 The incremental update system is a sophisticated architecture that:

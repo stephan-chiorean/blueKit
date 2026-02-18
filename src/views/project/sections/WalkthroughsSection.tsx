@@ -101,6 +101,10 @@ function WalkthroughsSection({
   const [hasDragThresholdMet, setHasDragThresholdMet] = useState(false);
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
+  // Auto-scroll state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollIntervalRef = useRef<number | null>(null);
+
   // Color mode for drag styling
   const { colorMode } = useColorMode();
 
@@ -402,6 +406,51 @@ function WalkthroughsSection({
     }
   }, [folders, onReload, onOptimisticMove]);
 
+  // Auto-scroll logic
+  const startAutoScroll = useCallback((clientY: number) => {
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    const scrollZone = 80; // pixels from edge to trigger scroll
+    const scrollSpeed = 15; // pixels per interval
+
+    // Clear existing interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
+    // Check if near top edge
+    const distanceFromTop = clientY - rect.top;
+    if (distanceFromTop < scrollZone && distanceFromTop > 0) {
+      autoScrollIntervalRef.current = window.setInterval(() => {
+        if (container.scrollTop > 0) {
+          container.scrollTop -= scrollSpeed;
+        }
+      }, 16); // ~60fps
+      return;
+    }
+
+    // Check if near bottom edge
+    const distanceFromBottom = rect.bottom - clientY;
+    if (distanceFromBottom < scrollZone && distanceFromBottom > 0) {
+      autoScrollIntervalRef.current = window.setInterval(() => {
+        if (container.scrollTop < container.scrollHeight - container.clientHeight) {
+          container.scrollTop += scrollSpeed;
+        }
+      }, 16); // ~60fps
+      return;
+    }
+  }, []);
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+  }, []);
+
   // Document-level mouse event handlers for drag
   useEffect(() => {
     if (!dragState) return;
@@ -419,6 +468,9 @@ function WalkthroughsSection({
         return;
       }
 
+      // Handle auto-scrolling
+      startAutoScroll(e.clientY);
+
       // Find drop target at cursor position
       const dropTarget = findDropTargetAtPosition(e.clientX, e.clientY);
       const isValid = dropTarget !== undefined;
@@ -432,6 +484,9 @@ function WalkthroughsSection({
 
     const handleMouseUp = async () => {
       const wasDragging = hasDragThresholdMet;
+
+      // Stop auto-scrolling
+      stopAutoScroll();
 
       if (hasDragThresholdMet && dragState.isValidDrop && dragState.dropTargetFolderId !== undefined) {
         await performMove(dragState.draggedWalkthrough, dragState.dropTargetFolderId);
@@ -448,6 +503,7 @@ function WalkthroughsSection({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        stopAutoScroll();
         clearDragState();
       }
     };
@@ -457,11 +513,12 @@ function WalkthroughsSection({
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      stopAutoScroll();
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [dragState, hasDragThresholdMet, clearDragState, performMove, findDropTargetAtPosition]);
+  }, [dragState, hasDragThresholdMet, clearDragState, performMove, findDropTargetAtPosition, startAutoScroll, stopAutoScroll]);
 
   // Get root-level walkthroughs (not in folders) - must be before early returns
   const rootWalkthroughs = useMemo(() => {
@@ -629,6 +686,7 @@ function WalkthroughsSection({
 
         {/* Scrollable Content Area */}
         <Box
+          ref={scrollContainerRef}
           flex={1}
           overflowY="auto"
           p={6}

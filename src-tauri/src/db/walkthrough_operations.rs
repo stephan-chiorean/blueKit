@@ -444,6 +444,34 @@ pub async fn get_walkthrough_details(
     })
 }
 
+/// Update walkthrough file path after a file move
+pub async fn update_walkthrough_file_path(
+    db: &DatabaseConnection,
+    old_file_path: &str,
+    new_file_path: &str,
+) -> Result<bool, DbErr> {
+    if old_file_path == new_file_path {
+        return Ok(false);
+    }
+
+    let existing = walkthrough::Entity::find()
+        .filter(walkthrough::Column::FilePath.eq(old_file_path))
+        .one(db)
+        .await?;
+
+    let Some(model) = existing else {
+        return Ok(false);
+    };
+
+    let now = Utc::now().timestamp();
+    let mut walkthrough_active: walkthrough::ActiveModel = model.into();
+    walkthrough_active.file_path = Set(new_file_path.to_string());
+    walkthrough_active.updated_at = Set(now);
+    walkthrough_active.update(db).await?;
+
+    Ok(true)
+}
+
 // Helper to calculate walkthrough progress from takeaways
 async fn calculate_walkthrough_progress(
     db: &DatabaseConnection,

@@ -1,6 +1,5 @@
 import { Box, HStack, Icon, Button, Text } from '@chakra-ui/react';
-import { FaEye, FaCode, FaEdit } from 'react-icons/fa';
-import { LuArrowLeft, LuArrowRight, LuEllipsisVertical } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight } from 'react-icons/lu';
 import { ResourceFile } from '@/types/resource';
 import path from 'path';
 
@@ -9,15 +8,18 @@ interface NoteViewHeaderProps {
   viewMode: 'preview' | 'source' | 'edit';
   onViewModeChange: (mode: 'preview' | 'source' | 'edit') => void;
   editable?: boolean;
-  /** Navigate to the previous file in the directory */
   onNavigatePrev?: () => void;
-  /** Navigate to the next file in the directory */
   onNavigateNext?: () => void;
-  /** Whether navigation to previous is available */
   canNavigatePrev?: boolean;
-  /** Whether navigation to next is available */
   canNavigateNext?: boolean;
 }
+
+const MODE_CYCLE: Array<'preview' | 'edit'> = ['preview', 'edit'];
+const MODE_LABEL: Record<string, string> = {
+  preview: 'Reader',
+  edit: 'Editor',
+  source: 'Source',
+};
 
 export function NoteViewHeader({
   resource,
@@ -29,93 +31,62 @@ export function NoteViewHeader({
   canNavigatePrev = false,
   canNavigateNext = false,
 }: NoteViewHeaderProps) {
-  // Parse breadcrumbs relative to .bluekit
   const breadcrumbs = (() => {
     const pathStr = resource.path;
-
-    // Find .bluekit in the path
     const bluekitIndex = pathStr.indexOf('.bluekit/');
     if (bluekitIndex === -1) {
-      // If no .bluekit found, fallback to just the filename
-      const basename = path.basename(pathStr);
-      return [basename.replace(/\.(md|mmd)$/, '') || 'Untitled'];
+      return [path.basename(pathStr).replace(/\.(md|mmd)$/, '') || 'Untitled'];
     }
-
-    // Extract path after .bluekit/
     const relativePath = pathStr.substring(bluekitIndex + '.bluekit/'.length);
-
-    // Remove file extension
-    const pathWithoutExt = relativePath.replace(/\.(md|mmd)$/, '');
-
-    // Split by path separator and filter out empty parts
-    const parts = pathWithoutExt.split(/[/\\]/).filter(part => part.length > 0);
-
+    const parts = relativePath.replace(/\.(md|mmd)$/, '').split(/[/\\]/).filter(Boolean);
     return parts.length > 0 ? parts : ['Untitled'];
   })();
 
+  const handleModeToggle = () => {
+    if (!editable) return;
+    const currentIdx = MODE_CYCLE.indexOf(viewMode as 'preview' | 'edit');
+    const nextMode = currentIdx === -1
+      ? 'preview'
+      : MODE_CYCLE[(currentIdx + 1) % MODE_CYCLE.length];
+    onViewModeChange(nextMode);
+  };
+
+  const modeLabel = MODE_LABEL[viewMode] ?? 'Reader';
+
   return (
-    <Box
-      position="sticky"
-      top={0}
-      zIndex={100}
-      bg="transparent"
-      px={4}
-      py={2}
-    >
+    <Box position="sticky" top={0} zIndex={100} bg="transparent" px={4} py={2}>
       <HStack justify="space-between" align="center" gap={4}>
+
         {/* Left: Navigation arrows */}
         <HStack gap={1}>
           <Button
-            variant="ghost"
-            size="sm"
-            px={2}
-            bg="transparent"
+            variant="ghost" size="sm" px={2} bg="transparent"
             disabled={!canNavigatePrev}
-            opacity={canNavigatePrev ? 1 : 0.5}
+            opacity={canNavigatePrev ? 1 : 0.35}
             cursor={canNavigatePrev ? 'pointer' : 'not-allowed'}
             onClick={onNavigatePrev}
             _hover={{}}
           >
-            <Icon boxSize={4}>
-              <LuArrowLeft />
-            </Icon>
+            <Icon boxSize={4}><LuArrowLeft /></Icon>
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
-            px={2}
-            bg="transparent"
+            variant="ghost" size="sm" px={2} bg="transparent"
             disabled={!canNavigateNext}
-            opacity={canNavigateNext ? 1 : 0.5}
+            opacity={canNavigateNext ? 1 : 0.35}
             cursor={canNavigateNext ? 'pointer' : 'not-allowed'}
             onClick={onNavigateNext}
             _hover={{}}
           >
-            <Icon boxSize={4}>
-              <LuArrowRight />
-            </Icon>
+            <Icon boxSize={4}><LuArrowRight /></Icon>
           </Button>
         </HStack>
 
         {/* Center: Breadcrumbs */}
-        <HStack
-          gap={2}
-          flex={1}
-          justify="center"
-          minW={0}
-          css={{
-            '& > *': {
-              fontSize: 'sm',
-              color: 'text.secondary',
-            },
-          }}
-        >
+        <HStack gap={2} flex={1} justify="center" minW={0}>
           {breadcrumbs.map((part, index) => (
             <HStack key={index} gap={2} align="center">
               {index > 0 && (
-                <Text fontSize="sm" color="text.tertiary">
-                  {'>'}
-                </Text>
+                <Text fontSize="sm" color="text.tertiary">{'>'}</Text>
               )}
               <Text
                 fontSize="sm"
@@ -129,81 +100,24 @@ export function NoteViewHeader({
           ))}
         </HStack>
 
-        {/* Right: View mode icons + menu */}
-        <HStack gap={1}>
-          {/* Preview icon */}
-          <Button
-            variant="ghost"
-            size="sm"
-            px={2}
-            onClick={() => onViewModeChange('preview')}
-            colorScheme={viewMode === 'preview' ? 'primary' : undefined}
-            bg={viewMode === 'preview' ? 'primary.50' : 'transparent'}
-            _hover={{}}
-            _dark={{
-              bg: viewMode === 'preview' ? 'primary.900/30' : 'transparent',
-            }}
-          >
-            <Icon boxSize={4}>
-              <FaEye />
-            </Icon>
-          </Button>
+        {/* Right: Mode toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          px={3}
+          bg="transparent"
+          onClick={editable ? handleModeToggle : undefined}
+          cursor={editable ? 'pointer' : 'default'}
+          _hover={editable ? { bg: 'whiteAlpha.100' } : {}}
+          _dark={{ _hover: editable ? { bg: 'whiteAlpha.50' } : {} }}
+        >
+          <HStack gap={1}>
+            <Text fontSize="xs" color="text.tertiary" fontWeight="normal">Mode:</Text>
+            <Text fontSize="xs" color="text.secondary" fontWeight="medium">{modeLabel}</Text>
+          </HStack>
+        </Button>
 
-          {/* Source icon */}
-          <Button
-            variant="ghost"
-            size="sm"
-            px={2}
-            onClick={() => onViewModeChange('source')}
-            colorScheme={viewMode === 'source' ? 'primary' : undefined}
-            bg={viewMode === 'source' ? 'primary.50' : 'transparent'}
-            _hover={{}}
-            _dark={{
-              bg: viewMode === 'source' ? 'primary.900/30' : 'transparent',
-            }}
-          >
-            <Icon boxSize={4}>
-              <FaCode />
-            </Icon>
-          </Button>
-
-          {/* Edit icon (only if editable) */}
-          {editable && (
-            <Button
-              variant="ghost"
-              size="sm"
-              px={2}
-              onClick={() => onViewModeChange('edit')}
-              colorScheme={viewMode === 'edit' ? 'primary' : undefined}
-              bg={viewMode === 'edit' ? 'primary.50' : 'transparent'}
-              _hover={{}}
-              _dark={{
-                bg: viewMode === 'edit' ? 'primary.900/30' : 'transparent',
-              }}
-            >
-              <Icon boxSize={4}>
-                <FaEdit />
-              </Icon>
-            </Button>
-          )}
-
-          {/* Menu icon */}
-          <Button
-            variant="ghost"
-            size="sm"
-            px={2}
-            disabled
-            opacity={0.5}
-            cursor="not-allowed"
-            _hover={{}}
-          >
-            <Icon boxSize={4}>
-              <LuEllipsisVertical />
-            </Icon>
-          </Button>
-        </HStack>
       </HStack>
     </Box>
   );
 }
-

@@ -1440,10 +1440,7 @@ function TreeNode({
 
     // Determine cursor style
     const getCursor = () => {
-        if (isEditing) return 'default';
-        if (isBeingDragged) return 'grabbing';
-        if (node.isEssential) return 'pointer';
-        return 'grab';
+        return 'default';
     };
 
     return (
@@ -1529,7 +1526,7 @@ function TreeNode({
                         }}
                     />
                 ) : (
-                    <Text fontSize="sm" truncate flex={1}>
+                    <Text fontSize={node.isFolder ? "sm" : "xs"} fontWeight={node.isFolder ? "semibold" : "normal"} truncate flex={1}>
                         {node.isFolder ? node.name : getDisplayName(node.name)}
                     </Text>
                 )}
