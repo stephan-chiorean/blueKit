@@ -33,6 +33,7 @@ class LivePreviewPlugin implements PluginValue {
       update.docChanged ||
       update.selectionSet ||
       update.viewportChanged ||
+      update.focusChanged ||
       // Rebuild when the async parser advances the syntax tree
       syntaxTree(update.view.state) !== syntaxTree(update.startState)
     ) {

@@ -5,8 +5,8 @@ import { FileTreeNode } from '@/ipc/fileTree';
 import { invokeOpenResourceInWindow } from '@/ipc/files';
 import { toaster } from '@/shared/components/ui/toaster';
 
-// Estimated height of the file context menu (6 items + 3 separators)
-const ESTIMATED_MENU_HEIGHT = 260;
+// Estimated height of the file context menu (8 items + 4 separators)
+const ESTIMATED_MENU_HEIGHT = 360;
 // Margin from viewport edge
 const VIEWPORT_MARGIN = 16;
 

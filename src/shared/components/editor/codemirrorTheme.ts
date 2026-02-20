@@ -9,6 +9,7 @@ import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { heading1Color } from '@/theme';
 
 /**
  * Creates a glassmorphism-compatible CodeMirror theme.
@@ -128,7 +129,7 @@ export function createMarkdownHighlighting(colorMode: 'light' | 'dark'): Extensi
       tag: tags.heading1,
       fontSize: '1.875rem',
       fontWeight: '700',
-      color: isLight ? '#4287f5' : '#60a5fa',
+      color: isLight ? heading1Color.light : heading1Color.dark,
       lineHeight: '2.25',
     },
     {

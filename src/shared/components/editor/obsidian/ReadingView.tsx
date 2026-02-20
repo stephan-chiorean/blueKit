@@ -14,6 +14,7 @@ import { useRef, useState, useEffect } from 'react';
 import mermaid from 'mermaid';
 import { Box, Alert } from '@chakra-ui/react';
 import ShikiCodeBlock from '@/features/workstation/components/ShikiCodeBlock';
+import { heading1Color } from '@/theme';
 
 interface ReadingViewProps {
   content: string;
@@ -93,7 +94,7 @@ export default function ReadingView({ content, colorMode }: ReadingViewProps) {
           components={{
             // ── Headings ──────────────────────────────────────────────
             h1: ({ children }) => (
-              <Box as="h1" css={{ fontSize: '1.875rem', fontWeight: 700, lineHeight: 2.25, textShadow: shadow, marginBottom: '0.5rem' }}>
+              <Box as="h1" css={{ fontSize: '1.875rem', fontWeight: 700, lineHeight: 2.25, color: isLight ? heading1Color.light : heading1Color.dark, textShadow: shadow, marginBottom: '0.5rem' }}>
                 {children}
               </Box>
             ),

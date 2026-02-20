@@ -6,6 +6,7 @@
 
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
+import { heading1Color } from '@/theme';
 
 /**
  * Creates the Live Preview theme extension.
@@ -118,6 +119,7 @@ export function createLivePreviewTheme(colorMode: 'light' | 'dark'): Extension {
     '.cm-lp-heading-1': {
       fontSize: '1.875rem',
       lineHeight: '2.25',
+      color: isLight ? heading1Color.light : heading1Color.dark,
     },
     '.cm-lp-heading-2': {
       fontSize: '1.875rem',

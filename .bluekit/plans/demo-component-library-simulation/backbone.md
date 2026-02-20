@@ -1,4 +1,3 @@
-# Backbone Strategy
 
 ## What is a Backbone?
 

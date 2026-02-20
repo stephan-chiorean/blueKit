@@ -206,11 +206,12 @@ class HorizontalRuleWidget extends WidgetType {
 export function buildDecorations(view: EditorView, readingMode = false): DecorationSet {
   const { state } = view;
   const selection = state.selection;
+  const hasFocus = view.hasFocus;
   const entries: DecorationEntry[] = [];
 
   syntaxTree(state).iterate({
     enter: (node: SyntaxNodeRef) => {
-      const cursorInside = readingMode ? false : cursorInRange(selection, node.from, node.to);
+      const cursorInside = (readingMode || !hasFocus) ? false : cursorInRange(selection, node.from, node.to);
 
       switch (node.name) {
         // Strong emphasis: **bold** or __bold__

@@ -2,14 +2,19 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Portal } from '@chakra-ui/react';
 import { listen } from '@tauri-apps/api/event';
 import { ResourceFile } from '@/types/resource';
+import { KitFrontMatter } from '@/ipc';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
+import { heading1Color } from '@/theme';
 import { NoteViewHeader } from '@/features/workstation/components/NoteViewHeader';
+import { FrontMatterProperties } from '@/features/workstation/components/FrontMatterProperties';
 import SearchInMarkdown from '@/features/workstation/components/SearchInMarkdown';
 import { useWorkstation } from '@/app/WorkstationContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { toaster } from '@/shared/components/ui/toaster';
 import { invokeGetFolderMarkdownFiles, deleteResources } from '@/ipc/artifacts';
 import { invokeReadFile, invokeWriteFile } from '@/ipc/files';
+import { parseFrontMatter } from '@/shared/utils/parseFrontMatter';
+import { stripFrontMatter, serializeMarkdown } from '@/shared/utils/markdownSerializer';
 import ObsidianEditor, { ObsidianEditorRef, EditorMode } from '@/shared/components/editor/obsidian';
 import path from 'path';
 
@@ -37,18 +42,6 @@ function toEditorMode(viewMode: ViewMode): EditorMode {
   return 'reading';
 }
 
-function extractTitle(markdown: string): string {
-  const match = markdown.match(/^# (.+)/m);
-  return match ? match[1].trim() : '';
-}
-
-function extractBody(markdown: string): string {
-  const firstLine = markdown.split('\n')[0];
-  if (firstLine.startsWith('# ')) {
-    return markdown.slice(firstLine.length + 1).replace(/^\n/, '');
-  }
-  return markdown;
-}
 
 export default function NoteViewPage({
   resource,
@@ -63,28 +56,46 @@ export default function NoteViewPage({
   const isLight = colorMode === 'light';
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [title, setTitle] = useState(() => resource.name.replace(/\.md$/i, ''));
-  const [body, setBody] = useState(() => extractBody(initialContent));
+  const [frontMatter, setFrontMatter] = useState<KitFrontMatter | null>(
+    () => parseFrontMatter(initialContent) ?? null,
+  );
+  const [body, setBody] = useState(() => stripFrontMatter(initialContent));
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const editorRef = useRef<ObsidianEditorRef>(null);
   const isRenamingRef = useRef(false);
-
-  // Reconstruct full markdown content
-  const buildFullContent = useCallback((t: string, b: string) =>
-    t ? `# ${t}\n\n${b}` : b,
-    []);
 
   // State for sibling navigation
   const [siblingFiles, setSiblingFiles] = useState<ResourceFile[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
 
+  // Ref to always have latest front matter for serialization
+  const frontMatterRef = useRef(frontMatter);
+  frontMatterRef.current = frontMatter;
+
+  // Helper: combine front matter + body into full file content
+  const buildFullContent = useCallback(
+    (bodyContent: string) => serializeMarkdown(frontMatterRef.current, bodyContent),
+    [],
+  );
+
   // Auto-save — active in edit and source modes
-  const { save, saveNow } = useAutoSave(resource.path, {
+  const { save: rawSave, saveNow: rawSaveNow } = useAutoSave(resource.path, {
     delay: 1500,
     enabled: editable && viewMode !== 'preview',
     onSaveError: (error) => {
       toaster.create({ type: 'error', title: 'Save failed', description: error.message });
     },
   });
+
+  // Wrap save functions to serialize front matter + body
+  const save = useCallback(
+    (bodyContent: string) => rawSave(buildFullContent(bodyContent)),
+    [rawSave, buildFullContent],
+  );
+  const saveNow = useCallback(
+    (bodyContent: string) => rawSaveNow(buildFullContent(bodyContent)),
+    [rawSaveNow, buildFullContent],
+  );
 
   // Track previous resource path to detect file change
   const prevResourcePathRef = useRef(resource.path);
@@ -95,11 +106,10 @@ export default function NoteViewPage({
     prevResourcePathRef.current = resource.path;
 
     if (isNewFile || viewMode !== 'edit') {
-      // Use filename (without extension) as the title
-      // We keep extractBody to strip the H1 from content if present, preventing duplication
       const fileName = resource.name.replace(/\.md$/i, '');
       setTitle(fileName);
-      setBody(extractBody(initialContent));
+      setFrontMatter(parseFrontMatter(initialContent) ?? null);
+      setBody(stripFrontMatter(initialContent));
       if (isNewFile) setViewMode(initialViewMode);
     }
   }, [initialContent, resource.path, resource.name, viewMode, initialViewMode]);
@@ -145,8 +155,8 @@ export default function NoteViewPage({
           if (event.payload.includes(resource.path)) {
             try {
               const newContent = await invokeReadFile(resource.path);
-              setTitle(extractTitle(newContent));
-              setBody(extractBody(newContent));
+              setFrontMatter(parseFrontMatter(newContent) ?? null);
+              setBody(stripFrontMatter(newContent));
             } catch { /* file may have been deleted */ }
           }
         });
@@ -183,25 +193,29 @@ export default function NoteViewPage({
   // Body changes from the editor
   const handleBodyChange = useCallback((newBody: string) => {
     setBody(newBody);
-    const full = buildFullContent(title, newBody);
-    onContentChange?.(full);
-    if (viewMode !== 'preview') save(full);
-  }, [title, buildFullContent, onContentChange, save, viewMode]);
+    onContentChange?.(buildFullContent(newBody));
+    if (viewMode !== 'preview') save(newBody);
+  }, [onContentChange, save, viewMode, buildFullContent]);
 
-  // Title changes from the header input
+  // Title changes from the header input — display only, file rename happens on commit
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);
-    const full = buildFullContent(newTitle, body);
-    onContentChange?.(full);
-    if (viewMode !== 'preview') save(full);
-  }, [body, buildFullContent, onContentChange, save, viewMode]);
+  }, []);
 
-  // Manual save (Cmd+S)
+  // Manual save (Cmd+S) — savedBody is the editor body (no front matter)
   const handleSave = useCallback(async (savedBody: string) => {
     try {
-      await saveNow(buildFullContent(title, savedBody));
+      await saveNow(savedBody);
     } catch { /* handled in hook */ }
-  }, [saveNow, title, buildFullContent]);
+  }, [saveNow]);
+
+  // Front matter property changes
+  const handleFrontMatterChange = useCallback((updated: KitFrontMatter) => {
+    setFrontMatter(updated);
+    const fullContent = serializeMarkdown(updated, body);
+    onContentChange?.(fullContent);
+    rawSave(fullContent);
+  }, [body, onContentChange, rawSave]);
 
   // Rename file when user commits the title (Enter or blur)
   const handleTitleCommit = useCallback(async (newTitle: string) => {
@@ -215,12 +229,11 @@ export default function NoteViewPage({
 
     isRenamingRef.current = true;
     try {
-      const updatedBody = body;
-      const updatedContent = `# ${sanitizedTitle}\n\n${updatedBody}`;
-      await invokeWriteFile(newPath, updatedContent);
+      const fullContent = buildFullContent(body);
+      await invokeWriteFile(newPath, fullContent);
       await deleteResources([currentPath]);
       setTitle(sanitizedTitle);
-      onContentChange?.(updatedContent);
+      onContentChange?.(fullContent);
       onFileRenamed?.(currentPath, newPath);
     } catch (error) {
       toaster.create({
@@ -231,7 +244,7 @@ export default function NoteViewPage({
     } finally {
       isRenamingRef.current = false;
     }
-  }, [resource.path, body, onContentChange, onFileRenamed]);
+  }, [resource.path, body, buildFullContent, onContentChange, onFileRenamed]);
 
   // Keyboard shortcut for search (Cmd+F / Ctrl+F)
   useEffect(() => {
@@ -249,33 +262,42 @@ export default function NoteViewPage({
 
   // Title input rendered as headerSlot — consistent across all modes
   const titleSlot = (
-    <Box w="100%" css={{ padding: '20px 40px 4px 40px' }}>
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => handleTitleChange(e.target.value)}
-        onBlur={(e) => handleTitleCommit(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
-        }}
-        placeholder="Untitled"
-        style={{
-          display: 'block',
-          width: '100%',
-          padding: '0',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-          fontSize: '1.875rem',
-          fontWeight: 700,
-          lineHeight: 1.3,
-          color: isLight ? '#1a1a2e' : '#e4e4e7',
-          textShadow: isLight
-            ? '0 1px 2px rgba(0,0,0,0.1)'
-            : '0 1px 2px rgba(0,0,0,0.5)',
-          background: 'transparent',
-          border: 'none',
-          outline: 'none',
-        }}
-      />
+    <Box w="100%">
+      <Box css={{ padding: '20px 40px 4px 40px' }}>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => handleTitleChange(e.target.value)}
+          onBlur={(e) => handleTitleCommit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+          }}
+          placeholder="Untitled"
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '0',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+            fontSize: '1.875rem',
+            fontWeight: 700,
+            lineHeight: 1.3,
+            color: isLight ? heading1Color.light : heading1Color.dark,
+            textShadow: isLight
+              ? '0 1px 2px rgba(0,0,0,0.1)'
+              : '0 1px 2px rgba(0,0,0,0.5)',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+          }}
+        />
+      </Box>
+      {frontMatter && Object.keys(frontMatter).length > 0 && (
+        <FrontMatterProperties
+          frontMatter={frontMatter}
+          onChange={handleFrontMatterChange}
+          colorMode={colorMode}
+        />
+      )}
     </Box>
   );
 

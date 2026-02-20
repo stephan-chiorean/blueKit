@@ -18,6 +18,9 @@ const themeColors = {
   },
 };
 
+// Heading 1 / title colors — single source of truth
+export const heading1Color = { light: '#1A33A3', dark: '#4287f5' };
+
 export const system = createSystem(defaultConfig, {
   theme: {
     tokens: {

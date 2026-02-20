@@ -65,8 +65,8 @@ export default function NewNoteModal({
             const cleanParentPath = parentPath.endsWith(separator) ? parentPath.slice(0, -1) : parentPath;
             const fullPath = `${cleanParentPath}${separator}${finalName}`;
 
-            // Create file with initial content
-            const initialContent = `# ${sanitizedName}\n\n`;
+            // Create empty file
+            const initialContent = '';
             await invokeWriteFile(fullPath, initialContent);
 
             toaster.create({
@@ -195,7 +195,7 @@ export default function NewNoteModal({
                                             >
                                                 <VStack align="stretch" gap={2}>
                                                     <Text fontSize="sm" fontWeight="medium" color="text.primary">
-                                                        Name
+                                                        Title
                                                     </Text>
                                                     <Input
                                                         ref={inputRef}
@@ -210,8 +210,8 @@ export default function NewNoteModal({
                                                             fontSize: '16px',
                                                             fontWeight: '500',
                                                             _focus: {
-                                                                borderColor: 'primary.400',
-                                                                boxShadow: '0 0 0 3px rgba(var(--chakra-colors-primary-400-rgb), 0.2)',
+                                                                borderColor: 'transparent',
+                                                                boxShadow: 'none',
                                                             },
                                                         }}
                                                     />

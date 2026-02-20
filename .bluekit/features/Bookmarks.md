@@ -1,4 +1,3 @@
-# Bookmarks
 
 # Obsidian-style Bookmarks Flow (grounded in the real `bookmarks.json` shape)
 

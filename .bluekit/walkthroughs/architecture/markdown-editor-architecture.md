@@ -12,6 +12,7 @@ description: How the CodeMirror-based markdown editor integrates with NoteViewPa
 complexity: comprehensive
 format: architecture
 ---
+
 # Markdown Editor Architecture
 
 This walkthrough explains how the markdown editing system works in BlueKit, covering the component hierarchy, data flow, and key implementation details.

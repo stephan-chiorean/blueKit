@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { heading1Color } from '@/theme';
 import {
   Box,
   Heading,
@@ -13,7 +14,7 @@ import {
   Icon,
   Badge,
 } from '@chakra-ui/react';
-import { ResourceFile, ResourceType, getResourceDisplayName } from '@/types/resource';
+import { ResourceFile, ResourceType } from '@/types/resource';
 import { LiquidViewModeSwitcher } from '@/features/kits/components/LiquidViewModeSwitcher';
 import { FaEye, FaCode } from 'react-icons/fa';
 import { LuChevronDown, LuChevronUp, LuLink } from 'react-icons/lu';
@@ -38,7 +39,7 @@ export function ResourceMarkdownHeader({
   viewMode,
   onViewModeChange,
 }: ResourceMarkdownHeaderProps) {
-  const displayName = getResourceDisplayName(resource);
+  const displayName = resource.name.replace(/\.(md|markdown)$/i, '');
   const [linksExpanded, setLinksExpanded] = useState(false);
   const { setSelectedResource } = useResource();
   const { artifacts: allArtifacts } = useProjectArtifacts();
@@ -74,8 +75,10 @@ export function ResourceMarkdownHeader({
             size="xl"
             mb={2}
             css={{
+              color: heading1Color.light,
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
               _dark: {
+                color: heading1Color.dark,
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
               },
             }}

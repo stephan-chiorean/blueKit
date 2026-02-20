@@ -12,6 +12,7 @@ description: Complete architecture and data flow for the database-backed task ma
 complexity: comprehensive
 format: documentation
 ---
+
 # Task Management System Architecture v2
 
 ## Overview

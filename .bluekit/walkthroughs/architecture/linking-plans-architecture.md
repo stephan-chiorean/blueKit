@@ -12,6 +12,7 @@ description: Overview of how BlueKit links database plans to file-system resourc
 complexity: moderate
 format: architecture
 ---
+
 # Linking Plans & Consolidated Resources
 
 This walkthrough explains how BlueKit creates the illusion of a consolidated resource by merging database entities with file system operations plan documents.

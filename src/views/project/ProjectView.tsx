@@ -355,7 +355,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       const isDiagram = node.path.endsWith('.mmd') || node.path.endsWith('.mermaid');
 
       // Get display label
-      const label = node.frontMatter?.alias || node.name;
+      const label = node.name;
       const resourceType: ResourceType = isDiagram ? 'diagram' : 'file';
       openInCurrentTab(
         {
@@ -547,10 +547,10 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
           return;
         }
         const fileResource: ResourceFile = {
-          name: tabTitle,
+          name: tabPath ? path.basename(tabPath) : tabTitle,
           path: tabPath,
           resourceType: 'file',
-          frontMatter: { type: 'file', alias: tabTitle },
+          frontMatter: { type: 'file' },
         };
         setNotebookFile({
           resource: fileResource,
@@ -574,7 +574,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
       }
 
       const resource: ResourceFile & { id?: string } = {
-        name: tabTitle,
+        name: tabPath ? path.basename(tabPath) : tabTitle,
         path: tabPath || '',
         resourceType: tabType,
         frontMatter: {
@@ -798,6 +798,9 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
     try {
       const changedArtifacts = await invokeGetChangedArtifacts(project.path, changedPaths);
 
+      // Track deleted paths to close their tabs after state update
+      const deletedPaths: string[] = [];
+
       // Use transition for non-urgent update - prevents blocking UI
       startTransition(() => {
         // Merge into existing state - update existing, add new, remove deleted
@@ -858,6 +861,7 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
               if (!wasMoved) {
                 // File was actually deleted, not moved
                 updated.delete(path);
+                deletedPaths.push(path);
               }
             }
           });
@@ -872,6 +876,14 @@ export default function ProjectView({ project, onBack, onProjectSelect, isWorktr
         });
         // No loading state for incremental updates - they happen silently
       });
+
+      // Close tabs for deleted files (outside state updater)
+      for (const path of deletedPaths) {
+        const tabToClose = tabs.find(t => t.resource?.path === path);
+        if (tabToClose) {
+          closeTab(tabToClose.id);
+        }
+      }
     } catch (err) {
       // Fallback to full reload on error
       loadProjectArtifacts();
