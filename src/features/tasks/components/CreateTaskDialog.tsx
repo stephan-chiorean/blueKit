@@ -362,6 +362,7 @@ export default function CreateTaskDialog({
                           value={priority}
                           onValueChange={(e) => setPriority(e.value as TaskPriority)}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items
@@ -435,6 +436,7 @@ export default function CreateTaskDialog({
                           value={complexity || undefined}
                           onValueChange={(e) => setComplexity(e.value as TaskComplexity | '')}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items
@@ -456,6 +458,7 @@ export default function CreateTaskDialog({
                           value={type || undefined}
                           onValueChange={(e) => setType(e.value as TaskType | '')}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items

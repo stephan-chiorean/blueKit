@@ -6,7 +6,7 @@
 
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
-import { heading1Color } from '@/theme';
+import { heading1Color, headingAccentColor } from '@/theme';
 
 /**
  * Creates the Live Preview theme extension.
@@ -16,7 +16,7 @@ export function createLivePreviewTheme(colorMode: 'light' | 'dark'): Extension {
 
   const text = isLight ? '#1a1a2e' : '#e4e4e7';
   const textMuted = isLight ? '#6b7280' : '#9ca3af';
-  const accent = '#4287f5';
+  const accent = isLight ? headingAccentColor.light : headingAccentColor.dark;
   const accentHover = '#2563eb';
   const border = isLight ? '#e5e7eb' : '#374151';
   const surfaceSubtle = isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)';
@@ -47,6 +47,9 @@ export function createLivePreviewTheme(colorMode: 'light' | 'dark'): Extension {
       lineHeight: '1.75',
       padding: '0',
       caretColor: accent,
+      maxWidth: '750px',
+      marginLeft: 'auto',
+      marginRight: 'auto',
     },
 
     '.cm-line': {

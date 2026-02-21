@@ -104,6 +104,9 @@ const LivePreviewEditor = forwardRef<LivePreviewEditorRef, LivePreviewEditorProp
       // Placeholder
       placeholderExt(placeholder),
 
+      // Line wrapping
+      EditorView.lineWrapping,
+
       // Update listener for content changes
       EditorView.updateListener.of((update) => {
         if (update.docChanged && onChangeRef.current) {

@@ -173,8 +173,10 @@ const ObsidianEditor = forwardRef<ObsidianEditorRef, ObsidianEditorProps>(
             // When a headerSlot is present, hand scroll control to this container.
             // CodeMirror's internal scroller becomes non-scrolling so everything
             // (title + content) moves as one document.
-            '& .cm-editor': { height: 'auto', minHeight: '300px' },
-            '& .cm-scroller': { overflow: 'hidden' },
+            '& .cm-editor': { height: 'auto !important', minHeight: '300px' },
+            '& .cm-editor > .cm-scroller': { overflow: 'hidden !important' },
+            // Prevent editor wrapper from filling the scroll container
+            '& > div': { height: 'auto !important' },
             // Hide active line and cursor when not focused (for clean initial view)
             '& .cm-editor:not(.cm-focused) .cm-activeLine': { backgroundColor: 'transparent !important' },
             '& .cm-editor:not(.cm-focused) .cm-selectionBackground': { backgroundColor: 'transparent !important' },

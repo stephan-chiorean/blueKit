@@ -9,7 +9,7 @@ import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { heading1Color } from '@/theme';
+import { heading1Color, headingAccentColor } from '@/theme';
 
 /**
  * Creates a glassmorphism-compatible CodeMirror theme.
@@ -32,6 +32,9 @@ export function createGlassmorphismTheme(colorMode: 'light' | 'dark'): Extension
     '.cm-content': {
       caretColor: isLight ? '#4287f5' : '#60a5fa',
       padding: '16px 0',
+      maxWidth: '750px',
+      marginLeft: 'auto',
+      marginRight: 'auto',
     },
     '.cm-cursor, .cm-dropCursor': {
       borderLeftColor: isLight ? '#4287f5' : '#60a5fa',
@@ -136,7 +139,7 @@ export function createMarkdownHighlighting(colorMode: 'light' | 'dark'): Extensi
       tag: tags.heading2,
       fontSize: '1.5rem',
       fontWeight: '600',
-      color: isLight ? '#4287f5' : '#60a5fa',
+      color: isLight ? headingAccentColor.light : headingAccentColor.dark,
       lineHeight: '2',
     },
     {

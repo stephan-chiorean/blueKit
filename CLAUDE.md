@@ -212,6 +212,12 @@ Configured in `src-tauri/tauri.conf.json:14-28`:
 
 ## Development Guidelines
 
+### Colors and Theming
+
+- **Never use raw hex color strings in components.** All colors must come from `src/theme.ts` — either via Chakra semantic tokens or exported constants (e.g., `heading1Color`).
+- When adding a new color, define it in `src/theme.ts` first, then import it where needed.
+- For colors used in non-Chakra contexts (CodeMirror, inline `style={}`, etc.), use exported constants from `src/theme.ts` with `{ light, dark }` shape.
+
 ### When Adding Features
 
 1. Check `product.md` for product vision alignment
@@ -219,6 +225,7 @@ Configured in `src-tauri/tauri.conf.json:14-28`:
 3. Maintain type safety across Rust ↔ TypeScript boundary
 4. Add IPC timeouts appropriate to operation (5s for quick ops, 60s for git)
 5. Consider real-time updates (do changes need file watcher events?)
+6. All colors must reference `src/theme.ts` — no raw hex strings in components
 
 ### File Structure Conventions
 

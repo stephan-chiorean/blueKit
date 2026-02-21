@@ -18,8 +18,14 @@ const themeColors = {
   },
 };
 
-// Heading 1 / title colors — single source of truth
-export const heading1Color = { light: '#1A33A3', dark: '#4287f5' };
+// Note title color — single source of truth (dark = blue.300)
+export const titleColor = { light: '#1A33A3', dark: '#a3cfff' };
+
+// H1 heading colors — single source of truth (primary.500 both modes)
+export const heading1Color = { light: '#4287f5', dark: '#4287f5' };
+
+// Heading 2+ / accent colors — single source of truth (dark = primary.500)
+export const headingAccentColor = { light: '#4287f5', dark: '#4287f5' };
 
 export const system = createSystem(defaultConfig, {
   theme: {

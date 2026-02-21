@@ -160,6 +160,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
       // Placeholder
       placeholderExt(placeholder),
 
+      // Line wrapping
+      EditorView.lineWrapping,
+
       // Update listener for content changes and H1 blur detection
       EditorView.updateListener.of((update) => {
         if (update.docChanged && onChangeRef.current) {

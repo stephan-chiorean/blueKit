@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { heading1Color } from '@/theme';
+import { titleColor } from '@/theme';
 import {
   Box,
   Heading,
@@ -75,10 +75,10 @@ export function ResourceMarkdownHeader({
             size="xl"
             mb={2}
             css={{
-              color: heading1Color.light,
+              color: titleColor.light,
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
               _dark: {
-                color: heading1Color.dark,
+                color: titleColor.dark,
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
               },
             }}

@@ -14,7 +14,7 @@ import { useRef, useState, useEffect } from 'react';
 import mermaid from 'mermaid';
 import { Box, Alert } from '@chakra-ui/react';
 import ShikiCodeBlock from '@/features/workstation/components/ShikiCodeBlock';
-import { heading1Color } from '@/theme';
+import { heading1Color, headingAccentColor } from '@/theme';
 
 interface ReadingViewProps {
   content: string;
@@ -68,7 +68,7 @@ export default function ReadingView({ content, colorMode }: ReadingViewProps) {
   // Colour palette mirroring livePreviewTheme
   const text    = isLight ? '#1a1a2e' : '#e4e4e7';
   const muted   = isLight ? '#6b7280' : '#9ca3af';
-  const accent  = isLight ? '#4287f5' : '#60a5fa';
+  const accent  = isLight ? headingAccentColor.light : headingAccentColor.dark;
   const border  = isLight ? '#e5e7eb' : '#374151';
   const surface = isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
   const shadow  = isLight ? '0 1px 2px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.5)';
@@ -88,7 +88,7 @@ export default function ReadingView({ content, colorMode }: ReadingViewProps) {
     >
       {/* Mirrors .cm-scroller: full-width with horizontal padding */}
       <Box css={{ padding: '20px 40px 48px 40px' }}>
-        <Box>
+        <Box css={{ maxWidth: '750px', marginLeft: 'auto', marginRight: 'auto' }}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{

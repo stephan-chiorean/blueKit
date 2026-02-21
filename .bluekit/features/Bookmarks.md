@@ -1,5 +1,5 @@
 
-# Obsidian-style Bookmarks Flow (grounded in the real `bookmarks.json` shape)
+# Obsidian-style Bookmarks Flow 
 
 This doc assumes the JSON looks like:
 
@@ -9,7 +9,7 @@ This doc assumes the JSON looks like:
   - `type: "group"` with `{ ctime, title, items: BookmarkItem[] }`
 - Groups can nest (because `items` is recursive).
 
-Your goal: keep `bookmarks.json` consistent by pruning or repairing references when files move/rename/delete.
+Your goal: keep `bookmarks.json` consistent by pruning or repairing references when files move/rename/delete. This is why it's cool to try to understand what's going on when we build something like this. 
 
 ---
 

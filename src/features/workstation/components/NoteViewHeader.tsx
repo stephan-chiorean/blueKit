@@ -1,5 +1,6 @@
-import { Box, HStack, Icon, Button, Text } from '@chakra-ui/react';
-import { LuArrowLeft, LuArrowRight } from 'react-icons/lu';
+import { Box, HStack, Icon, IconButton, Button, Text } from '@chakra-ui/react';
+import { LuArrowLeft, LuArrowRight, LuPanelRightOpen, LuPanelRightClose } from 'react-icons/lu';
+import { useColorMode } from '@/shared/contexts/ColorModeContext';
 import { ResourceFile } from '@/types/resource';
 import path from 'path';
 
@@ -12,6 +13,8 @@ interface NoteViewHeaderProps {
   onNavigateNext?: () => void;
   canNavigatePrev?: boolean;
   canNavigateNext?: boolean;
+  isPanelOpen?: boolean;
+  onTogglePanel?: () => void;
 }
 
 const MODE_CYCLE: Array<'preview' | 'edit'> = ['preview', 'edit'];
@@ -30,7 +33,10 @@ export function NoteViewHeader({
   onNavigateNext,
   canNavigatePrev = false,
   canNavigateNext = false,
+  isPanelOpen = false,
+  onTogglePanel,
 }: NoteViewHeaderProps) {
+  const { colorMode } = useColorMode();
   const breadcrumbs = (() => {
     const pathStr = resource.path;
     const bluekitIndex = pathStr.indexOf('.bluekit/');
@@ -100,22 +106,44 @@ export function NoteViewHeader({
           ))}
         </HStack>
 
-        {/* Right: Mode toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          px={3}
-          bg="transparent"
-          onClick={editable ? handleModeToggle : undefined}
-          cursor={editable ? 'pointer' : 'default'}
-          _hover={editable ? { bg: 'whiteAlpha.100' } : {}}
-          _dark={{ _hover: editable ? { bg: 'whiteAlpha.50' } : {} }}
-        >
-          <HStack gap={1}>
-            <Text fontSize="xs" color="text.tertiary" fontWeight="normal">Mode:</Text>
-            <Text fontSize="xs" color="text.secondary" fontWeight="medium">{modeLabel}</Text>
-          </HStack>
-        </Button>
+        {/* Right: Mode toggle + Panel toggle */}
+        <HStack gap={1}>
+          <Button
+            variant="ghost"
+            size="sm"
+            px={3}
+            bg="transparent"
+            onClick={editable ? handleModeToggle : undefined}
+            cursor={editable ? 'pointer' : 'default'}
+            _hover={editable ? { bg: 'whiteAlpha.100' } : {}}
+            _dark={{ _hover: editable ? { bg: 'whiteAlpha.50' } : {} }}
+          >
+            <HStack gap={1}>
+              <Text fontSize="xs" color="text.tertiary" fontWeight="normal">Mode:</Text>
+              <Text fontSize="xs" color="text.secondary" fontWeight="medium">{modeLabel}</Text>
+            </HStack>
+          </Button>
+
+          {onTogglePanel && (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              onClick={onTogglePanel}
+              aria-label={isPanelOpen ? "Close side panel" : "Open side panel"}
+              css={{
+                borderRadius: '10px',
+                color: "text.secondary",
+                _hover: {
+                  bg: colorMode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                },
+              }}
+            >
+              <Icon boxSize={4}>
+                {isPanelOpen ? <LuPanelRightClose /> : <LuPanelRightOpen />}
+              </Icon>
+            </IconButton>
+          )}
+        </HStack>
 
       </HStack>
     </Box>

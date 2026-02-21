@@ -1,10 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Box, Portal } from '@chakra-ui/react';
+import { Box, Flex, Portal, Text, VStack, HStack, Icon, Textarea, IconButton } from '@chakra-ui/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LuLink, LuChevronDown, LuNotebook, LuCopy, LuCheck } from 'react-icons/lu';
 import { listen } from '@tauri-apps/api/event';
 import { ResourceFile } from '@/types/resource';
 import { KitFrontMatter } from '@/ipc';
 import { useColorMode } from '@/shared/contexts/ColorModeContext';
-import { heading1Color } from '@/theme';
+import { titleColor } from '@/theme';
 import { NoteViewHeader } from '@/features/workstation/components/NoteViewHeader';
 import { FrontMatterProperties } from '@/features/workstation/components/FrontMatterProperties';
 import SearchInMarkdown from '@/features/workstation/components/SearchInMarkdown';
@@ -63,6 +65,38 @@ export default function NoteViewPage({
   const { isSearchOpen, setIsSearchOpen } = useWorkstation();
   const editorRef = useRef<ObsidianEditorRef>(null);
   const isRenamingRef = useRef(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const togglePanel = useCallback(() => setIsPanelOpen(prev => !prev), []);
+
+  // Side panel state
+  const [isLinkedTasksExpanded, setIsLinkedTasksExpanded] = useState(true);
+  const [isNotesExpanded, setIsNotesExpanded] = useState(true);
+  const [panelNotes, setPanelNotes] = useState('');
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+  const notesKey = `bluekit-note-notes-${resource.path}`;
+
+  // Load notes from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(notesKey);
+    setPanelNotes(saved ?? '');
+  }, [notesKey]);
+
+  // Auto-save notes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(notesKey, panelNotes); } catch { /* ignore */ }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [panelNotes, notesKey]);
+
+  const copyNotes = useCallback(async () => {
+    if (!panelNotes) return;
+    try {
+      await navigator.clipboard.writeText(panelNotes);
+      setCopiedNoteId('current');
+      setTimeout(() => setCopiedNoteId(null), 2000);
+    } catch { /* ignore */ }
+  }, [panelNotes]);
 
   // State for sibling navigation
   const [siblingFiles, setSiblingFiles] = useState<ResourceFile[]>([]);
@@ -263,7 +297,7 @@ export default function NoteViewPage({
   // Title input rendered as headerSlot — consistent across all modes
   const titleSlot = (
     <Box w="100%">
-      <Box css={{ padding: '20px 40px 4px 40px' }}>
+      <Box css={{ padding: '20px 40px 4px 40px', maxWidth: '830px', marginLeft: 'auto', marginRight: 'auto' }}>
         <input
           type="text"
           value={title}
@@ -281,7 +315,7 @@ export default function NoteViewPage({
             fontSize: '1.875rem',
             fontWeight: 700,
             lineHeight: 1.3,
-            color: isLight ? heading1Color.light : heading1Color.dark,
+            color: isLight ? titleColor.light : titleColor.dark,
             textShadow: isLight
               ? '0 1px 2px rgba(0,0,0,0.1)'
               : '0 1px 2px rgba(0,0,0,0.5)',
@@ -302,32 +336,187 @@ export default function NoteViewPage({
   );
 
   return (
-    <Box h="100%" w="100%" display="flex" flexDirection="column">
-      <NoteViewHeader
-        resource={resource}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        editable={editable}
-        onNavigatePrev={handleNavigatePrev}
-        onNavigateNext={handleNavigateNext}
-        canNavigatePrev={canNavigatePrev}
-        canNavigateNext={canNavigateNext}
-      />
-
-      <Box flex={1} overflow="hidden">
-        <ObsidianEditor
-          ref={editorRef}
-          initialContent={body}
-          mode={editorMode}
-          showModeToggle={false}
-          onChange={handleBodyChange}
-          onSave={handleSave}
-          colorMode={colorMode}
-          placeholder="Start writing..."
-          headerSlot={titleSlot}
-          contentId="markdown-content-container"
+    <Flex h="100%" w="100%" overflow="hidden">
+      {/* Main Content Area */}
+      <Box flex={1} h="100%" display="flex" flexDirection="column" minW={0}>
+        <NoteViewHeader
+          resource={resource}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          editable={editable}
+          onNavigatePrev={handleNavigatePrev}
+          onNavigateNext={handleNavigateNext}
+          canNavigatePrev={canNavigatePrev}
+          canNavigateNext={canNavigateNext}
+          isPanelOpen={isPanelOpen}
+          onTogglePanel={togglePanel}
         />
+
+        <Box flex={1} overflow="hidden">
+          <ObsidianEditor
+            ref={editorRef}
+            initialContent={body}
+            mode={editorMode}
+            showModeToggle={false}
+            onChange={handleBodyChange}
+            onSave={handleSave}
+            colorMode={colorMode}
+            placeholder="Start writing..."
+            headerSlot={titleSlot}
+            contentId="markdown-content-container"
+          />
+        </Box>
       </Box>
+
+      {/* Side Panel */}
+      {isPanelOpen && (
+        <Box
+          w="480px"
+          h="100%"
+          overflow="hidden"
+          position="relative"
+          display="flex"
+          flexDirection="column"
+          css={{
+            background: isLight ? '#EBEFF7' : 'rgba(255, 255, 255, 0.05)',
+            borderWidth: '0px',
+            borderLeftWidth: '1px',
+            borderColor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+            borderRadius: '0px',
+            boxShadow: 'none',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <VStack
+            flex="1"
+            minH={0}
+            p={4}
+            align="stretch"
+            gap={4}
+            overflowY="auto"
+          >
+            {/* Linked Tasks Section */}
+            <VStack align="stretch" gap={3}>
+              <HStack
+                gap={2}
+                color="text.secondary"
+                cursor="pointer"
+                onClick={() => setIsLinkedTasksExpanded(!isLinkedTasksExpanded)}
+              >
+                <Icon
+                  size="sm"
+                  transform={isLinkedTasksExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
+                  transition="transform 0.2s ease"
+                >
+                  <LuChevronDown />
+                </Icon>
+                <Icon size="sm">
+                  <LuLink />
+                </Icon>
+                <Text fontSize="sm" fontWeight="medium">
+                  Linked Tasks (0)
+                </Text>
+              </HStack>
+              <AnimatePresence>
+                {isLinkedTasksExpanded && (
+                  <motion.div
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <VStack
+                      align="center"
+                      justify="center"
+                      gap={2}
+                      py={10}
+                      borderRadius="10px"
+                      css={{
+                        border: '1px dashed',
+                        borderColor: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.1)',
+                      }}
+                    >
+                      <Text fontSize="sm" color="text.tertiary" textAlign="center">
+                        No linked tasks yet
+                      </Text>
+                      <Text fontSize="xs" color="text.tertiary" textAlign="center" maxW="200px">
+                        Link tasks to this note to track related work
+                      </Text>
+                    </VStack>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </VStack>
+
+            {/* Notes Section */}
+            <VStack align="stretch" gap={3}>
+              <Flex justify="space-between" align="center">
+                <HStack
+                  gap={2}
+                  color="text.secondary"
+                  cursor="pointer"
+                  onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                >
+                  <Icon
+                    size="sm"
+                    transform={isNotesExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
+                    transition="transform 0.2s ease"
+                  >
+                    <LuChevronDown />
+                  </Icon>
+                  <Icon size="sm">
+                    <LuNotebook />
+                  </Icon>
+                  <Text fontSize="sm" fontWeight="medium">Notes</Text>
+                </HStack>
+                {panelNotes && (
+                  <IconButton
+                    aria-label="Copy notes"
+                    variant="ghost"
+                    size="xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyNotes();
+                    }}
+                  >
+                    <Icon>
+                      {copiedNoteId === 'current' ? <LuCheck /> : <LuCopy />}
+                    </Icon>
+                  </IconButton>
+                )}
+              </Flex>
+              <AnimatePresence>
+                {isNotesExpanded && (
+                  <motion.div
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <VStack align="stretch" gap={1}>
+                      <Textarea
+                        value={panelNotes}
+                        onChange={(e) => setPanelNotes(e.target.value)}
+                        placeholder="Take notes about this document..."
+                        rows={6}
+                        resize="vertical"
+                        css={{
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <Text fontSize="xs" color="text.tertiary" textAlign="right">
+                        Auto-saved
+                      </Text>
+                    </VStack>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </VStack>
+          </VStack>
+        </Box>
+      )}
 
       {/* Search */}
       <Portal>
@@ -340,6 +529,6 @@ export default function NoteViewPage({
           />
         )}
       </Portal>
-    </Box>
+    </Flex>
   );
 }

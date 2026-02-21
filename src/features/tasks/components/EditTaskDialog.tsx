@@ -217,7 +217,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                 </Dialog.CloseTrigger>
               </Dialog.Header>
 
-              <Dialog.Body pt={4}>
+              <Dialog.Body pt={4} overflowY="auto" maxH="70vh">
                 <MotionVStack
                   align="stretch"
                   gap={5}
@@ -295,9 +295,10 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                         Status
                       </Text>
                       <SegmentGroup.Root
-                        value={status}
-                        onValueChange={(e) => setStatus(e.value as TaskStatus)}
-                      >
+                          value={status}
+                          onValueChange={(e) => setStatus(e.value as TaskStatus)}
+                          w="fit-content"
+                        >
                         <SegmentGroup.Indicator />
                         <SegmentGroup.Items
                           items={[
@@ -357,6 +358,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                           value={priority}
                           onValueChange={(e) => setPriority(e.value as TaskPriority)}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items
@@ -430,6 +432,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                           value={complexity || undefined}
                           onValueChange={(e) => setComplexity(e.value as TaskComplexity | '')}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items
@@ -451,6 +454,7 @@ export default function EditTaskDialog({ task, isOpen, onClose, onTaskUpdated }:
                           value={type || undefined}
                           onValueChange={(e) => setType(e.value as TaskType | '')}
                           size="sm"
+                          w="fit-content"
                         >
                           <SegmentGroup.Indicator />
                           <SegmentGroup.Items
